@@ -23,4 +23,8 @@ _testmain.go
 *.exe
 *.test
 *.prof
+cscope*
+vendor/*
+wallet.dat
+glide.lock
 

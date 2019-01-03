@@ -1,0 +1,190 @@
+package dsp_go_sdk
+
+import (
+	"encoding/hex"
+	"fmt"
+	"math/rand"
+	"time"
+
+	"github.com/oniio/dsp-go-sdk/client"
+	"github.com/oniio/dsp-go-sdk/utils"
+	"github.com/oniio/oniChain/common"
+	sign "github.com/oniio/oniChain/common"
+	"github.com/oniio/oniChain/common/constants"
+	"github.com/oniio/oniChain/core/payload"
+	"github.com/oniio/oniChain/core/types"
+	"github.com/oniio/oniChain/crypto/keypair"
+)
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+type DspSdk struct {
+	client.ClientMgr
+	Native *NativeContract
+	NeoVM  *NeoVMContract
+}
+
+//NewDspSdk return DspSdk.
+func NewDspSdk() *DspSdk {
+	dspSdk := &DspSdk{}
+	native := newNativeContract(dspSdk)
+	dspSdk.Native = native
+	neoVM := newNeoVMContract(dspSdk)
+	dspSdk.NeoVM = neoVM
+	return dspSdk
+}
+
+//CreateWallet return a new wallet
+func (this *DspSdk) CreateWallet(walletFile string) (*Wallet, error) {
+	if utils.IsFileExist(walletFile) {
+		return nil, fmt.Errorf("wallet:%s has already exist", walletFile)
+	}
+	return OpenWallet(walletFile)
+}
+
+//OpenWallet return a wallet instance
+func (this *DspSdk) OpenWallet(walletFile string) (*Wallet, error) {
+	return OpenWallet(walletFile)
+}
+
+//NewInvokeTransaction return smart contract invoke transaction
+func (this *DspSdk) NewInvokeTransaction(gasPrice, gasLimit uint64, invokeCode []byte) *types.MutableTransaction {
+	invokePayload := &payload.InvokeCode{
+		Code: invokeCode,
+	}
+	tx := &types.MutableTransaction{
+		GasPrice: gasPrice,
+		GasLimit: gasLimit,
+		TxType:   types.Invoke,
+		Nonce:    rand.Uint32(),
+		Payload:  invokePayload,
+		Sigs:     make([]types.Sig, 0, 0),
+	}
+	return tx
+}
+
+func (this *DspSdk) SignToTransaction(tx *types.MutableTransaction, signer Signer) error {
+	if tx.Payer == common.ADDRESS_EMPTY {
+		account, ok := signer.(*Account)
+		if ok {
+			tx.Payer = account.Address
+		}
+	}
+	for _, sigs := range tx.Sigs {
+		if utils.PubKeysEqual([]keypair.PublicKey{signer.GetPublicKey()}, sigs.PubKeys) {
+			//have already signed
+			return nil
+		}
+	}
+	txHash := tx.Hash()
+	sigData, err := signer.Sign(txHash.ToArray())
+	if err != nil {
+		return fmt.Errorf("sign error:%s", err)
+	}
+	if tx.Sigs == nil {
+		tx.Sigs = make([]types.Sig, 0)
+	}
+	tx.Sigs = append(tx.Sigs, types.Sig{
+		PubKeys: []keypair.PublicKey{signer.GetPublicKey()},
+		M:       1,
+		SigData: [][]byte{sigData},
+	})
+	return nil
+}
+
+func (this *DspSdk) MultiSignToTransaction(tx *types.MutableTransaction, m uint16, pubKeys []keypair.PublicKey, signer Signer) error {
+	pkSize := len(pubKeys)
+	if m == 0 || int(m) > pkSize || pkSize > constants.MULTI_SIG_MAX_PUBKEY_SIZE {
+		return fmt.Errorf("both m and number of pub key must larger than 0, and small than %d, and m must smaller than pub key number", constants.MULTI_SIG_MAX_PUBKEY_SIZE)
+	}
+	validPubKey := false
+	for _, pk := range pubKeys {
+		if keypair.ComparePublicKey(pk, signer.GetPublicKey()) {
+			validPubKey = true
+			break
+		}
+	}
+	if !validPubKey {
+		return fmt.Errorf("invalid signer")
+	}
+	if tx.Payer == common.ADDRESS_EMPTY {
+		payer, err := types.AddressFromMultiPubKeys(pubKeys, int(m))
+		if err != nil {
+			return fmt.Errorf("AddressFromMultiPubKeys error:%s", err)
+		}
+		tx.Payer = payer
+	}
+	txHash := tx.Hash()
+	if len(tx.Sigs) == 0 {
+		tx.Sigs = make([]types.Sig, 0)
+	}
+	sigData, err := signer.Sign(txHash.ToArray())
+	if err != nil {
+		return fmt.Errorf("sign error:%s", err)
+	}
+	hasMutilSig := false
+	for i, sigs := range tx.Sigs {
+		if utils.PubKeysEqual(sigs.PubKeys, pubKeys) {
+			hasMutilSig = true
+			if utils.HasAlreadySig(txHash.ToArray(), signer.GetPublicKey(), sigs.SigData) {
+				break
+			}
+			sigs.SigData = append(sigs.SigData, sigData)
+			tx.Sigs[i] = sigs
+			break
+		}
+	}
+	if !hasMutilSig {
+		tx.Sigs = append(tx.Sigs, types.Sig{
+			PubKeys: pubKeys,
+			M:       m,
+			SigData: [][]byte{sigData},
+		})
+	}
+	return nil
+}
+
+func (this *DspSdk) GetTxData(tx *types.MutableTransaction) (string, error) {
+	txData, err := tx.IntoImmutable()
+	if err != nil {
+		return "", fmt.Errorf("IntoImmutable error:%s", err)
+	}
+	sink := sign.ZeroCopySink{}
+	err = txData.Serialization(&sink)
+	if err != nil {
+		return "", fmt.Errorf("tx serialization error:%s", err)
+	}
+	rawtx := hex.EncodeToString(sink.Bytes())
+	return rawtx, nil
+}
+
+func (this *DspSdk) GetMutableTx(rawTx string) (*types.MutableTransaction, error) {
+	txData, err := hex.DecodeString(rawTx)
+	if err != nil {
+		return nil, fmt.Errorf("RawTx hex decode error:%s", err)
+	}
+	tx, err := types.TransactionFromRawBytes(txData)
+	if err != nil {
+		return nil, fmt.Errorf("TransactionFromRawBytes error:%s", err)
+	}
+	mutTx, err := tx.IntoMutable()
+	if err != nil {
+		return nil, fmt.Errorf("[ONT]IntoMutable error:%s", err)
+	}
+	return mutTx, nil
+}
+
+func (this *DspSdk) GetMultiAddr(pubkeys []keypair.PublicKey, m int) (string, error) {
+	addr, err := types.AddressFromMultiPubKeys(pubkeys, m)
+	if err != nil {
+		return "", fmt.Errorf("GetMultiAddrs error:%s", err)
+	}
+	return addr.ToBase58(), nil
+}
+
+func (this *DspSdk) GetAdddrByPubKey(pubKey keypair.PublicKey) string {
+	address := types.AddressFromPubKey(pubKey)
+	return address.ToBase58()
+}
