@@ -1,4 +1,4 @@
-package dns
+package contract
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	dns "github.com/oniio/oniChain/smartcontract/service/native/dns"
 )
 
-var walletPath = "../wallet.dat"
-var pwd = []byte("123456")
+var walletPath = "./wallet.dat"
+var pwd = []byte("pwd")
 var rpc_addr = "http://127.0.0.1:20336"
 
 func init() {
