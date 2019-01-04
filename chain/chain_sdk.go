@@ -1,4 +1,4 @@
-package dsp_go_sdk
+package chain_sdk
 
 import (
 	"encoding/hex"
@@ -6,8 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/client"
-	"github.com/oniio/dsp-go-sdk/utils"
+	"github.com/oniio/dsp-go-sdk/chain/client"
+	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/common"
 	sign "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/constants"
@@ -20,24 +20,24 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-type DspSdk struct {
+type ChainSdk struct {
 	client.ClientMgr
 	Native *NativeContract
 	NeoVM  *NeoVMContract
 }
 
-//NewDspSdk return DspSdk.
-func NewDspSdk() *DspSdk {
-	dspSdk := &DspSdk{}
-	native := newNativeContract(dspSdk)
-	dspSdk.Native = native
-	neoVM := newNeoVMContract(dspSdk)
-	dspSdk.NeoVM = neoVM
-	return dspSdk
+//NewChainSdk return ChainSdk.
+func NewChainSdk() *ChainSdk {
+	chainSdk := &ChainSdk{}
+	native := newNativeContract(chainSdk)
+	chainSdk.Native = native
+	neoVM := newNeoVMContract(chainSdk)
+	chainSdk.NeoVM = neoVM
+	return chainSdk
 }
 
 //CreateWallet return a new wallet
-func (this *DspSdk) CreateWallet(walletFile string) (*Wallet, error) {
+func (this *ChainSdk) CreateWallet(walletFile string) (*Wallet, error) {
 	if utils.IsFileExist(walletFile) {
 		return nil, fmt.Errorf("wallet:%s has already exist", walletFile)
 	}
@@ -45,12 +45,12 @@ func (this *DspSdk) CreateWallet(walletFile string) (*Wallet, error) {
 }
 
 //OpenWallet return a wallet instance
-func (this *DspSdk) OpenWallet(walletFile string) (*Wallet, error) {
+func (this *ChainSdk) OpenWallet(walletFile string) (*Wallet, error) {
 	return OpenWallet(walletFile)
 }
 
 //NewInvokeTransaction return smart contract invoke transaction
-func (this *DspSdk) NewInvokeTransaction(gasPrice, gasLimit uint64, invokeCode []byte) *types.MutableTransaction {
+func (this *ChainSdk) NewInvokeTransaction(gasPrice, gasLimit uint64, invokeCode []byte) *types.MutableTransaction {
 	invokePayload := &payload.InvokeCode{
 		Code: invokeCode,
 	}
@@ -65,7 +65,7 @@ func (this *DspSdk) NewInvokeTransaction(gasPrice, gasLimit uint64, invokeCode [
 	return tx
 }
 
-func (this *DspSdk) SignToTransaction(tx *types.MutableTransaction, signer Signer) error {
+func (this *ChainSdk) SignToTransaction(tx *types.MutableTransaction, signer Signer) error {
 	if tx.Payer == common.ADDRESS_EMPTY {
 		account, ok := signer.(*Account)
 		if ok {
@@ -94,7 +94,7 @@ func (this *DspSdk) SignToTransaction(tx *types.MutableTransaction, signer Signe
 	return nil
 }
 
-func (this *DspSdk) MultiSignToTransaction(tx *types.MutableTransaction, m uint16, pubKeys []keypair.PublicKey, signer Signer) error {
+func (this *ChainSdk) MultiSignToTransaction(tx *types.MutableTransaction, m uint16, pubKeys []keypair.PublicKey, signer Signer) error {
 	pkSize := len(pubKeys)
 	if m == 0 || int(m) > pkSize || pkSize > constants.MULTI_SIG_MAX_PUBKEY_SIZE {
 		return fmt.Errorf("both m and number of pub key must larger than 0, and small than %d, and m must smaller than pub key number", constants.MULTI_SIG_MAX_PUBKEY_SIZE)
@@ -146,7 +146,7 @@ func (this *DspSdk) MultiSignToTransaction(tx *types.MutableTransaction, m uint1
 	return nil
 }
 
-func (this *DspSdk) GetTxData(tx *types.MutableTransaction) (string, error) {
+func (this *ChainSdk) GetTxData(tx *types.MutableTransaction) (string, error) {
 	txData, err := tx.IntoImmutable()
 	if err != nil {
 		return "", fmt.Errorf("IntoImmutable error:%s", err)
@@ -160,7 +160,7 @@ func (this *DspSdk) GetTxData(tx *types.MutableTransaction) (string, error) {
 	return rawtx, nil
 }
 
-func (this *DspSdk) GetMutableTx(rawTx string) (*types.MutableTransaction, error) {
+func (this *ChainSdk) GetMutableTx(rawTx string) (*types.MutableTransaction, error) {
 	txData, err := hex.DecodeString(rawTx)
 	if err != nil {
 		return nil, fmt.Errorf("RawTx hex decode error:%s", err)
@@ -176,7 +176,7 @@ func (this *DspSdk) GetMutableTx(rawTx string) (*types.MutableTransaction, error
 	return mutTx, nil
 }
 
-func (this *DspSdk) GetMultiAddr(pubkeys []keypair.PublicKey, m int) (string, error) {
+func (this *ChainSdk) GetMultiAddr(pubkeys []keypair.PublicKey, m int) (string, error) {
 	addr, err := types.AddressFromMultiPubKeys(pubkeys, m)
 	if err != nil {
 		return "", fmt.Errorf("GetMultiAddrs error:%s", err)
@@ -184,7 +184,7 @@ func (this *DspSdk) GetMultiAddr(pubkeys []keypair.PublicKey, m int) (string, er
 	return addr.ToBase58(), nil
 }
 
-func (this *DspSdk) GetAdddrByPubKey(pubKey keypair.PublicKey) string {
+func (this *ChainSdk) GetAdddrByPubKey(pubKey keypair.PublicKey) string {
 	address := types.AddressFromPubKey(pubKey)
 	return address.ToBase58()
 }

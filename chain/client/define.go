@@ -7,7 +7,7 @@ import (
 	"github.com/oniio/oniChain/core/types"
 )
 
-type DspClient interface {
+type ChainClient interface {
 	getCurrentBlockHeight(qid string) ([]byte, error)
 	getCurrentBlockHash(qid string) ([]byte, error)
 	getVersion(qid string) ([]byte, error)

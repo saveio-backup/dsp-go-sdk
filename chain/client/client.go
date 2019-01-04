@@ -1,13 +1,14 @@
 package client
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"time"
 
-	sdkcom "github.com/oniio/dsp-go-sdk/common"
-	"github.com/oniio/dsp-go-sdk/utils"
+	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
+	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/core/types"
 )
@@ -16,7 +17,7 @@ type ClientMgr struct {
 	rpc       *RpcClient  //Rpc client used the rpc api of oniChain
 	rest      *RestClient //Rest client used the rest api of oniChain
 	ws        *WSClient   //Web socket client used the web socket api of oniChain
-	defClient DspClient
+	defClient ChainClient
 	qid       uint64
 }
 
@@ -48,7 +49,7 @@ func (this *ClientMgr) GetWebSocketClient() *WSClient {
 	return this.ws
 }
 
-func (this *ClientMgr) SetDefaultClient(client DspClient) {
+func (this *ClientMgr) SetDefaultClient(client ChainClient) {
 	this.defClient = client
 }
 
@@ -326,7 +327,28 @@ func (this *ClientMgr) WaitForGenerateBlock(timeout time.Duration, blockCount ..
 	return false, fmt.Errorf("timeout after %d (s)", secs)
 }
 
-func (this *ClientMgr) getClient() DspClient {
+// PollForTxConfirmed Poll tx for confirmation.
+func (this *ClientMgr) PollForTxConfirmed(timeout time.Duration, txHash []byte) (bool, error) {
+	if len(txHash) == 0 {
+		return false, fmt.Errorf("txHash is empty")
+	}
+	txHashStr := hex.EncodeToString(common.ToArrayReverse(txHash))
+	secs := int(timeout / time.Second)
+	if secs <= 0 {
+		secs = 1
+	}
+	for i := 0; i < secs; i++ {
+		time.Sleep(time.Second)
+		ret, err := this.GetBlockHeightByTxHash(txHashStr)
+		if err != nil || ret == 0 {
+			continue
+		}
+		return true, nil
+	}
+	return false, fmt.Errorf("timeout after %d (s)", secs)
+}
+
+func (this *ClientMgr) getClient() ChainClient {
 	if this.defClient != nil {
 		return this.defClient
 	}

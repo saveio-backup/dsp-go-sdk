@@ -1,4 +1,4 @@
-package dsp_go_sdk
+package chain_sdk
 
 import (
 	"encoding/hex"
@@ -35,7 +35,7 @@ type Wallet struct {
 	identityLabelMap map[string]*Identity
 	defIdentity      *Identity
 	path             string
-	dspSdk           *DspSdk
+	chainSdk         *ChainSdk
 	lock             sync.RWMutex
 }
 

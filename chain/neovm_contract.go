@@ -1,11 +1,11 @@
-package dsp_go_sdk
+package chain_sdk
 
 import (
 	"encoding/hex"
 	"fmt"
 	"time"
 
-	sdkcom "github.com/oniio/dsp-go-sdk/common"
+	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/core/payload"
 	"github.com/oniio/oniChain/core/types"
@@ -13,12 +13,12 @@ import (
 )
 
 type NeoVMContract struct {
-	dspSdk *DspSdk
+	chainSdk *ChainSdk
 }
 
-func newNeoVMContract(dspSdk *DspSdk) *NeoVMContract {
+func newNeoVMContract(chainSdk *ChainSdk) *NeoVMContract {
 	return &NeoVMContract{
-		dspSdk: dspSdk,
+		chainSdk: chainSdk,
 	}
 }
 
@@ -70,11 +70,11 @@ func (this *NeoVMContract) DeployNeoVMSmartContract(
 		Email:       email,
 		Description: desc,
 	})
-	err = this.dspSdk.SignToTransaction(tx, singer)
+	err = this.chainSdk.SignToTransaction(tx, singer)
 	if err != nil {
 		return common.Uint256{}, err
 	}
-	txHash, err := this.dspSdk.SendTransaction(tx)
+	txHash, err := this.chainSdk.SendTransaction(tx)
 	if err != nil {
 		return common.Uint256{}, fmt.Errorf("SendRawTransaction error:%s", err)
 	}
@@ -91,7 +91,7 @@ func (this *NeoVMContract) NewNeoVMInvokeTransaction(
 	if err != nil {
 		return nil, err
 	}
-	return this.dspSdk.NewInvokeTransaction(gasPrice, gasLimit, invokeCode), nil
+	return this.chainSdk.NewInvokeTransaction(gasPrice, gasLimit, invokeCode), nil
 }
 
 func (this *NeoVMContract) InvokeNeoVMContract(
@@ -104,11 +104,11 @@ func (this *NeoVMContract) InvokeNeoVMContract(
 	if err != nil {
 		return common.UINT256_EMPTY, fmt.Errorf("NewNeoVMInvokeTransaction error:%s", err)
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *NeoVMContract) PreExecInvokeNeoVMContract(
@@ -118,5 +118,5 @@ func (this *NeoVMContract) PreExecInvokeNeoVMContract(
 	if err != nil {
 		return nil, err
 	}
-	return this.dspSdk.PreExecTransaction(tx)
+	return this.chainSdk.PreExecTransaction(tx)
 }

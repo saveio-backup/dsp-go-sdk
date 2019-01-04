@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	sdkcom "github.com/oniio/dsp-go-sdk/common"
-	"github.com/oniio/dsp-go-sdk/utils"
+	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
+	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/core/types"
 )
 

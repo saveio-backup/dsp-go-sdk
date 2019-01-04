@@ -9,7 +9,7 @@ import (
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/core/payload"
 	"github.com/oniio/oniChain/core/types"
-	sdkcom "github.com/oniio/dsp-go-sdk/common"
+	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
 )
 
 func GetVersion(data []byte) (string, error) {

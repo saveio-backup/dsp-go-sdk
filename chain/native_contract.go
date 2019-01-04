@@ -1,12 +1,12 @@
-package dsp_go_sdk
+package chain_sdk
 
 import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
 
-	sdkcom "github.com/oniio/dsp-go-sdk/common"
-	"github.com/oniio/dsp-go-sdk/utils"
+	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
+	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/serialization"
 	"github.com/oniio/oniChain/core/types"
@@ -35,7 +35,7 @@ var (
 )
 
 type NativeContract struct {
-	dspSdk       *DspSdk
+	chainSdk     *ChainSdk
 	Ont          *Ont
 	Ong          *Ong
 	OntId        *OntId
@@ -43,13 +43,13 @@ type NativeContract struct {
 	Auth         *Auth
 }
 
-func newNativeContract(dspSdk *DspSdk) *NativeContract {
-	native := &NativeContract{dspSdk: dspSdk}
-	native.Ont = &Ont{native: native, dspSdk: dspSdk}
-	native.Ong = &Ong{native: native, dspSdk: dspSdk}
-	native.OntId = &OntId{native: native, dspSdk: dspSdk}
-	native.GlobalParams = &GlobalParam{native: native, dspSdk: dspSdk}
-	native.Auth = &Auth{native: native, dspSdk: dspSdk}
+func newNativeContract(chainSdk *ChainSdk) *NativeContract {
+	native := &NativeContract{chainSdk: chainSdk}
+	native.Ont = &Ont{native: native, chainSdk: chainSdk}
+	native.Ong = &Ong{native: native, chainSdk: chainSdk}
+	native.OntId = &OntId{native: native, chainSdk: chainSdk}
+	native.GlobalParams = &GlobalParam{native: native, chainSdk: chainSdk}
+	native.Auth = &Auth{native: native, chainSdk: chainSdk}
 	return native
 }
 
@@ -72,7 +72,7 @@ func (this *NativeContract) NewNativeInvokeTransaction(
 	if err != nil {
 		return nil, fmt.Errorf("BuildNativeInvokeCode error:%s", err)
 	}
-	return this.dspSdk.NewInvokeTransaction(gasPrice, gasLimit, invokeCode), nil
+	return this.chainSdk.NewInvokeTransaction(gasPrice, gasLimit, invokeCode), nil
 }
 
 func (this *NativeContract) InvokeNativeContract(
@@ -88,11 +88,11 @@ func (this *NativeContract) InvokeNativeContract(
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, singer)
+	err = this.chainSdk.SignToTransaction(tx, singer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *NativeContract) PreExecInvokeNativeContract(
@@ -105,12 +105,12 @@ func (this *NativeContract) PreExecInvokeNativeContract(
 	if err != nil {
 		return nil, err
 	}
-	return this.dspSdk.PreExecTransaction(tx)
+	return this.chainSdk.PreExecTransaction(tx)
 }
 
 type Ont struct {
-	dspSdk *DspSdk
-	native *NativeContract
+	chainSdk *ChainSdk
+	native   *NativeContract
 }
 
 func (this *Ont) NewTransferTransaction(gasPrice, gasLimit uint64, from, to common.Address, amount uint64) (*types.MutableTransaction, error) {
@@ -127,11 +127,11 @@ func (this *Ont) Transfer(gasPrice, gasLimit uint64, from *Account, to common.Ad
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, from)
+	err = this.chainSdk.SignToTransaction(tx, from)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ont) NewMultiTransferTransaction(gasPrice, gasLimit uint64, states []*ont.State) (*types.MutableTransaction, error) {
@@ -149,11 +149,11 @@ func (this *Ont) MultiTransfer(gasPrice, gasLimit uint64, states []*ont.State, s
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ont) NewTransferFromTransaction(gasPrice, gasLimit uint64, sender, from, to common.Address, amount uint64) (*types.MutableTransaction, error) {
@@ -178,11 +178,11 @@ func (this *Ont) TransferFrom(gasPrice, gasLimit uint64, sender *Account, from, 
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, sender)
+	err = this.chainSdk.SignToTransaction(tx, sender)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ont) NewApproveTransaction(gasPrice, gasLimit uint64, from, to common.Address, amount uint64) (*types.MutableTransaction, error) {
@@ -206,11 +206,11 @@ func (this *Ont) Approve(gasPrice, gasLimit uint64, from *Account, to common.Add
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, from)
+	err = this.chainSdk.SignToTransaction(tx, from)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ont) Allowance(from, to common.Address) (uint64, error) {
@@ -312,8 +312,8 @@ func (this *Ont) TotalSupply() (uint64, error) {
 }
 
 type Ong struct {
-	dspSdk *DspSdk
-	native *NativeContract
+	chainSdk *ChainSdk
+	native   *NativeContract
 }
 
 func (this *Ong) NewTransferTransaction(gasPrice, gasLimit uint64, from, to common.Address, amount uint64) (*types.MutableTransaction, error) {
@@ -330,11 +330,11 @@ func (this *Ong) Transfer(gasPrice, gasLimit uint64, from *Account, to common.Ad
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, from)
+	err = this.chainSdk.SignToTransaction(tx, from)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ong) NewMultiTransferTransaction(gasPrice, gasLimit uint64, states []*ont.State) (*types.MutableTransaction, error) {
@@ -352,11 +352,11 @@ func (this *Ong) MultiTransfer(gasPrice, gasLimit uint64, states []*ont.State, s
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ong) NewTransferFromTransaction(gasPrice, gasLimit uint64, sender, from, to common.Address, amount uint64) (*types.MutableTransaction, error) {
@@ -381,11 +381,11 @@ func (this *Ong) TransferFrom(gasPrice, gasLimit uint64, sender *Account, from, 
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, sender)
+	err = this.chainSdk.SignToTransaction(tx, sender)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ong) NewWithdrawONGTransaction(gasPrice, gasLimit uint64, address common.Address, amount uint64) (*types.MutableTransaction, error) {
@@ -397,11 +397,11 @@ func (this *Ong) WithdrawONG(gasPrice, gasLimit uint64, address *Account, amount
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, address)
+	err = this.chainSdk.SignToTransaction(tx, address)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ong) NewApproveTransaction(gasPrice, gasLimit uint64, from, to common.Address, amount uint64) (*types.MutableTransaction, error) {
@@ -425,11 +425,11 @@ func (this *Ong) Approve(gasPrice, gasLimit uint64, from *Account, to common.Add
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, from)
+	err = this.chainSdk.SignToTransaction(tx, from)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Ong) Allowance(from, to common.Address) (uint64, error) {
@@ -535,8 +535,8 @@ func (this *Ong) TotalSupply() (uint64, error) {
 }
 
 type OntId struct {
-	dspSdk *DspSdk
-	native *NativeContract
+	chainSdk *ChainSdk
+	native   *NativeContract
 }
 
 func (this *OntId) NewRegIDWithPublicKeyTransaction(gasPrice, gasLimit uint64, ontId string, pubKey keypair.PublicKey) (*types.MutableTransaction, error) {
@@ -564,15 +564,15 @@ func (this *OntId) RegIDWithPublicKey(gasPrice, gasLimit uint64, signer *Account
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *OntId) NewRegIDWithAttributesTransaction(gasPrice, gasLimit uint64, ontId string, pubKey keypair.PublicKey, attributes []*DDOAttribute) (*types.MutableTransaction, error) {
@@ -602,15 +602,15 @@ func (this *OntId) RegIDWithAttributes(gasPrice, gasLimit uint64, signer *Accoun
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *OntId) GetDDO(ontId string) (*DDO, error) {
@@ -689,15 +689,15 @@ func (this *OntId) AddKey(gasPrice, gasLimit uint64, ontId string, signer *Accou
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *OntId) NewRevokeKeyTransaction(gasPrice, gasLimit uint64, ontId string, removedPubKey, pubKey keypair.PublicKey) (*types.MutableTransaction, error) {
@@ -727,15 +727,15 @@ func (this *OntId) RevokeKey(gasPrice, gasLimit uint64, ontId string, signer *Ac
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *OntId) NewSetRecoveryTransaction(gasPrice, gasLimit uint64, ontId string, recovery common.Address, pubKey keypair.PublicKey) (*types.MutableTransaction, error) {
@@ -764,15 +764,15 @@ func (this *OntId) SetRecovery(gasPrice, gasLimit uint64, signer *Account, ontId
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *OntId) NewChangeRecoveryTransaction(gasPrice, gasLimit uint64, ontId string, newRecovery, oldRecovery common.Address) (*types.MutableTransaction, error) {
@@ -801,15 +801,15 @@ func (this *OntId) ChangeRecovery(gasPrice, gasLimit uint64, signer *Account, on
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *OntId) NewAddAttributesTransaction(gasPrice, gasLimit uint64, ontId string, attributes []*DDOAttribute, pubKey keypair.PublicKey) (*types.MutableTransaction, error) {
@@ -838,16 +838,16 @@ func (this *OntId) AddAttributes(gasPrice, gasLimit uint64, signer *Account, ont
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *OntId) NewRemoveAttributeTransaction(gasPrice, gasLimit uint64, ontId string, key []byte, pubKey keypair.PublicKey) (*types.MutableTransaction, error) {
@@ -876,16 +876,16 @@ func (this *OntId) RemoveAttribute(gasPrice, gasLimit uint64, signer *Account, o
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *OntId) GetAttributes(ontId string) ([]*DDOAttribute, error) {
@@ -946,11 +946,11 @@ func (this *OntId) VerifySignature(ontId string, keyIndex int, controller *Contr
 	if err != nil {
 		return false, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, controller)
+	err = this.chainSdk.SignToTransaction(tx, controller)
 	if err != nil {
 		return false, err
 	}
-	preResult, err := this.dspSdk.PreExecTransaction(tx)
+	preResult, err := this.chainSdk.PreExecTransaction(tx)
 	if err != nil {
 		return false, err
 	}
@@ -1030,8 +1030,8 @@ func (this *OntId) GetKeyState(ontId string, keyIndex int) (string, error) {
 }
 
 type GlobalParam struct {
-	dspSdk *DspSdk
-	native *NativeContract
+	chainSdk *ChainSdk
+	native   *NativeContract
 }
 
 func (this *GlobalParam) GetGlobalParams(params []string) (map[string]string, error) {
@@ -1082,11 +1082,11 @@ func (this *GlobalParam) SetGlobalParams(gasPrice, gasLimit uint64, signer *Acco
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *GlobalParam) NewTransferAdminTransaction(gasPrice, gasLimit uint64, newAdmin common.Address) (*types.MutableTransaction, error) {
@@ -1104,11 +1104,11 @@ func (this *GlobalParam) TransferAdmin(gasPrice, gasLimit uint64, signer *Accoun
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *GlobalParam) NewAcceptAdminTransaction(gasPrice, gasLimit uint64, admin common.Address) (*types.MutableTransaction, error) {
@@ -1126,11 +1126,11 @@ func (this *GlobalParam) AcceptAdmin(gasPrice, gasLimit uint64, signer *Account)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *GlobalParam) NewSetOperatorTransaction(gasPrice, gasLimit uint64, operator common.Address) (*types.MutableTransaction, error) {
@@ -1149,11 +1149,11 @@ func (this *GlobalParam) SetOperator(gasPrice, gasLimit uint64, signer *Account,
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *GlobalParam) NewCreateSnapshotTransaction(gasPrice, gasLimit uint64) (*types.MutableTransaction, error) {
@@ -1172,16 +1172,16 @@ func (this *GlobalParam) CreateSnapshot(gasPrice, gasLimit uint64, signer *Accou
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 type Auth struct {
-	dspSdk *DspSdk
-	native *NativeContract
+	chainSdk *ChainSdk
+	native   *NativeContract
 }
 
 func (this *Auth) NewAssignFuncsToRoleTransaction(gasPrice, gasLimit uint64, contractAddress common.Address, adminId, role []byte, funcNames []string, keyIndex int) (*types.MutableTransaction, error) {
@@ -1205,11 +1205,11 @@ func (this *Auth) AssignFuncsToRole(gasPrice, gasLimit uint64, contractAddress c
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Auth) NewDelegateTransaction(gasPrice, gasLimit uint64, contractAddress common.Address, from, to, role []byte, period, level, keyIndex int) (*types.MutableTransaction, error) {
@@ -1235,11 +1235,11 @@ func (this *Auth) Delegate(gasPrice, gasLimit uint64, signer *Account, contractA
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Auth) NewWithdrawTransaction(gasPrice, gasLimit uint64, contractAddress common.Address, initiator, delegate, role []byte, keyIndex int) (*types.MutableTransaction, error) {
@@ -1263,11 +1263,11 @@ func (this *Auth) Withdraw(gasPrice, gasLimit uint64, signer *Account, contractA
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Auth) NewAssignOntIDsToRoleTransaction(gasPrice, gasLimit uint64, contractAddress common.Address, admontId, role []byte, persons [][]byte, keyIndex int) (*types.MutableTransaction, error) {
@@ -1291,11 +1291,11 @@ func (this *Auth) AssignOntIDsToRole(gasPrice, gasLimit uint64, signer *Account,
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Auth) NewTransferTransaction(gasPrice, gasLimit uint64, contractAddress common.Address, newAdminId []byte, keyIndex int) (*types.MutableTransaction, error) {
@@ -1317,11 +1317,11 @@ func (this *Auth) Transfer(gasPrice, gasLimit uint64, signer *Account, contractA
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }
 
 func (this *Auth) NewVerifyTokenTransaction(gasPrice, gasLimit uint64, contractAddress common.Address, caller []byte, funcName string, keyIndex int) (*types.MutableTransaction, error) {
@@ -1344,9 +1344,9 @@ func (this *Auth) VerifyToken(gasPrice, gasLimit uint64, signer *Account, contra
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	err = this.dspSdk.SignToTransaction(tx, signer)
+	err = this.chainSdk.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.dspSdk.SendTransaction(tx)
+	return this.chainSdk.SendTransaction(tx)
 }

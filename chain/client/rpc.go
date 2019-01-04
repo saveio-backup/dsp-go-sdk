@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/utils"
+	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/core/types"
 )
 

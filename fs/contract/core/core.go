@@ -2,12 +2,11 @@ package core
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
 
-	dsp "github.com/oniio/dsp-go-sdk"
+	chain "github.com/oniio/dsp-go-sdk/chain"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/crypto/PDP"
 	"github.com/oniio/oniChain/crypto/keypair"
@@ -26,9 +25,9 @@ type OntFs struct {
 	WalletAddr    common.Address
 	GasPrice      uint64
 	GasLimit      uint64
-	DspSdk        *dsp.DspSdk
-	Wallet        *dsp.Wallet
-	DefAcc        *dsp.Account
+	ChainSdk      *chain.ChainSdk
+	Wallet        *chain.Wallet
+	DefAcc        *chain.Account
 	OntRpcSrvAddr string
 }
 
@@ -42,12 +41,12 @@ func Init(walletPath string, walletPwd string, ontRpcSrvAddr string) *OntFs {
 		OntRpcSrvAddr: ontRpcSrvAddr,
 	}
 
-	ontFs.DspSdk = dsp.NewDspSdk()
-	ontFs.DspSdk.NewRpcClient().SetAddress(ontFs.OntRpcSrvAddr)
+	ontFs.ChainSdk = chain.NewChainSdk()
+	ontFs.ChainSdk.NewRpcClient().SetAddress(ontFs.OntRpcSrvAddr)
 
 	if len(walletPath) != 0 {
 		var err error
-		ontFs.Wallet, err = ontFs.DspSdk.OpenWallet(ontFs.WalletPath)
+		ontFs.Wallet, err = ontFs.ChainSdk.OpenWallet(ontFs.WalletPath)
 		if err != nil {
 			fmt.Printf("Account.Open error:%s\n", err)
 			return nil
@@ -70,7 +69,7 @@ func (d *OntFs) OntFsInit(fsGasPrice, gasPerKBPerBlock, gasPerKBForRead, gasForC
 	if d.DefAcc == nil {
 		return nil, errors.New("DefAcc is nil")
 	}
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
 		contractVersion, contractAddr, fs.FS_INIT,
 		[]interface{}{&fs.FsSetting{FsGasPrice: fsGasPrice,
 			GasPerKBPerBlock: gasPerKBPerBlock,
@@ -87,7 +86,7 @@ func (d *OntFs) OntFsInit(fsGasPrice, gasPerKBPerBlock, gasPerKBForRead, gasForC
 }
 
 func (d *OntFs) GetSetting() (*fs.FsSetting, error) {
-	ret, err := d.DspSdk.Native.PreExecInvokeNativeContract(
+	ret, err := d.ChainSdk.Native.PreExecInvokeNativeContract(
 		contractAddr, contractVersion, fs.FS_GETSETTING, []interface{}{},
 	)
 	if err != nil {
@@ -113,7 +112,7 @@ func (d *OntFs) GetSetting() (*fs.FsSetting, error) {
 }
 
 func (d *OntFs) GetNodeList() (*fs.FsNodesInfo, error) {
-	ret, err := d.DspSdk.Native.PreExecInvokeNativeContract(
+	ret, err := d.ChainSdk.Native.PreExecInvokeNativeContract(
 		contractAddr, contractVersion, fs.FS_GET_NODE_LIST, []interface{}{},
 	)
 	if err != nil {
@@ -140,7 +139,7 @@ func (d *OntFs) NodeRegister(volume uint64, serviceTime uint64, nodeAddr string)
 	if d.DefAcc == nil {
 		return nil, errors.New("DefAcc is nil")
 	}
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
 		contractVersion, contractAddr, fs.FS_NODE_REGISTER,
 		[]interface{}{&fs.FsNodeInfo{Pledge: 0, Profit: 0, Volume: volume, RestVol: 0,
 			ServiceTime: serviceTime, WalletAddr: d.WalletAddr, NodeAddr: []byte(nodeAddr)}},
@@ -152,7 +151,7 @@ func (d *OntFs) NodeRegister(volume uint64, serviceTime uint64, nodeAddr string)
 }
 
 func (d *OntFs) NodeQuery(nodeWallet common.Address) (*fs.FsNodeInfo, error) {
-	ret, err := d.DspSdk.Native.PreExecInvokeNativeContract(
+	ret, err := d.ChainSdk.Native.PreExecInvokeNativeContract(
 		contractAddr, contractVersion, fs.FS_NODE_QUERY, []interface{}{nodeWallet},
 	)
 	if err != nil {
@@ -181,7 +180,7 @@ func (d *OntFs) NodeUpdate(volume uint64, serviceTime uint64, nodeAddr string) (
 	if d.DefAcc == nil {
 		return nil, errors.New("DefAcc is nil")
 	}
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
 		contractVersion, contractAddr, fs.FS_NODE_UPDATE,
 		[]interface{}{&fs.FsNodeInfo{Pledge: 0, Profit: 0, Volume: volume, RestVol: 0,
 			ServiceTime: serviceTime, WalletAddr: d.WalletAddr, NodeAddr: []byte(nodeAddr)}},
@@ -196,7 +195,7 @@ func (d *OntFs) NodeCancel() ([]byte, error) {
 	if d.DefAcc == nil {
 		return nil, errors.New("DefAcc is nil")
 	}
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
 		contractVersion, contractAddr, fs.FS_NODE_CANCEL,
 		[]interface{}{d.WalletAddr},
 	)
@@ -210,7 +209,7 @@ func (d *OntFs) NodeWithDrawProfit() ([]byte, error) {
 	if d.DefAcc == nil {
 		return nil, errors.New("DefAcc is nil")
 	}
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
 		contractVersion, contractAddr, fs.FS_NODE_WITH_DRAW_PROFIT,
 		[]interface{}{d.WalletAddr},
 	)
@@ -222,7 +221,7 @@ func (d *OntFs) NodeWithDrawProfit() ([]byte, error) {
 
 func (d *OntFs) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
 	fileHash := []byte(fileHashStr)
-	ret, err := d.DspSdk.Native.PreExecInvokeNativeContract(contractAddr, contractVersion,
+	ret, err := d.ChainSdk.Native.PreExecInvokeNativeContract(contractAddr, contractVersion,
 		fs.FS_GET_FILE_INFO, []interface{}{fileHash},
 	)
 	if err != nil {
@@ -253,7 +252,7 @@ func (d *OntFs) FileProve(fileHashStr string, multiRes []byte, addResStr string,
 	}
 	fileHash := []byte(fileHashStr)
 	addRes := []byte(addResStr)
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit,
 		d.DefAcc, contractVersion, contractAddr, fs.FS_FILE_PROVE,
 		[]interface{}{&fs.FileProve{FileHash: fileHash,
 			MultiRes:    multiRes,
@@ -278,7 +277,7 @@ func (d *OntFs) FileBackProve(fileHashStr string, multiRes []byte, addResStr str
 	}
 	fileHash := []byte(fileHashStr)
 	addRes := []byte(addResStr)
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit,
 		d.DefAcc, contractVersion, contractAddr, fs.FS_FILE_PROVE,
 		[]interface{}{&fs.FileProve{FileHash: fileHash,
 			MultiRes:     multiRes,
@@ -303,7 +302,7 @@ func (d *OntFs) GetFileReadPledge(fileHashStr string, readFromAddr common.Addres
 		FileHash: fileHash,
 		FromAddr: readFromAddr,
 	}
-	ret, err := d.DspSdk.Native.PreExecInvokeNativeContract(contractAddr, contractVersion,
+	ret, err := d.ChainSdk.Native.PreExecInvokeNativeContract(contractAddr, contractVersion,
 		fs.FS_GET_FILE_READ_PLEDGE, []interface{}{getReadPledge},
 	)
 	if err != nil {
@@ -334,7 +333,7 @@ func (d *OntFs) GetFileReadPledge(fileHashStr string, readFromAddr common.Addres
 }
 
 func (d *OntFs) GetExpiredProveList() (*fs.BakTasks, error) {
-	ret, err := d.DspSdk.Native.PreExecInvokeNativeContract(contractAddr, contractVersion,
+	ret, err := d.ChainSdk.Native.PreExecInvokeNativeContract(contractAddr, contractVersion,
 		fs.FS_GET_EXPIRED_PROVE_LIST, []interface{}{},
 	)
 	if err != nil {
@@ -360,7 +359,7 @@ func (d *OntFs) GetExpiredProveList() (*fs.BakTasks, error) {
 
 func (d *OntFs) GetFileProveDetails(fileHashStr string) (*fs.FsProveDetails, error) {
 	fileHash := []byte(fileHashStr)
-	ret, err := d.DspSdk.Native.PreExecInvokeNativeContract(contractAddr, contractVersion,
+	ret, err := d.ChainSdk.Native.PreExecInvokeNativeContract(contractAddr, contractVersion,
 		fs.FS_GET_FILE_PROVE_DETAILS, []interface{}{fileHash},
 	)
 	if err != nil {
@@ -401,7 +400,7 @@ func (d *OntFs) FileReadPledge(fileHashStr string, readPlans fs.ReadPlan) ([]byt
 		RestMoney:    0,
 		ReadRecord:   buf.Bytes(),
 	}
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
 		contractVersion, contractAddr, fs.FS_READ_FILE_PLEDGE, []interface{}{fileReadPledge},
 	)
 	if err != nil {
@@ -419,7 +418,7 @@ func (d *OntFs) CancelFileRead(fileHashStr string) ([]byte, error) {
 		FileHash: fileHash,
 		FromAddr: d.WalletAddr,
 	}
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit, d.DefAcc,
 		contractVersion, contractAddr, fs.FS_CANCLE_FILE_READ, []interface{}{getReadPledge},
 	)
 	if err != nil {
@@ -453,7 +452,7 @@ func (d *OntFs) FileReadProfitSettle(fileReadSettleSlice fs.FileReadSettleSlice)
 	if d.DefAcc == nil {
 		return nil, errors.New("DefAcc is nil")
 	}
-	ret, err := d.DspSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit,
+	ret, err := d.ChainSdk.Native.InvokeNativeContract(d.GasPrice, d.GasLimit,
 		d.DefAcc, contractVersion, contractAddr, fs.FS_FILE_READ_PROFIT_SETTLE,
 		[]interface{}{&fileReadSettleSlice},
 	)
@@ -528,21 +527,5 @@ func (d *OntFs) GenChallenge(walletAddr common.Address, hash common.Uint256, fil
 }
 
 func (d *OntFs) PollForTxConfirmed(timeout time.Duration, txHash []byte) (bool, error) {
-	if len(txHash) == 0 {
-		return false, fmt.Errorf("txHash is empty")
-	}
-	txHashStr := hex.EncodeToString(common.ToArrayReverse(txHash))
-	secs := int(timeout / time.Second)
-	if secs <= 0 {
-		secs = 1
-	}
-	for i := 0; i < secs; i++ {
-		time.Sleep(time.Second)
-		ret, err := d.DspSdk.GetBlockHeightByTxHash(txHashStr)
-		if err != nil || ret == 0 {
-			continue
-		}
-		return true, nil
-	}
-	return false, fmt.Errorf("timeout after %d (s)", secs)
+	return d.ChainSdk.PollForTxConfirmed(timeout, txHash)
 }

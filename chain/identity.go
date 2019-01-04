@@ -1,4 +1,4 @@
-package dsp_go_sdk
+package chain_sdk
 
 import (
 	"bytes"
