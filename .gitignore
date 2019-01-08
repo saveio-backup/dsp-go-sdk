@@ -4,10 +4,6 @@
 *.a
 *.so
 
-# Folders
-_obj
-_test
-
 # Architecture specific extensions/prefixes
 *.[568vq]
 [568vq].out

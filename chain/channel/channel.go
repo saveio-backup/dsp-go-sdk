@@ -1,78 +1,67 @@
-package contract
+package channel
 
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 
-	chain "github.com/oniio/dsp-go-sdk/chain"
+	"github.com/oniio/dsp-go-sdk/chain/account"
+	"github.com/oniio/dsp-go-sdk/chain/client"
+	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
+	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/smartcontract/service/native/micropayment"
-	"github.com/oniio/oniChain/smartcontract/service/native/utils"
+	sutils "github.com/oniio/oniChain/smartcontract/service/native/utils"
 	"github.com/oniio/oniChain/vm/neovm/types"
 )
 
-// Micropaymenet contract const
-const (
-	MPAY_CONTRACT_VERSION = byte(0)
-	DEFALUT_GAS_PRICE     = 0
-	DEFAULT_GAS_LIMIT     = 30000
+var (
+	CHANNEL_CONTRACT_ADDRESS, _ = utils.AddressFromHexString("0900000000000000000000000000000000000000")
+	CHANNEL_CONTRACT_VERSION    = byte(0)
 )
 
-type MicroPayment struct {
-	ChainSdk *chain.ChainSdk
-	DefAcc   *chain.Account
-	gasPrice uint64
-	gasLimit uint64
-	version  byte
+type Channel struct {
+	Client *client.ClientMgr
+	DefAcc *account.Account
 }
 
-func InitMicroPayment(acc *chain.Account, rpcSvrAddr string) *MicroPayment {
-	sdk := chain.NewChainSdk()
-	sdk.NewRpcClient().SetAddress(rpcSvrAddr)
-	return &MicroPayment{
-		ChainSdk: sdk,
-		DefAcc:   acc,
-		gasPrice: DEFALUT_GAS_PRICE,
-		gasLimit: DEFAULT_GAS_LIMIT,
-		version:  MPAY_CONTRACT_VERSION,
+func (this *Channel) InvokeNativeContract(signer *account.Account, method string, params []interface{}) (common.Uint256, error) {
+	if signer == nil {
+		return common.UINT256_EMPTY, errors.New("signer is nil")
 	}
+	tx, err := utils.NewNativeInvokeTransaction(sdkcom.GAS_PRICE, sdkcom.GAS_LIMIT, CHANNEL_CONTRACT_VERSION, CHANNEL_CONTRACT_ADDRESS, method, params)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = utils.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.Client.SendTransaction(tx)
 }
 
-func (this *MicroPayment) SetGasPrice(gasPrice uint64) {
-	this.gasPrice = gasPrice
+func (this *Channel) PreExecInvokeNativeContract(method string, params []interface{}) (*sdkcom.PreExecResult, error) {
+	tx, err := utils.NewNativeInvokeTransaction(0, 0, CHANNEL_CONTRACT_VERSION, CHANNEL_CONTRACT_ADDRESS, method, params)
+	if err != nil {
+		return nil, err
+	}
+	return this.Client.PreExecTransaction(tx)
 }
 
-func (this *MicroPayment) SetGasLimit(gasLimit uint64) {
-	this.gasLimit = gasLimit
-}
-
-func (this *MicroPayment) SetVersion(version byte) {
-	this.version = version
-}
-
-func (this *MicroPayment) GetContractAddress() common.Address {
-	return utils.MicroPayContractAddress
-}
-
-func (this *MicroPayment) GetVersion() byte {
-	return this.version
-}
-
-func (this *MicroPayment) RegisterPaymentEndPoint(ip, port []byte, regAccount common.Address) ([]byte, error) {
+func (this *Channel) RegisterPaymentEndPoint(ip, port []byte, regAccount common.Address) ([]byte, error) {
 	params := &micropayment.NodeInfo{
 		WalletAddr: regAccount,
 		IP:         ip,
 		Port:       port,
 	}
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+	tx, err := this.InvokeNativeContract(
+
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
+
 		micropayment.MP_ENDPOINT_REGISTRY,
 		[]interface{}{params},
 	)
@@ -83,18 +72,14 @@ func (this *MicroPayment) RegisterPaymentEndPoint(ip, port []byte, regAccount co
 	return tx[:], nil
 }
 
-func (this *MicroPayment) OpenChannel(wallet1Addr, wallet2Addr common.Address, blockHeight uint64) ([]byte, error) {
+func (this *Channel) OpenChannel(wallet1Addr, wallet2Addr common.Address, blockHeight uint64) ([]byte, error) {
 	params := &micropayment.OpenChannelInfo{
 		Participant1WalletAddr: wallet1Addr,
 		Participant2WalletAddr: wallet2Addr,
 		SettleBlockHeight:      blockHeight,
 	}
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+	tx, err := this.InvokeNativeContract(
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
 		micropayment.MP_OPEN_CHANNEL,
 		[]interface{}{params},
 	)
@@ -105,19 +90,15 @@ func (this *MicroPayment) OpenChannel(wallet1Addr, wallet2Addr common.Address, b
 	return tx[:], nil
 }
 
-func (this *MicroPayment) SetTotalDeposit(channelId uint64, participantWalletAddr common.Address, partnerWalletAddr common.Address, deposit uint64) ([]byte, error) {
+func (this *Channel) SetTotalDeposit(channelId uint64, participantWalletAddr common.Address, partnerWalletAddr common.Address, deposit uint64) ([]byte, error) {
 	params := &micropayment.SetTotalDepositInfo{
 		ChannelID:             channelId,
 		ParticipantWalletAddr: participantWalletAddr,
 		PartnerWalletAddr:     partnerWalletAddr,
 		SetTotalDeposit:       deposit,
 	}
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+	tx, err := this.InvokeNativeContract(
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
 		micropayment.MP_SET_TOTALDEPOSIT,
 		[]interface{}{params},
 	)
@@ -127,7 +108,7 @@ func (this *MicroPayment) SetTotalDeposit(channelId uint64, participantWalletAdd
 	}
 	return tx[:], nil
 }
-func (this *MicroPayment) SetTotalWithdraw(channelID uint64, participant, partner common.Address, totalWithdraw uint64, participantSig, participantPubKey, partnerSig, partnerPubKey []byte) ([]byte, error) {
+func (this *Channel) SetTotalWithdraw(channelID uint64, participant, partner common.Address, totalWithdraw uint64, participantSig, participantPubKey, partnerSig, partnerPubKey []byte) ([]byte, error) {
 	params := &micropayment.WithDraw{
 		ChannelID:         channelID,
 		Participant:       participant,
@@ -138,12 +119,10 @@ func (this *MicroPayment) SetTotalWithdraw(channelID uint64, participant, partne
 		PartnerSig:        partnerSig,
 		PartnerPubKey:     partnerPubKey,
 	}
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+	tx, err := this.InvokeNativeContract(
+
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
+
 		micropayment.MP_SET_TOTALWITHDRAW,
 		[]interface{}{params},
 	)
@@ -153,7 +132,7 @@ func (this *MicroPayment) SetTotalWithdraw(channelID uint64, participant, partne
 	}
 	return tx[:], nil
 }
-func (this *MicroPayment) CooperativeSettle(channelID uint64, participant1Address common.Address, participant1Balance uint64, participant2Address common.Address, participant2Balance uint64, participant1Signature, participant1PubKey, participant2Signature, participant2PubKey []byte) ([]byte, error) {
+func (this *Channel) CooperativeSettle(channelID uint64, participant1Address common.Address, participant1Balance uint64, participant2Address common.Address, participant2Balance uint64, participant1Signature, participant1PubKey, participant2Signature, participant2PubKey []byte) ([]byte, error) {
 	params := &micropayment.CooperativeSettleInfo{
 		ChannelID:             channelID,
 		Participant1Address:   participant1Address,
@@ -165,12 +144,10 @@ func (this *MicroPayment) CooperativeSettle(channelID uint64, participant1Addres
 		Participant2Signature: participant2Signature,
 		Participant2PubKey:    participant2PubKey,
 	}
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+	tx, err := this.InvokeNativeContract(
+
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
+
 		micropayment.MP_COOPERATIVESETTLE,
 		[]interface{}{params},
 	)
@@ -180,7 +157,7 @@ func (this *MicroPayment) CooperativeSettle(channelID uint64, participant1Addres
 	}
 	return tx[:], nil
 }
-func (this *MicroPayment) CloseChannel(channelID uint64, participantAddress, partnerAddress common.Address, balanceHash []byte, nonce uint64, additionalHash, partnerSignature, partnerPubKey []byte) ([]byte, error) {
+func (this *Channel) CloseChannel(channelID uint64, participantAddress, partnerAddress common.Address, balanceHash []byte, nonce uint64, additionalHash, partnerSignature, partnerPubKey []byte) ([]byte, error) {
 	params := &micropayment.CloseChannelInfo{
 		ChannelID:          channelID,
 		ParticipantAddress: participantAddress,
@@ -191,12 +168,10 @@ func (this *MicroPayment) CloseChannel(channelID uint64, participantAddress, par
 		PartnerSignature:   partnerSignature,
 		PartnerPubKey:      partnerPubKey,
 	}
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+	tx, err := this.InvokeNativeContract(
+
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
+
 		micropayment.MP_CLOSE_CHANNEL,
 		[]interface{}{params},
 	)
@@ -206,13 +181,11 @@ func (this *MicroPayment) CloseChannel(channelID uint64, participantAddress, par
 	}
 	return tx[:], nil
 }
-func (this *MicroPayment) RegisterSecret(secret []byte) ([]byte, error) {
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+func (this *Channel) RegisterSecret(secret []byte) ([]byte, error) {
+	tx, err := this.InvokeNativeContract(
+
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
+
 		micropayment.MP_SECRET_REG,
 		[]interface{}{secret},
 	)
@@ -223,13 +196,11 @@ func (this *MicroPayment) RegisterSecret(secret []byte) ([]byte, error) {
 
 	return tx[:], nil
 }
-func (this *MicroPayment) RegisterSecretBatch(secrets []byte) ([]byte, error) {
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+func (this *Channel) RegisterSecretBatch(secrets []byte) ([]byte, error) {
+	tx, err := this.InvokeNativeContract(
+
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
+
 		micropayment.MP_SECRET_REG_BATCH,
 		[]interface{}{secrets},
 	)
@@ -240,10 +211,9 @@ func (this *MicroPayment) RegisterSecretBatch(secrets []byte) ([]byte, error) {
 	return tx[:], nil
 }
 
-func (this *MicroPayment) GetSecretRevealBlockHeight(secretHash []byte) (uint64, error) {
-	ret, err := this.ChainSdk.Native.PreExecInvokeNativeContract(
-		this.GetContractAddress(),
-		this.version,
+func (this *Channel) GetSecretRevealBlockHeight(secretHash []byte) (uint64, error) {
+	ret, err := this.PreExecInvokeNativeContract(
+
 		micropayment.MP_GET_SECRET_REVEAL_BLOCKHEIGHT,
 		[]interface{}{secretHash},
 	)
@@ -261,7 +231,7 @@ func (this *MicroPayment) GetSecretRevealBlockHeight(secretHash []byte) (uint64,
 	}
 	return height, nil
 }
-func (this *MicroPayment) UpdateNonClosingBalanceProof(chanID uint64, closeParticipant, nonCloseParticipant common.Address, balanceHash []byte, nonce uint64, additionalHash, closeSignature, nonCloseSignature, closePubKey, nonClosePubKey []byte) ([]byte, error) {
+func (this *Channel) UpdateNonClosingBalanceProof(chanID uint64, closeParticipant, nonCloseParticipant common.Address, balanceHash []byte, nonce uint64, additionalHash, closeSignature, nonCloseSignature, closePubKey, nonClosePubKey []byte) ([]byte, error) {
 	params := &micropayment.UpdateNonCloseBalanceProof{
 		ChanID:              chanID,
 		CloseParticipant:    closeParticipant,
@@ -274,12 +244,10 @@ func (this *MicroPayment) UpdateNonClosingBalanceProof(chanID uint64, closeParti
 		ClosePubKey:         closePubKey,
 		NonClosePubKey:      nonClosePubKey,
 	}
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+	tx, err := this.InvokeNativeContract(
+
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
+
 		micropayment.MP_UPDATE_NONCLOSING_BPF,
 		[]interface{}{params},
 	)
@@ -291,7 +259,7 @@ func (this *MicroPayment) UpdateNonClosingBalanceProof(chanID uint64, closeParti
 	return tx[:], nil
 }
 
-func (this *MicroPayment) SettleChannel(chanID uint64, participant1 common.Address, p1TransferredAmount, p1LockedAmount uint64, p1LocksRoot []byte, participant2 common.Address, p2TransferredAmount, p2LockedAmount uint64, p2LocksRoot []byte) ([]byte, error) {
+func (this *Channel) SettleChannel(chanID uint64, participant1 common.Address, p1TransferredAmount, p1LockedAmount uint64, p1LocksRoot []byte, participant2 common.Address, p2TransferredAmount, p2LockedAmount uint64, p2LocksRoot []byte) ([]byte, error) {
 	params := &micropayment.SettleChannelInfo{
 		ChanID:              chanID,
 		Participant1:        participant1,
@@ -303,12 +271,10 @@ func (this *MicroPayment) SettleChannel(chanID uint64, participant1 common.Addre
 		P2LockedAmount:      p2LockedAmount,
 		P2LocksRoot:         p2LocksRoot,
 	}
-	tx, err := this.ChainSdk.Native.InvokeNativeContract(
-		this.gasPrice,
-		this.gasLimit,
+	tx, err := this.InvokeNativeContract(
+
 		this.DefAcc,
-		this.version,
-		this.GetContractAddress(),
+
 		micropayment.MP_SETTLE_CHANNEL,
 		[]interface{}{params},
 	)
@@ -320,16 +286,15 @@ func (this *MicroPayment) SettleChannel(chanID uint64, participant1 common.Addre
 	return tx[:], nil
 }
 
-func (this *MicroPayment) GetChannelInfo(channelID uint64, participant1, participant2 common.Address) (*micropayment.ChannelInfo, error) {
+func (this *Channel) GetChannelInfo(channelID uint64, participant1, participant2 common.Address) (*micropayment.ChannelInfo, error) {
 	params := &micropayment.GetChanInfo{
 		ChannelID:    channelID,
 		Participant1: participant1,
 		Participant2: participant2,
 	}
 
-	ret, err := this.ChainSdk.Native.PreExecInvokeNativeContract(
-		this.GetContractAddress(),
-		this.version,
+	ret, err := this.PreExecInvokeNativeContract(
+
 		micropayment.MP_GET_CHANNELINFO,
 		[]interface{}{params},
 	)
@@ -344,27 +309,26 @@ func (this *MicroPayment) GetChannelInfo(channelID uint64, participant1, partici
 	}
 	channelInfo := &micropayment.ChannelInfo{}
 	source := common.NewZeroCopySource(buf)
-	channelInfo.SettleBlockHeight, err = utils.DecodeVarUint(source)
+	channelInfo.SettleBlockHeight, err = sutils.DecodeVarUint(source)
 	if err != nil {
 		return nil, err
 	}
-	channelInfo.ChannelState, err = utils.DecodeVarUint(source)
+	channelInfo.ChannelState, err = sutils.DecodeVarUint(source)
 	if err != nil {
 		return nil, err
 	}
 	return channelInfo, nil
 }
 
-func (this *MicroPayment) GetChannelParticipantInfo(channelID uint64, participant1, participant2 common.Address) (*micropayment.Participant, error) {
+func (this *Channel) GetChannelParticipantInfo(channelID uint64, participant1, participant2 common.Address) (*micropayment.Participant, error) {
 	params := &micropayment.GetChanInfo{
 		ChannelID:    channelID,
 		Participant1: participant1,
 		Participant2: participant2,
 	}
 
-	ret, err := this.ChainSdk.Native.PreExecInvokeNativeContract(
-		this.GetContractAddress(),
-		this.version,
+	ret, err := this.PreExecInvokeNativeContract(
+
 		micropayment.MP_GET_CHANNEL_PARTICIPANTINFO,
 		[]interface{}{params},
 	)
@@ -386,19 +350,10 @@ func (this *MicroPayment) GetChannelParticipantInfo(channelID uint64, participan
 	return participant, nil
 }
 
-func (this *MicroPayment) GetOntBalance(address common.Address) (uint64, error) {
-	return this.ChainSdk.Native.Ont.BalanceOf(address)
-}
-
-func (this *MicroPayment) GetOngBalance(address common.Address) (uint64, error) {
-	return this.ChainSdk.Native.Ong.BalanceOf(address)
-}
-
 // GetEndpointByAddress get endpoint by user wallet address
-func (this *MicroPayment) GetEndpointByAddress(nodeAddress common.Address) (*micropayment.NodeInfo, error) {
-	ret, err := this.ChainSdk.Native.PreExecInvokeNativeContract(
-		this.GetContractAddress(),
-		this.version,
+func (this *Channel) GetEndpointByAddress(nodeAddress common.Address) (*micropayment.NodeInfo, error) {
+	ret, err := this.PreExecInvokeNativeContract(
+
 		micropayment.MP_FIND_ENDPOINT,
 		[]interface{}{nodeAddress},
 	)
@@ -420,14 +375,13 @@ func (this *MicroPayment) GetEndpointByAddress(nodeAddress common.Address) (*mic
 	return nodeInfo, nil
 }
 
-func (this *MicroPayment) GetChannelIdentifier(participant1WalletAddr, participant2WalletAddr common.Address) (uint64, error) {
+func (this *Channel) GetChannelIdentifier(participant1WalletAddr, participant2WalletAddr common.Address) (uint64, error) {
 	params := &micropayment.GetChannelId{
 		Participant1WalletAddr: participant1WalletAddr,
 		Participant2WalletAddr: participant2WalletAddr,
 	}
-	ret, err := this.ChainSdk.Native.PreExecInvokeNativeContract(
-		this.GetContractAddress(),
-		this.version,
+	ret, err := this.PreExecInvokeNativeContract(
+
 		micropayment.MP_GET_CHANNELID,
 		[]interface{}{params},
 	)
@@ -442,4 +396,60 @@ func (this *MicroPayment) GetChannelIdentifier(participant1WalletAddr, participa
 	fmt.Printf("buf:%v\n", buf)
 	valStr := fmt.Sprintf("%s", types.BigIntFromBytes(buf))
 	return strconv.ParseUint(valStr, 10, 64)
+}
+
+func (this *Channel) GetFilterArgsForAllEventsFromChannel(chanID int, fromBlock, toBlock uint32) ([]map[string]interface{}, error) {
+	toBlockUint := uint32(toBlock)
+	currentH, _ := this.Client.GetCurrentBlockHeight()
+	if toBlockUint > currentH {
+		return nil, fmt.Errorf("toBlock bigger than currentBlockHeight:%d", currentH)
+	} else if toBlockUint == 0 {
+		toBlockUint = currentH
+	} else if uint32(fromBlock) > toBlockUint {
+		return nil, errors.New("fromBlock bigger than toBlock")
+	}
+	var eventRe = make([]map[string]interface{}, 0)
+	for bc := uint32(fromBlock); bc <= toBlockUint; bc++ {
+		raws, err := this.Client.GetSmartContractEventByBlock(bc)
+		if err != nil {
+			log.Errorf("get smart contract result by block err, msg:%s", err)
+			return nil, err
+		}
+		if len(raws) == 0 {
+			continue
+		}
+		for _, r := range raws {
+			buf, err := json.Marshal(r)
+			if err != nil {
+				log.Errorf("json marshal result err:%s", err)
+				return nil, err
+			}
+			result, err := utils.GetSmartContractEvent(buf)
+			if err != nil {
+				log.Errorf("GetSmartContractEvent[rawResult Unmarshal] err: %s", err)
+				return nil, err
+			}
+			if result == nil {
+				log.Errorf("rawResult Unmarshal return nil")
+				continue
+			}
+			for _, notify := range result.Notify {
+				if _, ok := notify.States.(map[string]interface{}); !ok {
+					continue
+				}
+				eventRe = append(eventRe, notify.States.(map[string]interface{}))
+			}
+		}
+	}
+	return eventRe, nil
+}
+
+// GetAllFilterArgsForAllEventsFromChannel get all events from fromBlock to current block height
+// return a slice of map[string]interface{}
+func (this *Channel) GetAllFilterArgsForAllEventsFromChannel(chanID int, fromBlock uint32) ([]map[string]interface{}, error) {
+	height, err := this.Client.GetCurrentBlockHeight()
+	if err != nil {
+		return nil, err
+	}
+	return this.GetFilterArgsForAllEventsFromChannel(chanID, fromBlock, height)
 }

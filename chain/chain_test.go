@@ -1,27 +1,30 @@
-package chain_sdk
+package chain
 
 import (
 	"fmt"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/oniio/dsp-go-sdk/chain/account"
+	"github.com/oniio/dsp-go-sdk/chain/wallet"
 )
 
 var (
-	testChainSdk *ChainSdk
-	testWallet   *Wallet
+	testChain    *Chain
+	testWallet   *wallet.Wallet
 	testPasswd   = []byte("pwd")
-	testDefAcc   *Account
+	testDefAcc   *account.Account
 	testGasPrice = uint64(0)
 	testGasLimit = uint64(20000)
 )
 
 func TestMain(m *testing.M) {
-	testChainSdk = NewChainSdk()
-	testChainSdk.NewRpcClient().SetAddress("http://localhost:20336")
+	testChain = NewChain()
+	testChain.NewRpcClient().SetAddress("http://localhost:20336")
 
 	var err error
-	testWallet, err = testChainSdk.OpenWallet("./wallet.dat")
+	testWallet, err = testChain.OpenWallet("./wallet.dat")
 	if err != nil {
 		fmt.Printf("account.Open error:%s\n", err)
 		return
@@ -32,7 +35,7 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	ws := testChainSdk.NewWebSocketClient()
+	ws := testChain.NewWebSocketClient()
 	err = ws.Connect("ws://localhost:20335")
 	if err != nil {
 		fmt.Printf("Connect ws error:%s", err)
@@ -42,13 +45,13 @@ func TestMain(m *testing.M) {
 }
 
 func TestOnt_Transfer(t *testing.T) {
-	txHash, err := testChainSdk.Native.Ont.Transfer(testGasPrice, testGasLimit, testDefAcc, testDefAcc.Address, 1)
+	txHash, err := testChain.Native.Ont.Transfer(testGasPrice, testGasLimit, testDefAcc, testDefAcc.Address, 1)
 	if err != nil {
 		t.Errorf("NewTransferTransaction error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	evts, err := testChainSdk.GetSmartContractEvent(txHash.ToHexString())
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	evts, err := testChain.GetSmartContractEvent(txHash.ToHexString())
 	if err != nil {
 		t.Errorf("GetSmartContractEvent error:%s", err)
 		return
@@ -63,13 +66,13 @@ func TestOnt_Transfer(t *testing.T) {
 }
 
 func TestOng_WithDrawONG(t *testing.T) {
-	unboundONG, err := testChainSdk.Native.Ong.UnboundONG(testDefAcc.Address)
+	unboundONG, err := testChain.Native.Ong.UnboundONG(testDefAcc.Address)
 	if err != nil {
 		t.Errorf("UnboundONG error:%s", err)
 		return
 	}
 	fmt.Printf("Address:%s UnboundONG:%d\n", testDefAcc.Address.ToBase58(), unboundONG)
-	_, err = testChainSdk.Native.Ong.WithdrawONG(0, 20000, testDefAcc, unboundONG)
+	_, err = testChain.Native.Ong.WithdrawONG(0, 20000, testDefAcc, unboundONG)
 	if err != nil {
 		t.Errorf("WithDrawONG error:%s", err)
 		return
@@ -80,7 +83,7 @@ func TestOng_WithDrawONG(t *testing.T) {
 func TestGlobalParam_GetGlobalParams(t *testing.T) {
 	gasPrice := "gasPrice"
 	params := []string{gasPrice}
-	results, err := testChainSdk.Native.GlobalParams.GetGlobalParams(params)
+	results, err := testChain.Native.GlobalParams.GetGlobalParams(params)
 	if err != nil {
 		t.Errorf("GetGlobalParams:%+v error:%s", params, err)
 		return
@@ -90,7 +93,7 @@ func TestGlobalParam_GetGlobalParams(t *testing.T) {
 
 func TestGlobalParam_SetGlobalParams(t *testing.T) {
 	gasPrice := "gasPrice"
-	globalParams, err := testChainSdk.Native.GlobalParams.GetGlobalParams([]string{gasPrice})
+	globalParams, err := testChain.Native.GlobalParams.GetGlobalParams([]string{gasPrice})
 	if err != nil {
 		t.Errorf("GetGlobalParams error:%s", err)
 		return
@@ -100,13 +103,13 @@ func TestGlobalParam_SetGlobalParams(t *testing.T) {
 		t.Errorf("Get prama value error:%s", err)
 		return
 	}
-	_, err = testChainSdk.Native.GlobalParams.SetGlobalParams(testGasPrice, testGasLimit, testDefAcc, map[string]string{gasPrice: strconv.Itoa(gasPriceValue + 1)})
+	_, err = testChain.Native.GlobalParams.SetGlobalParams(testGasPrice, testGasLimit, testDefAcc, map[string]string{gasPrice: strconv.Itoa(gasPriceValue + 1)})
 	if err != nil {
 		t.Errorf("SetGlobalParams error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	globalParams, err = testChainSdk.Native.GlobalParams.GetGlobalParams([]string{gasPrice})
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	globalParams, err = testChain.Native.GlobalParams.GetGlobalParams([]string{gasPrice})
 	if err != nil {
 		t.Errorf("GetGlobalParams error:%s", err)
 		return
@@ -120,7 +123,7 @@ func TestGlobalParam_SetGlobalParams(t *testing.T) {
 }
 
 func TestWsScribeEvent(t *testing.T) {
-	wsClient := testChainSdk.ClientMgr.GetWebSocketClient()
+	wsClient := testChain.ClientMgr.GetWebSocketClient()
 	err := wsClient.SubscribeEvent()
 	if err != nil {
 		t.Errorf("SubscribeTxHash error:%s", err)
@@ -142,15 +145,15 @@ func TestWsScribeEvent(t *testing.T) {
 }
 
 func TestWsTransfer(t *testing.T) {
-	wsClient := testChainSdk.ClientMgr.GetWebSocketClient()
-	testChainSdk.ClientMgr.SetDefaultClient(wsClient)
-	txHash, err := testChainSdk.Native.Ont.Transfer(testGasPrice, testGasLimit, testDefAcc, testDefAcc.Address, 1)
+	wsClient := testChain.ClientMgr.GetWebSocketClient()
+	testChain.ClientMgr.SetDefaultClient(wsClient)
+	txHash, err := testChain.Native.Ont.Transfer(testGasPrice, testGasLimit, testDefAcc, testDefAcc.Address, 1)
 	if err != nil {
 		t.Errorf("NewTransferTransaction error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	evts, err := testChainSdk.GetSmartContractEvent(txHash.ToHexString())
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	evts, err := testChain.GetSmartContractEvent(txHash.ToHexString())
 	if err != nil {
 		t.Errorf("GetSmartContractEvent error:%s", err)
 		return
@@ -162,4 +165,10 @@ func TestWsTransfer(t *testing.T) {
 		fmt.Printf("ContractAddress:%s\n", notify.ContractAddress)
 		fmt.Printf("States:%+v\n", notify.States)
 	}
+}
+
+func TestOniFsInit(t *testing.T) {
+	testChain.Native.Fs.DefAcc = testDefAcc
+	setting, _ := testChain.Native.Fs.GetSetting()
+	fmt.Printf("setting: %v\n", setting)
 }

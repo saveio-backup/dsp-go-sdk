@@ -1,4 +1,4 @@
-package chain_sdk
+package wallet
 
 import (
 	"encoding/hex"
@@ -9,6 +9,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/oniio/dsp-go-sdk/chain/account"
+	"github.com/oniio/dsp-go-sdk/chain/identity"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/core/types"
 	"github.com/oniio/oniChain/crypto/keypair"
@@ -19,23 +21,21 @@ var DEFAULT_WALLET_NAME = "MyWallet"
 var DEFAULT_WALLET_VERSION = "1.1"
 var ERR_ACCOUNT_NOT_FOUND = errors.New("account not found")
 var ERR_IDENTITY_NOT_FOUND = errors.New("identity not found")
-var ERR_CONTROLLER_NOT_FOUND = errors.New("controller not found")
 
 type Wallet struct {
 	Name             string
 	Version          string
 	Scrypt           *keypair.ScryptParam
 	Extra            string
-	accounts         []*AccountData
-	identities       []*Identity
-	defAcc           *AccountData
-	accAddressMap    map[string]*AccountData
-	accLabelMap      map[string]*AccountData
-	identityMap      map[string]*Identity
-	identityLabelMap map[string]*Identity
-	defIdentity      *Identity
+	accounts         []*account.AccountData
+	identities       []*identity.Identity
+	defAcc           *account.AccountData
+	accAddressMap    map[string]*account.AccountData
+	accLabelMap      map[string]*account.AccountData
+	identityMap      map[string]*identity.Identity
+	identityLabelMap map[string]*identity.Identity
+	defIdentity      *identity.Identity
 	path             string
-	chainSdk         *ChainSdk
 	lock             sync.RWMutex
 }
 
@@ -44,12 +44,12 @@ func NewWallet(path string) *Wallet {
 		Name:             DEFAULT_WALLET_NAME,
 		Version:          DEFAULT_WALLET_VERSION,
 		Scrypt:           keypair.GetScryptParameters(),
-		accounts:         make([]*AccountData, 0),
-		accAddressMap:    make(map[string]*AccountData),
-		accLabelMap:      make(map[string]*AccountData),
-		identities:       make([]*Identity, 0),
-		identityMap:      make(map[string]*Identity),
-		identityLabelMap: make(map[string]*Identity),
+		accounts:         make([]*account.AccountData, 0),
+		accAddressMap:    make(map[string]*account.AccountData),
+		accLabelMap:      make(map[string]*account.AccountData),
+		identities:       make([]*identity.Identity, 0),
+		identityMap:      make(map[string]*identity.Identity),
+		identityLabelMap: make(map[string]*identity.Identity),
 		path:             path,
 	}
 }
@@ -66,7 +66,7 @@ func OpenWallet(path string) (*Wallet, error) {
 	wallet.Scrypt = walletData.Scrypt
 	wallet.Extra = walletData.Extra
 	for _, accountData := range walletData.Accounts {
-		accountData.scrypt = wallet.Scrypt
+		accountData.Scrypt = wallet.Scrypt
 		if accountData.IsDefault {
 			if wallet.defAcc != nil {
 				return nil, fmt.Errorf("more than one default account")
@@ -88,8 +88,8 @@ func OpenWallet(path string) (*Wallet, error) {
 	}
 
 	for _, identityData := range walletData.Identities {
-		identityData.scrypt = wallet.Scrypt
-		identity, err := NewIdentityFromIdentityData(identityData)
+		identityData.Scrypt = wallet.Scrypt
+		identity, err := identity.NewIdentityFromIdentityData(identityData)
 		if err != nil {
 			return nil, fmt.Errorf("NewIdentityFromIdentityData error:%s", err)
 		}
@@ -115,8 +115,8 @@ func OpenWallet(path string) (*Wallet, error) {
 	return wallet, nil
 }
 
-func (this *Wallet) NewAccount(keyType keypair.KeyType, curveCode byte, sigScheme s.SignatureScheme, passwd []byte) (*Account, error) {
-	accData, err := NewAccountData(keyType, curveCode, sigScheme, passwd, this.Scrypt)
+func (this *Wallet) NewAccount(keyType keypair.KeyType, curveCode byte, sigScheme s.SignatureScheme, passwd []byte) (*account.Account, error) {
+	accData, err := account.NewAccountData(keyType, curveCode, sigScheme, passwd, this.Scrypt)
 	if err != nil {
 		return nil, err
 	}
@@ -127,11 +127,11 @@ func (this *Wallet) NewAccount(keyType keypair.KeyType, curveCode byte, sigSchem
 	return accData.GetAccount(passwd)
 }
 
-func (this *Wallet) NewDefaultSettingAccount(passwd []byte) (*Account, error) {
+func (this *Wallet) NewDefaultSettingAccount(passwd []byte) (*account.Account, error) {
 	return this.NewAccount(keypair.PK_ECDSA, keypair.P256, s.SHA256withECDSA, passwd)
 }
 
-func (this *Wallet) NewAccountFromWIF(wif, passwd []byte) (*Account, error) {
+func (this *Wallet) NewAccountFromWIF(wif, passwd []byte) (*account.Account, error) {
 	if len(passwd) == 0 {
 		return nil, fmt.Errorf("password cannot empty")
 	}
@@ -146,7 +146,7 @@ func (this *Wallet) NewAccountFromWIF(wif, passwd []byte) (*Account, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encryptPrivateKey error:%s", err)
 	}
-	accData := &AccountData{}
+	accData := &account.AccountData{}
 	accData.SetKeyPair(prvSecret)
 	accData.SigSch = s.SHA256withECDSA.Name()
 	accData.PubKey = hex.EncodeToString(keypair.SerializePublicKey(pubKey))
@@ -154,7 +154,7 @@ func (this *Wallet) NewAccountFromWIF(wif, passwd []byte) (*Account, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Account{
+	return &account.Account{
 		PrivateKey: prvkey,
 		PublicKey:  pubKey,
 		Address:    address,
@@ -162,8 +162,8 @@ func (this *Wallet) NewAccountFromWIF(wif, passwd []byte) (*Account, error) {
 	}, nil
 }
 
-func (this *Wallet) AddAccountData(accountData *AccountData) error {
-	if !ScryptEqual(accountData.scrypt, this.Scrypt) {
+func (this *Wallet) AddAccountData(accountData *account.AccountData) error {
+	if !ScryptEqual(accountData.Scrypt, this.Scrypt) {
 		return fmt.Errorf("scrypt unmatch")
 	}
 	this.lock.Lock()
@@ -238,7 +238,7 @@ func (this *Wallet) SetDefaultAccount(address string) error {
 	return nil
 }
 
-func (this *Wallet) GetDefaultAccount(passwd []byte) (*Account, error) {
+func (this *Wallet) GetDefaultAccount(passwd []byte) (*account.Account, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	if this.defAcc == nil {
@@ -247,7 +247,7 @@ func (this *Wallet) GetDefaultAccount(passwd []byte) (*Account, error) {
 	return this.defAcc.GetAccount(passwd)
 }
 
-func (this *Wallet) GetAccountByAddress(address string, passwd []byte) (*Account, error) {
+func (this *Wallet) GetAccountByAddress(address string, passwd []byte) (*account.Account, error) {
 	accData, err := this.GetAccountDataByAddress(address)
 	if err != nil {
 		return nil, err
@@ -255,7 +255,7 @@ func (this *Wallet) GetAccountByAddress(address string, passwd []byte) (*Account
 	return accData.GetAccount(passwd)
 }
 
-func (this *Wallet) GetAccountByLabel(label string, passwd []byte) (*Account, error) {
+func (this *Wallet) GetAccountByLabel(label string, passwd []byte) (*account.Account, error) {
 	accData, err := this.GetAccountDataByLabel(label)
 	if err != nil {
 		return nil, err
@@ -264,7 +264,7 @@ func (this *Wallet) GetAccountByLabel(label string, passwd []byte) (*Account, er
 }
 
 //Index start from 1
-func (this *Wallet) GetAccountByIndex(index int, passwd []byte) (*Account, error) {
+func (this *Wallet) GetAccountByIndex(index int, passwd []byte) (*account.Account, error) {
 	accData, err := this.GetAccountDataByIndex(index)
 	if err != nil {
 		return nil, err
@@ -278,7 +278,7 @@ func (this *Wallet) GetAccountCount() int {
 	return len(this.accounts)
 }
 
-func (this *Wallet) GetDefaultAccountData() (*AccountData, error) {
+func (this *Wallet) GetDefaultAccountData() (*account.AccountData, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	if this.defAcc == nil {
@@ -287,7 +287,7 @@ func (this *Wallet) GetDefaultAccountData() (*AccountData, error) {
 	return this.defAcc.Clone(), nil
 }
 
-func (this *Wallet) GetAccountDataByAddress(address string) (*AccountData, error) {
+func (this *Wallet) GetAccountDataByAddress(address string) (*account.AccountData, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	accData, ok := this.accAddressMap[address]
@@ -297,7 +297,7 @@ func (this *Wallet) GetAccountDataByAddress(address string) (*AccountData, error
 	return accData.Clone(), nil
 }
 
-func (this *Wallet) GetAccountDataByLabel(label string) (*AccountData, error) {
+func (this *Wallet) GetAccountDataByLabel(label string) (*account.AccountData, error) {
 	if label == "" {
 		return nil, fmt.Errorf("cannot found account by empty label")
 	}
@@ -309,7 +309,7 @@ func (this *Wallet) GetAccountDataByLabel(label string) (*AccountData, error) {
 }
 
 //Index start from 1
-func (this *Wallet) GetAccountDataByIndex(index int) (*AccountData, error) {
+func (this *Wallet) GetAccountDataByIndex(index int) (*account.AccountData, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	if index <= 0 || index > len(this.accounts) {
@@ -359,7 +359,7 @@ func (this *Wallet) SetSigScheme(address string, sigScheme s.SignatureScheme) er
 		return err
 	}
 	keyType := keypair.GetKeyType(pubKey)
-	if CheckSigScheme(keyType, sigScheme) {
+	if account.CheckSigScheme(keyType, sigScheme) {
 		return fmt.Errorf("sigScheme:%s does not match with KeyType:%s", sigScheme.Name(), accData.Alg)
 	}
 	accData.SigSch = sigScheme.Name()
@@ -381,7 +381,7 @@ func (this *Wallet) ChangeAccountPassword(address string, oldPassword, newPasswo
 	return nil
 }
 
-func (this *Wallet) ImportAccounts(accountDatas []*AccountData, passwds [][]byte) error {
+func (this *Wallet) ImportAccounts(accountDatas []*account.AccountData, passwds [][]byte) error {
 	if len(accountDatas) != len(passwds) {
 		return fmt.Errorf("account size doesnot math password size")
 	}
@@ -391,7 +391,7 @@ func (this *Wallet) ImportAccounts(accountDatas []*AccountData, passwds [][]byte
 		if err != nil {
 			return fmt.Errorf("ReencryptPrivateKey address:%s error:%s", accData.Address, err)
 		}
-		newAccData := &AccountData{
+		newAccData := &account.AccountData{
 			PubKey:    accData.PubKey,
 			SigSch:    accData.SigSch,
 			Lock:      accData.Lock,
@@ -412,7 +412,7 @@ func (this *Wallet) ImportAccounts(accountDatas []*AccountData, passwds [][]byte
 	return nil
 }
 
-func (this *Wallet) ExportAccounts(path string, accountDatas []*AccountData, passwds [][]byte, newScrypts ...*keypair.ScryptParam) (*Wallet, error) {
+func (this *Wallet) ExportAccounts(path string, accountDatas []*account.AccountData, passwds [][]byte, newScrypts ...*keypair.ScryptParam) (*Wallet, error) {
 	var newScrypt keypair.ScryptParam
 	if len(newScrypts) == 0 {
 		newScrypt = *this.Scrypt
@@ -430,7 +430,7 @@ func (this *Wallet) ExportAccounts(path string, accountDatas []*AccountData, pas
 		if err != nil {
 			return nil, fmt.Errorf("ReencryptPrivateKey address:%s error:%s", accData.Address, err)
 		}
-		newAccData := &AccountData{
+		newAccData := &account.AccountData{
 			PubKey:    accData.PubKey,
 			SigSch:    accData.SigSch,
 			Lock:      accData.Lock,
@@ -446,33 +446,33 @@ func (this *Wallet) ExportAccounts(path string, accountDatas []*AccountData, pas
 	return newWallet, nil
 }
 
-func (this *Wallet) NewIdentity(keyType keypair.KeyType, curveCode byte, sigScheme s.SignatureScheme, passwd []byte) (*Identity, error) {
-	identity, err := NewIdentity(this.Scrypt)
+func (this *Wallet) NewIdentity(keyType keypair.KeyType, curveCode byte, sigScheme s.SignatureScheme, passwd []byte) (*identity.Identity, error) {
+	idt, err := identity.NewIdentity(this.Scrypt)
 	if err != nil {
 		return nil, err
 	}
 	//Key Index start from 1
 	controllerId := "1"
-	controllerData, err := NewControllerData(controllerId, keyType, curveCode, sigScheme, passwd, this.Scrypt)
+	controllerData, err := identity.NewControllerData(controllerId, keyType, curveCode, sigScheme, passwd, this.Scrypt)
 	if err != nil {
 		return nil, err
 	}
-	err = identity.AddControllerData(controllerData)
+	err = idt.AddControllerData(controllerData)
 	if err != nil {
 		return nil, err
 	}
-	err = this.AddIdentity(identity)
+	err = this.AddIdentity(idt)
 	if err != nil {
 		return nil, err
 	}
-	return identity, nil
+	return idt, nil
 }
 
-func (this *Wallet) NewDefaultSettingIdentity(passwd []byte) (*Identity, error) {
+func (this *Wallet) NewDefaultSettingIdentity(passwd []byte) (*identity.Identity, error) {
 	return this.NewIdentity(keypair.PK_ECDSA, keypair.P256, s.SHA256withECDSA, passwd)
 }
 
-func (this *Wallet) GetDefaultIdentity() (*Identity, error) {
+func (this *Wallet) GetDefaultIdentity() (*identity.Identity, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	if this.defIdentity == nil {
@@ -496,7 +496,7 @@ func (this *Wallet) SetDefaultIdentity(id string) error {
 	return nil
 }
 
-func (this *Wallet) AddIdentity(identity *Identity) error {
+func (this *Wallet) AddIdentity(identity *identity.Identity) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if this.defIdentity != nil && identity.IsDefault {
@@ -540,7 +540,7 @@ func (this *Wallet) DeleteIdentity(id string) error {
 	return nil
 }
 
-func (this *Wallet) GetIdentityById(id string) (*Identity, error) {
+func (this *Wallet) GetIdentityById(id string) (*identity.Identity, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	identity, ok := this.identityMap[id]
@@ -550,7 +550,7 @@ func (this *Wallet) GetIdentityById(id string) (*Identity, error) {
 	return identity, nil
 }
 
-func (this *Wallet) GetIdentityByLabel(label string) (*Identity, error) {
+func (this *Wallet) GetIdentityByLabel(label string) (*identity.Identity, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	identity, ok := this.identityLabelMap[label]
@@ -561,7 +561,7 @@ func (this *Wallet) GetIdentityByLabel(label string) (*Identity, error) {
 }
 
 //Index start from 1
-func (this *Wallet) GetIdentityByIndex(index int) (*Identity, error) {
+func (this *Wallet) GetIdentityByIndex(index int) (*identity.Identity, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	if index <= 0 || index > len(this.identities) {
@@ -606,8 +606,8 @@ func (this *Wallet) Save() error {
 		Name:       this.Name,
 		Version:    this.Version,
 		Scrypt:     this.Scrypt,
-		Identities: make([]*IdentityData, 0),
-		Accounts:   make([]*AccountData, 0),
+		Identities: make([]*identity.IdentityData, 0),
+		Accounts:   make([]*account.AccountData, 0),
 		Extra:      this.Extra,
 	}
 	for _, identity := range this.identities {
@@ -621,12 +621,12 @@ func (this *Wallet) Save() error {
 }
 
 type WalletData struct {
-	Name       string               `json:"name"`
-	Version    string               `json:"version"`
-	Scrypt     *keypair.ScryptParam `json:"scrypt"`
-	Identities []*IdentityData      `json:"identities,omitempty"`
-	Accounts   []*AccountData       `json:"accounts,omitempty"`
-	Extra      string               `json:"extra,omitempty"`
+	Name       string                   `json:"name"`
+	Version    string                   `json:"version"`
+	Scrypt     *keypair.ScryptParam     `json:"scrypt"`
+	Identities []*identity.IdentityData `json:"identities,omitempty"`
+	Accounts   []*account.AccountData   `json:"accounts,omitempty"`
+	Extra      string                   `json:"extra,omitempty"`
 }
 
 func NewWalletData() *WalletData {
@@ -636,7 +636,7 @@ func NewWalletData() *WalletData {
 		Scrypt:     keypair.GetScryptParameters(),
 		Identities: nil,
 		Extra:      "",
-		Accounts:   make([]*AccountData, 0, 0),
+		Accounts:   make([]*account.AccountData, 0, 0),
 	}
 }
 
@@ -646,7 +646,7 @@ func (this *WalletData) Clone() *WalletData {
 	w.Version = this.Version
 	sp := *this.Scrypt
 	w.Scrypt = &sp
-	w.Accounts = make([]*AccountData, len(this.Accounts))
+	w.Accounts = make([]*account.AccountData, len(this.Accounts))
 	for i, v := range this.Accounts {
 		ac := *v
 		ac.SetKeyPair(v.GetKeyPair())

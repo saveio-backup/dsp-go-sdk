@@ -1,4 +1,4 @@
-package chain_sdk
+package chain
 
 import (
 	"encoding/hex"
@@ -6,8 +6,11 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/oniio/dsp-go-sdk/chain/account"
 	"github.com/oniio/dsp-go-sdk/chain/client"
+	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
 	"github.com/oniio/dsp-go-sdk/chain/utils"
+	"github.com/oniio/dsp-go-sdk/chain/wallet"
 	"github.com/oniio/oniChain/common"
 	sign "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/constants"
@@ -20,37 +23,37 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-type ChainSdk struct {
+type Chain struct {
 	client.ClientMgr
 	Native *NativeContract
 	NeoVM  *NeoVMContract
 }
 
-//NewChainSdk return ChainSdk.
-func NewChainSdk() *ChainSdk {
-	chainSdk := &ChainSdk{}
-	native := newNativeContract(chainSdk)
-	chainSdk.Native = native
-	neoVM := newNeoVMContract(chainSdk)
-	chainSdk.NeoVM = neoVM
-	return chainSdk
+//NewChain return Chain.
+func NewChain() *Chain {
+	chain := &Chain{}
+	native := newNativeContract(chain.GetClientMgr())
+	chain.Native = native
+	neoVM := newNeoVMContract(chain)
+	chain.NeoVM = neoVM
+	return chain
 }
 
 //CreateWallet return a new wallet
-func (this *ChainSdk) CreateWallet(walletFile string) (*Wallet, error) {
+func (this *Chain) CreateWallet(walletFile string) (*wallet.Wallet, error) {
 	if utils.IsFileExist(walletFile) {
 		return nil, fmt.Errorf("wallet:%s has already exist", walletFile)
 	}
-	return OpenWallet(walletFile)
+	return wallet.OpenWallet(walletFile)
 }
 
 //OpenWallet return a wallet instance
-func (this *ChainSdk) OpenWallet(walletFile string) (*Wallet, error) {
-	return OpenWallet(walletFile)
+func (this *Chain) OpenWallet(walletFile string) (*wallet.Wallet, error) {
+	return wallet.OpenWallet(walletFile)
 }
 
 //NewInvokeTransaction return smart contract invoke transaction
-func (this *ChainSdk) NewInvokeTransaction(gasPrice, gasLimit uint64, invokeCode []byte) *types.MutableTransaction {
+func (this *Chain) NewInvokeTransaction(gasPrice, gasLimit uint64, invokeCode []byte) *types.MutableTransaction {
 	invokePayload := &payload.InvokeCode{
 		Code: invokeCode,
 	}
@@ -65,36 +68,11 @@ func (this *ChainSdk) NewInvokeTransaction(gasPrice, gasLimit uint64, invokeCode
 	return tx
 }
 
-func (this *ChainSdk) SignToTransaction(tx *types.MutableTransaction, signer Signer) error {
-	if tx.Payer == common.ADDRESS_EMPTY {
-		account, ok := signer.(*Account)
-		if ok {
-			tx.Payer = account.Address
-		}
-	}
-	for _, sigs := range tx.Sigs {
-		if utils.PubKeysEqual([]keypair.PublicKey{signer.GetPublicKey()}, sigs.PubKeys) {
-			//have already signed
-			return nil
-		}
-	}
-	txHash := tx.Hash()
-	sigData, err := signer.Sign(txHash.ToArray())
-	if err != nil {
-		return fmt.Errorf("sign error:%s", err)
-	}
-	if tx.Sigs == nil {
-		tx.Sigs = make([]types.Sig, 0)
-	}
-	tx.Sigs = append(tx.Sigs, types.Sig{
-		PubKeys: []keypair.PublicKey{signer.GetPublicKey()},
-		M:       1,
-		SigData: [][]byte{sigData},
-	})
-	return nil
+func (this *Chain) SignToTransaction(tx *types.MutableTransaction, signer account.Signer) error {
+	return utils.SignToTransaction(tx, signer)
 }
 
-func (this *ChainSdk) MultiSignToTransaction(tx *types.MutableTransaction, m uint16, pubKeys []keypair.PublicKey, signer Signer) error {
+func (this *Chain) MultiSignToTransaction(tx *types.MutableTransaction, m uint16, pubKeys []keypair.PublicKey, signer account.Signer) error {
 	pkSize := len(pubKeys)
 	if m == 0 || int(m) > pkSize || pkSize > constants.MULTI_SIG_MAX_PUBKEY_SIZE {
 		return fmt.Errorf("both m and number of pub key must larger than 0, and small than %d, and m must smaller than pub key number", constants.MULTI_SIG_MAX_PUBKEY_SIZE)
@@ -146,7 +124,40 @@ func (this *ChainSdk) MultiSignToTransaction(tx *types.MutableTransaction, m uin
 	return nil
 }
 
-func (this *ChainSdk) GetTxData(tx *types.MutableTransaction) (string, error) {
+func (this *Chain) InvokeNativeContract(
+	gasPrice,
+	gasLimit uint64,
+	signer *account.Account,
+	version byte,
+	contractAddress common.Address,
+	method string,
+	params []interface{},
+) (common.Uint256, error) {
+	tx, err := utils.NewNativeInvokeTransaction(gasPrice, gasLimit, version, contractAddress, method, params)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = this.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.SendTransaction(tx)
+}
+
+func (this *Chain) PreExecInvokeNativeContract(
+	contractAddress common.Address,
+	version byte,
+	method string,
+	params []interface{},
+) (*sdkcom.PreExecResult, error) {
+	tx, err := utils.NewNativeInvokeTransaction(0, 0, version, contractAddress, method, params)
+	if err != nil {
+		return nil, err
+	}
+	return this.PreExecTransaction(tx)
+}
+
+func (this *Chain) GetTxData(tx *types.MutableTransaction) (string, error) {
 	txData, err := tx.IntoImmutable()
 	if err != nil {
 		return "", fmt.Errorf("IntoImmutable error:%s", err)
@@ -160,7 +171,7 @@ func (this *ChainSdk) GetTxData(tx *types.MutableTransaction) (string, error) {
 	return rawtx, nil
 }
 
-func (this *ChainSdk) GetMutableTx(rawTx string) (*types.MutableTransaction, error) {
+func (this *Chain) GetMutableTx(rawTx string) (*types.MutableTransaction, error) {
 	txData, err := hex.DecodeString(rawTx)
 	if err != nil {
 		return nil, fmt.Errorf("RawTx hex decode error:%s", err)
@@ -176,7 +187,7 @@ func (this *ChainSdk) GetMutableTx(rawTx string) (*types.MutableTransaction, err
 	return mutTx, nil
 }
 
-func (this *ChainSdk) GetMultiAddr(pubkeys []keypair.PublicKey, m int) (string, error) {
+func (this *Chain) GetMultiAddr(pubkeys []keypair.PublicKey, m int) (string, error) {
 	addr, err := types.AddressFromMultiPubKeys(pubkeys, m)
 	if err != nil {
 		return "", fmt.Errorf("GetMultiAddrs error:%s", err)
@@ -184,7 +195,7 @@ func (this *ChainSdk) GetMultiAddr(pubkeys []keypair.PublicKey, m int) (string, 
 	return addr.ToBase58(), nil
 }
 
-func (this *ChainSdk) GetAdddrByPubKey(pubKey keypair.PublicKey) string {
+func (this *Chain) GetAdddrByPubKey(pubKey keypair.PublicKey) string {
 	address := types.AddressFromPubKey(pubKey)
 	return address.ToBase58()
 }

@@ -1,36 +1,53 @@
-package contract
+package dns
 
 import (
 	"bytes"
 	"errors"
 	"strings"
 
-	chain "github.com/oniio/dsp-go-sdk/chain"
+	"github.com/oniio/dsp-go-sdk/chain/account"
+	"github.com/oniio/dsp-go-sdk/chain/client"
+	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
+	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/common"
-	dns "github.com/oniio/oniChain/smartcontract/service/native/dns"
-	"github.com/oniio/oniChain/smartcontract/service/native/utils"
+	"github.com/oniio/oniChain/smartcontract/service/native/dns"
 )
 
-var ChainSdk *chain.ChainSdk
-var AccClient *chain.Account
-var OntRpcSrvAddr string
-
-const (
-	GasPrice        uint64 = 500
-	GasLimit        uint64 = 20000
-	contractVersion byte   = 0
+var (
+	DNS_CONTRACT_ADDRESS, _ = utils.AddressFromHexString("1200000000000000000000000000000000000000")
+	DNS_CONTRACT_VERSION    = byte(0)
 )
 
-var contractAddr = utils.OntDNSAddress
-
-func InitDNS(client *chain.Account, sdk *chain.ChainSdk, rpcSvrAddr string) {
-	ChainSdk = sdk
-	ChainSdk.NewRpcClient().SetAddress(rpcSvrAddr)
-	AccClient = client
+type Dns struct {
+	Client *client.ClientMgr
+	DefAcc *account.Account
 }
 
-func RegisterUrl(url string, rType uint64, name, desc string, ttl uint64) (common.Uint256, error) {
-	if AccClient == nil {
+func (this *Dns) InvokeNativeContract(signer *account.Account, method string, params []interface{}) (common.Uint256, error) {
+	if signer == nil {
+		return common.UINT256_EMPTY, errors.New("signer is nil")
+	}
+	tx, err := utils.NewNativeInvokeTransaction(sdkcom.GAS_PRICE, sdkcom.GAS_LIMIT, DNS_CONTRACT_VERSION, DNS_CONTRACT_ADDRESS, method, params)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	err = utils.SignToTransaction(tx, signer)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return this.Client.SendTransaction(tx)
+}
+
+func (this *Dns) PreExecInvokeNativeContract(method string, params []interface{}) (*sdkcom.PreExecResult, error) {
+	tx, err := utils.NewNativeInvokeTransaction(0, 0, DNS_CONTRACT_VERSION, DNS_CONTRACT_ADDRESS, method, params)
+	if err != nil {
+		return nil, err
+	}
+	return this.Client.PreExecTransaction(tx)
+}
+
+func (this *Dns) RegisterUrl(url string, rType uint64, name, desc string, ttl uint64) (common.Uint256, error) {
+	if this.DefAcc == nil {
 		return common.UINT256_EMPTY, errors.New("account is nil")
 	}
 	var req dns.RequestName
@@ -40,7 +57,7 @@ func RegisterUrl(url string, rType uint64, name, desc string, ttl uint64) (commo
 			Header:    []byte{0},
 			URL:       []byte{0},
 			Name:      []byte(name),
-			NameOwner: AccClient.Address,
+			NameOwner: this.DefAcc.Address,
 			Desc:      []byte(desc),
 			DesireTTL: ttl,
 		}
@@ -54,41 +71,36 @@ func RegisterUrl(url string, rType uint64, name, desc string, ttl uint64) (commo
 			Header:    []byte(strs[0]),
 			URL:       []byte(strs[1]),
 			Name:      []byte(name),
-			NameOwner: AccClient.Address,
+			NameOwner: this.DefAcc.Address,
 			Desc:      []byte(desc),
 			DesireTTL: ttl,
 		}
 	}
-
-	ret, err := ChainSdk.Native.InvokeNativeContract(GasPrice, GasLimit, AccClient,
-		contractVersion, contractAddr, dns.REGISTER_NAME, []interface{}{req},
-	)
+	ret, err := this.InvokeNativeContract(this.DefAcc, dns.REGISTER_NAME, []interface{}{req})
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 	return ret, nil
-
 }
-func RegisterHeader(header, desc string, ttl uint64) (common.Uint256, error) {
-	if AccClient == nil {
+
+func (this *Dns) RegisterHeader(header, desc string, ttl uint64) (common.Uint256, error) {
+	if this.DefAcc == nil {
 		return common.UINT256_EMPTY, errors.New("account is nil")
 	}
 	req := dns.RequestHeader{
 		Header:    []byte(header),
-		NameOwner: AccClient.Address,
+		NameOwner: this.DefAcc.Address,
 		Desc:      []byte(desc),
 		DesireTTL: ttl,
 	}
-	ret, err := ChainSdk.Native.InvokeNativeContract(GasPrice, GasLimit, AccClient,
-		contractVersion, contractAddr, dns.REGISTER_HEADER, []interface{}{req},
-	)
+	ret, err := this.InvokeNativeContract(this.DefAcc, dns.REGISTER_HEADER, []interface{}{req})
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 	return ret, nil
 }
-func Binding(url string, name, desc string, ttl uint64) (common.Uint256, error) {
-	if AccClient == nil {
+func (this *Dns) Binding(url string, name, desc string, ttl uint64) (common.Uint256, error) {
+	if this.DefAcc == nil {
 		return common.UINT256_EMPTY, errors.New("account is nil")
 	}
 	strs := strings.Split(url, "://")
@@ -99,21 +111,19 @@ func Binding(url string, name, desc string, ttl uint64) (common.Uint256, error) 
 		Header:    []byte(strs[0]),
 		URL:       []byte(strs[1]),
 		Name:      []byte(name),
-		NameOwner: AccClient.Address,
+		NameOwner: this.DefAcc.Address,
 		Desc:      []byte(desc),
 		DesireTTL: ttl,
 	}
-	ret, err := ChainSdk.Native.InvokeNativeContract(GasPrice, GasLimit, AccClient,
-		contractVersion, contractAddr, dns.UPDATE_DNS_NAME, []interface{}{req},
-	)
+	ret, err := this.InvokeNativeContract(this.DefAcc, dns.UPDATE_DNS_NAME, []interface{}{req})
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 	return ret, nil
 }
 
-func DeleteUrl(url string) (common.Uint256, error) {
-	if AccClient == nil {
+func (this *Dns) DeleteUrl(url string) (common.Uint256, error) {
+	if this.DefAcc == nil {
 		return common.UINT256_EMPTY, errors.New("account is nil")
 	}
 	strs := strings.Split(url, "://")
@@ -123,34 +133,30 @@ func DeleteUrl(url string) (common.Uint256, error) {
 	req := dns.ReqInfo{
 		Header: []byte(strs[0]),
 		URL:    []byte(strs[1]),
-		Owner:  AccClient.Address,
+		Owner:  this.DefAcc.Address,
 	}
-	ret, err := ChainSdk.Native.InvokeNativeContract(GasPrice, GasLimit, AccClient,
-		contractVersion, contractAddr, dns.DEL_DNS, []interface{}{req},
-	)
+	ret, err := this.InvokeNativeContract(this.DefAcc, dns.DEL_DNS, []interface{}{req})
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 	return ret, nil
 }
-func DeleteHeader(header string) (common.Uint256, error) {
-	if AccClient == nil {
+func (this *Dns) DeleteHeader(header string) (common.Uint256, error) {
+	if this.DefAcc == nil {
 		return common.UINT256_EMPTY, errors.New("account is nil")
 	}
 	req := dns.ReqInfo{
 		Header: []byte(header),
-		Owner:  AccClient.Address,
+		Owner:  this.DefAcc.Address,
 	}
-	ret, err := ChainSdk.Native.InvokeNativeContract(GasPrice, GasLimit, AccClient,
-		contractVersion, contractAddr, dns.DEL_DNS_HEADER, []interface{}{req},
-	)
+	ret, err := this.InvokeNativeContract(this.DefAcc, dns.DEL_DNS_HEADER, []interface{}{req})
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 	return ret, nil
 }
-func TransferUrl(url string, toAdder string) (common.Uint256, error) {
-	if AccClient == nil {
+func (this *Dns) TransferUrl(url string, toAdder string) (common.Uint256, error) {
+	if this.DefAcc == nil {
 		return common.UINT256_EMPTY, errors.New("account is nil")
 	}
 	strs := strings.Split(url, "://")
@@ -161,37 +167,33 @@ func TransferUrl(url string, toAdder string) (common.Uint256, error) {
 	req := dns.TranferInfo{
 		Header: []byte(strs[0]),
 		URL:    []byte(strs[1]),
-		From:   AccClient.Address,
+		From:   this.DefAcc.Address,
 		To:     to,
 	}
-	ret, err := ChainSdk.Native.InvokeNativeContract(GasPrice, GasLimit, AccClient,
-		contractVersion, contractAddr, dns.TRANSFER_NAME, []interface{}{req},
-	)
+	ret, err := this.InvokeNativeContract(this.DefAcc, dns.TRANSFER_NAME, []interface{}{req})
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 	return ret, nil
 }
-func TransferHeader(header, toAdder string) (common.Uint256, error) {
-	if AccClient == nil {
+func (this *Dns) TransferHeader(header, toAdder string) (common.Uint256, error) {
+	if this.DefAcc == nil {
 		return common.UINT256_EMPTY, errors.New("account is nil")
 	}
 	to, err := common.AddressFromHexString(toAdder)
 	req := dns.TranferInfo{
 		Header: []byte(header),
-		From:   AccClient.Address,
+		From:   this.DefAcc.Address,
 		To:     to,
 	}
-	ret, err := ChainSdk.Native.InvokeNativeContract(GasPrice, GasLimit, AccClient,
-		contractVersion, contractAddr, dns.TRANSFER_HEADER_NAME, []interface{}{req},
-	)
+	ret, err := this.InvokeNativeContract(this.DefAcc, dns.TRANSFER_HEADER_NAME, []interface{}{req})
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
 	return ret, err
 }
 
-func QueryUrl(url string) (*dns.NameInfo, error) {
+func (this *Dns) QueryUrl(url string, ownerAddr common.Address) (*dns.NameInfo, error) {
 	strs := strings.Split(url, "://")
 	if len(strs) != 2 {
 		return nil, errors.New("QueryUrl input url format valid")
@@ -199,10 +201,10 @@ func QueryUrl(url string) (*dns.NameInfo, error) {
 	req := dns.ReqInfo{
 		Header: []byte(strs[0]),
 		URL:    []byte(strs[1]),
-		Owner:  AccClient.Address,
+		Owner:  ownerAddr,
 	}
-	ret, err := ChainSdk.Native.PreExecInvokeNativeContract(
-		contractAddr, contractVersion, dns.GET_DNS_NAME, []interface{}{req},
+	ret, err := this.PreExecInvokeNativeContract(
+		dns.GET_DNS_NAME, []interface{}{req},
 	)
 	if err != nil {
 		return nil, err
@@ -221,13 +223,14 @@ func QueryUrl(url string) (*dns.NameInfo, error) {
 	return &name, nil
 }
 
-func QueryHeader(header string) (*dns.HeaderInfo, error) {
+func (this *Dns) QueryHeader(header string, ownerAddr common.Address) (*dns.HeaderInfo, error) {
 	req := dns.ReqInfo{
 		Header: []byte(header),
-		Owner:  AccClient.Address,
+		Owner:  ownerAddr,
 	}
-	ret, err := ChainSdk.Native.PreExecInvokeNativeContract(
-		contractAddr, contractVersion, dns.GET_HEADER_NAME, []interface{}{req},
+
+	ret, err := this.PreExecInvokeNativeContract(
+		dns.GET_HEADER_NAME, []interface{}{req},
 	)
 	if err != nil {
 		return nil, err

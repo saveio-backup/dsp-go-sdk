@@ -364,6 +364,10 @@ func (this *ClientMgr) getClient() ChainClient {
 	return nil
 }
 
+func (this *ClientMgr) GetClientMgr() *ClientMgr {
+	return this
+}
+
 func (this *ClientMgr) getNextQid() string {
 	return fmt.Sprintf("%d", atomic.AddUint64(&this.qid, 1))
 }

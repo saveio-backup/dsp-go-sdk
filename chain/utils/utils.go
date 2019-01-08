@@ -104,3 +104,18 @@ func PubKeysEqual(pks1, pks2 []keypair.PublicKey) bool {
 	}
 	return true
 }
+
+// func DecodeVarUint(source *common.ZeroCopySource) (uint64, error) {
+// 	value, _, irregular, eof := source.NextVarBytes()
+// 	if eof {
+// 		return 0, io.ErrUnexpectedEOF
+// 	}
+// 	if irregular {
+// 		return 0, common.ErrIrregularData
+// 	}
+// 	v := types.BigIntFromBytes(value)
+// 	if v.Cmp(big.NewInt(0)) < 0 {
+// 		return 0, fmt.Errorf("%s", "value should not be a negative number.")
+// 	}
+// 	return v.Uint64(), nil
+// }

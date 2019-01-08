@@ -1,10 +1,11 @@
-package chain_sdk
+package chain
 
 import (
 	"encoding/hex"
 	"fmt"
 	"time"
 
+	"github.com/oniio/dsp-go-sdk/chain/account"
 	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/core/payload"
@@ -13,12 +14,12 @@ import (
 )
 
 type NeoVMContract struct {
-	chainSdk *ChainSdk
+	chain *Chain
 }
 
-func newNeoVMContract(chainSdk *ChainSdk) *NeoVMContract {
+func newNeoVMContract(chain *Chain) *NeoVMContract {
 	return &NeoVMContract{
-		chainSdk: chainSdk,
+		chain: chain,
 	}
 }
 
@@ -48,7 +49,7 @@ func (this *NeoVMContract) NewDeployNeoVMCodeTransaction(gasPrice, gasLimit uint
 func (this *NeoVMContract) DeployNeoVMSmartContract(
 	gasPrice,
 	gasLimit uint64,
-	singer *Account,
+	singer *account.Account,
 	needStorage bool,
 	code,
 	name,
@@ -70,11 +71,11 @@ func (this *NeoVMContract) DeployNeoVMSmartContract(
 		Email:       email,
 		Description: desc,
 	})
-	err = this.chainSdk.SignToTransaction(tx, singer)
+	err = this.chain.SignToTransaction(tx, singer)
 	if err != nil {
 		return common.Uint256{}, err
 	}
-	txHash, err := this.chainSdk.SendTransaction(tx)
+	txHash, err := this.chain.SendTransaction(tx)
 	if err != nil {
 		return common.Uint256{}, fmt.Errorf("SendRawTransaction error:%s", err)
 	}
@@ -91,24 +92,24 @@ func (this *NeoVMContract) NewNeoVMInvokeTransaction(
 	if err != nil {
 		return nil, err
 	}
-	return this.chainSdk.NewInvokeTransaction(gasPrice, gasLimit, invokeCode), nil
+	return this.chain.NewInvokeTransaction(gasPrice, gasLimit, invokeCode), nil
 }
 
 func (this *NeoVMContract) InvokeNeoVMContract(
 	gasPrice,
 	gasLimit uint64,
-	signer *Account,
+	signer *account.Account,
 	contractAddress common.Address,
 	params []interface{}) (common.Uint256, error) {
 	tx, err := this.NewNeoVMInvokeTransaction(gasPrice, gasLimit, contractAddress, params)
 	if err != nil {
 		return common.UINT256_EMPTY, fmt.Errorf("NewNeoVMInvokeTransaction error:%s", err)
 	}
-	err = this.chainSdk.SignToTransaction(tx, signer)
+	err = this.chain.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}
-	return this.chainSdk.SendTransaction(tx)
+	return this.chain.SendTransaction(tx)
 }
 
 func (this *NeoVMContract) PreExecInvokeNeoVMContract(
@@ -118,5 +119,5 @@ func (this *NeoVMContract) PreExecInvokeNeoVMContract(
 	if err != nil {
 		return nil, err
 	}
-	return this.chainSdk.PreExecTransaction(tx)
+	return this.chain.PreExecTransaction(tx)
 }

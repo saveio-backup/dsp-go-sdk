@@ -1,4 +1,4 @@
-package chain_sdk
+package chain
 
 import (
 	"encoding/hex"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oniio/dsp-go-sdk/chain/identity"
 	"github.com/oniio/oniChain/crypto/keypair"
 )
 
@@ -20,20 +21,20 @@ func TestOntId_RegIDWithPublicKey(t *testing.T) {
 		t.Errorf("TestOntId_RegIDWithPublicKey GetControllerByIndex error:%s", err)
 		return
 	}
-	txHash, err := testChainSdk.Native.OntId.RegIDWithPublicKey(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController)
+	txHash, err := testChain.Native.OntId.RegIDWithPublicKey(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_RegIDWithPublicKey RegIDWithPublicKey error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	event, err := testChainSdk.GetSmartContractEvent(txHash.ToHexString())
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	event, err := testChain.GetSmartContractEvent(txHash.ToHexString())
 	if err != nil {
 		t.Errorf("TestOntId_RegIDWithPublicKey GetSmartContractEvent error:%s", err)
 		return
 	}
 	fmt.Printf("TestOntId_RegIDWithPublicKey Event: %+v\n", event)
 
-	ddo, err := testChainSdk.Native.OntId.GetDDO(testIdentity.ID)
+	ddo, err := testChain.Native.OntId.GetDDO(testIdentity.ID)
 	if err != nil {
 		t.Errorf("TestOntId_RegIDWithPublicKey GetDDO error:%s", err)
 		return
@@ -52,27 +53,27 @@ func TestOntId_RegIDWithAttributes(t *testing.T) {
 		t.Errorf("TestOntId_RegIDWithPublicKey GetControllerByIndex error:%s", err)
 		return
 	}
-	attributes := make([]*DDOAttribute, 0)
-	attr1 := &DDOAttribute{
+	attributes := make([]*identity.DDOAttribute, 0)
+	attr1 := &identity.DDOAttribute{
 		Key:       []byte("Hello"),
 		Value:     []byte("World"),
 		ValueType: []byte("string"),
 	}
 	attributes = append(attributes, attr1)
-	attr2 := &DDOAttribute{
+	attr2 := &identity.DDOAttribute{
 		Key:       []byte("Foo"),
 		Value:     []byte("Bar"),
 		ValueType: []byte("string"),
 	}
 	attributes = append(attributes, attr2)
-	_, err = testChainSdk.Native.OntId.RegIDWithAttributes(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController, attributes)
+	_, err = testChain.Native.OntId.RegIDWithAttributes(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController, attributes)
 	if err != nil {
 		t.Errorf("TestOntId_RegIDWithPublicKey RegIDWithAttributes error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
 
-	ddo, err := testChainSdk.Native.OntId.GetDDO(testIdentity.ID)
+	ddo, err := testChain.Native.OntId.GetDDO(testIdentity.ID)
 	if err != nil {
 		t.Errorf("GetDDO error:%s", err)
 		return
@@ -112,12 +113,12 @@ func TestOntId_Key(t *testing.T) {
 		t.Errorf("TestOntId_Key GetControllerByIndex error:%s", err)
 		return
 	}
-	_, err = testChainSdk.Native.OntId.RegIDWithPublicKey(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController)
+	_, err = testChain.Native.OntId.RegIDWithPublicKey(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_Key RegIDWithPublicKey error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
 
 	controller1, err := testIdentity.NewDefaultSettingController("2", testPasswd)
 	if err != nil {
@@ -125,14 +126,14 @@ func TestOntId_Key(t *testing.T) {
 		return
 	}
 
-	_, err = testChainSdk.Native.OntId.AddKey(testGasPrice, testGasLimit, testIdentity.ID, testDefAcc, controller1.PublicKey, testDefController)
+	_, err = testChain.Native.OntId.AddKey(testGasPrice, testGasLimit, testIdentity.ID, testDefAcc, controller1.PublicKey, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_Key AddKey error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
 
-	owners, err := testChainSdk.Native.OntId.GetPublicKeys(testIdentity.ID)
+	owners, err := testChain.Native.OntId.GetPublicKeys(testIdentity.ID)
 	if err != nil {
 		t.Errorf("TestOntId_Key GetPublicKeys error:%s", err)
 		return
@@ -144,23 +145,23 @@ func TestOntId_Key(t *testing.T) {
 	}
 
 	if owners[0].Value != hex.EncodeToString(keypair.SerializePublicKey(testDefController.PublicKey)) {
-		t.Errorf("TestOntId_Key owner index:%d pubkey:%s != %s", owners[0].pubKeyIndex, owners[0].Value, hex.EncodeToString(keypair.SerializePublicKey(testDefController.PublicKey)))
+		t.Errorf("TestOntId_Key owner index:%d pubkey:%s != %s", owners[0].PubKeyIndex, owners[0].Value, hex.EncodeToString(keypair.SerializePublicKey(testDefController.PublicKey)))
 		return
 	}
 
 	if owners[1].Value != hex.EncodeToString(keypair.SerializePublicKey(controller1.PublicKey)) {
-		t.Errorf("TestOntId_Key owner index:%d pubkey:%s != %s", owners[1].pubKeyIndex, owners[1].Value, hex.EncodeToString(keypair.SerializePublicKey(controller1.PublicKey)))
+		t.Errorf("TestOntId_Key owner index:%d pubkey:%s != %s", owners[1].PubKeyIndex, owners[1].Value, hex.EncodeToString(keypair.SerializePublicKey(controller1.PublicKey)))
 		return
 	}
 
-	_, err = testChainSdk.Native.OntId.RevokeKey(testGasPrice, testGasLimit, testIdentity.ID, testDefAcc, testDefController.PublicKey, controller1)
+	_, err = testChain.Native.OntId.RevokeKey(testGasPrice, testGasLimit, testIdentity.ID, testDefAcc, testDefController.PublicKey, controller1)
 	if err != nil {
 		t.Errorf("TestOntId_Key RevokeKey error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
 
-	owners, err = testChainSdk.Native.OntId.GetPublicKeys(testIdentity.ID)
+	owners, err = testChain.Native.OntId.GetPublicKeys(testIdentity.ID)
 	if err != nil {
 		t.Errorf("TestOntId_Key GetPublicKeys error:%s", err)
 		return
@@ -171,24 +172,24 @@ func TestOntId_Key(t *testing.T) {
 		return
 	}
 
-	state, err := testChainSdk.Native.OntId.GetKeyState(testIdentity.ID, 1)
+	state, err := testChain.Native.OntId.GetKeyState(testIdentity.ID, 1)
 	if err != nil {
 		t.Errorf("TestOntId_Key GetKeyState error:%s", err)
 		return
 	}
 
-	if state != KEY_STATUS_REVOKE {
-		t.Errorf("TestOntId_Key remove key state != %s", KEY_STATUS_REVOKE)
+	if state != identity.KEY_STATUS_REVOKE {
+		t.Errorf("TestOntId_Key remove key state != %s", identity.KEY_STATUS_REVOKE)
 		return
 	}
 
-	state, err = testChainSdk.Native.OntId.GetKeyState(testIdentity.ID, 2)
+	state, err = testChain.Native.OntId.GetKeyState(testIdentity.ID, 2)
 	if err != nil {
 		t.Errorf("TestOntId_Key GetKeyState error:%s", err)
 		return
 	}
-	if state != KEY_STSTUS_IN_USE {
-		t.Errorf("TestOntId_Key GetKeyState state != %s", KEY_STSTUS_IN_USE)
+	if state != identity.KEY_STSTUS_IN_USE {
+		t.Errorf("TestOntId_Key GetKeyState state != %s", identity.KEY_STSTUS_IN_USE)
 		return
 	}
 }
@@ -204,33 +205,33 @@ func TestOntId_Attribute(t *testing.T) {
 		t.Errorf("TestOntId_Attribute GetControllerByIndex error:%s", err)
 		return
 	}
-	_, err = testChainSdk.Native.OntId.RegIDWithPublicKey(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController)
+	_, err = testChain.Native.OntId.RegIDWithPublicKey(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_Attribute RegIDWithPublicKey error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
 
-	attributes := make([]*DDOAttribute, 0)
-	attr1 := &DDOAttribute{
+	attributes := make([]*identity.DDOAttribute, 0)
+	attr1 := &identity.DDOAttribute{
 		Key:       []byte("Foo"),
 		Value:     []byte("Bar"),
 		ValueType: []byte("string"),
 	}
 	attributes = append(attributes, attr1)
-	attr2 := &DDOAttribute{
+	attr2 := &identity.DDOAttribute{
 		Key:       []byte("Hello"),
 		Value:     []byte("World"),
 		ValueType: []byte("string"),
 	}
 	attributes = append(attributes, attr2)
-	_, err = testChainSdk.Native.OntId.AddAttributes(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, attributes, testDefController)
+	_, err = testChain.Native.OntId.AddAttributes(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, attributes, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_Attribute AddAttributes error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	attrs, err := testChainSdk.Native.OntId.GetAttributes(testIdentity.ID)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	attrs, err := testChain.Native.OntId.GetAttributes(testIdentity.ID)
 	if len(attributes) != len(attrs) {
 		t.Errorf("TestOntId_Attribute GetAttributes len:%d != %d", len(attrs), len(attributes))
 		return
@@ -240,13 +241,13 @@ func TestOntId_Attribute(t *testing.T) {
 		return
 	}
 
-	_, err = testChainSdk.Native.OntId.RemoveAttribute(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, attr1.Key, testDefController)
+	_, err = testChain.Native.OntId.RemoveAttribute(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, attr1.Key, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_Attribute RemoveAttribute error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	attrs, err = testChainSdk.Native.OntId.GetAttributes(testIdentity.ID)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	attrs, err = testChain.Native.OntId.GetAttributes(testIdentity.ID)
 	if len(attrs) != 1 {
 		t.Errorf("TestOntId_Attribute GetAttributes len:%d != 1", len(attrs))
 		return
@@ -268,19 +269,19 @@ func TestOntId_Recovery(t *testing.T) {
 		t.Errorf("TestOntId_Recovery GetControllerByIndex error:%s", err)
 		return
 	}
-	_, err = testChainSdk.Native.OntId.RegIDWithPublicKey(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController)
+	_, err = testChain.Native.OntId.RegIDWithPublicKey(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_Recovery RegIDWithPublicKey error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	_, err = testChainSdk.Native.OntId.SetRecovery(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefAcc.Address, testDefController)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	_, err = testChain.Native.OntId.SetRecovery(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, testDefAcc.Address, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_Recovery SetRecovery error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	ddo, err := testChainSdk.Native.OntId.GetDDO(testIdentity.ID)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	ddo, err := testChain.Native.OntId.GetDDO(testIdentity.ID)
 	if err != nil {
 		t.Errorf("TestOntId_Recovery GetDDO error:%s", err)
 		return
@@ -296,10 +297,10 @@ func TestOntId_Recovery(t *testing.T) {
 		return
 	}
 
-	txHash, err := testChainSdk.Native.OntId.SetRecovery(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, acc1.Address, testDefController)
+	txHash, err := testChain.Native.OntId.SetRecovery(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, acc1.Address, testDefController)
 
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	evt, err := testChainSdk.GetSmartContractEvent(txHash.ToHexString())
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	evt, err := testChain.GetSmartContractEvent(txHash.ToHexString())
 	if err != nil {
 		t.Errorf("TestOntId_Recovery GetSmartContractEvent:%s error:%s", txHash.ToHexString(), err)
 		return
@@ -308,13 +309,13 @@ func TestOntId_Recovery(t *testing.T) {
 		t.Errorf("TestOntId_Recovery duplicate add recovery should failed")
 		return
 	}
-	_, err = testChainSdk.Native.OntId.ChangeRecovery(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, acc1.Address, testDefAcc.Address, testDefController)
+	_, err = testChain.Native.OntId.ChangeRecovery(testGasPrice, testGasLimit, testDefAcc, testIdentity.ID, acc1.Address, testDefAcc.Address, testDefController)
 	if err != nil {
 		t.Errorf("TestOntId_Recovery ChangeRecovery error:%s", err)
 		return
 	}
-	testChainSdk.WaitForGenerateBlock(30*time.Second, 1)
-	ddo, err = testChainSdk.Native.OntId.GetDDO(testIdentity.ID)
+	testChain.WaitForGenerateBlock(30*time.Second, 1)
+	ddo, err = testChain.Native.OntId.GetDDO(testIdentity.ID)
 	if err != nil {
 		t.Errorf("TestOntId_Recovery GetDDO error:%s", err)
 		return

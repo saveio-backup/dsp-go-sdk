@@ -1,17 +1,20 @@
-package chain_sdk
+package identity
 
 import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"math/big"
+
 	base58 "github.com/itchyny/base58-go"
+	"github.com/oniio/dsp-go-sdk/chain/account"
+	"github.com/oniio/oniChain/core/types"
 	"github.com/oniio/oniChain/crypto/keypair"
 	s "github.com/oniio/oniChain/crypto/signature"
-	"github.com/oniio/oniChain/core/types"
 	"golang.org/x/crypto/ripemd160"
-	"math/big"
 )
 
 const (
@@ -19,6 +22,8 @@ const (
 	METHOD = "ont"
 	VER    = 0x41
 )
+
+var ERR_CONTROLLER_NOT_FOUND = errors.New("controller not found")
 
 type Controller struct {
 	ID         string
@@ -63,11 +68,11 @@ func NewControllerData(id string, keyType keypair.KeyType, curveCode byte, sigSc
 	if len(passwd) == 0 {
 		return nil, fmt.Errorf("password cannot empty")
 	}
-	if !CheckKeyTypeCurve(keyType, curveCode) {
+	if !account.CheckKeyTypeCurve(keyType, curveCode) {
 		return nil, fmt.Errorf("curve unmath key type")
 	}
-	if !CheckSigScheme(keyType, sigScheme) {
-		return nil, fmt.Errorf("sigScheme:%s does not match with KeyType:%s", sigScheme.Name(), GetKeyTypeString(keyType))
+	if !account.CheckSigScheme(keyType, sigScheme) {
+		return nil, fmt.Errorf("sigScheme:%s does not match with KeyType:%s", sigScheme.Name(), account.GetKeyTypeString(keyType))
 	}
 	var scrypt *keypair.ScryptParam
 	if len(scrypts) > 0 {
@@ -173,7 +178,7 @@ type Identity struct {
 	ctrsIdMap   map[string]*ControllerData
 	ctrsPubMap  map[string]*ControllerData
 	Extra       interface{}
-	scrypt      *keypair.ScryptParam
+	Scrypt      *keypair.ScryptParam
 }
 
 func NewIdentity(scrypt *keypair.ScryptParam) (*Identity, error) {
@@ -183,7 +188,7 @@ func NewIdentity(scrypt *keypair.ScryptParam) (*Identity, error) {
 	}
 	identity := &Identity{
 		ID:          id,
-		scrypt:      scrypt,
+		Scrypt:      scrypt,
 		controllers: make([]*ControllerData, 0),
 		ctrsIdMap:   make(map[string]*ControllerData),
 		ctrsPubMap:  make(map[string]*ControllerData),
@@ -200,7 +205,7 @@ func NewIdentityFromIdentityData(identityData *IdentityData) (*Identity, error) 
 		controllers: make([]*ControllerData, 0, len(identityData.Control)),
 		ctrsIdMap:   make(map[string]*ControllerData),
 		ctrsPubMap:  make(map[string]*ControllerData),
-		scrypt:      identityData.scrypt,
+		Scrypt:      identityData.Scrypt,
 	}
 	for _, ctrData := range identityData.Control {
 		_, ok := identity.ctrsIdMap[ctrData.ID]
@@ -235,7 +240,7 @@ func (this *Identity) NewDefaultSettingController(id string, passwd []byte) (*Co
 }
 
 func (this *Identity) AddControllerData(controllerData *ControllerData) error {
-	if !ScryptEqual(controllerData.scrypt, this.scrypt) {
+	if !ScryptEqual(controllerData.scrypt, this.Scrypt) {
 		return fmt.Errorf("scrypt unmatch")
 	}
 	if controllerData.ID == "" {
@@ -348,7 +353,7 @@ type IdentityData struct {
 	IsDefault bool              `json:"isDefault"`
 	Control   []*ControllerData `json:"controls,omitempty"`
 	Extra     interface{}       `json:"extra,omitempty"`
-	scrypt    *keypair.ScryptParam
+	Scrypt    *keypair.ScryptParam
 }
 
 func GenerateID() (string, error) {
@@ -414,13 +419,17 @@ func checksum(data []byte) []byte {
 	return sum[:4]
 }
 
+func ScryptEqual(s1, s2 *keypair.ScryptParam) bool {
+	return s1.DKLen == s2.DKLen && s1.N == s2.N && s1.P == s2.P && s1.R == s2.R
+}
+
 const (
 	KEY_STATUS_REVOKE = "revoked"
 	KEY_STSTUS_IN_USE = "in use"
 )
 
 type DDOOwner struct {
-	pubKeyIndex uint32
+	PubKeyIndex uint32
 	PubKeyId    string
 	Type        string
 	Curve       string
@@ -428,7 +437,7 @@ type DDOOwner struct {
 }
 
 func (this *DDOOwner) GetIndex() uint32 {
-	return this.pubKeyIndex
+	return this.PubKeyIndex
 }
 
 type DDOAttribute struct {

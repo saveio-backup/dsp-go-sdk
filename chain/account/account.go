@@ -1,12 +1,13 @@
-package chain_sdk
+package account
 
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/oniio/oniChain/crypto/keypair"
-	s "github.com/oniio/oniChain/crypto/signature"
+
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/core/types"
+	"github.com/oniio/oniChain/crypto/keypair"
+	s "github.com/oniio/oniChain/crypto/signature"
 )
 
 type Signer interface {
@@ -98,7 +99,7 @@ type AccountData struct {
 	SigSch    string `json:"signatureScheme"`
 	IsDefault bool   `json:"isDefault"`
 	Lock      bool   `json:"lock"`
-	scrypt    *keypair.ScryptParam
+	Scrypt    *keypair.ScryptParam
 }
 
 func NewAccountData(keyType keypair.KeyType, curveCode byte, sigScheme s.SignatureScheme, passwd []byte, scrypts ...*keypair.ScryptParam) (*AccountData, error) {
@@ -131,12 +132,12 @@ func NewAccountData(keyType keypair.KeyType, curveCode byte, sigScheme s.Signatu
 	accData.SetKeyPair(prvSecret)
 	accData.SigSch = sigScheme.Name()
 	accData.PubKey = hex.EncodeToString(keypair.SerializePublicKey(pubkey))
-	accData.scrypt = scrypt
+	accData.Scrypt = scrypt
 	return accData, nil
 }
 
 func (this *AccountData) GetAccount(passwd []byte) (*Account, error) {
-	privateKey, err := keypair.DecryptWithCustomScrypt(&this.ProtectedKey, passwd, this.scrypt)
+	privateKey, err := keypair.DecryptWithCustomScrypt(&this.ProtectedKey, passwd, this.Scrypt)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt privateKey error:%s", err)
 	}
@@ -155,7 +156,7 @@ func (this *AccountData) GetAccount(passwd []byte) (*Account, error) {
 }
 
 func (this *AccountData) GetScrypt() *keypair.ScryptParam {
-	return this.scrypt
+	return this.Scrypt
 }
 
 func (this *AccountData) Clone() *AccountData {
@@ -165,7 +166,7 @@ func (this *AccountData) Clone() *AccountData {
 		SigSch:    this.SigSch,
 		IsDefault: this.IsDefault,
 		Lock:      this.Lock,
-		scrypt:    this.scrypt,
+		Scrypt:    this.Scrypt,
 	}
 	accData.SetKeyPair(this.GetKeyPair())
 	return accData
