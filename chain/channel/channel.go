@@ -13,7 +13,6 @@ import (
 	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
 	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/common"
-	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/smartcontract/service/native/micropayment"
 	sutils "github.com/oniio/oniChain/smartcontract/service/native/utils"
 	"github.com/oniio/oniChain/vm/neovm/types"
@@ -59,14 +58,11 @@ func (this *Channel) RegisterPaymentEndPoint(ip, port []byte, regAccount common.
 		Port:       port,
 	}
 	tx, err := this.InvokeNativeContract(
-
 		this.DefAcc,
-
 		micropayment.MP_ENDPOINT_REGISTRY,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 	return tx[:], nil
@@ -84,7 +80,6 @@ func (this *Channel) OpenChannel(wallet1Addr, wallet2Addr common.Address, blockH
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 	return tx[:], nil
@@ -103,7 +98,6 @@ func (this *Channel) SetTotalDeposit(channelId uint64, participantWalletAddr com
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 	return tx[:], nil
@@ -120,14 +114,11 @@ func (this *Channel) SetTotalWithdraw(channelID uint64, participant, partner com
 		PartnerPubKey:     partnerPubKey,
 	}
 	tx, err := this.InvokeNativeContract(
-
 		this.DefAcc,
-
 		micropayment.MP_SET_TOTALWITHDRAW,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 	return tx[:], nil
@@ -145,14 +136,11 @@ func (this *Channel) CooperativeSettle(channelID uint64, participant1Address com
 		Participant2PubKey:    participant2PubKey,
 	}
 	tx, err := this.InvokeNativeContract(
-
 		this.DefAcc,
-
 		micropayment.MP_COOPERATIVESETTLE,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 	return tx[:], nil
@@ -169,14 +157,11 @@ func (this *Channel) CloseChannel(channelID uint64, participantAddress, partnerA
 		PartnerPubKey:      partnerPubKey,
 	}
 	tx, err := this.InvokeNativeContract(
-
 		this.DefAcc,
-
 		micropayment.MP_CLOSE_CHANNEL,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 	return tx[:], nil
@@ -190,7 +175,6 @@ func (this *Channel) RegisterSecret(secret []byte) ([]byte, error) {
 		[]interface{}{secret},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 
@@ -198,14 +182,11 @@ func (this *Channel) RegisterSecret(secret []byte) ([]byte, error) {
 }
 func (this *Channel) RegisterSecretBatch(secrets []byte) ([]byte, error) {
 	tx, err := this.InvokeNativeContract(
-
 		this.DefAcc,
-
 		micropayment.MP_SECRET_REG_BATCH,
 		[]interface{}{secrets},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 	return tx[:], nil
@@ -213,12 +194,10 @@ func (this *Channel) RegisterSecretBatch(secrets []byte) ([]byte, error) {
 
 func (this *Channel) GetSecretRevealBlockHeight(secretHash []byte) (uint64, error) {
 	ret, err := this.PreExecInvokeNativeContract(
-
 		micropayment.MP_GET_SECRET_REVEAL_BLOCKHEIGHT,
 		[]interface{}{secretHash},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return 0, err
 	}
 	buf, err := ret.Result.ToByteArray()
@@ -245,14 +224,11 @@ func (this *Channel) UpdateNonClosingBalanceProof(chanID uint64, closeParticipan
 		NonClosePubKey:      nonClosePubKey,
 	}
 	tx, err := this.InvokeNativeContract(
-
 		this.DefAcc,
-
 		micropayment.MP_UPDATE_NONCLOSING_BPF,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 
@@ -272,14 +248,11 @@ func (this *Channel) SettleChannel(chanID uint64, participant1 common.Address, p
 		P2LocksRoot:         p2LocksRoot,
 	}
 	tx, err := this.InvokeNativeContract(
-
 		this.DefAcc,
-
 		micropayment.MP_SETTLE_CHANNEL,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 
@@ -294,12 +267,10 @@ func (this *Channel) GetChannelInfo(channelID uint64, participant1, participant2
 	}
 
 	ret, err := this.PreExecInvokeNativeContract(
-
 		micropayment.MP_GET_CHANNELINFO,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 
@@ -328,12 +299,10 @@ func (this *Channel) GetChannelParticipantInfo(channelID uint64, participant1, p
 	}
 
 	ret, err := this.PreExecInvokeNativeContract(
-
 		micropayment.MP_GET_CHANNEL_PARTICIPANTINFO,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 
@@ -353,12 +322,10 @@ func (this *Channel) GetChannelParticipantInfo(channelID uint64, participant1, p
 // GetEndpointByAddress get endpoint by user wallet address
 func (this *Channel) GetEndpointByAddress(nodeAddress common.Address) (*micropayment.NodeInfo, error) {
 	ret, err := this.PreExecInvokeNativeContract(
-
 		micropayment.MP_FIND_ENDPOINT,
 		[]interface{}{nodeAddress},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return nil, err
 	}
 
@@ -381,19 +348,16 @@ func (this *Channel) GetChannelIdentifier(participant1WalletAddr, participant2Wa
 		Participant2WalletAddr: participant2WalletAddr,
 	}
 	ret, err := this.PreExecInvokeNativeContract(
-
 		micropayment.MP_GET_CHANNELID,
 		[]interface{}{params},
 	)
 	if err != nil {
-		log.Errorf("Construct native invoke tx error, Msg:", err.Error())
 		return 0, err
 	}
 	buf, err := ret.Result.ToByteArray()
 	if err != nil {
 		return 0, err
 	}
-	fmt.Printf("buf:%v\n", buf)
 	valStr := fmt.Sprintf("%s", types.BigIntFromBytes(buf))
 	return strconv.ParseUint(valStr, 10, 64)
 }
@@ -412,7 +376,6 @@ func (this *Channel) GetFilterArgsForAllEventsFromChannel(chanID int, fromBlock,
 	for bc := uint32(fromBlock); bc <= toBlockUint; bc++ {
 		raws, err := this.Client.GetSmartContractEventByBlock(bc)
 		if err != nil {
-			log.Errorf("get smart contract result by block err, msg:%s", err)
 			return nil, err
 		}
 		if len(raws) == 0 {
@@ -421,16 +384,13 @@ func (this *Channel) GetFilterArgsForAllEventsFromChannel(chanID int, fromBlock,
 		for _, r := range raws {
 			buf, err := json.Marshal(r)
 			if err != nil {
-				log.Errorf("json marshal result err:%s", err)
 				return nil, err
 			}
 			result, err := utils.GetSmartContractEvent(buf)
 			if err != nil {
-				log.Errorf("GetSmartContractEvent[rawResult Unmarshal] err: %s", err)
 				return nil, err
 			}
 			if result == nil {
-				log.Errorf("rawResult Unmarshal return nil")
 				continue
 			}
 			for _, notify := range result.Notify {
