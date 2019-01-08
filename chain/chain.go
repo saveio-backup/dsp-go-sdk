@@ -6,11 +6,11 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/chain/account"
 	"github.com/oniio/dsp-go-sdk/chain/client"
 	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
 	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/dsp-go-sdk/chain/wallet"
+	"github.com/oniio/oniChain/account"
 	"github.com/oniio/oniChain/common"
 	sign "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/constants"
@@ -68,18 +68,18 @@ func (this *Chain) NewInvokeTransaction(gasPrice, gasLimit uint64, invokeCode []
 	return tx
 }
 
-func (this *Chain) SignToTransaction(tx *types.MutableTransaction, signer account.Signer) error {
+func (this *Chain) SignToTransaction(tx *types.MutableTransaction, signer *account.Account) error {
 	return utils.SignToTransaction(tx, signer)
 }
 
-func (this *Chain) MultiSignToTransaction(tx *types.MutableTransaction, m uint16, pubKeys []keypair.PublicKey, signer account.Signer) error {
+func (this *Chain) MultiSignToTransaction(tx *types.MutableTransaction, m uint16, pubKeys []keypair.PublicKey, signer *account.Account) error {
 	pkSize := len(pubKeys)
 	if m == 0 || int(m) > pkSize || pkSize > constants.MULTI_SIG_MAX_PUBKEY_SIZE {
 		return fmt.Errorf("both m and number of pub key must larger than 0, and small than %d, and m must smaller than pub key number", constants.MULTI_SIG_MAX_PUBKEY_SIZE)
 	}
 	validPubKey := false
 	for _, pk := range pubKeys {
-		if keypair.ComparePublicKey(pk, signer.GetPublicKey()) {
+		if keypair.ComparePublicKey(pk, signer.PublicKey) {
 			validPubKey = true
 			break
 		}
@@ -98,7 +98,7 @@ func (this *Chain) MultiSignToTransaction(tx *types.MutableTransaction, m uint16
 	if len(tx.Sigs) == 0 {
 		tx.Sigs = make([]types.Sig, 0)
 	}
-	sigData, err := signer.Sign(txHash.ToArray())
+	sigData, err := utils.Sign(signer, txHash.ToArray())
 	if err != nil {
 		return fmt.Errorf("sign error:%s", err)
 	}
@@ -106,7 +106,7 @@ func (this *Chain) MultiSignToTransaction(tx *types.MutableTransaction, m uint16
 	for i, sigs := range tx.Sigs {
 		if utils.PubKeysEqual(sigs.PubKeys, pubKeys) {
 			hasMutilSig = true
-			if utils.HasAlreadySig(txHash.ToArray(), signer.GetPublicKey(), sigs.SigData) {
+			if utils.HasAlreadySig(txHash.ToArray(), signer.PublicKey, sigs.SigData) {
 				break
 			}
 			sigs.SigData = append(sigs.SigData, sigData)

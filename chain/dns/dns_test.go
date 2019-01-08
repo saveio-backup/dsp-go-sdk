@@ -32,7 +32,7 @@ func init() {
 }
 func TestRegister(t *testing.T) {
 	fmt.Printf("====register a random default url with dsp header====\n")
-	ret1, err := testDns.RegisterUrl("", dns.SYSTEM, "path://weqwquhdnskfudyzksdwj", "32123232", 123235)
+	ret1, err := dns.RegisterUrl("", dns.SYSTEM, "path://weqwquhdnskfudyzksdwj", "32123232", 123235)
 	if err != nil {
 		t.Errorf(err.Error())
 		return

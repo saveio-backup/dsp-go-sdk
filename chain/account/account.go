@@ -4,91 +4,11 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/oniio/oniChain/common"
+	"github.com/oniio/oniChain/account"
 	"github.com/oniio/oniChain/core/types"
 	"github.com/oniio/oniChain/crypto/keypair"
 	s "github.com/oniio/oniChain/crypto/signature"
 )
-
-type Signer interface {
-	Sign(data []byte) ([]byte, error)
-	GetPublicKey() keypair.PublicKey
-	GetPrivateKey() keypair.PrivateKey
-	GetSigScheme() s.SignatureScheme
-}
-
-/* crypto object */
-type Account struct {
-	PrivateKey keypair.PrivateKey
-	PublicKey  keypair.PublicKey
-	Address    common.Address
-	SigScheme  s.SignatureScheme
-}
-
-func NewAccount(sigscheme ...s.SignatureScheme) *Account {
-	var scheme s.SignatureScheme
-	if len(sigscheme) == 0 {
-		scheme = s.SHA256withECDSA
-	} else {
-		scheme = sigscheme[0]
-	}
-	var pkAlgorithm keypair.KeyType
-	var params interface{}
-	switch scheme {
-	case s.SHA224withECDSA, s.SHA3_224withECDSA:
-		pkAlgorithm = keypair.PK_ECDSA
-		params = keypair.P224
-	case s.SHA256withECDSA, s.SHA3_256withECDSA, s.RIPEMD160withECDSA:
-		pkAlgorithm = keypair.PK_ECDSA
-		params = keypair.P256
-	case s.SHA384withECDSA, s.SHA3_384withECDSA:
-		pkAlgorithm = keypair.PK_ECDSA
-		params = keypair.P384
-	case s.SHA512withECDSA, s.SHA3_512withECDSA:
-		pkAlgorithm = keypair.PK_ECDSA
-		params = keypair.P521
-	case s.SM3withSM2:
-		pkAlgorithm = keypair.PK_SM2
-		params = keypair.SM2P256V1
-	case s.SHA512withEDDSA:
-		pkAlgorithm = keypair.PK_EDDSA
-		params = keypair.ED25519
-	default:
-		return nil
-	}
-	pri, pub, _ := keypair.GenerateKeyPair(pkAlgorithm, params)
-	address := types.AddressFromPubKey(pub)
-	return &Account{
-		PrivateKey: pri,
-		PublicKey:  pub,
-		Address:    address,
-		SigScheme:  scheme,
-	}
-}
-
-func (this *Account) Sign(data []byte) ([]byte, error) {
-	sig, err := s.Sign(this.SigScheme, this.PrivateKey, data, nil)
-	if err != nil {
-		return nil, err
-	}
-	sigData, err := s.Serialize(sig)
-	if err != nil {
-		return nil, fmt.Errorf("signature.Serialize error:%s", err)
-	}
-	return sigData, nil
-}
-
-func (this *Account) GetPrivateKey() keypair.PrivateKey {
-	return this.PrivateKey
-}
-
-func (this *Account) GetPublicKey() keypair.PublicKey {
-	return this.PublicKey
-}
-
-func (this *Account) GetSigScheme() s.SignatureScheme {
-	return this.SigScheme
-}
 
 /** AccountData - for wallet read and save, no crypto object included **/
 type AccountData struct {
@@ -136,7 +56,7 @@ func NewAccountData(keyType keypair.KeyType, curveCode byte, sigScheme s.Signatu
 	return accData, nil
 }
 
-func (this *AccountData) GetAccount(passwd []byte) (*Account, error) {
+func (this *AccountData) GetAccount(passwd []byte) (*account.Account, error) {
 	privateKey, err := keypair.DecryptWithCustomScrypt(&this.ProtectedKey, passwd, this.Scrypt)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt privateKey error:%s", err)
@@ -147,7 +67,7 @@ func (this *AccountData) GetAccount(passwd []byte) (*Account, error) {
 	if err != nil {
 		return nil, fmt.Errorf("signature scheme error:%s", err)
 	}
-	return &Account{
+	return &account.Account{
 		PrivateKey: privateKey,
 		PublicKey:  publicKey,
 		Address:    addr,

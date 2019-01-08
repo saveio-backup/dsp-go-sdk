@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/chain/account"
 	"github.com/oniio/dsp-go-sdk/chain/wallet"
+	"github.com/oniio/oniChain/account"
 )
 
 var (

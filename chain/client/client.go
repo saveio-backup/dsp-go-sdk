@@ -101,6 +101,14 @@ func (this *ClientMgr) GetBlockByHash(blockHash string) (*types.Block, error) {
 	return utils.GetBlock(data)
 }
 
+func (this *ClientMgr) GetRawTransaction(txHash string) ([]byte, error) {
+	client := this.getClient()
+	if client == nil {
+		return nil, fmt.Errorf("don't have available client of oniChain")
+	}
+	return client.getRawTransaction(this.getNextQid(), txHash)
+}
+
 func (this *ClientMgr) GetTransaction(txHash string) (*types.Transaction, error) {
 	client := this.getClient()
 	if client == nil {

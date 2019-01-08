@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/oniio/dsp-go-sdk/chain/account"
+	cacc "github.com/oniio/dsp-go-sdk/chain/account"
 	"github.com/oniio/dsp-go-sdk/chain/client"
 	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
 	"github.com/oniio/dsp-go-sdk/chain/identity"
 	"github.com/oniio/dsp-go-sdk/chain/utils"
+	"github.com/oniio/oniChain/account"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/serialization"
 	"github.com/oniio/oniChain/crypto/keypair"
@@ -38,7 +39,12 @@ func (this *OntId) InvokeNativeContract(signer *account.Account, controller *ide
 		return common.UINT256_EMPTY, err
 	}
 	if controller != nil {
-		err = utils.SignToTransaction(tx, controller)
+		controllerAcc := &account.Account{
+			PrivateKey: controller.PrivateKey,
+			PublicKey:  controller.PublicKey,
+			SigScheme:  controller.SigScheme,
+		}
+		err = utils.SignToTransaction(tx, controllerAcc)
 		if err != nil {
 			return common.UINT256_EMPTY, err
 		}
@@ -280,7 +286,12 @@ func (this *OntId) VerifySignature(ontId string, keyIndex int, controller *ident
 	if err != nil {
 		return false, err
 	}
-	err = utils.SignToTransaction(tx, controller)
+	controllerAcc := &account.Account{
+		PrivateKey: controller.PrivateKey,
+		PublicKey:  controller.PublicKey,
+		SigScheme:  controller.SigScheme,
+	}
+	err = utils.SignToTransaction(tx, controllerAcc)
 	if err != nil {
 		return false, err
 	}
@@ -331,8 +342,8 @@ func (this *OntId) getPublicKeys(ontId string, data []byte) ([]*identity.DDOOwne
 		owner := &identity.DDOOwner{
 			PubKeyIndex: index,
 			PubKeyId:    pubKeyId,
-			Type:        account.GetKeyTypeString(keyType),
-			Curve:       account.GetCurveName(pkData),
+			Type:        cacc.GetKeyTypeString(keyType),
+			Curve:       cacc.GetCurveName(pkData),
 			Value:       hex.EncodeToString(pkData),
 		}
 		owners = append(owners, owner)

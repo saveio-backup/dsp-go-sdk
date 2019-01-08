@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/chain/account"
 	"github.com/oniio/dsp-go-sdk/chain/client"
 	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
 	"github.com/oniio/dsp-go-sdk/chain/utils"
+	"github.com/oniio/oniChain/account"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/crypto/keypair"
 	"github.com/oniio/oniChain/crypto/pdp"
@@ -391,7 +391,7 @@ func (this *Fs) GenFileReadSettleSlice(fileHash []byte, payTo common.Address, sl
 	if err != nil {
 		return nil, fmt.Errorf("FileReadSettleSlice serialize error: %s", err.Error())
 	}
-	signData, err := this.DefAcc.Sign(bf.Bytes())
+	signData, err := utils.Sign(this.DefAcc, bf.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("FileReadSettleSlice Sign error: %s", err.Error())
 	}

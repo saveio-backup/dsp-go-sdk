@@ -4,29 +4,39 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/oniio/dsp-go-sdk/chain/account"
+	"github.com/oniio/oniChain/account"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/core/payload"
 	"github.com/oniio/oniChain/core/types"
 	cutils "github.com/oniio/oniChain/core/utils"
 	"github.com/oniio/oniChain/crypto/keypair"
+	s "github.com/oniio/oniChain/crypto/signature"
 )
 
-func SignToTransaction(tx *types.MutableTransaction, signer account.Signer) error {
+func Sign(acc *account.Account, data []byte) ([]byte, error) {
+	sig, err := s.Sign(acc.SigScheme, acc.PrivateKey, data, nil)
+	if err != nil {
+		return nil, err
+	}
+	sigData, err := s.Serialize(sig)
+	if err != nil {
+		return nil, fmt.Errorf("signature.Serialize error:%s", err)
+	}
+	return sigData, nil
+}
+
+func SignToTransaction(tx *types.MutableTransaction, signer *account.Account) error {
 	if tx.Payer == common.ADDRESS_EMPTY {
-		account, ok := signer.(*account.Account)
-		if ok {
-			tx.Payer = account.Address
-		}
+		tx.Payer = signer.Address
 	}
 	for _, sigs := range tx.Sigs {
-		if PubKeysEqual([]keypair.PublicKey{signer.GetPublicKey()}, sigs.PubKeys) {
+		if PubKeysEqual([]keypair.PublicKey{signer.PublicKey}, sigs.PubKeys) {
 			//have already signed
 			return nil
 		}
 	}
 	txHash := tx.Hash()
-	sigData, err := signer.Sign(txHash.ToArray())
+	sigData, err := Sign(signer, txHash.ToArray())
 	if err != nil {
 		return fmt.Errorf("sign error:%s", err)
 	}
@@ -34,7 +44,7 @@ func SignToTransaction(tx *types.MutableTransaction, signer account.Signer) erro
 		tx.Sigs = make([]types.Sig, 0)
 	}
 	tx.Sigs = append(tx.Sigs, types.Sig{
-		PubKeys: []keypair.PublicKey{signer.GetPublicKey()},
+		PubKeys: []keypair.PublicKey{signer.PublicKey},
 		M:       1,
 		SigData: [][]byte{sigData},
 	})
