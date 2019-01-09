@@ -6,6 +6,7 @@ import (
 	"time"
 
 	sdkcom "github.com/oniio/dsp-go-sdk/chain/common"
+	"github.com/oniio/dsp-go-sdk/chain/utils"
 	"github.com/oniio/oniChain/account"
 	"github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/core/payload"
@@ -71,7 +72,7 @@ func (this *NeoVMContract) DeployNeoVMSmartContract(
 		Email:       email,
 		Description: desc,
 	})
-	err = this.chain.SignToTransaction(tx, singer)
+	err = utils.SignToTransaction(tx, singer)
 	if err != nil {
 		return common.Uint256{}, err
 	}
@@ -92,7 +93,7 @@ func (this *NeoVMContract) NewNeoVMInvokeTransaction(
 	if err != nil {
 		return nil, err
 	}
-	return this.chain.NewInvokeTransaction(gasPrice, gasLimit, invokeCode), nil
+	return utils.NewInvokeTransaction(gasPrice, gasLimit, invokeCode), nil
 }
 
 func (this *NeoVMContract) InvokeNeoVMContract(
@@ -105,7 +106,7 @@ func (this *NeoVMContract) InvokeNeoVMContract(
 	if err != nil {
 		return common.UINT256_EMPTY, fmt.Errorf("NewNeoVMInvokeTransaction error:%s", err)
 	}
-	err = this.chain.SignToTransaction(tx, signer)
+	err = utils.SignToTransaction(tx, signer)
 	if err != nil {
 		return common.UINT256_EMPTY, err
 	}

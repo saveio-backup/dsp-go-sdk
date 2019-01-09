@@ -105,17 +105,15 @@ func PubKeysEqual(pks1, pks2 []keypair.PublicKey) bool {
 	return true
 }
 
-// func DecodeVarUint(source *common.ZeroCopySource) (uint64, error) {
-// 	value, _, irregular, eof := source.NextVarBytes()
-// 	if eof {
-// 		return 0, io.ErrUnexpectedEOF
-// 	}
-// 	if irregular {
-// 		return 0, common.ErrIrregularData
-// 	}
-// 	v := types.BigIntFromBytes(value)
-// 	if v.Cmp(big.NewInt(0)) < 0 {
-// 		return 0, fmt.Errorf("%s", "value should not be a negative number.")
-// 	}
-// 	return v.Uint64(), nil
-// }
+func GetMultiAddr(pubkeys []keypair.PublicKey, m int) (string, error) {
+	addr, err := types.AddressFromMultiPubKeys(pubkeys, m)
+	if err != nil {
+		return "", fmt.Errorf("GetMultiAddrs error:%s", err)
+	}
+	return addr.ToBase58(), nil
+}
+
+func GetAdddrByPubKey(pubKey keypair.PublicKey) string {
+	address := types.AddressFromPubKey(pubKey)
+	return address.ToBase58()
+}

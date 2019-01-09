@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 	testChain.NewRpcClient().SetAddress("http://localhost:20336")
 
 	var err error
-	testWallet, err = testChain.OpenWallet("./wallet.dat")
+	testWallet, err = wallet.OpenWallet("./wallet.dat")
 	if err != nil {
 		fmt.Printf("account.Open error:%s\n", err)
 		return
