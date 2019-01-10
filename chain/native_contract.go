@@ -10,6 +10,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/chain/ong"
 	"github.com/oniio/dsp-go-sdk/chain/ont"
 	"github.com/oniio/dsp-go-sdk/chain/ontid"
+	"github.com/oniio/oniChain/account"
 )
 
 type NativeContract struct {
@@ -34,4 +35,10 @@ func newNativeContract(client *client.ClientMgr) *NativeContract {
 	native.Fs = &fs.Fs{Client: client}
 	native.Channel = &channel.Channel{Client: client}
 	return native
+}
+
+func (this *NativeContract) SetDefaultAccount(acc *account.Account) {
+	this.Channel.DefAcc = acc
+	this.Fs.DefAcc = acc
+	this.Dns.DefAcc = acc
 }

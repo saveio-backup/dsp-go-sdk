@@ -31,6 +31,10 @@ func NewChain() *Chain {
 	return chain
 }
 
+func (this *Chain) SetDefaultAccount(acc *account.Account) {
+	this.Native.SetDefaultAccount(acc)
+}
+
 func (this *Chain) InvokeNativeContract(
 	gasPrice,
 	gasLimit uint64,
