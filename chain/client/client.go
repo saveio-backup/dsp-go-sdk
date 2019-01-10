@@ -347,18 +347,19 @@ func (this *ClientMgr) WaitForGenerateBlock(timeout time.Duration, blockCount ..
 	return false, fmt.Errorf("timeout after %d (s)", secs)
 }
 
-// PollForTxConfirmed Poll tx for confirmation.
+// PollForTxConfirmed Poll tx for confirmation. This is a thread-block method
 func (this *ClientMgr) PollForTxConfirmed(timeout time.Duration, txHash []byte) (bool, error) {
 	if len(txHash) == 0 {
 		return false, fmt.Errorf("txHash is empty")
 	}
 	txHashStr := hex.EncodeToString(common.ToArrayReverse(txHash))
-	secs := int(timeout / time.Second)
+	interval := time.Duration(sdkcom.POLL_TX_INTERVAL) * time.Second
+	secs := int(timeout / interval)
 	if secs <= 0 {
 		secs = 1
 	}
 	for i := 0; i < secs; i++ {
-		time.Sleep(time.Second)
+		time.Sleep(interval)
 		ret, err := this.GetBlockHeightByTxHash(txHashStr)
 		if err != nil || ret == 0 {
 			continue

@@ -17,13 +17,6 @@ var (
 	GAS_LIMIT           = uint64(30000)
 )
 
-const (
-	WS_SUBSCRIBE_ACTION_BLOCK         = "Block"
-	WS_SUBSCRIBE_ACTION_EVENT_NOTIFY  = "Notify"
-	WS_SUBSCRIBE_ACTION_EVENT_LOG     = "Log"
-	WS_SUBSCRIBE_ACTION_BLOCK_TX_HASH = "BlockTxHash"
-)
-
 type SmartContract payload.DeployCode
 
 type PreExecResult struct {
