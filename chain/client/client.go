@@ -198,7 +198,7 @@ func (this *ClientMgr) GetSmartContractEvent(txHash string) (*sdkcom.SmartContac
 	return utils.GetSmartContractEvent(data)
 }
 
-func (this *ClientMgr) GetSmartContractEventByBlock(height uint32) ([]*sdkcom.SmartContactEvent, error) {
+func (this *ClientMgr) GetSmartContractEventsByBlock(height uint32) ([]*sdkcom.SmartContactEvent, error) {
 	client := this.getClient()
 	if client == nil {
 		return nil, fmt.Errorf("don't have available client of oniChain")
@@ -207,7 +207,19 @@ func (this *ClientMgr) GetSmartContractEventByBlock(height uint32) ([]*sdkcom.Sm
 	if err != nil {
 		return nil, err
 	}
-	return utils.GetSmartContactEvents(data)
+	return utils.GetSmartContractEvents(data)
+}
+
+func (this *ClientMgr) GetSmartContractEventByBlock(height uint32) (*sdkcom.SmartContactEvent, error) {
+	client := this.getClient()
+	if client == nil {
+		return nil, fmt.Errorf("don't have available client of oniChain")
+	}
+	data, err := client.getSmartContractEventByBlock(this.getNextQid(), height)
+	if err != nil {
+		return nil, err
+	}
+	return utils.GetSmartContractEvent(data)
 }
 
 func (this *ClientMgr) GetMerkleProof(txHash string) (*sdkcom.MerkleProof, error) {

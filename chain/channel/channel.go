@@ -374,7 +374,7 @@ func (this *Channel) GetFilterArgsForAllEventsFromChannel(chanID int, fromBlock,
 	}
 	var eventRe = make([]map[string]interface{}, 0)
 	for bc := uint32(fromBlock); bc <= toBlockUint; bc++ {
-		raws, err := this.Client.GetSmartContractEventByBlock(bc)
+		raws, err := this.Client.GetSmartContractEventsByBlock(bc)
 		if err != nil {
 			return nil, err
 		}
