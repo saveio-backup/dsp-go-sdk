@@ -151,6 +151,11 @@ func (this *RestClient) getBlockTxHashesByHeight(qid string, height uint32) ([]b
 	return this.sendRestGetRequest(reqPath)
 }
 
+func (this *RestClient) getGasPrice(qid string) ([]byte, error) {
+	reqPath := GET_GAS_PRICE
+	return this.sendRestGetRequest(reqPath)
+}
+
 func (this *RestClient) sendRawTransaction(qid string, tx *types.Transaction, isPreExec bool) ([]byte, error) {
 	reqPath := POST_RAW_TX
 	var buffer bytes.Buffer

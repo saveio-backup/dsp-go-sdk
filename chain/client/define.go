@@ -26,6 +26,7 @@ type ChainClient interface {
 	getMemPoolTxState(qid, txHash string) ([]byte, error)
 	getMemPoolTxCount(qid string) ([]byte, error)
 	sendRawTransaction(qid string, tx *types.Transaction, isPreExec bool) ([]byte, error)
+	getGasPrice(qid string) ([]byte, error)
 }
 
 const (
@@ -49,6 +50,7 @@ const (
 	RPC_GET_BLOCK_HEIGHT_BY_TX_HASH = "getblockheightbytxhash"
 	SEND_EMERGENCY_GOV_REQ          = "sendemergencygovreq"
 	GET_BLOCK_ROOT_WITH_NEW_TX_ROOT = "getblockrootwithnewtxroot"
+	RPC_GET_GAS_PRICE               = "getgasprice"
 )
 
 //JsonRpc version

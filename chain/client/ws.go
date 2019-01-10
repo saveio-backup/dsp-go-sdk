@@ -650,6 +650,10 @@ func (this *WSClient) getSmartContractEventByBlock(qid string, blockHeight uint3
 	return this.sendSyncWSRequest(qid, WS_ACTION_GET_SMARTCONTRACT_BY_HEIGHT, map[string]interface{}{"Height": blockHeight})
 }
 
+func (this *WSClient) getGasPrice(qid string) ([]byte, error) {
+	return this.sendSyncWSRequest(qid, WS_ACTION_GET_GAS_PRICE, map[string]interface{}{})
+}
+
 func (this *WSClient) GetActionCh() chan *WSAction {
 	return this.actionCh
 }

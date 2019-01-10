@@ -139,6 +139,10 @@ func (this *RpcClient) getBlockTxHashesByHeight(qid string, height uint32) ([]by
 	return this.sendRpcRequest(qid, RPC_GET_BLOCK_TX_HASH_BY_HEIGHT, []interface{}{height})
 }
 
+func (this *RpcClient) getGasPrice(qid string) ([]byte, error) {
+	return this.sendRpcRequest(qid, RPC_GET_GAS_PRICE, []interface{}{})
+}
+
 func (this *RpcClient) sendRawTransaction(qid string, tx *types.Transaction, isPreExec bool) ([]byte, error) {
 	var buffer bytes.Buffer
 	err := tx.Serialize(&buffer)

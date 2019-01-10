@@ -270,6 +270,18 @@ func (this *ClientMgr) GetNetworkId() (uint32, error) {
 	return utils.GetUint32(data)
 }
 
+func (this *ClientMgr) GetGasPrice() (uint64, error) {
+	client := this.getClient()
+	if client == nil {
+		return 0, fmt.Errorf("don't have available client of oniChain")
+	}
+	data, err := client.getGasPrice(this.getNextQid())
+	if err != nil {
+		return 0, err
+	}
+	return utils.GetUint64(data)
+}
+
 func (this *ClientMgr) SendTransaction(mutTx *types.MutableTransaction) (common.Uint256, error) {
 	client := this.getClient()
 	if client == nil {
