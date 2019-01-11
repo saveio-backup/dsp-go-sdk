@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/oniio/dsp-go-sdk/chain"
+	"github.com/oniio/oniChain-go-sdk"
 )
 
 var rpcAddr = "http://127.0.0.1:20336"

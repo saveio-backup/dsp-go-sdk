@@ -1,8 +1,8 @@
 package dsp
 
 import (
-	"github.com/oniio/dsp-go-sdk/chain"
 	"github.com/oniio/dsp-go-sdk/common"
+	"github.com/oniio/oniChain-go-sdk"
 )
 
 type Dsp struct {
