@@ -9,19 +9,14 @@ import (
 )
 
 type Header struct {
-	Version string
-	Type    string
-	Length  int32
-}
-
-type Payload interface {
-	// Data() []byte
-	XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+	Version   string
+	Type      string
+	MsgLength int32
 }
 
 type Message struct {
 	Header  *Header
-	Payload Payload
+	Payload proto.Message
 }
 
 func ReadMessage(msg proto.Message) *Message {
@@ -32,26 +27,26 @@ func ReadMessage(msg proto.Message) *Message {
 	newMsg := &Message{}
 	if pbMsg.GetHeader() != nil {
 		header := &Header{
-			Version: pbMsg.GetHeader().GetVersion(),
-			Type:    pbMsg.GetHeader().GetType(),
-			Length:  pbMsg.GetHeader().GetLength(),
+			Version:   pbMsg.GetHeader().GetVersion(),
+			Type:      pbMsg.GetHeader().GetType(),
+			MsgLength: pbMsg.GetHeader().GetMsgLength(),
 		}
 		newMsg.Header = header
 	}
-	if pbMsg.GetPayload() != nil && len(pbMsg.GetPayload().GetData()) > 0 {
-		data := pbMsg.GetPayload().GetData()
+	if pbMsg.GetData() != nil && len(pbMsg.GetData()) > 0 {
+		data := pbMsg.GetData()
 		msgType := pbMsg.GetHeader().GetType()
 		switch msgType {
-		case common.MSG_TYPE_BLOCK, common.MSG_TYPE_BLOCK_REQ:
+		case common.MSG_TYPE_BLOCK:
 			blk := &block.Block{}
-			err := blk.XXX_Unmarshal(data)
+			err := proto.Unmarshal(data, blk)
 			if err != nil {
 				return nil
 			}
 			newMsg.Payload = blk
 		case common.MSG_TYPE_FILE:
 			file := &file.File{}
-			err := file.XXX_Unmarshal(data)
+			err := proto.Unmarshal(data, file)
 			if err != nil {
 				return nil
 			}
@@ -67,12 +62,14 @@ func (this *Message) ToProtoMsg() proto.Message {
 		msg.Header = new(pb.Header)
 		msg.Header.Version = this.Header.Version
 		msg.Header.Type = this.Header.Type
-		msg.Header.Length = this.Header.Length
+		msg.Header.MsgLength = this.Header.MsgLength
 	}
 	if this.Payload != nil {
-		msg.Payload = new(pb.Payload)
-		data, _ := this.Payload.XXX_Marshal(nil, false)
-		msg.Payload.Data = data
+		data, err := proto.Marshal(this.Payload)
+		if err != nil {
+			return nil
+		}
+		msg.Data = data
 	}
 	return msg
 }

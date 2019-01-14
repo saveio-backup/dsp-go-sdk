@@ -8,4 +8,5 @@ message Block {
    string hash = 3; // block hash
    bytes data = 4; // raw data
    bytes tag = 5; // used for pdp
+   int32 operation = 6; // block operation
 }

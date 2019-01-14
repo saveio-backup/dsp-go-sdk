@@ -3,8 +3,9 @@ syntax = "proto3";
 package file;
 
 message Payment {
-    int32 asset = 1;
-    uint64 price = 2;
+    string walletAddress = 1;
+    int32 asset = 2;
+    uint64 price = 3;
 }
 
 message File {

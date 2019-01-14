@@ -5,14 +5,10 @@ package pb;
 message Header {
     string version = 1;
     string type = 2;
-    int32 length = 3;
-}
-
-message Payload {
-    bytes data = 1; 
+    int32 msgLength = 3;
 }
 
 message Message {
     Header header = 1;
-    Payload payload = 2;
+    bytes  data = 2;
 }

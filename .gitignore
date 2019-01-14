@@ -25,3 +25,6 @@ wallet.dat
 glide.lock
 
 Log/*
+testdata/*
+filestore.files
+filestore-info/*

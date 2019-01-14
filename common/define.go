@@ -16,3 +16,15 @@ type UploadOption struct {
 	Encrypt         bool
 	EncryptPassword string
 }
+
+type UploadResult struct {
+	Tx       string
+	FileHash string
+	Link     string
+}
+
+type PayStoreFileReulst struct {
+	Tx         string
+	ParamsBuf  []byte
+	PrivateKey []byte
+}

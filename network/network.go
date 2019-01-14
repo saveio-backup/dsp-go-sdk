@@ -8,7 +8,6 @@ import (
 
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/pb"
-	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniP2p/crypto/ed25519"
 	"github.com/oniio/oniP2p/network"
 	p2pNet "github.com/oniio/oniP2p/network"
@@ -19,10 +18,10 @@ type Network struct {
 	*p2pNet.Component
 	listenAddr string
 	net        *p2pNet.Network
-	handler    func(*message.Message)
+	handler    func(*network.PeerClient, *message.Message)
 }
 
-func NewNetwork(addr string, handler func(*message.Message)) *Network {
+func NewNetwork(addr string, handler func(*network.PeerClient, *message.Message)) *Network {
 	return &Network{
 		listenAddr: addr,
 		handler:    handler,
@@ -34,9 +33,8 @@ func (this *Network) Receive(ctx *network.ComponentContext) error {
 	if msg == nil {
 		return errors.New("message is nil")
 	}
-	log.Debugf("Got msg from %s, version: %s", ctx.Client().ID.String(), msg.Header.Version)
 	if this.handler != nil {
-		this.handler(msg)
+		this.handler(ctx.Client(), msg)
 	}
 	return nil
 }
@@ -68,15 +66,38 @@ func (this *Network) Halt() error {
 	return nil
 }
 
-func (this *Network) Connect(addr string) {
-	this.net.Bootstrap(addr)
-	this.net.BlockUntilListening()
+func (this *Network) IsConnectionExists(addr string) bool {
+	return this.net.ConnectionStateExists(addr)
 }
 
-func (this *Network) Send(msg *message.Message, addr string) error {
-	client, err := this.net.Client(addr)
-	if err != nil {
-		return err
+func (this *Network) Connect(addr ...string) error {
+	this.net.Bootstrap(addr...)
+	for _, a := range addr {
+		exist := this.net.ConnectionStateExists(a)
+		if !exist {
+			return errors.New("connection not exist")
+		}
+	}
+	return nil
+}
+
+// Send send msg to peer
+// peer can be addr(string) or client(*network.peerClient)
+func (this *Network) Send(msg *message.Message, peer interface{}) error {
+	addr, ok := peer.(string)
+	if ok {
+		client, err := this.net.Client(addr)
+		if err != nil {
+			return err
+		}
+		if client == nil {
+			return errors.New("client is nil")
+		}
+		return client.Tell(context.Background(), msg.ToProtoMsg())
+	}
+	client, ok := peer.(*network.PeerClient)
+	if !ok || client == nil {
+		return errors.New("invalid peer type")
 	}
 	return client.Tell(context.Background(), msg.ToProtoMsg())
 }
