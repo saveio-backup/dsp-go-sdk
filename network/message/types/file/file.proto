@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package file;
+
+message Payment {
+    int32 asset = 1;
+    uint64 price = 2;
+}
+
+message File {
+   string hash = 1;  
+   repeated string blockHashes = 2;
+   int32 operation = 3;
+   Payment payInfo = 4;
+}

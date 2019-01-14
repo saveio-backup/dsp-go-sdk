@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package pb;
+
+message Header {
+    string version = 1;
+    string type = 2;
+    int32 length = 3;
+}
+
+message Payload {
+    bytes data = 1; 
+}
+
+message Message {
+    Header header = 1;
+    Payload payload = 2;
+}

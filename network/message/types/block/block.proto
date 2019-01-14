@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package block;
+
+message Block {
+   int32 index = 1; // block index of file
+   string fileHash = 2; // file  hash
+   string hash = 3; // block hash
+   bytes data = 4; // raw data
+   bytes tag = 5; // used for pdp
+}

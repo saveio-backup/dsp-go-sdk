@@ -24,3 +24,4 @@ vendor/*
 wallet.dat
 glide.lock
 
+Log/*
