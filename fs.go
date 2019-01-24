@@ -14,6 +14,7 @@ import (
 	chainCom "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/crypto/pdp"
+	fs "github.com/oniio/oniChain/smartcontract/service/native/onifs"
 )
 
 // RegisterNode. register node to chain
@@ -29,6 +30,51 @@ func (this *Dsp) RegisterNode(addr string, volume, serviceTime uint64) (string, 
 // UnregisterNode. unregister node to chain
 func (this *Dsp) UnregisterNode() (string, error) {
 	txHash, err := this.Chain.Native.Fs.NodeCancel()
+	if err != nil {
+		return "", err
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
+}
+
+// QueryNode. query node information by wallet address
+func (this *Dsp) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
+	address, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return nil, err
+	}
+	return this.Chain.Native.Fs.NodeQuery(address)
+}
+
+// UpdateNode. update node information
+func (this *Dsp) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
+	nodeInfo, err := this.QueryNode(this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+	if err != nil {
+		return "", err
+	}
+	if volume == 0 {
+		volume = nodeInfo.Volume
+	}
+	if volume < nodeInfo.Volume-nodeInfo.RestVol {
+		return "", fmt.Errorf("volume %d is less than original volume %d - restvol %d", volume, nodeInfo.Volume, nodeInfo.RestVol)
+	}
+	if serviceTime == 0 {
+		serviceTime = nodeInfo.ServiceTime
+	}
+	if len(addr) == 0 {
+		addr = string(nodeInfo.NodeAddr)
+	}
+	txHash, err := this.Chain.Native.Fs.NodeUpdate(volume, serviceTime, addr)
+	if err != nil {
+		return "", err
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
+}
+
+// RegisterNode. register node to chain
+func (this *Dsp) NodeWithdrawProfit() (string, error) {
+	txHash, err := this.Chain.Native.Fs.NodeWithDrawProfit()
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +195,6 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 			sent := uint64(this.UserFileMgr.StoredBlockCount(fileHashStr))
 			go emitProgress(progress, opt.FileDesc, fileHashStr, totalCount, sent)
 			if totalCount == sent {
-				// TODO check pdp prove
 				log.Infof("all block has sent")
 				finish = true
 				break

@@ -23,6 +23,7 @@ var uploadTestFile = "./testdata/testuploadbigfile.txt"
 // var uploadTestFile = "./testdata/testuploadfile.txt"
 var walletFile = "./testdata/wallet.dat"
 var wallet2File = "./testdata/wallet2.dat"
+var wallet1Addr = "AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS"
 var walletPwd = "pwd"
 
 func init() {
@@ -93,6 +94,69 @@ func TestNodeUnregister(t *testing.T) {
 	log.Infof("tx: %s", tx)
 }
 
+func TestNodeQuery(t *testing.T) {
+	d := NewDsp()
+	d.Chain = chain.NewChain()
+	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	info, err := d.QueryNode(wallet1Addr)
+	if err != nil {
+		log.Errorf("query node err %s", err)
+		return
+	}
+	log.Infof("node info pledge %d", info.Pledge)
+	log.Infof("node info profit %d", info.Profit)
+	log.Infof("node info volume %d", info.Volume)
+	log.Infof("node info restvol %d", info.RestVol)
+	log.Infof("node info service time %d", info.ServiceTime)
+	log.Infof("node info wallet address %s", info.WalletAddr.ToBase58())
+	log.Infof("node info node address %s", info.NodeAddr)
+}
+
+func TestNodeUpdate(t *testing.T) {
+	d := NewDsp()
+	d.Chain = chain.NewChain()
+	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	d.Chain.SetDefaultAccount(acc)
+	tx, err := d.UpdateNode(node1ListAddr, 0, 13)
+	if err != nil {
+		log.Errorf("update node err:%s", err)
+		return
+	}
+	log.Infof("tx: %s", tx)
+}
+
+func TestNodeWithdrawProfit(t *testing.T) {
+	d := NewDsp()
+	d.Chain = chain.NewChain()
+	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	d.Chain.SetDefaultAccount(acc)
+	tx, err := d.NodeWithdrawProfit()
+	if err != nil {
+		log.Errorf("register node err:%s", err)
+		return
+	}
+	log.Infof("tx: %s", tx)
+}
 func TestDspReceive(t *testing.T) {
 	log.InitLog(1, log.PATH, log.Stdout)
 	d := NewDsp()
