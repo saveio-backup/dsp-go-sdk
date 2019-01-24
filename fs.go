@@ -158,7 +158,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	for {
 		select {
 		case reqInfo := <-req:
-			isStored := this.UserFileMgr.IsBlockStored(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
+			isStored := this.taskMgr.IsBlockUploaded(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 			if isStored {
 				log.Debugf("block has stored %s", reqInfo.Hash)
 				break
@@ -187,12 +187,12 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 			}
 			// stored
-			this.UserFileMgr.AddStoredBlock(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
+			this.taskMgr.AddUploadedBlock(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 			// update progress
-			if len(this.UserFileMgr.GetStoredBlockNodeList(fileHashStr, reqInfo.Hash)) < int(opt.CopyNum)+1 {
+			if len(this.taskMgr.GetUploadedBlockNodeList(fileHashStr, reqInfo.Hash, uint32(reqInfo.Index))) < int(opt.CopyNum)+1 {
 				break
 			}
-			sent := uint64(this.UserFileMgr.StoredBlockCount(fileHashStr))
+			sent := uint64(this.taskMgr.UploadedBlockCount(fileHashStr))
 			go emitProgress(progress, opt.FileDesc, fileHashStr, totalCount, sent)
 			if totalCount == sent {
 				log.Infof("all block has sent")
@@ -209,6 +209,10 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	proved := this.checkFileBeProved(fileHashStr, opt.ProveTimes, opt.CopyNum)
 	if !proved {
 		return nil, errors.New("file has sent, but no enought prove is finished")
+	}
+	err = this.taskMgr.DeleteFileUploadInfo(fileHashStr)
+	if err != nil {
+		log.Errorf("delete file upload info err: %s", err)
 	}
 	return &common.UploadResult{
 		Tx:       tx,
@@ -253,7 +257,7 @@ func (this *Dsp) payForSendFile(filePath, fileHashStr string, blockNum uint64, o
 		if err != nil || !confirmed {
 			return nil, errors.New("tx is not confirmed")
 		}
-		err = this.UserFileMgr.NewStoreFile(tx, fileHashStr, privateKey)
+		err = this.taskMgr.PutFileUploadInfo(tx, fileHashStr, privateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -266,16 +270,12 @@ func (this *Dsp) payForSendFile(filePath, fileHashStr string, blockNum uint64, o
 			return nil, fmt.Errorf("file:%s has expired, please delete it first", fileHashStr)
 		}
 		log.Debugf("has paid but not store")
-		err := this.UserFileMgr.NewStoreFile("", fileHashStr, []byte{})
-		if err != nil {
-			return nil, err
-		}
-		if uint64(this.UserFileMgr.StoredBlockCount(fileHashStr)) == blockNum {
+		if uint64(this.taskMgr.UploadedBlockCount(fileHashStr)) == blockNum {
 			return nil, fmt.Errorf("has sent all blocks, waiting for ont-ipfs node commit proves")
 		}
 		paramsBuf = fileInfo.FileProveParam
-		privateKey = this.UserFileMgr.GetFileProvePrivKey(fileHashStr)
-		tx = this.UserFileMgr.GetStoreFileTx(fileHashStr)
+		privateKey = this.taskMgr.GetFileProvePrivKey(fileHashStr)
+		tx = this.taskMgr.GetStoreFileTx(fileHashStr)
 	}
 	if len(paramsBuf) == 0 || len(privateKey) == 0 {
 		return nil, fmt.Errorf("params.length is %d, prove private key length is %d. please delete file and re-send it", len(paramsBuf), len(privateKey))
@@ -309,7 +309,7 @@ func (this *Dsp) getUploadNodeList(filePath, fileHashStr string) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	nodeList := this.UserFileMgr.GetStoredBlockNodeList(fileHashStr, fileHashStr)
+	nodeList := this.taskMgr.GetUploadedBlockNodeList(fileHashStr, fileHashStr, 0)
 	if len(nodeList) != 0 {
 		return nodeList, nil
 	}
@@ -471,7 +471,7 @@ func (this *Dsp) notifyFetchReady(fileHashStr string, receivers []string) error 
 
 // startFetchBlocks for store node, fetch blocks one by one after receive fetch_rdy msg
 func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
-	blockHashes := this.NodeFilemgr.FileBlockHashes(fileHashStr)
+	blockHashes := this.taskMgr.FileBlockHashes(fileHashStr)
 	if len(blockHashes) == 0 {
 		log.Errorf("block hashes is empty for file :%s", fileHashStr)
 		return errors.New("block hashes is empty")
@@ -488,7 +488,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		return err
 	}
 	for index, hash := range blockHashes {
-		if this.NodeFilemgr.IsBlockStored(fileHashStr, hash, uint32(index)) {
+		if this.taskMgr.IsBlockDownloaded(fileHashStr, hash, uint32(index)) {
 			continue
 		}
 		msg := message.NewBlockReqMsg(fileHashStr, hash, int32(index))
@@ -516,7 +516,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 			if err != nil {
 				return err
 			}
-			this.NodeFilemgr.SetBlockStored(fileHashStr, value.Hash, uint32(index))
+			this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, uint32(index))
 		case <-time.After(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second):
 			if received {
 				break
@@ -525,13 +525,18 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 			return fmt.Errorf("receiving block %s timeout", hash)
 		}
 	}
-	if !this.NodeFilemgr.IsFileStored(fileHashStr) {
+	if !this.taskMgr.IsFileDownloaded(fileHashStr) {
 		return errors.New("all blocks have sent but file not be stored")
 	}
 	// TODO: push to tracker
 	log.Infof("received all block, start pdp verify")
 	// all block is saved, prove it
-	return this.Fs.StartPDPVerify(fileHashStr)
+	err = this.Fs.StartPDPVerify(fileHashStr)
+	if err != nil {
+		return err
+	}
+	// TODO: remove unused file info fields after prove pdp success
+	return nil
 }
 
 // uploadOptValid check upload opt valid

@@ -22,6 +22,7 @@ const (
 	BT_FILE_PREFIX_LEN             = 34                  // bt file prefix length
 )
 
+// deprecated. use filedb instead
 type NodeFileMgr struct {
 	NodeStoreFileMgr
 	NodeReadFileMgr

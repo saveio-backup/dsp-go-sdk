@@ -15,6 +15,7 @@ const (
 	DOWNLOAD_FILES_INFO_DIR = "./download-info/"  // downloads file directory, using for store temp downloaded files infomation
 )
 
+// deprecated. use filedb instead
 type UserFileMgr struct {
 	UserStoreFileMgr
 	UserReadFileMgr

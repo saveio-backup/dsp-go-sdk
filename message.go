@@ -53,8 +53,8 @@ func (this *Dsp) handleFileMsg(peer *network.PeerClient, msg *message.Message) {
 			log.Errorf("block number is unmatched %d, %d", len(fileMsg.BlockHashes), info.FileBlockNum)
 			return
 		}
-		if !this.NodeFilemgr.IsFileStoring(fileMsg.Hash) {
-			err := this.NodeFilemgr.AddFileBlockHashes(fileMsg.Hash, fileMsg.BlockHashes)
+		if !this.taskMgr.IsFileDownloading(fileMsg.Hash) {
+			err := this.taskMgr.AddFileBlockHashes(fileMsg.Hash, fileMsg.BlockHashes)
 			if err != nil {
 				log.Errorf("add fileblockhashes failed:%s", err)
 				return
@@ -74,7 +74,7 @@ func (this *Dsp) handleFileMsg(peer *network.PeerClient, msg *message.Message) {
 		}
 		this.taskMgr.OnTaskAck(fileMsg.Hash)
 	case netcom.FILE_OP_FETCH_RDY:
-		if !this.NodeFilemgr.IsFileStoring(fileMsg.Hash) {
+		if !this.taskMgr.IsFileDownloading(fileMsg.Hash) {
 			return
 		}
 		err := this.startFetchBlocks(fileMsg.Hash, peer.Address)

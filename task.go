@@ -3,6 +3,9 @@ package dsp
 import (
 	"errors"
 	"sync"
+
+	"github.com/oniio/dsp-go-sdk/common"
+	"github.com/oniio/dsp-go-sdk/store"
 )
 
 type GetBlockReq struct {
@@ -29,16 +32,21 @@ type Task struct {
 	blockResp  chan *BlockResp
 }
 
+// TaskMgr. implement upload/download task manager.
+// only save needed information to db by fileDB, the other field save in memory
 type TaskMgr struct {
 	tasks map[string]*Task
 	lock  sync.RWMutex
+	*store.FileDB
 }
 
 func NewTaskMgr() *TaskMgr {
 	ts := make(map[string]*Task, 0)
-	return &TaskMgr{
+	tmgr := &TaskMgr{
 		tasks: ts,
 	}
+	tmgr.FileDB = store.NewFileDB(common.FILE_DB_DIR_PATH)
+	return tmgr
 }
 
 func (this *TaskMgr) NewTask(fileHash string) {

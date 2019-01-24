@@ -1,7 +1,8 @@
 package common
 
 const (
-	CHUNK_SIZE = 256 * 1024 // chunk size
+	CHUNK_SIZE       = 256 * 1024 // chunk size
+	FILE_DB_DIR_PATH = "./db"
 )
 
 const (
