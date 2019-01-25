@@ -102,3 +102,13 @@ func NewFileFetchRdyMsg(hash string) *Message {
 func NewFileDownloadMsg(hash, walletAddr string, asset int32, pricePerBlk uint64) *Message {
 	return NewFileMsg(hash, nil, common.FILE_OP_DOWNLOAD, walletAddr, asset, pricePerBlk)
 }
+
+// NewFileDeleteMsg
+func NewFileDeleteMsg(hash, walletAddr string) *Message {
+	return NewFileMsg(hash, nil, common.FILE_OP_DELETE, walletAddr, common.ASSET_NONE, 0)
+}
+
+// NewFileDeleteAckMsg
+func NewFileDeleteAckMsg(hash string) *Message {
+	return NewFileMsg(hash, nil, common.FILE_OP_DELETE_ACK, "", common.ASSET_NONE, 0)
+}

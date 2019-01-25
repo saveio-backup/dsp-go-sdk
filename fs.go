@@ -91,7 +91,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	}
 	var tx, fileHashStr string
 	var totalCount uint64
-	root, list, err := this.Fs.NodesFromFile(filePath, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), opt.Encrypt, opt.EncryptPassword)
+	root, list, err := this.Fs.NodesFromFile(filePath, "", opt.Encrypt, opt.EncryptPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	if err != nil {
 		return nil, err
 	}
-
+	log.Debugf("wait for fetching block")
 	finish := false
 	timeout := time.NewTimer(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
 	for {
@@ -185,6 +185,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 			if err != nil {
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 			}
+			log.Debugf("send block success %s, add uploaded block to db", reqInfo.Hash)
 			// stored
 			this.taskMgr.AddUploadedBlock(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 			// update progress
@@ -228,7 +229,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 	info, err := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	if err != nil || info == nil {
 		log.Debugf("info:%v, err:%s", info, err)
-		return "", fmt.Errorf("file %s has deleted", fileHashStr)
+		return "", fmt.Errorf("file info not found, %s has deleted", fileHashStr)
 	}
 	if info.FileOwner.ToBase58() != this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
 		return "", fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
@@ -237,7 +238,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT), txHash)
+	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
 	if err != nil || !confirmed {
 		return "", errors.New("wait for tx confirmed failed")
 	}
@@ -245,8 +246,11 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 	if len(storingNode) == 0 {
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(fileHashStr, fileHashStr, 0)...)
 	}
-	// TODO: send delete msg
-
+	msg := message.NewFileDeleteMsg(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+	err = this.Network.Broadcast(storingNode, msg, true, nil, nil)
+	if err != nil {
+		return "", err
+	}
 	err = this.taskMgr.DeleteFileUploadInfo(fileHashStr)
 	if err != nil {
 		log.Errorf("delete upload info from db err: %s", err)
@@ -388,7 +392,8 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	receivers := make([]string, 0)
 	msg := message.NewFileFetchAskMsg(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
-	action := func(addr string) {
+	action := func(res *message.Message, addr string) {
+		log.Debugf("send file ask msg success %s", addr)
 		// block waiting for ack msg or timeout msg
 		isAck := false
 		ack, err := this.taskMgr.TaskAck(fileHashStr)
@@ -411,8 +416,9 @@ func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []s
 	stop := func() bool {
 		return len(receivers) >= receiverCount
 	}
-	err := this.Network.Broadcast(nodeList, msg, stop, action)
+	err := this.Network.Broadcast(nodeList, msg, false, stop, action)
 	if err != nil {
+		log.Errorf("wait file receivers broadcast err")
 		return nil, err
 	}
 	log.Debugf("receives :%v", receivers)
@@ -423,7 +429,7 @@ func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []s
 func (this *Dsp) notifyFetchReady(fileHashStr string, receivers []string) error {
 	msg := message.NewFileFetchRdyMsg(fileHashStr)
 	this.taskMgr.SetTaskReady(fileHashStr, true)
-	err := this.Network.Broadcast(receivers, msg, nil, nil)
+	err := this.Network.Broadcast(receivers, msg, false, nil, nil)
 	if err != nil {
 		log.Errorf("notify err %s", err)
 		this.taskMgr.SetTaskReady(fileHashStr, false)
@@ -499,6 +505,16 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 	}
 	// TODO: remove unused file info fields after prove pdp success
 	return nil
+}
+
+// deleteFile. delete file from fs.
+func (this *Dsp) deleteFile(fileHashStr string) error {
+	err := this.Fs.DeleteFile(fileHashStr)
+	if err != nil {
+		return err
+	}
+	log.Debugf("delete file success")
+	return this.taskMgr.DeleteFileDownloadInfo(fileHashStr)
 }
 
 // uploadOptValid check upload opt valid

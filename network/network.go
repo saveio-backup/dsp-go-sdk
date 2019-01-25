@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
@@ -21,10 +22,10 @@ type Network struct {
 	*p2pNet.Component
 	listenAddr string
 	net        *p2pNet.Network
-	handler    func(*network.PeerClient, *message.Message)
+	handler    func(*network.ComponentContext)
 }
 
-func NewNetwork(addr string, handler func(*network.PeerClient, *message.Message)) *Network {
+func NewNetwork(addr string, handler func(*network.ComponentContext)) *Network {
 	return &Network{
 		listenAddr: addr,
 		handler:    handler,
@@ -32,12 +33,8 @@ func NewNetwork(addr string, handler func(*network.PeerClient, *message.Message)
 }
 
 func (this *Network) Receive(ctx *network.ComponentContext) error {
-	msg := message.ReadMessage(ctx.Message())
-	if msg == nil {
-		return errors.New("message is nil")
-	}
 	if this.handler != nil {
-		this.handler(ctx.Client(), msg)
+		this.handler(ctx)
 	}
 	return nil
 }
@@ -87,27 +84,31 @@ func (this *Network) Connect(addr ...string) error {
 // Send send msg to peer
 // peer can be addr(string) or client(*network.peerClient)
 func (this *Network) Send(msg *message.Message, peer interface{}) error {
-	addr, ok := peer.(string)
-	if ok {
-		client, err := this.net.Client(addr)
-		if err != nil {
-			return err
-		}
-		if client == nil {
-			return errors.New("client is nil")
-		}
-		return client.Tell(context.Background(), msg.ToProtoMsg())
-	}
-	client, ok := peer.(*network.PeerClient)
-	if !ok || client == nil {
-		return errors.New("invalid peer type")
+	client, err := this.loadClient(peer)
+	if err != nil {
+		return err
 	}
 	return client.Tell(context.Background(), msg.ToProtoMsg())
 }
 
+func (this *Network) Request(msg *message.Message, peer interface{}) (*message.Message, error) {
+	client, err := this.loadClient(peer)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(common.REQUEST_MSG_TIMEOUT)*time.Second)
+	defer cancel()
+	res, err := client.Request(ctx, msg.ToProtoMsg())
+	if err != nil {
+		return nil, err
+	}
+	return message.ReadMessage(res), nil
+}
+
 // Broadcast. broadcast same msg to peers. Handle action if send msg success.
 // If one msg is sent failed, return err. But the previous success msgs can not be recalled.
-func (this *Network) Broadcast(addrs []string, msg *message.Message, stop func() bool, action func(addr string)) error {
+// action(responseMsg, responseToAddr).
+func (this *Network) Broadcast(addrs []string, msg *message.Message, needReply bool, stop func() bool, action func(*message.Message, string)) error {
 	wg := sync.WaitGroup{}
 	maxRoutines := common.MAX_GOROUTINES_IN_LOOP
 	if len(addrs) <= common.MAX_GOROUTINES_IN_LOOP {
@@ -126,13 +127,19 @@ func (this *Network) Broadcast(addrs []string, msg *message.Message, stop func()
 					return
 				}
 			}
-			err := this.Send(msg, to)
+			var res *message.Message
+			var err error
+			if !needReply {
+				err = this.Send(msg, to)
+			} else {
+				res, err = this.Request(msg, to)
+			}
 			if err != nil {
 				errs[to] = err
 				return
 			}
 			if action != nil {
-				action(to)
+				action(res, to)
 			}
 		}(addr)
 		count++
@@ -157,4 +164,23 @@ func (this *Network) Broadcast(addrs []string, msg *message.Message, stop func()
 		log.Errorf("broadcast msg to %s, err %s", to, err)
 	}
 	return errors.New("broadcast failed")
+}
+
+func (this *Network) loadClient(peer interface{}) (*network.PeerClient, error) {
+	addr, ok := peer.(string)
+	if ok {
+		client, err := this.net.Client(addr)
+		if err != nil {
+			return nil, err
+		}
+		if client == nil {
+			return nil, errors.New("client is nil")
+		}
+		return client, nil
+	}
+	client, ok := peer.(*network.PeerClient)
+	if !ok || client == nil {
+		return nil, errors.New("invalid peer type")
+	}
+	return client, nil
 }

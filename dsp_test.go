@@ -16,8 +16,8 @@ import (
 )
 
 var rpcAddr = "http://127.0.0.1:20336"
-var node1ListAddr = "kcp://127.0.0.1:4001"
-var node2ListAddr = "kcp://127.0.0.1:4002"
+var node1ListAddr = "tcp://127.0.0.1:4001"
+var node2ListAddr = "tcp://127.0.0.1:4002"
 
 var uploadTestFile = "./testdata/testuploadbigfile.txt"
 
@@ -232,6 +232,31 @@ func TestUploadFile(t *testing.T) {
 		return
 	}
 	log.Infof("upload file success, ret:%v", ret)
+}
+
+func TestDeleteFile(t *testing.T) {
+	d := NewDsp()
+	d.taskMgr.FileDB = store.NewFileDB("./db1")
+	d.Start(node2ListAddr)
+	d.Chain = chain.NewChain()
+	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	w, err := wallet.OpenWallet(wallet2File)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	d.Chain.SetDefaultAccount(acc)
+	ret, err := d.DeleteUploadedFile("QmcZpEMmwLGYCC1FHuixdrn31cPcmUYTfZ3vXzBTcafDym")
+	if err != nil {
+		log.Errorf("delete file failed, err:%s", err)
+		return
+	}
+	log.Infof("delete file success, ret:%v", ret)
 }
 
 func TestMsgResponse(t *testing.T) {

@@ -1,6 +1,9 @@
 package dsp
 
 import (
+	"context"
+	"strings"
+
 	netcom "github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/types/block"
@@ -10,7 +13,9 @@ import (
 )
 
 // Receive p2p message receive router
-func (this *Dsp) Receive(peer *network.PeerClient, msg *message.Message) {
+func (this *Dsp) Receive(ctx *network.ComponentContext) {
+	msg := message.ReadMessage(ctx.Message())
+	peer := ctx.Client()
 	if msg == nil || msg.Header == nil {
 		log.Debugf("receive nil msg from %s\n", peer.Address)
 		return
@@ -21,16 +26,16 @@ func (this *Dsp) Receive(peer *network.PeerClient, msg *message.Message) {
 	}
 	switch msg.Header.Type {
 	case netcom.MSG_TYPE_FILE:
-		this.handleFileMsg(peer, msg)
+		this.handleFileMsg(ctx, peer, msg)
 	case netcom.MSG_TYPE_BLOCK:
-		this.handleBlockMsg(peer, msg)
+		this.handleBlockMsg(ctx, peer, msg)
 	default:
 		log.Debugf("unrecongized msg type %s", msg.Header.Type)
 	}
 }
 
 // handleFileMsg handle all file msg
-func (this *Dsp) handleFileMsg(peer *network.PeerClient, msg *message.Message) {
+func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
 	log.Debugf("handleFileMsg %s from peer:%s, length:%d\n", map[int32]string{
 		netcom.FILE_OP_FETCH_ASK: "fetch_ask",
@@ -42,7 +47,7 @@ func (this *Dsp) handleFileMsg(peer *network.PeerClient, msg *message.Message) {
 		//TODO: verify & save info
 		info, _ := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
 		if info == nil {
-			log.Errorf("file info is nil %s %s!", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+			log.Errorf("fetch ask file info is nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 			return
 		}
 		if info.FileOwner.ToBase58() != fileMsg.PayInfo.WalletAddress {
@@ -81,12 +86,25 @@ func (this *Dsp) handleFileMsg(peer *network.PeerClient, msg *message.Message) {
 		if err != nil {
 			log.Errorf("start fetch blocks for file %s failed, err:%s", fileMsg.Hash, err)
 		}
+	case netcom.FILE_OP_DELETE:
+		info, err := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
+		if info != nil || strings.Index(err.Error(), "FsGetFileInfo not found") == -1 {
+			log.Errorf("delete file info is not nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+			return
+		}
+		replyMsg := message.NewFileDeleteAckMsg(fileMsg.Hash)
+		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply delete ok msg failed", err)
+		}
+		// TODO: check file owner
+		this.deleteFile(fileMsg.Hash)
 	default:
 	}
 }
 
 // handleBlockMsg handle all file msg
-func (this *Dsp) handleBlockMsg(peer *network.PeerClient, msg *message.Message) {
+func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	blockMsg := msg.Payload.(*block.Block)
 	log.Debugf("handleBlockMsg %s from peer:%s, length:%d\n",
 		map[int32]string{

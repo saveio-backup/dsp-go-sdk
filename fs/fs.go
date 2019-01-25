@@ -111,3 +111,14 @@ func (this *Fs) PutTag(key string, tag []byte) error {
 func (this *Fs) StartPDPVerify(fileHashStr string) error {
 	return nil
 }
+
+// GetBlock get blocks
+func (this *Fs) GetBlock(hash string) blocks.Block {
+	return nil
+}
+
+// DeleteFile. delete file, unpin root block if needed
+// If a block is referenced to other file, ignore it.
+func (this *Fs) DeleteFile(fileHashStr string) error {
+	return nil
+}

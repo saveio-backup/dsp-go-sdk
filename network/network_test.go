@@ -1,20 +1,33 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
+	"github.com/oniio/oniP2p/network"
 )
 
-var node1ListAddr = "kcp://127.0.0.1:4001"
-var node2ListAddr = "kcp://127.0.0.1:4002"
+var node1ListAddr = "tcp://127.0.0.1:4001"
+var node2ListAddr = "tcp://127.0.0.1:4002"
 
 func TestNetworkReceiveMsg(t *testing.T) {
 	n := NewNetwork(node1ListAddr, nil)
 	n.Start()
+	n.handler = func(ctx *network.ComponentContext) {
+		msg := message.ReadMessage(ctx.Message())
+		if msg == nil {
+			return
+		}
+		fmt.Printf("receive, requestNonce:%d, from address %s\n", ctx.Client().RequestNonce, ctx.Client().Address)
+		err := ctx.Reply(context.Background(), msg.ToProtoMsg())
+		if err != nil {
+			fmt.Printf("reply err:%v\n", err)
+		}
+	}
 	tick := time.NewTicker(time.Second)
 	for {
 		<-tick.C
@@ -25,23 +38,16 @@ func TestNetworkSendMsg(t *testing.T) {
 	n := NewNetwork(node2ListAddr, nil)
 	n.Start()
 	n.Connect(node1ListAddr)
-	tick := time.NewTicker(time.Duration(10) * time.Second)
+	tick := time.NewTicker(time.Duration(3) * time.Second)
 	for {
-
-		data1 := []byte{0x2}
-		for i := 0; i < 256*1024; i++ {
-			data1 = append(data1, []byte("0")...)
-		}
-		data1 = append(data1, []byte{0x4}...)
-		fmt.Printf("len:%d\n", len(data1))
 		msg := &message.Message{}
 		msg.Header = &message.Header{
-			Version:   string(data1),
+			Version:   "0",
 			Type:      common.MSG_TYPE_BLOCK,
 			MsgLength: 0,
 		}
-		// fmt.Printf("msg:%v\n", msg.Header.Version)
-		n.Send(msg, node1ListAddr)
+		res, err := n.Request(msg, node1ListAddr)
+		fmt.Printf("get response from msg:%v, err:%s\n", res, err)
 		<-tick.C
 	}
 }
