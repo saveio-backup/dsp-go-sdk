@@ -33,15 +33,16 @@ type blockInfo struct {
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type fileInfo struct {
 	Tx           string                `json:"tx,omitempty"`
-	Blocks       map[string]*blockInfo `json:"blocks,omitempty"`
+	Blocks       map[string]*blockInfo `json:"blocks"`
 	BlockHashes  []string              `json:"block_hashes,omitempty"`
 	ProvePrivKey []byte                `json:"prove_private_key,omitempty"`
 }
 
 func NewFileDB(dbPath string) *FileDB {
 	db, err := NewLevelDBStore(dbPath)
+	fmt.Printf("path:%v, err:%s\n", dbPath, err)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	return &FileDB{
 		db: db,
@@ -59,6 +60,7 @@ func (this *FileDB) PutFileUploadInfo(tx, fileHashStr string, provePrivKey []byt
 	}
 	fi.Tx = tx
 	fi.ProvePrivKey = provePrivKey
+	fi.Blocks = make(map[string]*blockInfo, 0)
 	return this.putFileInfo(fileHashStr, fi, FileInfoTypeUpload)
 }
 
@@ -86,6 +88,9 @@ func (this *FileDB) AddUploadedBlock(fileHashStr, blockHashStr, nodeAddr string,
 		}
 	}
 	block.NodeList = append(block.NodeList, nodeAddr)
+	if fi.Blocks == nil {
+		fi.Blocks = make(map[string]*blockInfo, 0)
+	}
 	fi.Blocks[blockKey] = block
 	return this.putFileInfo(fileHashStr, fi, FileInfoTypeUpload)
 }
@@ -192,6 +197,9 @@ func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr string, index u
 		State: 1,
 	}
 	blockKey := string(downloadFileBlockKey(fileHashStr, blockHashStr, index))
+	if fi.Blocks == nil {
+		fi.Blocks = make(map[string]*blockInfo, 0)
+	}
 	fi.Blocks[blockKey] = recv
 	return this.putFileInfo(fileHashStr, fi, FileInfoTypeDownload)
 }

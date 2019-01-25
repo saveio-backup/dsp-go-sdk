@@ -30,3 +30,7 @@ const (
 	ASSET_ONT  = 1
 	ASSET_ONG  = 2
 )
+
+const (
+	MAX_GOROUTINES_IN_LOOP = 10
+)

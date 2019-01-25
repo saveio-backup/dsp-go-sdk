@@ -10,6 +10,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/common"
 	netcom "github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
+	"github.com/oniio/dsp-go-sdk/store"
 	"github.com/oniio/oniChain-go-sdk"
 	"github.com/oniio/oniChain/common/log"
 )
@@ -162,6 +163,7 @@ func TestDspReceive(t *testing.T) {
 	d := NewDsp()
 	d.Chain = chain.NewChain()
 	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+
 	d.Start(node1ListAddr)
 	tick := time.NewTicker(time.Second)
 	for {
@@ -187,6 +189,7 @@ func TestDspSendMsg(t *testing.T) {
 
 func TestUploadFile(t *testing.T) {
 	d := NewDsp()
+	d.taskMgr.FileDB = store.NewFileDB("./db1")
 	d.Start(node2ListAddr)
 	d.Chain = chain.NewChain()
 	d.Chain.NewRpcClient().SetAddress(rpcAddr)

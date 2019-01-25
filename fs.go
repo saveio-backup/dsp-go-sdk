@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/oniio/dsp-go-sdk/common"
@@ -221,6 +220,40 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	}, nil
 }
 
+// DeleteUploadedFile. delete uploaded file from the owner
+func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
+	if len(fileHashStr) == 0 {
+		return "", errors.New("delete file hash string is empty")
+	}
+	info, err := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
+	if err != nil || info == nil {
+		log.Debugf("info:%v, err:%s", info, err)
+		return "", fmt.Errorf("file %s has deleted", fileHashStr)
+	}
+	if info.FileOwner.ToBase58() != this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
+		return "", fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
+	}
+	txHash, err := this.Chain.Native.Fs.DeleteFile(fileHashStr)
+	if err != nil {
+		return "", err
+	}
+	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT), txHash)
+	if err != nil || !confirmed {
+		return "", errors.New("wait for tx confirmed failed")
+	}
+	storingNode, _ := this.getFileProveNode(fileHashStr, info.ChallengeTimes)
+	if len(storingNode) == 0 {
+		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(fileHashStr, fileHashStr, 0)...)
+	}
+	// TODO: send delete msg
+
+	err = this.taskMgr.DeleteFileUploadInfo(fileHashStr)
+	if err != nil {
+		log.Errorf("delete upload info from db err: %s", err)
+	}
+	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
+}
+
 // payForSendFile pay before send a file
 // return PoR params byte slice, PoR private key of the file or error
 func (this *Dsp) payForSendFile(filePath, fileHashStr string, blockNum uint64, opt *common.UploadOption) (*common.PayStoreFileReulst, error) {
@@ -262,11 +295,11 @@ func (this *Dsp) payForSendFile(filePath, fileHashStr string, blockNum uint64, o
 			return nil, err
 		}
 	} else {
-		storing, stored := this.getFileStoreNodeCount(fileHashStr, fileInfo.ChallengeTimes)
-		if storing > 0 {
+		storing, stored := this.getFileProveNode(fileHashStr, fileInfo.ChallengeTimes)
+		if len(storing) > 0 {
 			return nil, fmt.Errorf("file:%s has stored", fileHashStr)
 		}
-		if stored > 0 {
+		if len(stored) > 0 {
 			return nil, fmt.Errorf("file:%s has expired, please delete it first", fileHashStr)
 		}
 		log.Debugf("has paid but not store")
@@ -287,17 +320,18 @@ func (this *Dsp) payForSendFile(filePath, fileHashStr string, blockNum uint64, o
 	}, nil
 }
 
-// getFileStoreNodeCount. get file storing nodes count and stored (expired) nodes count
-func (this *Dsp) getFileStoreNodeCount(fileHashStr string, challengeTimes uint64) (uint32, uint32) {
+// getFileProveNode. get file storing nodes  and stored (expired) nodes
+func (this *Dsp) getFileProveNode(fileHashStr string, challengeTimes uint64) ([]string, []string) {
 	proveDetails, _ := this.Chain.Native.Fs.GetFileProveDetails(fileHashStr)
-	storing, stored := uint32(0), uint32(0)
-	if proveDetails != nil {
-		for _, detail := range proveDetails.ProveDetails {
-			if detail.ProveTimes < challengeTimes+1 {
-				storing++
-			} else {
-				stored++
-			}
+	storing, stored := make([]string, 0), make([]string, 0)
+	if proveDetails == nil {
+		return storing, stored
+	}
+	for _, detail := range proveDetails.ProveDetails {
+		if detail.ProveTimes < challengeTimes+1 {
+			storing = append(storing, string(detail.NodeAddr))
+		} else {
+			stored = append(stored, string(detail.NodeAddr))
 		}
 	}
 	return storing, stored
@@ -337,8 +371,8 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 		if retry > common.CHECK_PROVE_TIMEOUT/timewait {
 			return false
 		}
-		storing, _ := this.getFileStoreNodeCount(fileHashStr, uint64(proveTimes))
-		if storing >= copyNum+1 {
+		storing, _ := this.getFileProveNode(fileHashStr, uint64(proveTimes))
+		if uint32(len(storing)) >= copyNum+1 {
 			break
 		}
 		retry++
@@ -348,75 +382,38 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 }
 
 // waitFileReceivers find nodes and send file give msg, waiting for file fetch msg
-// peer -> filegive
-// peer <- filefetch
+// client -> fetch_ask -> peer.
+// client <- fetch_ack <- peer.
 // return receivers
 func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	receivers := make([]string, 0)
-	sent := 0
-	wg := sync.WaitGroup{}
-	// max go routines number in loop
-	connsInLoop := common.MAX_GOROUTINES_IN_LOOP
-	if receiverCount <= common.MAX_GOROUTINES_IN_LOOP {
-		connsInLoop = receiverCount
+	msg := message.NewFileFetchAskMsg(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+	action := func(addr string) {
+		// block waiting for ack msg or timeout msg
+		isAck := false
+		ack, err := this.taskMgr.TaskAck(fileHashStr)
+		if err != nil {
+			return
+		}
+		select {
+		case <-ack:
+			isAck = true
+			log.Debugf("received ack from %s\n", addr)
+			receivers = append(receivers, addr)
+		case <-time.After(time.Duration(common.FILE_FETCH_ACK_TIMEOUT) * time.Second):
+			if isAck {
+				return
+			}
+			this.taskMgr.SetTaskTimeout(fileHashStr, true)
+			return
+		}
 	}
-	//TEST: large amount of go routine case
-	for _, addr := range nodeList {
-		wg.Add(1)
-		go func(to string) {
-			if !this.Network.IsConnectionExists(to) {
-				err := this.Network.Connect(to)
-				if err != nil {
-					log.Errorf("connect err:%s", err)
-					sent--
-					wg.Done()
-					return
-				}
-			}
-			msg := message.NewFileFetchAskMsg(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
-			err := this.Network.Send(msg, to)
-			log.Debugf("sent fetch ask msg: %v", msg)
-			if err != nil {
-				sent--
-				wg.Done()
-				return
-			}
-			// block waiting for ack msg or timeout msg
-			isAck := false
-			ack, err := this.taskMgr.TaskAck(fileHashStr)
-			if err != nil {
-				sent--
-				wg.Done()
-				return
-			}
-			select {
-			case <-ack:
-				isAck = true
-				log.Debugf("received ack from %s\n", to)
-				receivers = append(receivers, to)
-				wg.Done()
-			case <-time.After(time.Duration(common.FILE_FETCH_ACK_TIMEOUT) * time.Second):
-				if isAck {
-					return
-				}
-				this.taskMgr.SetTaskTimeout(fileHashStr, true)
-				sent--
-				wg.Done()
-				return
-			}
-		}(addr)
-		sent++
-		if sent == connsInLoop {
-			wg.Wait()
-		}
-		if len(receivers) >= receiverCount {
-			break
-		}
-		sent = 0
-		connsInLoop = common.MAX_GOROUTINES_IN_LOOP
-		if receiverCount-len(receivers) <= common.MAX_GOROUTINES_IN_LOOP {
-			connsInLoop = receiverCount - len(receivers)
-		}
+	stop := func() bool {
+		return len(receivers) >= receiverCount
+	}
+	err := this.Network.Broadcast(nodeList, msg, stop, action)
+	if err != nil {
+		return nil, err
 	}
 	log.Debugf("receives :%v", receivers)
 	return receivers, nil
@@ -424,44 +421,9 @@ func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []s
 
 // notifyFetchReady send fetch_rdy msg to receivers
 func (this *Dsp) notifyFetchReady(fileHashStr string, receivers []string) error {
-	wg := sync.WaitGroup{}
-	connsInLoop := common.MAX_GOROUTINES_IN_LOOP
-	if len(receivers) <= common.MAX_GOROUTINES_IN_LOOP {
-		connsInLoop = len(receivers)
-	}
-	count := 0
+	msg := message.NewFileFetchRdyMsg(fileHashStr)
 	this.taskMgr.SetTaskReady(fileHashStr, true)
-	var err error
-	for _, addr := range receivers {
-		wg.Add(1)
-		go func(to string) {
-			if !this.Network.IsConnectionExists(to) {
-				err = this.Network.Connect(to)
-				if err != nil {
-					wg.Done()
-					return
-				}
-			}
-			msg := message.NewFileFetchRdyMsg(fileHashStr)
-			err = this.Network.Send(msg, to)
-			if err != nil {
-				count--
-				wg.Done()
-				return
-			}
-			wg.Done()
-		}(addr)
-		count++
-		if count >= connsInLoop {
-			wg.Wait()
-		}
-		// reset
-		connsInLoop = common.MAX_GOROUTINES_IN_LOOP
-		if len(receivers)-count <= common.MAX_GOROUTINES_IN_LOOP {
-			connsInLoop = len(receivers) - count
-		}
-		count = 0
-	}
+	err := this.Network.Broadcast(receivers, msg, nil, nil)
 	if err != nil {
 		log.Errorf("notify err %s", err)
 		this.taskMgr.SetTaskReady(fileHashStr, false)

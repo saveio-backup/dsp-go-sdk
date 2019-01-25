@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
 
+	"github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/pb"
+	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniP2p/crypto/ed25519"
 	"github.com/oniio/oniP2p/network"
 	p2pNet "github.com/oniio/oniP2p/network"
@@ -100,4 +103,58 @@ func (this *Network) Send(msg *message.Message, peer interface{}) error {
 		return errors.New("invalid peer type")
 	}
 	return client.Tell(context.Background(), msg.ToProtoMsg())
+}
+
+// Broadcast. broadcast same msg to peers. Handle action if send msg success.
+// If one msg is sent failed, return err. But the previous success msgs can not be recalled.
+func (this *Network) Broadcast(addrs []string, msg *message.Message, stop func() bool, action func(addr string)) error {
+	wg := sync.WaitGroup{}
+	maxRoutines := common.MAX_GOROUTINES_IN_LOOP
+	if len(addrs) <= common.MAX_GOROUTINES_IN_LOOP {
+		maxRoutines = len(addrs)
+	}
+	count := 0
+	errs := make(map[string]error, 0)
+	for _, addr := range addrs {
+		wg.Add(1)
+		go func(to string) {
+			defer wg.Done()
+			if !this.IsConnectionExists(to) {
+				err := this.Connect(to)
+				if err != nil {
+					errs[to] = err
+					return
+				}
+			}
+			err := this.Send(msg, to)
+			if err != nil {
+				errs[to] = err
+				return
+			}
+			if action != nil {
+				action(to)
+			}
+		}(addr)
+		count++
+		if count >= maxRoutines {
+			wg.Wait()
+			// reset, start new round
+			count = 0
+		}
+		if len(errs) > 0 {
+			break
+		}
+		if stop != nil && stop() {
+			break
+		}
+	}
+	// wait again if last round count < maxRoutines
+	wg.Wait()
+	if len(errs) == 0 {
+		return nil
+	}
+	for to, err := range errs {
+		log.Errorf("broadcast msg to %s, err %s", to, err)
+	}
+	return errors.New("broadcast failed")
 }

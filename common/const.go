@@ -5,10 +5,6 @@ const (
 	FILE_DB_DIR_PATH = "./db"
 )
 
-const (
-	MAX_GOROUTINES_IN_LOOP = 10
-)
-
 // timeout
 const (
 	TX_CONFIRM_TIMEOUT     = 60 // wait for tx confirmed timeout

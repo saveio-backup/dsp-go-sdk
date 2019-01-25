@@ -28,3 +28,5 @@ Log/*
 testdata/*
 filestore.files
 filestore-info/*
+db/*
+db1/*
