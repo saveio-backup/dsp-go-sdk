@@ -5,6 +5,7 @@ import (
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
 	"os"
 
+	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
 	"gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
 
 	"github.com/gogo/protobuf/proto"
@@ -121,4 +122,76 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 // If a block is referenced to other file, ignore it.
 func (this *Fs) DeleteFile(fileHashStr string) error {
 	return nil
+}
+
+type ProtoNode struct {
+	Data       []byte
+	FileSize   uint64
+	Blocksizes []uint64
+	LinkHashes []string
+	LinkSizes  map[string]uint64
+}
+
+func (this *Fs) BlockToProtoNode(block blocks.Block) (*ProtoNode, error) {
+	dagNode, err := ml.DecodeProtobufBlock(block)
+	if err != nil {
+		return nil, err
+	}
+	node := new(ProtoNode)
+	node.LinkHashes = make([]string, 0)
+	node.LinkSizes = make(map[string]uint64, 0)
+	for _, link := range dagNode.Links() {
+		node.LinkHashes = append(node.LinkHashes, link.Cid.String())
+		node.LinkSizes[link.Cid.String()] = link.Size
+	}
+	pb := new(ftpb.Data)
+	if err := proto.Unmarshal(dagNode.(*ml.ProtoNode).Data(), pb); err != nil {
+		return nil, err
+	}
+	node.Data = pb.GetData()
+	node.FileSize = pb.GetFilesize()
+	node.Blocksizes = pb.GetBlocksizes()
+	// fmt.Printf("GetType:%v\n", pb.GetType())
+	// fmt.Printf("GetData:%v\n", len(pb.GetData()))
+	// fmt.Printf("GetFilesize:%v\n", pb.GetFilesize())
+	// fmt.Printf("GetBlocksizes:%v\n", pb.GetBlocksizes())
+	// fmt.Printf("GetHashType:%v\n", pb.GetHashType())
+	// fmt.Printf("GetFanout:%v\n", pb.GetFanout())
+	return node, nil
+}
+
+func (this *Fs) ProtoNodeToBlock(node *ProtoNode) (blocks.Block, error) {
+	pb := new(ftpb.Data)
+	pb.Type = ftpb.Data_File.Enum()
+	if len(node.Data) > 0 {
+		pb.Data = node.Data
+	}
+	pb.Filesize = new(uint64)
+	*pb.Filesize = node.FileSize
+	pb.Blocksizes = node.Blocksizes
+	data, err := proto.Marshal(pb)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("data:%v, len:%d\n", data, len(data))
+	root := ml.NodeWithData(data)
+	for _, hash := range node.LinkHashes {
+		c, err := cid.Decode(hash)
+		if err != nil {
+			return nil, err
+		}
+		size := node.LinkSizes[hash]
+		l1 := &ipld.Link{
+			Name: "",
+			Size: size,
+			Cid:  c,
+		}
+		root.AddRawLink("", l1)
+	}
+	buf, err := root.EncodeProtobuf(false)
+	if err != nil {
+		return nil, err
+	}
+	block := this.BytesToBlock(buf)
+	return block, nil
 }
