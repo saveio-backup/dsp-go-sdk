@@ -84,7 +84,7 @@ func (this *Dsp) NodeWithdrawProfit() (string, error) {
 }
 
 // UploadFile upload file logic
-func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress chan *common.UploadingInfo) (*common.UploadResult, error) {
+func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.UploadResult, error) {
 	if err := uploadOptValid(filePath, opt); err != nil {
 		return nil, err
 	}
@@ -109,7 +109,6 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	}
 
 	totalCount = uint64(len(list) + 1)
-	go emitProgress(progress, opt.FileDesc, fileHashStr, totalCount, 0)
 
 	// pay file
 	payRet, err := this.payForSendFile(filePath, fileHashStr, uint64(len(list)+1), opt)
@@ -133,6 +132,9 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	this.taskMgr.NewTask(fileHashStr, task.TaskTypeUpload)
 	// delete task from cache in the end
 	defer this.taskMgr.DeleteTask(fileHashStr)
+	this.taskMgr.SetFileName(fileHashStr, opt.FileDesc)
+	this.taskMgr.SetFileBlocksTotalCount(fileHashStr, uint64(len(list)+1))
+	go this.taskMgr.EmitProgress(fileHashStr)
 	receivers, err := this.waitFileReceivers(fileHashStr, nodeList, hashes, int(opt.CopyNum)+1)
 	if err != nil {
 		return nil, err
@@ -207,11 +209,11 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 			// stored
 			this.taskMgr.AddUploadedBlock(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 			// update progress
+			go this.taskMgr.EmitProgress(fileHashStr)
 			if len(this.taskMgr.GetUploadedBlockNodeList(fileHashStr, reqInfo.Hash, uint32(reqInfo.Index))) < int(opt.CopyNum)+1 {
 				break
 			}
 			sent := uint64(this.taskMgr.UploadedBlockCount(fileHashStr))
-			go emitProgress(progress, opt.FileDesc, fileHashStr, totalCount, sent)
 			if totalCount == sent {
 				log.Infof("all block has sent")
 				finish = true
@@ -348,6 +350,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 	// start a task
 	this.taskMgr.NewTask(fileHashStr, task.TaskTypeDownload)
 	defer this.taskMgr.DeleteTask(fileHashStr)
+	this.taskMgr.SetFileBlocksTotalCount(fileHashStr, uint64(len(blockHashes)))
 	// declare job for workers
 	job := func(fHash, bHash, pAddr string, index int32, respCh chan *task.BlockResp) (*task.BlockResp, error) {
 		log.Debugf("download %s-%s-%d from %s", fHash, bHash, index, pAddr)
@@ -371,10 +374,11 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 				log.Debugf("%s-%s-%d is downloaded", fileHashStr, value.Hash, value.Index)
 				continue
 			}
-			err := this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, uint32(value.Index), value.Offset)
+			err := this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset)
 			if err != nil {
 				return err
 			}
+			go this.taskMgr.EmitProgress(fileHashStr)
 			log.Debugf("%s-%s-%d set downloaded", fileHashStr, value.Hash, value.Index)
 			block := this.Fs.EncodedToBlock(value.Block)
 			dagNode, err := this.Fs.BlockToDagNode(block)
@@ -627,7 +631,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 			return err
 		}
 		log.Debugf("SetBlockDownloaded %s-%s-%d-%d", fileHashStr, value.Hash, index, value.Offset)
-		this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, uint32(index), value.Offset)
+		this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(index), value.Offset)
 	}
 	if !this.taskMgr.IsFileDownloaded(fileHashStr) {
 		return errors.New("all blocks have sent but file not be stored")
@@ -692,15 +696,6 @@ func uploadOptValid(filePath string, opt *common.UploadOption) error {
 		return errors.New("encrypt password is missing")
 	}
 	return nil
-}
-
-func emitProgress(uploading chan *common.UploadingInfo, desc, hash string, total, sent uint64) {
-	uploading <- &common.UploadingInfo{
-		FileName: desc,
-		FileHash: hash,
-		Total:    total,
-		Uploaded: sent,
-	}
 }
 
 func createTempDir() error {

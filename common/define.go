@@ -1,12 +1,5 @@
 package common
 
-type UploadingInfo struct {
-	FileName string
-	FileHash string
-	Total    uint64
-	Uploaded uint64
-}
-
 type UploadOption struct {
 	FileDesc        string
 	ProveInterval   uint64

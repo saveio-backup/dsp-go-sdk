@@ -148,15 +148,18 @@ func (this *Network) Broadcast(addrs []string, msg *message.Message, needReply b
 			// reset, start new round
 			count = 0
 		}
-		if len(errs) > 0 {
+		if stop != nil && stop() {
 			break
 		}
-		if stop != nil && stop() {
+		if len(errs) > 0 {
 			break
 		}
 	}
 	// wait again if last round count < maxRoutines
 	wg.Wait()
+	if stop != nil && stop() {
+		return nil
+	}
 	if len(errs) == 0 {
 		return nil
 	}

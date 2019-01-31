@@ -238,24 +238,25 @@ func TestUploadFile(t *testing.T) {
 		ProveInterval:   110,
 		ProveTimes:      3,
 		Privilege:       1,
-		CopyNum:         1,
+		CopyNum:         0,
 		Encrypt:         false,
 		EncryptPassword: "",
 	}
-	progress := make(chan *common.UploadingInfo, 1)
+	d.taskMgr.RegProgressCh()
 	go func() {
 		stop := false
 		for {
-			v := <-progress
-			log.Infof("file:%s, hash:%s, total:%d, uploaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, v.Uploaded, float64(v.Uploaded)/float64(v.Total))
-			stop = v.Uploaded == v.Total
+			v := <-d.taskMgr.ProgressCh()
+			for node, cnt := range v.Count {
+				log.Infof("file:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
+				stop = (cnt == v.Total)
+			}
 			if stop {
 				break
 			}
 		}
-		log.Infof("progress finished")
 	}()
-	ret, err := d.UploadFile(uploadTestFile, opt, progress)
+	ret, err := d.UploadFile(uploadTestFile, opt)
 	if err != nil {
 		log.Errorf("upload file failed, err:%s", err)
 		return
@@ -306,7 +307,21 @@ func TestDownloadFile(t *testing.T) {
 	}
 	d.Chain.SetDefaultAccount(acc)
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	addrs := []string{node1ListAddr, node4ListAddr}
+	d.taskMgr.RegProgressCh()
+	go func() {
+		stop := false
+		for {
+			v := <-d.taskMgr.ProgressCh()
+			for node, cnt := range v.Count {
+				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
+				stop = (cnt == v.Total)
+			}
+			if stop {
+				break
+			}
+		}
+	}()
+	addrs := []string{node1ListAddr}
 	err = d.DownloadFile("QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr", true, addrs)
 	if err != nil {
 		log.Errorf("download err %s\n", err)

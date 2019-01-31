@@ -35,8 +35,17 @@ type BlockResp struct {
 	Offset   int64
 }
 
+type ProgressInfo struct {
+	FileName string            // file name
+	FileHash string            // file hash
+	Total    uint64            // total file's blocks count
+	Count    map[string]uint64 // address <=> count
+}
+
 type Task struct {
 	fileHash   string        // task file hash
+	fileName   string        // file name
+	total      uint64        // total blockes count
 	taskType   TaskType      // task type
 	askTimeout bool          // fetch ask timeout flag
 	ack        chan struct{} // fetch ack channel
@@ -58,6 +67,7 @@ type TaskMgr struct {
 	tasks      map[string]*Task
 	lock       sync.RWMutex
 	blockReqCh chan *GetBlockReq
+	progress   chan *ProgressInfo // progress channel
 	*store.FileDB
 }
 
@@ -187,6 +197,26 @@ func (this *TaskMgr) SetTaskReady(fileHash string, ready bool) {
 	v.ready = ready
 }
 
+func (this *TaskMgr) SetFileName(fileHash, fileName string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	v, ok := this.tasks[fileHash]
+	if !ok {
+		return
+	}
+	v.fileName = fileName
+}
+
+func (this *TaskMgr) SetFileBlocksTotalCount(fileHash string, count uint64) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	v, ok := this.tasks[fileHash]
+	if !ok {
+		return
+	}
+	v.total = count
+}
+
 func (this *TaskMgr) OnTaskAck(fileHash string) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -215,6 +245,44 @@ func (this *TaskMgr) OnlyBlock(fileHash string) bool {
 		return false
 	}
 	return v.onlyBlock
+}
+
+func (this *TaskMgr) RegProgressCh() {
+	if this.progress == nil {
+		this.progress = make(chan *ProgressInfo, 0)
+	}
+}
+
+func (this *TaskMgr) ProgressCh() chan *ProgressInfo {
+	return this.progress
+}
+
+func (this *TaskMgr) EmitProgress(fileHash string) {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	v, ok := this.tasks[fileHash]
+	if !ok {
+		return
+	}
+	if this.progress == nil {
+		return
+	}
+	switch v.taskType {
+	case TaskTypeUpload:
+		this.progress <- &ProgressInfo{
+			FileName: v.fileName,
+			FileHash: fileHash,
+			Total:    v.total,
+			Count:    this.FileProgress(fileHash, store.FileInfoTypeUpload),
+		}
+	case TaskTypeDownload:
+		this.progress <- &ProgressInfo{
+			FileHash: fileHash,
+			Total:    v.total,
+			Count:    this.FileProgress(fileHash, store.FileInfoTypeDownload),
+		}
+	default:
+	}
 }
 
 func (this *TaskMgr) NewWorkers(fileHash string, addrs []string, inOrder bool, job jobFunc) {

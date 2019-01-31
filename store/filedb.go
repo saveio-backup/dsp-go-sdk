@@ -46,6 +46,7 @@ type fileInfo struct {
 	Tx           string                `json:"tx,omitempty"`
 	Blocks       map[string]*blockInfo `json:"blocks"`
 	BlockHashes  []string              `json:"block_hashes,omitempty"`
+	Progress     map[string]uint64     `json:"progress"`
 	ProvePrivKey []byte                `json:"prove_private_key,omitempty"`
 }
 
@@ -105,6 +106,10 @@ func (this *FileDB) AddUploadedBlock(fileHashStr, blockHashStr, nodeAddr string,
 		fi.Blocks = make(map[string]*blockInfo, 0)
 	}
 	fi.Blocks[blockKey] = block
+	if fi.Progress == nil {
+		fi.Progress = make(map[string]uint64, 0)
+	}
+	fi.Progress[nodeAddr]++
 	return this.putFileInfo(fileHashStr, fi, FileInfoTypeUpload)
 }
 
@@ -195,8 +200,17 @@ func (this *FileDB) FileBlockHashes(fileHashStr string) []string {
 	return fi.BlockHashes
 }
 
+// FileProgress. return each node count progress
+func (this *FileDB) FileProgress(fileHashStr string, fileType FileInfoType) map[string]uint64 {
+	fi, err := this.getFileInfo(fileHashStr, fileType)
+	if err != nil || fi == nil {
+		return nil
+	}
+	return fi.Progress
+}
+
 //  SetBlockStored set the flag of store state
-func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr string, index uint32, offset int64) error {
+func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr, nodeAddr string, index uint32, offset int64) error {
 	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
 	if err != nil {
 		return err
@@ -214,6 +228,10 @@ func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr string, index u
 		fi.Blocks = make(map[string]*blockInfo, 0)
 	}
 	fi.Blocks[blockKey] = recv
+	if fi.Progress == nil {
+		fi.Progress = make(map[string]uint64, 0)
+	}
+	fi.Progress[nodeAddr]++
 	return this.putFileInfo(fileHashStr, fi, FileInfoTypeDownload)
 }
 

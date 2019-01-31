@@ -10,8 +10,8 @@ import (
 	"github.com/oniio/oniP2p/network"
 )
 
-var node1ListAddr = "kcp://127.0.0.1:4001"
-var node2ListAddr = "kcp://127.0.0.1:4002"
+var node1ListAddr = "udp://127.0.0.1:4001"
+var node2ListAddr = "udp://127.0.0.1:4002"
 
 func TestNetworkReceiveMsg(t *testing.T) {
 	n := NewNetwork(node1ListAddr, nil)
