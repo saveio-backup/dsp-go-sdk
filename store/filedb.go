@@ -20,14 +20,25 @@ const (
 	FileInfoTypeDownload
 )
 
+type linkInfo struct {
+	Hash string `json:"hash"`
+	Name string `json:"name"`
+	Size uint64 `json:"size"`
+}
+
 // blockInfo record a block infomation of a file
 type blockInfo struct {
-	Hash           string   `json:"hash"`
-	Index          uint32   `json:"index"`
-	State          uint8    `json:"state,omitempty"` // Block state. 0 => unstored, 1 => stored
-	NodeWalletAddr string   `json:"node_wallet_address,omitempty"`
-	NodeList       []string `json:"node_list,omitempty"`
-	ChildHashStrs  []string `json:"childs,omitempty"`
+	Hash           string               `json:"hash"`                          // block  hash
+	Index          uint32               `json:"index"`                         // block index of file
+	State          uint8                `json:"state,omitempty"`               // Block state. 0 => unstored, 1 => stored
+	DataSize       uint64               `json:"data_size"`                     // block raw data size
+	DataOffset     uint64               `json:"data_offset"`                   // block raw data offset
+	FileSize       uint64               `json:"file_size"`                     // file size
+	NodeWalletAddr string               `json:"node_wallet_address,omitempty"` // block wallet address
+	NodeList       []string             `json:"node_list,omitempty"`           // uploaded node list
+	LinkHashes     []string             `json:"link_hashes,omitempty"`         // child link hashes slice
+	BlockSizes     []uint64             `json:"block_sizes"`                   // child block raw data size slice
+	LinkInfos      map[string]*linkInfo `json:"link_info"`                     // child link info
 }
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
@@ -40,8 +51,10 @@ type fileInfo struct {
 
 func NewFileDB(dbPath string) *FileDB {
 	db, err := NewLevelDBStore(dbPath)
-	fmt.Printf("path:%v, err:%s\n", dbPath, err)
 	if err != nil {
+		return nil
+	}
+	if db == nil {
 		return nil
 	}
 	return &FileDB{
@@ -164,8 +177,8 @@ func (this *FileDB) AddFileBlockHashes(fileHashStr string, blocks []string) erro
 	return this.putFileInfo(fileHashStr, fi, FileInfoTypeDownload)
 }
 
-// IsFileDownloading return a file is downloading but not finish storing all blocks
-func (this *FileDB) IsFileDownloading(fileHashStr string) bool {
+// IsDownloadInfoExist return a file is exist or not
+func (this *FileDB) IsDownloadInfoExist(fileHashStr string) bool {
 	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
 	if err != nil || fi == nil {
 		return false
@@ -183,7 +196,7 @@ func (this *FileDB) FileBlockHashes(fileHashStr string) []string {
 }
 
 //  SetBlockStored set the flag of store state
-func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr string, index uint32) error {
+func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr string, index uint32, offset int64) error {
 	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
 	if err != nil {
 		return err
@@ -213,6 +226,20 @@ func (this *FileDB) IsBlockDownloaded(fileHashStr, blockHashStr string, index ui
 	blockKey := string(downloadFileBlockKey(fileHashStr, blockHashStr, index))
 	_, ok := fi.Blocks[blockKey]
 	return ok
+}
+
+//  BlockOffset
+func (this *FileDB) BlockOffset(fileHashStr, blockHashStr string, index uint32) (uint64, error) {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
+	if err != nil || fi == nil {
+		return 0, errors.New("file not found")
+	}
+	blockKey := string(downloadFileBlockKey(fileHashStr, blockHashStr, index))
+	v, ok := fi.Blocks[blockKey]
+	if !ok {
+		return 0, errors.New("block not found")
+	}
+	return v.DataOffset, nil
 }
 
 // IsFileDownloaded check if a downloaded file task has finished storing all blocks

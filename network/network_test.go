@@ -1,7 +1,6 @@
 package network
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -11,8 +10,8 @@ import (
 	"github.com/oniio/oniP2p/network"
 )
 
-var node1ListAddr = "tcp://127.0.0.1:4001"
-var node2ListAddr = "tcp://127.0.0.1:4002"
+var node1ListAddr = "kcp://127.0.0.1:4001"
+var node2ListAddr = "kcp://127.0.0.1:4002"
 
 func TestNetworkReceiveMsg(t *testing.T) {
 	n := NewNetwork(node1ListAddr, nil)
@@ -22,11 +21,11 @@ func TestNetworkReceiveMsg(t *testing.T) {
 		if msg == nil {
 			return
 		}
-		fmt.Printf("receive, requestNonce:%d, from address %s\n", ctx.Client().RequestNonce, ctx.Client().Address)
-		err := ctx.Reply(context.Background(), msg.ToProtoMsg())
-		if err != nil {
-			fmt.Printf("reply err:%v\n", err)
-		}
+		fmt.Printf("receive msg:%v, from address %s\n", msg, ctx.Client().Address)
+		// err := ctx.Reply(context.Background(), msg.ToProtoMsg())
+		// if err != nil {
+		// 	fmt.Printf("reply err:%v\n", err)
+		// }
 	}
 	tick := time.NewTicker(time.Second)
 	for {
@@ -46,8 +45,10 @@ func TestNetworkSendMsg(t *testing.T) {
 			Type:      common.MSG_TYPE_BLOCK,
 			MsgLength: 0,
 		}
-		res, err := n.Request(msg, node1ListAddr)
-		fmt.Printf("get response from msg:%v, err:%s\n", res, err)
+		err := n.Send(msg, node1ListAddr)
+		fmt.Printf("send err:%s\n", err)
+		// res, err := n.Request(msg, node1ListAddr)
+		// fmt.Printf("get response from msg:%v, err:%s\n", res, err)
 		<-tick.C
 	}
 }

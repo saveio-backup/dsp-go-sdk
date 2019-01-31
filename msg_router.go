@@ -4,10 +4,12 @@ import (
 	"context"
 	"strings"
 
+	"github.com/oniio/dsp-go-sdk/common"
 	netcom "github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/types/block"
 	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/oniio/dsp-go-sdk/task"
 	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniP2p/network"
 )
@@ -58,14 +60,14 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			log.Errorf("block number is unmatched %d, %d", len(fileMsg.BlockHashes), info.FileBlockNum)
 			return
 		}
-		if !this.taskMgr.IsFileDownloading(fileMsg.Hash) {
+		if !this.taskMgr.IsDownloadInfoExist(fileMsg.Hash) {
 			err := this.taskMgr.AddFileBlockHashes(fileMsg.Hash, fileMsg.BlockHashes)
 			if err != nil {
 				log.Errorf("add fileblockhashes failed:%s", err)
 				return
 			}
 		}
-		newMsg := message.NewFileFetchAckMsg(fileMsg.GetHash())
+		newMsg := message.NewFileFetchAck(fileMsg.GetHash())
 		this.Network.Send(newMsg, peer)
 	case netcom.FILE_OP_FETCH_ACK:
 		timeout, err := this.taskMgr.TaskTimeout(fileMsg.Hash)
@@ -79,7 +81,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		}
 		this.taskMgr.OnTaskAck(fileMsg.Hash)
 	case netcom.FILE_OP_FETCH_RDY:
-		if !this.taskMgr.IsFileDownloading(fileMsg.Hash) {
+		if !this.taskMgr.IsDownloadInfoExist(fileMsg.Hash) {
 			return
 		}
 		err := this.startFetchBlocks(fileMsg.Hash, peer.Address)
@@ -92,13 +94,37 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			log.Errorf("delete file info is not nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 			return
 		}
-		replyMsg := message.NewFileDeleteAckMsg(fileMsg.Hash)
+		replyMsg := message.NewFileDeleteAck(fileMsg.Hash)
 		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply delete ok msg failed", err)
 		}
 		// TODO: check file owner
 		this.deleteFile(fileMsg.Hash)
+	case netcom.FILE_OP_DOWNLOAD:
+		if !this.taskMgr.IsDownloadInfoExist(fileMsg.Hash) {
+			replyMsg := message.NewFileDownloadAckErr(fileMsg.Hash, netcom.MSG_ERROR_CODE_FILE_NOT_EXIST)
+			err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+			if err != nil {
+				log.Errorf("reply download ack err msg failed", err)
+			}
+			return
+		}
+		if this.taskMgr.TaskNum() >= common.MAX_TASKS_NUM {
+			replyMsg := message.NewFileDownloadAckErr(fileMsg.Hash, netcom.MSG_ERROR_CODE_FILE_NOT_EXIST)
+			err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+			if err != nil {
+				log.Errorf("reply download ack err msg failed", err)
+			}
+		}
+		// TODO: verify price
+		replyMsg := message.NewFileDownloadAck(fileMsg.Hash, this.taskMgr.FileBlockHashes(fileMsg.Hash), this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+		err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply download ack  msg failed", err)
+		}
+		this.taskMgr.NewTask(fileMsg.Hash, task.TaskTypeDownload)
+		// TODO: delete task finally
 	default:
 	}
 }
@@ -123,23 +149,39 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 			log.Errorf("get task block respch err: %s", err)
 			return
 		}
-		respCh <- &BlockResp{
+		respCh <- &task.BlockResp{
 			Hash:     blockMsg.Hash,
 			Index:    blockMsg.Index,
 			PeerAddr: peer.Address,
 			Block:    blockMsg.Data,
 			Tag:      blockMsg.Tag,
+			Offset:   blockMsg.Offset,
 		}
 	case netcom.BLOCK_OP_GET:
-		reqCh, err := this.taskMgr.TaskBlockReq(blockMsg.FileHash)
-		if err != nil {
-			log.Errorf("get task block reqch err: %s", err)
+		log.Debugf("handle get block %s-%s-%d", blockMsg.FileHash, blockMsg.Hash, blockMsg.Index)
+		taskType := this.taskMgr.TaskType(blockMsg.FileHash)
+		switch taskType {
+		case task.TaskTypeUpload:
+			reqCh, err := this.taskMgr.TaskBlockReq(blockMsg.FileHash)
+			if err != nil {
+				log.Errorf("get task block reqch err: %s", err)
+				return
+			}
+			reqCh <- &task.GetBlockReq{
+				FileHash: blockMsg.FileHash,
+				Hash:     blockMsg.Hash,
+				Index:    blockMsg.Index,
+				PeerAddr: peer.Address,
+			}
 			return
-		}
-		reqCh <- &GetBlockReq{
-			Hash:     blockMsg.Hash,
-			Index:    blockMsg.Index,
-			PeerAddr: peer.Address,
+		case task.TaskTypeDownload:
+			reqCh := this.taskMgr.BlockReqCh()
+			reqCh <- &task.GetBlockReq{
+				FileHash: blockMsg.FileHash,
+				Hash:     blockMsg.Hash,
+				Index:    blockMsg.Index,
+				PeerAddr: peer.Address,
+			}
 		}
 	default:
 	}

@@ -14,9 +14,15 @@ type Header struct {
 	MsgLength int32
 }
 
+type Error struct {
+	Code    int32
+	Message string
+}
+
 type Message struct {
 	Header  *Header
 	Payload proto.Message
+	Error   *Error
 }
 
 func ReadMessage(msg proto.Message) *Message {
@@ -53,6 +59,12 @@ func ReadMessage(msg proto.Message) *Message {
 			newMsg.Payload = file
 		}
 	}
+	if pbMsg.GetError() != nil {
+		newMsg.Error = &Error{
+			Code:    pbMsg.GetError().GetCode(),
+			Message: pbMsg.GetError().GetMessage(),
+		}
+	}
 	return newMsg
 }
 
@@ -70,6 +82,11 @@ func (this *Message) ToProtoMsg() proto.Message {
 			return nil
 		}
 		msg.Data = data
+	}
+	if this.Error != nil {
+		msg.Error = new(pb.Error)
+		msg.Error.Code = this.Error.Code
+		msg.Error.Message = this.Error.Message
 	}
 	return msg
 }

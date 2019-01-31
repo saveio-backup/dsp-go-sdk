@@ -10,6 +10,8 @@ import (
 
 	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
+	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/oniio/dsp-go-sdk/task"
 	chainCom "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/crypto/pdp"
@@ -128,11 +130,9 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	if err != nil {
 		return nil, err
 	}
-	this.taskMgr.NewTask(fileHashStr)
+	this.taskMgr.NewTask(fileHashStr, task.TaskTypeUpload)
 	// delete task from cache in the end
-	defer func() {
-		this.taskMgr.DeleteTask(fileHashStr)
-	}()
+	defer this.taskMgr.DeleteTask(fileHashStr)
 	receivers, err := this.waitFileReceivers(fileHashStr, nodeList, hashes, int(opt.CopyNum)+1)
 	if err != nil {
 		return nil, err
@@ -154,33 +154,51 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption, progress 
 	log.Debugf("wait for fetching block")
 	finish := false
 	timeout := time.NewTimer(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
+	// TODO: replace offset calculate by fs api
+	offset := int64(0)
 	for {
 		select {
 		case reqInfo := <-req:
+			timeout.Reset(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
+			// send block
+			var blockData []byte
+			var dataLen int64
+			if reqInfo.Hash == fileHashStr && reqInfo.Index == 0 {
+				blockData = this.Fs.BlockDataOfAny(root)
+				blockDecodedData, err := this.Fs.BlockToBytes(root)
+				if err != nil {
+					return nil, err
+				}
+				dataLen = int64(len(blockDecodedData))
+			} else {
+				unixNode := listMap[fmt.Sprintf("%s%d", reqInfo.Hash, reqInfo.Index)]
+				unixBlock, err := unixNode.GetDagNode()
+				if err != nil {
+					return nil, err
+				}
+				blockData = this.Fs.BlockDataOfAny(unixNode)
+				blockDecodedData, err := this.Fs.BlockToBytes(unixBlock)
+				if err != nil {
+					return nil, err
+				}
+				dataLen = int64(len(blockDecodedData))
+			}
+			offset += dataLen
+			if len(blockData) == 0 {
+				log.Errorf("block is nil hash %s, peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
+				break
+			}
 			isStored := this.taskMgr.IsBlockUploaded(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 			if isStored {
 				log.Debugf("block has stored %s", reqInfo.Hash)
 				break
 			}
-			timeout.Reset(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
-			// send block
-			var blockData []byte
-			if reqInfo.Hash == fileHashStr && reqInfo.Index == 0 {
-				blockData = this.Fs.BlockDataOfAny(root)
-			} else {
-				unixNode := listMap[fmt.Sprintf("%s%d", reqInfo.Hash, reqInfo.Index)]
-				blockData = this.Fs.BlockDataOfAny(unixNode)
-			}
-			if len(blockData) == 0 {
-				log.Errorf("block is nil hash %s, peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
-				break
-			}
 			tag, err := pdp.SignGenerate(blockData, fileID, uint32(reqInfo.Index)+1, g0, payRet.PrivateKey)
 			if err != nil {
 				log.Errorf("generate tag hash %s, peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
-				break
+				return nil, err
 			}
-			msg := message.NewBlockMsg(int32(reqInfo.Index), fileHashStr, reqInfo.Hash, blockData, tag)
+			msg := message.NewBlockMsg(int32(reqInfo.Index), fileHashStr, reqInfo.Hash, blockData, tag, offset-dataLen)
 			err = this.Network.Send(msg, reqInfo.PeerAddr)
 			if err != nil {
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
@@ -246,7 +264,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 	if len(storingNode) == 0 {
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(fileHashStr, fileHashStr, 0)...)
 	}
-	msg := message.NewFileDeleteMsg(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+	msg := message.NewFileDelete(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
 	err = this.Network.Broadcast(storingNode, msg, true, nil, nil)
 	if err != nil {
 		return "", err
@@ -256,6 +274,142 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 		log.Errorf("delete upload info from db err: %s", err)
 	}
 	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
+}
+
+func (this *Dsp) StartShareServices() {
+	ch := this.taskMgr.BlockReqCh()
+	for {
+		select {
+		case req, ok := <-ch:
+			if !ok {
+				log.Errorf("block req channel false")
+				break
+			}
+			blk := this.Fs.GetBlock(req.Hash)
+			blockData := this.Fs.BlockDataOfAny(blk)
+			if len(blockData) == 0 {
+				log.Errorf("get block data empty %s", req.Hash)
+				continue
+			}
+			offset, err := this.taskMgr.BlockOffset(req.FileHash, req.Hash, uint32(req.Index))
+			if err != nil {
+				log.Errorf("get block offset err%s", err)
+				continue
+			}
+			msg := message.NewBlockMsg(req.Index, req.FileHash, req.Hash, blockData, nil, int64(offset))
+			this.Network.Send(msg, req.PeerAddr)
+		}
+	}
+}
+
+// DownloadFile. download file, peice by peice from addrs.
+// inOrder: if true, the file will be downloaded block by block in order
+func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) error {
+	msg := message.NewFileDownload(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), 0, 0)
+	peers := make([]string, 0)
+	blockHashes := make([]string, 0)
+	reply := func(msg *message.Message, addr string) {
+		if msg.Error != nil {
+			return
+		}
+		fileMsg := msg.Payload.(*file.File)
+		if len(fileMsg.BlockHashes) < len(blockHashes) {
+			return
+		}
+		blockHashes = fileMsg.BlockHashes
+		peers = append(peers, addr)
+	}
+	err := this.Network.Broadcast(addrs, msg, true, nil, reply)
+	if err != nil {
+		return err
+	}
+	if len(peers) == 0 {
+		return errors.New("no peer for download")
+	}
+	log.Debugf("filehashstr:%v, blockhashes:%v\n", fileHashStr, blockHashes)
+	err = this.taskMgr.AddFileBlockHashes(fileHashStr, blockHashes)
+	if err != nil {
+		return err
+	}
+	err = createTempDir()
+	if err != nil {
+		return err
+	}
+	err = createDownloadDir()
+	if err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	// start a task
+	this.taskMgr.NewTask(fileHashStr, task.TaskTypeDownload)
+	defer this.taskMgr.DeleteTask(fileHashStr)
+	// declare job for workers
+	job := func(fHash, bHash, pAddr string, index int32, respCh chan *task.BlockResp) (*task.BlockResp, error) {
+		log.Debugf("download %s-%s-%d from %s", fHash, bHash, index, pAddr)
+		return this.downloadBlock(fHash, bHash, index, pAddr, respCh)
+	}
+	this.taskMgr.NewWorkers(fileHashStr, addrs, inOrder, job)
+	go this.taskMgr.WorkBackground(fileHashStr)
+	if inOrder {
+		blockIndex := int32(0)
+		err := this.taskMgr.AddBlockReq(fileHashStr, fileHashStr, blockIndex)
+		if err != nil {
+			return err
+		}
+		for {
+			value, ok := <-this.taskMgr.TaskNotify(fileHashStr)
+			if !ok {
+				return errors.New("download internal error")
+			}
+			// this.taskMgr.DelBlockReq(fileHashStr, value.Hash, value.Index)
+			if this.taskMgr.IsBlockDownloaded(fileHashStr, value.Hash, uint32(value.Index)) {
+				log.Debugf("%s-%s-%d is downloaded", fileHashStr, value.Hash, value.Index)
+				continue
+			}
+			err := this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, uint32(value.Index), value.Offset)
+			if err != nil {
+				return err
+			}
+			log.Debugf("%s-%s-%d set downloaded", fileHashStr, value.Hash, value.Index)
+			block := this.Fs.EncodedToBlock(value.Block)
+			dagNode, err := this.Fs.BlockToDagNode(block)
+			if err != nil {
+				return err
+			}
+			for _, l := range dagNode.Links() {
+				blockIndex++
+				err := this.taskMgr.AddBlockReq(fileHashStr, l.Cid.String(), blockIndex)
+				if err != nil {
+					return err
+				}
+			}
+			if len(dagNode.Links()) != 0 {
+				continue
+			}
+			data, err := this.Fs.DecodeDagNode(dagNode)
+			if err != nil {
+				return err
+			}
+			_, err = file.Write(data)
+			if err != nil {
+				return err
+			}
+			if value.Index != blockIndex {
+				continue
+			}
+			// last block
+			this.taskMgr.SetTaskDone(fileHashStr, true)
+			break
+		}
+		return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, common.DOWNLOAD_FILE_DIR_PATH+"/"+fileHashStr)
+	}
+	// TODO: support out-of-order download
+	return nil
 }
 
 // payForSendFile pay before send a file
@@ -391,7 +545,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 // return receivers
 func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	receivers := make([]string, 0)
-	msg := message.NewFileFetchAskMsg(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+	msg := message.NewFileFetchAsk(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
 	action := func(res *message.Message, addr string) {
 		log.Debugf("send file ask msg success %s", addr)
 		// block waiting for ack msg or timeout msg
@@ -427,7 +581,7 @@ func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []s
 
 // notifyFetchReady send fetch_rdy msg to receivers
 func (this *Dsp) notifyFetchReady(fileHashStr string, receivers []string) error {
-	msg := message.NewFileFetchRdyMsg(fileHashStr)
+	msg := message.NewFileFetchRdy(fileHashStr)
 	this.taskMgr.SetTaskReady(fileHashStr, true)
 	err := this.Network.Broadcast(receivers, msg, false, nil, nil)
 	if err != nil {
@@ -450,7 +604,8 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 			return err
 		}
 	}
-	this.taskMgr.NewTask(fileHashStr)
+	this.taskMgr.NewTask(fileHashStr, task.TaskTypeDownload)
+	defer this.taskMgr.DeleteTask(fileHashStr)
 	resp, err := this.taskMgr.TaskBlockResp(fileHashStr)
 	if err != nil {
 		return err
@@ -459,39 +614,20 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		if this.taskMgr.IsBlockDownloaded(fileHashStr, hash, uint32(index)) {
 			continue
 		}
-		msg := message.NewBlockReqMsg(fileHashStr, hash, int32(index))
-		err := this.Network.Send(msg, addr)
+		value, err := this.downloadBlock(fileHashStr, hash, int32(index), addr, resp)
 		if err != nil {
 			return err
 		}
-		received := false
-		timeout := false
-		// wait for block msg
-		select {
-		case value, ok := <-resp:
-			if timeout {
-				return fmt.Errorf("receiving block %s timeout", hash)
-			}
-			if !ok {
-				return fmt.Errorf("receiving block channel %s error", hash)
-			}
-			// save block to fs
-			err := this.Fs.PutBlock(value.Hash, this.Fs.BytesToBlock(value.Block), common.BLOCK_STORE_TYPE_NORMAL)
-			if err != nil {
-				return err
-			}
-			err = this.Fs.PutTag(fmt.Sprintf("%s%d", hash, value.Index), value.Tag)
-			if err != nil {
-				return err
-			}
-			this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, uint32(index))
-		case <-time.After(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second):
-			if received {
-				break
-			}
-			timeout = true
-			return fmt.Errorf("receiving block %s timeout", hash)
+		err = this.Fs.PutBlock(value.Hash, this.Fs.EncodedToBlock(value.Block), common.BLOCK_STORE_TYPE_NORMAL)
+		if err != nil {
+			return err
 		}
+		err = this.Fs.PutTag(fmt.Sprintf("%s%d", hash, value.Index), value.Tag)
+		if err != nil {
+			return err
+		}
+		log.Debugf("SetBlockDownloaded %s-%s-%d-%d", fileHashStr, value.Hash, index, value.Offset)
+		this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, uint32(index), value.Offset)
 	}
 	if !this.taskMgr.IsFileDownloaded(fileHashStr) {
 		return errors.New("all blocks have sent but file not be stored")
@@ -503,8 +639,38 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 	if err != nil {
 		return err
 	}
+
 	// TODO: remove unused file info fields after prove pdp success
 	return nil
+}
+
+// downloadBlock. download block helper function.
+func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr interface{}, resp chan *task.BlockResp) (*task.BlockResp, error) {
+	msg := message.NewBlockReqMsg(fileHashStr, hash, index)
+	err := this.Network.Send(msg, addr)
+	if err != nil {
+		return nil, err
+	}
+	received := false
+	timeout := false
+	select {
+	case value, ok := <-resp:
+		received = true
+		if timeout {
+			return nil, fmt.Errorf("receiving block %s timeout", hash)
+		}
+		if !ok {
+			return nil, fmt.Errorf("receiving block channel %s error", hash)
+		}
+		return value, nil
+	case <-time.After(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second):
+		if received {
+			break
+		}
+		timeout = true
+		return nil, fmt.Errorf("receiving block %s timeout", hash)
+	}
+	return nil, errors.New("no receive channel")
 }
 
 // deleteFile. delete file from fs.
@@ -535,4 +701,18 @@ func emitProgress(uploading chan *common.UploadingInfo, desc, hash string, total
 		Total:    total,
 		Uploaded: sent,
 	}
+}
+
+func createTempDir() error {
+	if _, err := os.Stat(common.DOWNLOAD_FILE_TEMP_DIR_PATH); os.IsNotExist(err) {
+		return os.MkdirAll(common.DOWNLOAD_FILE_TEMP_DIR_PATH, 0755)
+	}
+	return nil
+}
+
+func createDownloadDir() error {
+	if _, err := os.Stat(common.DOWNLOAD_FILE_DIR_PATH); os.IsNotExist(err) {
+		return os.MkdirAll(common.DOWNLOAD_FILE_DIR_PATH, 0755)
+	}
+	return nil
 }

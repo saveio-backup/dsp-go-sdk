@@ -9,4 +9,5 @@ message Block {
    bytes data = 4; // raw data
    bytes tag = 5; // used for pdp
    int32 operation = 6; // block operation
+   int64 offset = 7; // data offset of file
 }

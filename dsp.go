@@ -4,6 +4,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/fs"
 	"github.com/oniio/dsp-go-sdk/network"
+	"github.com/oniio/dsp-go-sdk/task"
 	"github.com/oniio/oniChain-go-sdk"
 )
 
@@ -11,13 +12,13 @@ type Dsp struct {
 	Chain   *chain.Chain
 	Network *network.Network
 	Fs      *fs.Fs
-	taskMgr *TaskMgr
+	taskMgr *task.TaskMgr
 }
 
 func NewDsp() *Dsp {
 	return &Dsp{
 		Fs:      &fs.Fs{},
-		taskMgr: NewTaskMgr(),
+		taskMgr: task.NewTaskMgr(),
 	}
 }
 

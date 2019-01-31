@@ -8,7 +8,13 @@ message Header {
     int32 msgLength = 3;
 }
 
+message Error {
+    int32 code = 1;
+    string message = 2;
+}
+
 message Message {
     Header header = 1;
     bytes  data = 2;
+    Error error = 3;
 }

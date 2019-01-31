@@ -8,8 +8,6 @@ import (
 	"github.com/oniio/oniChain-go-sdk/wallet"
 
 	"github.com/oniio/dsp-go-sdk/common"
-	netcom "github.com/oniio/dsp-go-sdk/network/common"
-	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/store"
 	"github.com/oniio/oniChain-go-sdk"
 	"github.com/oniio/oniChain/common/log"
@@ -18,12 +16,16 @@ import (
 var rpcAddr = "http://127.0.0.1:20336"
 var node1ListAddr = "tcp://127.0.0.1:4001"
 var node2ListAddr = "tcp://127.0.0.1:4002"
+var node3ListAddr = "tcp://127.0.0.1:4003"
+var node4ListAddr = "tcp://127.0.0.1:4004"
 
 var uploadTestFile = "./testdata/testuploadbigfile.txt"
 
 // var uploadTestFile = "./testdata/testuploadfile.txt"
 var walletFile = "./testdata/wallet.dat"
 var wallet2File = "./testdata/wallet2.dat"
+var wallet3File = "./testdata/wallet3.dat"
+var wallet4File = "./testdata/wallet4.dat"
 var wallet1Addr = "AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS"
 var walletPwd = "pwd"
 
@@ -53,6 +55,7 @@ func TestNodeRegister(t *testing.T) {
 	d.Chain = chain.NewChain()
 	d.Chain.NewRpcClient().SetAddress(rpcAddr)
 	w, err := wallet.OpenWallet(walletFile)
+	// w, err := wallet.OpenWallet(wallet4File)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
 		return
@@ -65,6 +68,7 @@ func TestNodeRegister(t *testing.T) {
 	// register 512G for 12 hours
 	d.Chain.SetDefaultAccount(acc)
 	tx, err := d.RegisterNode(node1ListAddr, 512*1024*1024, 12)
+	// tx, err := d.RegisterNode(node4ListAddr, 512*1024*1024, 12)
 	if err != nil {
 		log.Errorf("register node err:%s", err)
 		return
@@ -158,32 +162,56 @@ func TestNodeWithdrawProfit(t *testing.T) {
 	}
 	log.Infof("tx: %s", tx)
 }
-func TestDspReceive(t *testing.T) {
+func TestStartDspNode(t *testing.T) {
 	log.InitLog(1, log.PATH, log.Stdout)
 	d := NewDsp()
 	d.Chain = chain.NewChain()
 	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d.Chain.SetDefaultAccount(acc)
 
 	d.Start(node1ListAddr)
+	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
 	for {
 		<-tick.C
 	}
 }
-func TestDspSendMsg(t *testing.T) {
+
+func TestStartDspNode4(t *testing.T) {
+	log.InitLog(1, log.PATH, log.Stdout)
 	d := NewDsp()
-	d.Start(node2ListAddr)
-	d.Network.Connect(node1ListAddr)
+	d.taskMgr.FileDB = store.NewFileDB("./db3")
+	d.Chain = chain.NewChain()
+	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	w, err := wallet.OpenWallet(wallet4File)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d.Chain.SetDefaultAccount(acc)
+
+	d.Start(node4ListAddr)
+	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
 	for {
 		<-tick.C
-		msg := &message.Message{}
-		msg.Header = &message.Header{
-			Version:   netcom.MESSAGE_VERSION,
-			Type:      netcom.MSG_TYPE_BLOCK,
-			MsgLength: 0,
-		}
-		d.Network.Send(msg, node1ListAddr)
 	}
 }
 
@@ -204,12 +232,13 @@ func TestUploadFile(t *testing.T) {
 		return
 	}
 	d.Chain.SetDefaultAccount(acc)
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	opt := &common.UploadOption{
 		FileDesc:        "file",
 		ProveInterval:   110,
 		ProveTimes:      3,
 		Privilege:       1,
-		CopyNum:         0,
+		CopyNum:         1,
 		Encrypt:         false,
 		EncryptPassword: "",
 	}
@@ -251,7 +280,7 @@ func TestDeleteFile(t *testing.T) {
 		return
 	}
 	d.Chain.SetDefaultAccount(acc)
-	ret, err := d.DeleteUploadedFile("QmcZpEMmwLGYCC1FHuixdrn31cPcmUYTfZ3vXzBTcafDym")
+	ret, err := d.DeleteUploadedFile("QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr")
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
 		return
@@ -259,22 +288,29 @@ func TestDeleteFile(t *testing.T) {
 	log.Infof("delete file success, ret:%v", ret)
 }
 
-func TestMsgResponse(t *testing.T) {
+func TestDownloadFile(t *testing.T) {
 	d := NewDsp()
-	d.Start(node2ListAddr)
-	err := d.Network.Connect(node1ListAddr)
+	d.taskMgr.FileDB = store.NewFileDB("./db2")
+	d.Start(node3ListAddr)
+	d.Chain = chain.NewChain()
+	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	w, err := wallet.OpenWallet(wallet3File)
 	if err != nil {
-		fmt.Printf("connect err:%v\n", err)
+		log.Errorf("open wallet err:%s\n", err)
 		return
 	}
-	msg := message.NewFileFetchAskMsg("1", []string{"1"}, "")
-	err = d.Network.Send(msg, node1ListAddr)
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
 	if err != nil {
-		fmt.Printf("send err:%v\n", err)
+		log.Errorf("get default acc err:%s\n", err)
 		return
 	}
-	tick := time.NewTicker(time.Second)
-	for {
-		<-tick.C
+	d.Chain.SetDefaultAccount(acc)
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	addrs := []string{node1ListAddr, node4ListAddr}
+	err = d.DownloadFile("QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr", true, addrs)
+	if err != nil {
+		log.Errorf("download err %s\n", err)
 	}
+	// use for testing go routines for tasks are released or not
+	time.Sleep(time.Duration(5) * time.Second)
 }

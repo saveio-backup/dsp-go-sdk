@@ -30,3 +30,6 @@ filestore.files
 filestore-info/*
 db/*
 db1/*
+db2/*
+data/*
+temp/*

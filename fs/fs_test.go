@@ -10,6 +10,19 @@ import (
 var testbigFile = "../testdata/testuploadbigfile.txt"
 var testsmallFile = "../testdata/testuploadfile.txt"
 
+func TestNodeFromFile(t *testing.T) {
+	fs := &Fs{}
+	root, list, err := fs.NodesFromFile(testbigFile, "", false, "")
+	if err != nil {
+		return
+	}
+	tree, err := fs.AllBlockHashes(root, list)
+	if err != nil {
+		return
+	}
+	fmt.Printf("tree:%v\n", tree)
+}
+
 func TestBlockToBytes(t *testing.T) {
 	fs := &Fs{}
 	root, _, err := fs.NodesFromFile(testbigFile, "", false, "")
@@ -28,7 +41,7 @@ func TestBlockToBytes(t *testing.T) {
 	fmt.Printf("len:%d, blockbytes:%v\n", len(blockBytes), blockBytes)
 }
 
-func TestBytesToBlock(t *testing.T) {
+func TestEncodedToBlock(t *testing.T) {
 	fs := &Fs{}
 	root, l, err := fs.NodesFromFile(testbigFile, "", false, "")
 	if err != nil {
@@ -43,7 +56,7 @@ func TestBytesToBlock(t *testing.T) {
 		return
 	}
 	fmt.Printf("block content:%v, len:%d\n", rawData[:], len(rawData))
-	block := fs.BytesToBlock(rawData)
+	block := fs.EncodedToBlock(rawData)
 	fmt.Printf("block cid:%s\n", block.Cid().String())
 }
 
@@ -97,4 +110,13 @@ func TestReadWithOffset(t *testing.T) {
 	fmt.Printf("buf :%v\n", buf)
 	all, _ := ioutil.ReadFile(testsmallFile)
 	fmt.Printf("all:%v\n", all)
+}
+
+func TestWriteAtOffset(t *testing.T) {
+	fi, _ := os.OpenFile("./temp.txt", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	buf1 := []byte("hello")
+	buf2 := []byte("world")
+	fi.WriteAt(buf2, int64(len(buf1)))
+	fi.WriteAt(buf1, 0)
+	fi.Close()
 }

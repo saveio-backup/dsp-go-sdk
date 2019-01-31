@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"errors"
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
 	"os"
@@ -20,7 +21,48 @@ import (
 type Fs struct{}
 
 func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) (ipld.Node, []*helpers.UnixfsNode, error) {
-	return oniFs.NodesFromFile(fileName, filePrefix, encrypt, password)
+	root, list, err := oniFs.NodesFromFile(fileName, filePrefix, encrypt, password)
+	if err != nil {
+		return nil, nil, err
+	}
+	m := make(map[string]*helpers.UnixfsNode, 0)
+	for _, node := range list {
+		dagNode, err := node.GetDagNode()
+		if err != nil {
+			return nil, nil, err
+		}
+		m[dagNode.Cid().String()] = node
+	}
+	newList := make([]*helpers.UnixfsNode, 0)
+	var breadth func(block ipld.Node)
+	breadth = func(block ipld.Node) {
+		for _, l := range block.Links() {
+			n := m[l.Cid.String()]
+			if n == nil {
+				return
+			}
+			newList = append(newList, n)
+		}
+		for _, l := range block.Links() {
+			n := m[l.Cid.String()]
+			if n == nil {
+				return
+			}
+			dag, err := n.GetDagNode()
+			if err != nil {
+				return
+			}
+			if len(dag.Links()) == 0 {
+				continue
+			}
+			breadth(dag)
+		}
+	}
+	breadth(root)
+	if len(list) != len(newList) {
+		return nil, nil, errors.New("build new list error")
+	}
+	return root, newList, nil
 }
 
 func (this *Fs) BlockData(block blocks.Block) []byte {
@@ -56,8 +98,20 @@ func (this *Fs) BlockToBytes(block blocks.Block) ([]byte, error) {
 	return pb.Data, nil
 }
 
-func (this *Fs) BytesToBlock(data []byte) blocks.Block {
+func (this *Fs) EncodedToBlock(data []byte) blocks.Block {
 	return blocks.NewBlock(data)
+}
+
+func (this *Fs) BlockToDagNode(block blocks.Block) (ipld.Node, error) {
+	return ml.DecodeProtobufBlock(block)
+}
+
+func (this *Fs) DecodeDagNode(dagNode ipld.Node) ([]byte, error) {
+	pb := new(ftpb.Data)
+	if err := proto.Unmarshal(dagNode.(*ml.ProtoNode).Data(), pb); err != nil {
+		return nil, err
+	}
+	return pb.Data, nil
 }
 
 func (this *Fs) AllBlockHashes(root ipld.Node, list []*helpers.UnixfsNode) ([]string, error) {
@@ -115,6 +169,20 @@ func (this *Fs) StartPDPVerify(fileHashStr string) error {
 
 // GetBlock get blocks
 func (this *Fs) GetBlock(hash string) blocks.Block {
+	root, list, err := this.NodesFromFile("./testdata/testuploadbigfile.txt", "", false, "")
+	if err != nil {
+		log.Errorf("node from file err:%s", err)
+		return nil
+	}
+	if root.Cid().String() == hash {
+		return root
+	}
+	for _, l := range list {
+		n, _ := l.GetDagNode()
+		if n.Cid().String() == hash {
+			return n
+		}
+	}
 	return nil
 }
 
@@ -192,6 +260,6 @@ func (this *Fs) ProtoNodeToBlock(node *ProtoNode) (blocks.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	block := this.BytesToBlock(buf)
+	block := this.EncodedToBlock(buf)
 	return block, nil
 }
