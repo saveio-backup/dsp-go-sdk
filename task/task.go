@@ -217,16 +217,6 @@ func (this *TaskMgr) SetFileBlocksTotalCount(fileHash string, count uint64) {
 	v.total = count
 }
 
-func (this *TaskMgr) OnTaskAck(fileHash string) {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
-	if !ok {
-		return
-	}
-	v.ack <- struct{}{}
-}
-
 func (this *TaskMgr) SetOnlyBlock(fileHash string, only bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -235,6 +225,16 @@ func (this *TaskMgr) SetOnlyBlock(fileHash string, only bool) {
 		return
 	}
 	v.onlyBlock = only
+}
+
+func (this *TaskMgr) OnTaskAck(fileHash string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	v, ok := this.tasks[fileHash]
+	if !ok {
+		return
+	}
+	v.ack <- struct{}{}
 }
 
 func (this *TaskMgr) OnlyBlock(fileHash string) bool {

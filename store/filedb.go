@@ -210,7 +210,7 @@ func (this *FileDB) FileProgress(fileHashStr string, fileType FileInfoType) map[
 }
 
 //  SetBlockStored set the flag of store state
-func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr, nodeAddr string, index uint32, offset int64) error {
+func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
 	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
 	if err != nil {
 		return err
@@ -219,9 +219,13 @@ func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr, nodeAddr strin
 		return errors.New("file info not found")
 	}
 	recv := &blockInfo{
-		Index: index,
-		Hash:  blockHashStr,
-		State: 1,
+		Index:      index,
+		Hash:       blockHashStr,
+		State:      1,
+		LinkHashes: make([]string, 0),
+	}
+	for _, l := range links {
+		recv.LinkHashes = append(recv.LinkHashes, l)
 	}
 	blockKey := string(downloadFileBlockKey(fileHashStr, blockHashStr, index))
 	if fi.Blocks == nil {
@@ -267,6 +271,50 @@ func (this *FileDB) IsFileDownloaded(fileHashStr string) bool {
 		return false
 	}
 	return len(fi.BlockHashes) == len(fi.Blocks)
+}
+
+// GetUndownloadedBlockInfo. check undownloaded block in-order
+func (this *FileDB) GetUndownloadedBlockInfo(fileHashStr, rootBlockHash string) (string, uint32, error) {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
+	if err != nil || fi == nil {
+		return "", 0, errors.New("file not found")
+	}
+	index := uint32(0)
+	var search func(bh string) string
+	search = func(bh string) string {
+		blockKey := string(downloadFileBlockKey(fileHashStr, bh, index))
+		downloaded, ok := fi.Blocks[blockKey]
+		if !ok {
+			return bh
+		}
+		if len(downloaded.LinkHashes) == 0 {
+			return ""
+		}
+		oldIndex := index
+		for _, hash := range downloaded.LinkHashes {
+			index++
+			blockKey := string(downloadFileBlockKey(fileHashStr, hash, index))
+			_, ok := fi.Blocks[blockKey]
+			if !ok {
+				return hash
+			}
+		}
+		for _, hash := range downloaded.LinkHashes {
+			oldIndex++
+			blockKey := string(downloadFileBlockKey(fileHashStr, hash, oldIndex))
+			downloaded := fi.Blocks[blockKey]
+			for _, ch := range downloaded.LinkHashes {
+				index++
+				ret := search(ch)
+				if len(ret) == 0 {
+					continue
+				}
+				return ret
+			}
+		}
+		return ""
+	}
+	return search(rootBlockHash), index, nil
 }
 
 // DeleteFileDownloadInfo. delete file download info from db
