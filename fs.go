@@ -359,8 +359,15 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 	this.taskMgr.NewWorkers(fileHashStr, addrs, inOrder, job)
 	go this.taskMgr.WorkBackground(fileHashStr)
 	if inOrder {
-		blockIndex := int32(0)
-		err := this.taskMgr.AddBlockReq(fileHashStr, fileHashStr, blockIndex)
+		hash, index, err := this.taskMgr.GetUndownloadedBlockInfo(fileHashStr, fileHashStr)
+		if err != nil {
+			return err
+		}
+		if len(hash) == 0 {
+			return errors.New("no undownloaded block")
+		}
+		blockIndex := int32(index)
+		err = this.taskMgr.AddBlockReq(fileHashStr, hash, blockIndex)
 		if err != nil {
 			return err
 		}
@@ -374,17 +381,22 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 				log.Debugf("%s-%s-%d is downloaded", fileHashStr, value.Hash, value.Index)
 				continue
 			}
-			err := this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset)
-			if err != nil {
-				return err
-			}
-			go this.taskMgr.EmitProgress(fileHashStr)
-			log.Debugf("%s-%s-%d set downloaded", fileHashStr, value.Hash, value.Index)
+
 			block := this.Fs.EncodedToBlock(value.Block)
 			dagNode, err := this.Fs.BlockToDagNode(block)
 			if err != nil {
 				return err
 			}
+			links := make([]string, 0)
+			for _, l := range dagNode.Links() {
+				links = append(links, l.Cid.String())
+			}
+			err = this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset, links)
+			if err != nil {
+				return err
+			}
+			go this.taskMgr.EmitProgress(fileHashStr)
+			log.Debugf("%s-%s-%d set downloaded", fileHashStr, value.Hash, value.Index)
 			for _, l := range dagNode.Links() {
 				blockIndex++
 				err := this.taskMgr.AddBlockReq(fileHashStr, l.Cid.String(), blockIndex)
@@ -631,7 +643,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 			return err
 		}
 		log.Debugf("SetBlockDownloaded %s-%s-%d-%d", fileHashStr, value.Hash, index, value.Offset)
-		this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(index), value.Offset)
+		this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(index), value.Offset, nil)
 	}
 	if !this.taskMgr.IsFileDownloaded(fileHashStr) {
 		return errors.New("all blocks have sent but file not be stored")
