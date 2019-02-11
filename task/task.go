@@ -17,6 +17,7 @@ const (
 	TaskTypeNone TaskType = iota
 	TaskTypeUpload
 	TaskTypeDownload
+	TaskTypeBackup
 )
 
 type GetBlockReq struct {
@@ -42,6 +43,14 @@ type ProgressInfo struct {
 	Count    map[string]uint64 // address <=> count
 }
 
+type BackupFileOpt struct {
+	LuckyNum   uint64
+	BakNum     uint64
+	BakHeight  uint64
+	BackUpAddr string
+	BrokenAddr string
+}
+
 type Task struct {
 	fileHash   string        // task file hash
 	fileName   string        // file name
@@ -59,6 +68,7 @@ type Task struct {
 	onlyBlock    bool               // only send block data, without tag data
 	notify       chan *BlockResp    // notify download block
 	done         bool               // task done
+	backupOpt    *BackupFileOpt
 }
 
 // TaskMgr. implement upload/download task manager.
@@ -225,6 +235,16 @@ func (this *TaskMgr) SetOnlyBlock(fileHash string, only bool) {
 		return
 	}
 	v.onlyBlock = only
+}
+
+func (this *TaskMgr) SetBackupOpt(fileHash string, opt *BackupFileOpt) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	v, ok := this.tasks[fileHash]
+	if !ok {
+		return
+	}
+	v.backupOpt = opt
 }
 
 func (this *TaskMgr) OnTaskAck(fileHash string) {

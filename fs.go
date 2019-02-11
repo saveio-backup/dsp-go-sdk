@@ -428,6 +428,72 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 	return nil
 }
 
+func (this *Dsp) StartBackupFileService() {
+	// wait for init contractRequest
+	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			if this.Chain == nil {
+				break
+			}
+			tasks, err := this.Chain.Native.Fs.GetExpiredProveList()
+			if err != nil {
+				break
+			}
+			if tasks == nil || len(tasks.Tasks) == 0 {
+				log.Debugf("expired tasks len:%d", len(tasks.Tasks))
+				break
+			}
+			cnt := 0
+			for _, t := range tasks.Tasks {
+				if t.LuckyAddr.ToBase58() != this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
+					log.Debugf("get expired list err: lucky node is %s not me", t.LuckyAddr.ToBase58())
+					continue
+				}
+				if t.BackUpAddr.ToBase58() == this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
+					log.Debug("get expired list err: backup to self")
+					continue
+				}
+				if t.BrokenAddr.ToBase58() == this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
+					log.Debug("get expired list err: me is offline")
+					continue
+				}
+				log.Debugf("broken:%s, backupsvr:%s", t.BrokenAddr.ToBase58(), t.BackUpAddr.ToBase58())
+				if t.BrokenAddr.ToBase58() == t.BackUpAddr.ToBase58() {
+					log.Debug("get expired list err: backup from a bad node")
+					continue
+				}
+				if len(t.FileHash) == 0 || len(t.BakSrvAddr) == 0 || len(t.BackUpAddr.ToBase58()) == 0 {
+					log.Debugf("get expired prove list params invalid:%v", t)
+					continue
+				}
+				log.Debugf("go backup file:%s, from:%s %s", t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58())
+				cnt++
+				if cnt >= common.MAX_EXPIRED_PROVE_TASK_NUM {
+					break
+				}
+				opt := &task.BackupFileOpt{
+					LuckyNum:   t.LuckyNum,
+					BakNum:     t.BakNum,
+					BakHeight:  t.BakHeight,
+					BackUpAddr: t.BackUpAddr.ToBase58(),
+					BrokenAddr: t.BrokenAddr.ToBase58(),
+				}
+				this.taskMgr.NewTask(string(t.FileHash), task.TaskTypeBackup)
+				this.taskMgr.SetBackupOpt(string(t.FileHash), opt)
+				// TODO:
+				// err := bs.backupFileFromNode(context.TODO(), string(t.FileHash), string(t.BakSrvAddr), t.LuckyNum, t.BakHeight, t.BakNum, t.BackUpAddr, t.BrokenAddr)
+				// if err != nil {
+				// 	log.Errorf("back up file:%s failed:%s", t.FileHash, err)
+				// 	continue
+				// }
+				log.Debugf("backup file:%s success", t.FileHash)
+			}
+		}
+	}
+}
+
 // payForSendFile pay before send a file
 // return PoR params byte slice, PoR private key of the file or error
 func (this *Dsp) payForSendFile(filePath, fileHashStr string, blockNum uint64, opt *common.UploadOption) (*common.PayStoreFileReulst, error) {
