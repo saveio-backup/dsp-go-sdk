@@ -4,24 +4,56 @@ import (
 	"errors"
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
-	"os"
 
 	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
 	"gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/oniio/dsp-go-sdk/common"
-	"github.com/oniio/oniChain/common/log"
-	oniFs "github.com/ontio/ont-ipfs-go-sdk"
-	"github.com/ontio/ont-ipfs-go-sdk/importer/helpers"
-	ml "github.com/ontio/ont-ipfs-go-sdk/merkledag"
-	ftpb "github.com/ontio/ont-ipfs/unixfs/pb"
+	sdk "github.com/oniio/oniChain-go-sdk"
+
+	"github.com/oniio/oniFS/importer/helpers"
+	ml "github.com/oniio/oniFS/merkledag"
+	oniFs "github.com/oniio/oniFS/onifs"
+	ftpb "github.com/oniio/oniFS/unixfs/pb"
 )
 
-type Fs struct{}
+type Fs struct {
+	fs *oniFs.OniFSService
+}
+
+type FsConfig struct {
+	repoRoot  string
+	fsRoot    string
+	fsType    oniFs.FSType
+	chunkSize uint64
+	chain     *sdk.Chain
+}
+
+func NewFs(config *FsConfig) *Fs {
+	if config == nil {
+		config = defaultFSConfig()
+	}
+
+	fs, err := oniFs.NewOniFSService(config.repoRoot, config.fsRoot, config.fsType, config.chunkSize, config.chain)
+	if err != nil {
+		return nil
+	}
+
+	return &Fs{fs: fs}
+}
+
+func defaultFSConfig() *FsConfig {
+	return &FsConfig{
+		repoRoot:  "./",
+		fsRoot:    "./",
+		fsType:    oniFs.FS_BLOCKSTORE,
+		chunkSize: common.CHUNK_SIZE,
+	}
+}
 
 func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) (ipld.Node, []*helpers.UnixfsNode, error) {
-	root, list, err := oniFs.NodesFromFile(fileName, filePrefix, encrypt, password)
+	root, list, err := this.fs.NodesFromFile(fileName, filePrefix, encrypt, password)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -88,7 +120,7 @@ func (this *Fs) BlockDataOfAny(node interface{}) []byte {
 func (this *Fs) BlockToBytes(block blocks.Block) ([]byte, error) {
 	dagNode, err := ml.DecodeProtobufBlock(block)
 	if err != nil {
-		return nil, err
+		return block.RawData(), nil
 	}
 
 	pb := new(ftpb.Data)
@@ -143,53 +175,35 @@ func (this *Fs) BlocksListToMap(list []*helpers.UnixfsNode) (map[string]*helpers
 }
 
 func (this *Fs) PutBlock(key string, block blocks.Block, storeType common.BlockStoreType) error {
-	dagNode, _ := ml.DecodeProtobufBlock(block)
-	if dagNode != nil {
-		rawData, err := this.BlockToBytes(block)
-		log.Debugf("rawData len:%d, err:%s", len(rawData), err)
-		if err == nil {
-			bigF, _ := os.OpenFile("bigfile.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-			defer bigF.Close()
-			bigF.Write(rawData)
-		}
-		log.Debugf("put block cid:%s, links:%v\n", block.Cid().String(), dagNode.Links())
-	} else {
-		log.Debugf("put block but dagnode is nil\n")
-	}
-	return nil
+	return this.fs.PutBlock(block)
 }
 
-func (this *Fs) PutTag(key string, tag []byte) error {
-	return nil
+func (this *Fs) PutTag(blockHash string, fileHash string, index uint64, tag []byte) error {
+	return this.fs.PutTag(blockHash, fileHash, index, tag)
 }
 
-func (this *Fs) StartPDPVerify(fileHashStr string) error {
-	return nil
+func (this *Fs) StartPDPVerify(fileHash string, luckyNum uint64, bakHeight uint64, bakNum uint64) error {
+	return this.fs.StartPDPVerify(fileHash, luckyNum, bakHeight, bakNum)
 }
 
 // GetBlock get blocks
 func (this *Fs) GetBlock(hash string) blocks.Block {
-	root, list, err := this.NodesFromFile("./testdata/testuploadbigfile.txt", "", false, "")
+	cid, err := cid.Decode(hash)
 	if err != nil {
-		log.Errorf("node from file err:%s", err)
 		return nil
 	}
-	if root.Cid().String() == hash {
-		return root
+	block, err := this.fs.GetBlock(cid)
+	if err != nil {
+		return nil
 	}
-	for _, l := range list {
-		n, _ := l.GetDagNode()
-		if n.Cid().String() == hash {
-			return n
-		}
-	}
-	return nil
+
+	return block
 }
 
 // DeleteFile. delete file, unpin root block if needed
 // If a block is referenced to other file, ignore it.
 func (this *Fs) DeleteFile(fileHashStr string) error {
-	return nil
+	return this.fs.DeleteFile(fileHashStr)
 }
 
 type ProtoNode struct {

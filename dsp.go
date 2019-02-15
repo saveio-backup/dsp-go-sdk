@@ -17,7 +17,7 @@ type Dsp struct {
 
 func NewDsp() *Dsp {
 	return &Dsp{
-		Fs:      &fs.Fs{},
+		Fs:      fs.NewFs(nil),
 		taskMgr: task.NewTaskMgr(),
 	}
 }

@@ -704,7 +704,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		if err != nil {
 			return err
 		}
-		err = this.Fs.PutTag(fmt.Sprintf("%s%d", hash, value.Index), value.Tag)
+		err = this.Fs.PutTag(hash, fileHashStr, uint64(value.Index), value.Tag)
 		if err != nil {
 			return err
 		}
@@ -717,7 +717,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 	// TODO: push to tracker
 	log.Infof("received all block, start pdp verify")
 	// all block is saved, prove it
-	err = this.Fs.StartPDPVerify(fileHashStr)
+	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0)
 	if err != nil {
 		return err
 	}
