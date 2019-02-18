@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
+	"strings"
 
 	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
 	"gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
@@ -22,12 +23,19 @@ type Fs struct {
 	fs *oniFs.OniFSService
 }
 
+type FSType int
+
+const (
+	FS_FILESTORE = iota
+	FS_BLOCKSTORE
+)
+
 type FsConfig struct {
-	repoRoot  string
-	fsRoot    string
-	fsType    oniFs.FSType
-	chunkSize uint64
-	chain     *sdk.Chain
+	RepoRoot  string
+	FsRoot    string
+	FsType    FSType
+	ChunkSize uint64
+	Chain     *sdk.Chain
 }
 
 func NewFs(config *FsConfig) *Fs {
@@ -35,7 +43,8 @@ func NewFs(config *FsConfig) *Fs {
 		config = defaultFSConfig()
 	}
 
-	fs, err := oniFs.NewOniFSService(config.repoRoot, config.fsRoot, config.fsType, config.chunkSize, config.chain)
+	fsType := oniFs.FSType(config.FsType)
+	fs, err := oniFs.NewOniFSService(config.RepoRoot, config.FsRoot, fsType, config.ChunkSize, config.Chain)
 	if err != nil {
 		return nil
 	}
@@ -45,10 +54,10 @@ func NewFs(config *FsConfig) *Fs {
 
 func defaultFSConfig() *FsConfig {
 	return &FsConfig{
-		repoRoot:  "./",
-		fsRoot:    "./",
-		fsType:    oniFs.FS_BLOCKSTORE,
-		chunkSize: common.CHUNK_SIZE,
+		RepoRoot:  "./",
+		FsRoot:    "./",
+		FsType:    oniFs.FS_BLOCKSTORE,
+		ChunkSize: common.CHUNK_SIZE,
 	}
 }
 
@@ -134,6 +143,19 @@ func (this *Fs) EncodedToBlock(data []byte) blocks.Block {
 	return blocks.NewBlock(data)
 }
 
+func (this *Fs) EncodedToBlockWithCid(data []byte, cid string) blocks.Block {
+	if len(cid) < 2 {
+		return nil
+	}
+	if strings.HasPrefix(cid, common.PROTO_NODE_PREFIX) {
+		return blocks.NewBlock(data)
+	}
+	if strings.HasPrefix(cid, common.RAW_NODE_PREFIX) {
+		return ml.NewRawNode(data)
+	}
+	return nil
+}
+
 func (this *Fs) BlockToDagNode(block blocks.Block) (ipld.Node, error) {
 	return ml.DecodeProtobufBlock(block)
 }
@@ -174,7 +196,7 @@ func (this *Fs) BlocksListToMap(list []*helpers.UnixfsNode) (map[string]*helpers
 	return m, nil
 }
 
-func (this *Fs) PutBlock(key string, block blocks.Block, storeType common.BlockStoreType) error {
+func (this *Fs) PutBlock(block blocks.Block) error {
 	return this.fs.PutBlock(block)
 }
 
@@ -204,76 +226,4 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 // If a block is referenced to other file, ignore it.
 func (this *Fs) DeleteFile(fileHashStr string) error {
 	return this.fs.DeleteFile(fileHashStr)
-}
-
-type ProtoNode struct {
-	Data       []byte
-	FileSize   uint64
-	Blocksizes []uint64
-	LinkHashes []string
-	LinkSizes  map[string]uint64
-}
-
-func (this *Fs) BlockToProtoNode(block blocks.Block) (*ProtoNode, error) {
-	dagNode, err := ml.DecodeProtobufBlock(block)
-	if err != nil {
-		return nil, err
-	}
-	node := new(ProtoNode)
-	node.LinkHashes = make([]string, 0)
-	node.LinkSizes = make(map[string]uint64, 0)
-	for _, link := range dagNode.Links() {
-		node.LinkHashes = append(node.LinkHashes, link.Cid.String())
-		node.LinkSizes[link.Cid.String()] = link.Size
-	}
-	pb := new(ftpb.Data)
-	if err := proto.Unmarshal(dagNode.(*ml.ProtoNode).Data(), pb); err != nil {
-		return nil, err
-	}
-	node.Data = pb.GetData()
-	node.FileSize = pb.GetFilesize()
-	node.Blocksizes = pb.GetBlocksizes()
-	// fmt.Printf("GetType:%v\n", pb.GetType())
-	// fmt.Printf("GetData:%v\n", len(pb.GetData()))
-	// fmt.Printf("GetFilesize:%v\n", pb.GetFilesize())
-	// fmt.Printf("GetBlocksizes:%v\n", pb.GetBlocksizes())
-	// fmt.Printf("GetHashType:%v\n", pb.GetHashType())
-	// fmt.Printf("GetFanout:%v\n", pb.GetFanout())
-	return node, nil
-}
-
-func (this *Fs) ProtoNodeToBlock(node *ProtoNode) (blocks.Block, error) {
-	pb := new(ftpb.Data)
-	pb.Type = ftpb.Data_File.Enum()
-	if len(node.Data) > 0 {
-		pb.Data = node.Data
-	}
-	pb.Filesize = new(uint64)
-	*pb.Filesize = node.FileSize
-	pb.Blocksizes = node.Blocksizes
-	data, err := proto.Marshal(pb)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("data:%v, len:%d\n", data, len(data))
-	root := ml.NodeWithData(data)
-	for _, hash := range node.LinkHashes {
-		c, err := cid.Decode(hash)
-		if err != nil {
-			return nil, err
-		}
-		size := node.LinkSizes[hash]
-		l1 := &ipld.Link{
-			Name: "",
-			Size: size,
-			Cid:  c,
-		}
-		root.AddRawLink("", l1)
-	}
-	buf, err := root.EncodeProtobuf(false)
-	if err != nil {
-		return nil, err
-	}
-	block := this.EncodedToBlock(buf)
-	return block, nil
 }

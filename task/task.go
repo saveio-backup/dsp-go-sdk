@@ -87,7 +87,7 @@ func NewTaskMgr() *TaskMgr {
 		tasks: ts,
 	}
 	tmgr.blockReqCh = make(chan *GetBlockReq, 500)
-	tmgr.FileDB = store.NewFileDB(common.FILE_DB_DIR_PATH)
+	// tmgr.FileDB = store.NewFileDB(common.FILE_DB_DIR_PATH)
 	return tmgr
 }
 

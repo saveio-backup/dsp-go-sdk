@@ -2,9 +2,7 @@ package common
 
 const (
 	CHUNK_SIZE                  = 256 * 1024 // chunk size
-	FILE_DB_DIR_PATH            = "./db"     // file db path
 	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"   // download temp file path
-	DOWNLOAD_FILE_DIR_PATH      = "./data"   // download file real path
 )
 
 // timeout
@@ -15,11 +13,9 @@ const (
 	CHECK_PROVE_TIMEOUT    = 60 // client upload file and check prove timeout
 )
 
-type BlockStoreType int
-
 const (
-	BLOCK_STORE_TYPE_NORMAL BlockStoreType = iota
-	BLOCK_STORE_TYPE_FILE
+	PROTO_NODE_PREFIX = "Qm"
+	RAW_NODE_PREFIX   = "zb"
 )
 
 const (

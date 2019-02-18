@@ -8,8 +8,7 @@ import (
 	"github.com/oniio/oniChain-go-sdk/wallet"
 
 	"github.com/oniio/dsp-go-sdk/common"
-	"github.com/oniio/dsp-go-sdk/store"
-	"github.com/oniio/oniChain-go-sdk"
+	"github.com/oniio/dsp-go-sdk/config"
 	"github.com/oniio/oniChain/common/log"
 )
 
@@ -34,9 +33,10 @@ func init() {
 }
 
 func TestChainGetBlockHeight(t *testing.T) {
-	d := NewDsp()
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	height, err := d.Chain.GetCurrentBlockHeight()
 	if err != nil {
 		fmt.Printf("get block height err: %s", err)
@@ -45,15 +45,19 @@ func TestChainGetBlockHeight(t *testing.T) {
 	fmt.Printf("current block height: %d\n", height)
 }
 func TestGetVersion(t *testing.T) {
-	d := NewDsp()
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	version := d.GetVersion()
 	fmt.Printf("version: %s\n", version)
 }
 
 func TestNodeRegister(t *testing.T) {
-	d := NewDsp()
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	w, err := wallet.OpenWallet(walletFile)
 	// w, err := wallet.OpenWallet(wallet4File)
 	if err != nil {
@@ -77,9 +81,10 @@ func TestNodeRegister(t *testing.T) {
 }
 
 func TestNodeUnregister(t *testing.T) {
-	d := NewDsp()
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -100,9 +105,10 @@ func TestNodeUnregister(t *testing.T) {
 }
 
 func TestNodeQuery(t *testing.T) {
-	d := NewDsp()
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	info, err := d.QueryNode(wallet1Addr)
 	if err != nil {
 		log.Errorf("query node err %s", err)
@@ -118,9 +124,10 @@ func TestNodeQuery(t *testing.T) {
 }
 
 func TestNodeUpdate(t *testing.T) {
-	d := NewDsp()
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -141,9 +148,10 @@ func TestNodeUpdate(t *testing.T) {
 }
 
 func TestNodeWithdrawProfit(t *testing.T) {
-	d := NewDsp()
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -164,9 +172,14 @@ func TestNodeWithdrawProfit(t *testing.T) {
 }
 func TestStartDspNode(t *testing.T) {
 	log.InitLog(1, log.PATH, log.Stdout)
-	d := NewDsp()
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	dspCfg := &config.DspConfig{
+		DBPath:       "./testdata/db1",
+		FsRepoRoot:   "./testdata/onifs1",
+		FsFileRoot:   "./testdata",
+		FsType:       config.FS_BLOCKSTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -190,10 +203,14 @@ func TestStartDspNode(t *testing.T) {
 
 func TestStartDspNode4(t *testing.T) {
 	log.InitLog(1, log.PATH, log.Stdout)
-	d := NewDsp()
-	d.taskMgr.FileDB = store.NewFileDB("./db3")
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
+	dspCfg := &config.DspConfig{
+		DBPath:       "./db3",
+		FsRepoRoot:   "./onifs",
+		FsFileRoot:   "./onifs",
+		FsType:       config.FS_BLOCKSTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	w, err := wallet.OpenWallet(wallet4File)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -215,12 +232,48 @@ func TestStartDspNode4(t *testing.T) {
 	}
 }
 
+func TestNodeFromFile(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		DBPath:       "./testdata/db2",
+		FsRepoRoot:   "./testdata/onifs2",
+		FsFileRoot:   "./testdata",
+		FsType:       config.FS_FILESTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
+	w, err := wallet.OpenWallet(wallet2File)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+
+	r, l, err := d.Fs.NodesFromFile(uploadTestFile, acc.Address.ToBase58(), false, "")
+	if err != nil {
+		fmt.Printf("nodes from file err %s", err)
+		return
+	}
+	for _, li := range l {
+		lid, _ := li.GetDagNode()
+		fmt.Printf("li %s\n", lid.Cid())
+	}
+	fmt.Printf("r :%s, l:%d\n", r.Cid().String(), len(l))
+}
+
 func TestUploadFile(t *testing.T) {
-	d := NewDsp()
-	d.taskMgr.FileDB = store.NewFileDB("./db1")
+	dspCfg := &config.DspConfig{
+		DBPath:       "./testdata/db2",
+		FsRepoRoot:   "./testdata/onifs2",
+		FsFileRoot:   "./testdata",
+		FsType:       config.FS_FILESTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	d.Start(node2ListAddr)
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
 	w, err := wallet.OpenWallet(wallet2File)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -265,11 +318,15 @@ func TestUploadFile(t *testing.T) {
 }
 
 func TestDeleteFile(t *testing.T) {
-	d := NewDsp()
-	d.taskMgr.FileDB = store.NewFileDB("./db1")
+	dspCfg := &config.DspConfig{
+		DBPath:       "./testdata/db2",
+		FsRepoRoot:   "./testdata/onifs2",
+		FsFileRoot:   "./testdata",
+		FsType:       config.FS_FILESTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	d.Start(node2ListAddr)
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
 	w, err := wallet.OpenWallet(wallet2File)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -281,7 +338,7 @@ func TestDeleteFile(t *testing.T) {
 		return
 	}
 	d.Chain.SetDefaultAccount(acc)
-	ret, err := d.DeleteUploadedFile("QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr")
+	ret, err := d.DeleteUploadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
 		return
@@ -290,11 +347,15 @@ func TestDeleteFile(t *testing.T) {
 }
 
 func TestDownloadFile(t *testing.T) {
-	d := NewDsp()
-	d.taskMgr.FileDB = store.NewFileDB("./db2")
+	dspCfg := &config.DspConfig{
+		DBPath:       "./db2",
+		FsRepoRoot:   "./onifs",
+		FsFileRoot:   "./onifs",
+		FsType:       config.FS_FILESTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
 	d.Start(node3ListAddr)
-	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress(rpcAddr)
 	w, err := wallet.OpenWallet(wallet3File)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -328,4 +389,33 @@ func TestDownloadFile(t *testing.T) {
 	}
 	// use for testing go routines for tasks are released or not
 	time.Sleep(time.Duration(5) * time.Second)
+}
+
+func TestStartPDPVerify(t *testing.T) {
+	log.InitLog(1, log.PATH, log.Stdout)
+	dspCfg := &config.DspConfig{
+		DBPath:       "./testdata/db1",
+		FsRepoRoot:   "./testdata/onifs1",
+		FsFileRoot:   "./testdata",
+		FsType:       config.FS_BLOCKSTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d.Chain.SetDefaultAccount(acc)
+	d.Fs.StartPDPVerify("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", 0, 0, 0)
+	tick := time.NewTicker(time.Second)
+	for {
+		<-tick.C
+	}
 }

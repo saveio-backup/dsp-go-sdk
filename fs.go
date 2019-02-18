@@ -93,8 +93,9 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	}
 	var tx, fileHashStr string
 	var totalCount uint64
-	root, list, err := this.Fs.NodesFromFile(filePath, "", opt.Encrypt, opt.EncryptPassword)
+	root, list, err := this.Fs.NodesFromFile(filePath, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), opt.Encrypt, opt.EncryptPassword)
 	if err != nil {
+		log.Errorf("node from file err: %s", err)
 		return nil, err
 	}
 	fileHashStr = root.Cid().String()
@@ -205,7 +206,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 			if err != nil {
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 			}
-			log.Debugf("send block success %s, add uploaded block to db", reqInfo.Hash)
+			log.Debugf("send block success %s, index:%d, taglen:%d, add uploaded block to db", reqInfo.Hash, reqInfo.Index, len(tag))
 			// stored
 			this.taskMgr.AddUploadedBlock(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 			// update progress
@@ -226,7 +227,9 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 			break
 		}
 	}
+	log.Debugf("checking file proved")
 	proved := this.checkFileBeProved(fileHashStr, opt.ProveTimes, opt.CopyNum)
+	log.Debugf("checking file proved done %t", proved)
 	if !proved {
 		return nil, errors.New("file has sent, but no enought prove is finished")
 	}
@@ -258,6 +261,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	log.Debugf("delete file txHash %s", hex.EncodeToString(chainCom.ToArrayReverse(txHash)))
 	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
 	if err != nil || !confirmed {
 		return "", errors.New("wait for tx confirmed failed")
@@ -337,7 +341,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 	if err != nil {
 		return err
 	}
-	err = createDownloadDir()
+	err = createDownloadDir(this.Config.FsFileRoot)
 	if err != nil {
 		return err
 	}
@@ -382,7 +386,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 				continue
 			}
 
-			block := this.Fs.EncodedToBlock(value.Block)
+			block := this.Fs.EncodedToBlockWithCid(value.Block, value.Hash)
 			dagNode, err := this.Fs.BlockToDagNode(block)
 			if err != nil {
 				return err
@@ -422,7 +426,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 			this.taskMgr.SetTaskDone(fileHashStr, true)
 			break
 		}
-		return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, common.DOWNLOAD_FILE_DIR_PATH+"/"+fileHashStr)
+		return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, this.Config.FsFileRoot+"/"+fileHashStr)
 	}
 	// TODO: support out-of-order download
 	return nil
@@ -562,12 +566,14 @@ func (this *Dsp) payForSendFile(filePath, fileHashStr string, blockNum uint64, o
 
 // getFileProveNode. get file storing nodes  and stored (expired) nodes
 func (this *Dsp) getFileProveNode(fileHashStr string, challengeTimes uint64) ([]string, []string) {
-	proveDetails, _ := this.Chain.Native.Fs.GetFileProveDetails(fileHashStr)
+	proveDetails, err := this.Chain.Native.Fs.GetFileProveDetails(fileHashStr)
 	storing, stored := make([]string, 0), make([]string, 0)
 	if proveDetails == nil {
 		return storing, stored
 	}
+	log.Debugf("details :%v, err:%s", len(proveDetails.ProveDetails), err)
 	for _, detail := range proveDetails.ProveDetails {
+		log.Debugf("prove times %d, challenge times %d", detail.ProveTimes, challengeTimes)
 		if detail.ProveTimes < challengeTimes+1 {
 			storing = append(storing, string(detail.NodeAddr))
 		} else {
@@ -616,6 +622,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 			break
 		}
 		retry++
+		log.Debugf("time.Duration %d", timewait)
 		time.Sleep(time.Duration(timewait) * time.Second)
 	}
 	return true
@@ -700,7 +707,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		if err != nil {
 			return err
 		}
-		err = this.Fs.PutBlock(value.Hash, this.Fs.EncodedToBlock(value.Block), common.BLOCK_STORE_TYPE_NORMAL)
+		err = this.Fs.PutBlock(this.Fs.EncodedToBlockWithCid(value.Block, hash))
 		if err != nil {
 			return err
 		}
@@ -719,9 +726,9 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 	// all block is saved, prove it
 	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0)
 	if err != nil {
+		log.Errorf("start pdp verify err %s", err)
 		return err
 	}
-
 	// TODO: remove unused file info fields after prove pdp success
 	return nil
 }
@@ -783,9 +790,9 @@ func createTempDir() error {
 	return nil
 }
 
-func createDownloadDir() error {
-	if _, err := os.Stat(common.DOWNLOAD_FILE_DIR_PATH); os.IsNotExist(err) {
-		return os.MkdirAll(common.DOWNLOAD_FILE_DIR_PATH, 0755)
+func createDownloadDir(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return os.MkdirAll(path, 0755)
 	}
 	return nil
 }
