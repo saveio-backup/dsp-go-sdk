@@ -25,6 +25,7 @@ func NewDsp(c *config.DspConfig) *Dsp {
 	if c == nil {
 		return d
 	}
+	d.Config = c
 	d.Chain = chain.NewChain()
 	d.Chain.NewRpcClient().SetAddress(c.ChainRpcAddr)
 	if len(c.DBPath) > 0 {

@@ -12,5 +12,6 @@ message File {
    string hash = 1;  
    repeated string blockHashes = 2;
    int32 operation = 3;
-   Payment payInfo = 4;
+   string prefix = 4;
+   Payment payInfo = 5;
 }

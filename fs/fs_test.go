@@ -8,6 +8,7 @@ import (
 
 	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/config"
+	ml "github.com/oniio/oniFS/merkledag"
 	oniFs "github.com/oniio/oniFS/onifs"
 )
 
@@ -58,6 +59,7 @@ func TestEncodedToBlock(t *testing.T) {
 		return
 	}
 	rootData := fs.BlockDataOfAny(root)
+	fmt.Printf("rootData :%d\n", len(rootData))
 	rootBlock := fs.EncodedToBlockWithCid(rootData, root.Cid().String())
 	rootBytes, _ := fs.BlockToBytes(root)
 	fmt.Printf("rootBlock cid:%s, len:%d, lenbtes :%d \n", rootBlock.Cid(), len(rootBlock.RawData()), len(rootBytes))
@@ -99,28 +101,38 @@ func TestWriteAtOffset(t *testing.T) {
 
 func TestGetBlock(t *testing.T) {
 	fs := NewFs(&FsConfig{
-		RepoRoot:  "./onifs2",
-		FsRoot:    "./onifs2",
-		FsType:    oniFs.FS_FILESTORE,
+		RepoRoot:  "../testdata/onifs_test",
+		FsRoot:    "../testdata",
+		FsType:    oniFs.FS_BLOCKSTORE,
 		ChunkSize: common.CHUNK_SIZE,
 	})
-	root, _, err := fs.NodesFromFile("./fs.go", "123", false, "")
+	root, _, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
 	if err != nil {
 		fmt.Printf("err:%v\n", err)
 		return
 	}
-	// fmt.Printf("root:%s\n", root.Cid().String())
-	// err = fs.PutBlock("", root, common.BLOCK_STORE_TYPE_NORMAL)
-	// if err != nil {
-	// 	fmt.Printf("put block err %s\n", err)
-	// 	return
-	// }
+	err = fs.PutBlock(root)
+	if err != nil {
+		fmt.Printf("put block err %s\n", err)
+		return
+	}
 	blk := fs.GetBlock(root.Cid().String())
 	if blk == nil {
 		fmt.Printf("block is nil\n")
 		return
 	}
+	// for *ml.ProtoNode, it has links
+	dagNode, err := ml.DecodeProtobufBlock(blk)
+	if err != nil {
+		return
+	}
+	ls, err := fs.BlockLinks(blk)
+	if err != nil {
+		return
+	}
+	fmt.Printf("links :%v, ls:%v\n", dagNode.Links(), ls)
 	fmt.Printf("cid %s\n", blk.Cid().String())
-	fmt.Printf("raw data :%s\n", blk.RawData())
+	blockData := fs.BlockDataOfAny(blk)
+	fmt.Printf("raw data :%d\n", len(blockData))
 
 }

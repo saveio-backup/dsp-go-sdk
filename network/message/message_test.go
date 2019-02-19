@@ -9,7 +9,7 @@ import (
 )
 
 func TestReadMsg(t *testing.T) {
-	msg1 := NewFileFetchAsk("1", []string{"1", "2"}, "wallet")
+	msg1 := NewFileFetchAsk("1", []string{"1", "2"}, "wallet", "")
 	fmt.Printf("msg1.header:%v, payload:%v\n", msg1.Header, msg1.Payload)
 	msg1Proto := msg1.ToProtoMsg()
 	msg2 := ReadMessage(msg1Proto)

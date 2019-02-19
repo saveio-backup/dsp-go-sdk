@@ -310,10 +310,11 @@ func (this *Dsp) StartShareServices() {
 
 // DownloadFile. download file, peice by peice from addrs.
 // inOrder: if true, the file will be downloaded block by block in order
-func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) error {
+func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, decryptPwd string) error {
 	msg := message.NewFileDownload(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), 0, 0)
 	peers := make([]string, 0)
 	blockHashes := make([]string, 0)
+	prefix := ""
 	reply := func(msg *message.Message, addr string) {
 		if msg.Error != nil {
 			return
@@ -324,6 +325,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 		}
 		blockHashes = fileMsg.BlockHashes
 		peers = append(peers, addr)
+		prefix = fileMsg.Prefix
 	}
 	err := this.Network.Broadcast(addrs, msg, true, nil, reply)
 	if err != nil {
@@ -332,8 +334,12 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 	if len(peers) == 0 {
 		return errors.New("no peer for download")
 	}
-	log.Debugf("filehashstr:%v, blockhashes:%v\n", fileHashStr, blockHashes)
+	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v\n", fileHashStr, len(blockHashes), prefix)
 	err = this.taskMgr.AddFileBlockHashes(fileHashStr, blockHashes)
+	if err != nil {
+		return err
+	}
+	err = this.taskMgr.AddFilePrefix(fileHashStr, prefix)
 	if err != nil {
 		return err
 	}
@@ -411,6 +417,16 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 				continue
 			}
 			data := this.Fs.BlockData(block)
+			// Test: performance
+			fileStat, err := file.Stat()
+			if err != nil {
+				return err
+			}
+			// cut prefix
+			if fileStat.Size() == 0 && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
+				data = data[len(prefix):]
+				log.Debugf("cut prefix len:%d", len(data))
+			}
 			_, err = file.Write(data)
 			if err != nil {
 				return err
@@ -421,6 +437,9 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 			// last block
 			this.taskMgr.SetTaskDone(fileHashStr, true)
 			break
+		}
+		if len(decryptPwd) > 0 {
+			// TODO: decrypt file
 		}
 		return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, this.Config.FsFileRoot+"/"+fileHashStr)
 	}
@@ -630,7 +649,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 // return receivers
 func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	receivers := make([]string, 0)
-	msg := message.NewFileFetchAsk(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+	msg := message.NewFileFetchAsk(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), this.Chain.Native.Fs.DefAcc.Address.ToBase58())
 	action := func(res *message.Message, addr string) {
 		log.Debugf("send file ask msg success %s", addr)
 		// block waiting for ack msg or timeout msg

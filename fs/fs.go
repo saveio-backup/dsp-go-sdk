@@ -119,6 +119,10 @@ func (this *Fs) BlockDataOfAny(node interface{}) []byte {
 		}
 		return dagNode.RawData()
 	}
+	basicBlk, ok := node.(*blocks.BasicBlock)
+	if ok && basicBlk != nil {
+		return basicBlk.RawData()
+	}
 	return nil
 }
 
@@ -156,8 +160,8 @@ func (this *Fs) EncodedToBlockWithCid(data []byte, cid string) blocks.Block {
 // BlockLinks. get links from a block
 func (this *Fs) BlockLinks(block blocks.Block) ([]string, error) {
 	links := make([]string, 0)
-	_, ok := block.(*ml.ProtoNode)
-	if !ok {
+	_, ok := block.(*ml.RawNode)
+	if ok {
 		// for *ml.RawNode, it has no links
 		return nil, nil
 	}

@@ -48,6 +48,7 @@ type fileInfo struct {
 	BlockHashes  []string              `json:"block_hashes,omitempty"`
 	Progress     map[string]uint64     `json:"progress"`
 	ProvePrivKey []byte                `json:"prove_private_key,omitempty"`
+	Prefix       string                `json:"prefix"`
 }
 
 func NewFileDB(dbPath string) *FileDB {
@@ -182,6 +183,16 @@ func (this *FileDB) AddFileBlockHashes(fileHashStr string, blocks []string) erro
 	return this.putFileInfo(fileHashStr, fi, FileInfoTypeDownload)
 }
 
+// AddFilePrefix add file prefix
+func (this *FileDB) AddFilePrefix(fileHashStr, prefix string) error {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
+	if err != nil {
+		return err
+	}
+	fi.Prefix = prefix
+	return this.putFileInfo(fileHashStr, fi, FileInfoTypeDownload)
+}
+
 // IsDownloadInfoExist return a file is exist or not
 func (this *FileDB) IsDownloadInfoExist(fileHashStr string) bool {
 	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
@@ -198,6 +209,15 @@ func (this *FileDB) FileBlockHashes(fileHashStr string) []string {
 		return nil
 	}
 	return fi.BlockHashes
+}
+
+// FilePrefix. return file prefix
+func (this *FileDB) FilePrefix(fileHashStr string) string {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
+	if err != nil || fi == nil {
+		return ""
+	}
+	return fi.Prefix
 }
 
 // FileProgress. return each node count progress

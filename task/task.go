@@ -381,14 +381,25 @@ func (this *TaskMgr) WorkBackground(fileHash string) {
 					continue
 				}
 				// get next index idle worker
-				idx++
-				if idx >= len(addrs) {
-					idx = 0
+				var worker *Worker
+				for i, _ := range addrs {
+					idx++
+					if idx >= len(addrs) {
+						idx = 0
+					}
+					w := v.workers[addrs[idx]]
+					if w.Working() || w.WorkFailed(req.Hash) {
+						log.Debugf("%d worker is working: %t, failed: %t for %s, pool-len: %d, flight-len: %d, cache-len: %d", i, w.Working(), w.WorkFailed(req.Hash), req.Hash, len(v.blockReqPool), len(flight), len(blockCache))
+						continue
+					}
+					worker = w
+					break
 				}
-				worker := v.workers[addrs[idx]]
-				if worker.Working() || worker.WorkFailed(req.Hash) {
-					log.Debugf("worker is working for %s", req.Hash)
+				if worker == nil {
+					// can't find a valid worker
 					workLock.Unlock()
+					log.Debugf("no worker...")
+					time.Sleep(time.Duration(3) * time.Second)
 					continue
 				}
 				flight = append(flight, flightKey)

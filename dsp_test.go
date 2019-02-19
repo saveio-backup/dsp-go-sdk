@@ -201,6 +201,34 @@ func TestStartDspNode(t *testing.T) {
 	}
 }
 
+func TestDspGetBlock(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		DBPath:       "./testdata/db1",
+		FsRepoRoot:   "./testdata/onifs1",
+		FsFileRoot:   "./testdata",
+		FsType:       config.FS_BLOCKSTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d.Chain.SetDefaultAccount(acc)
+	// blk := d.Fs.GetBlock("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
+	blk := d.Fs.GetBlock("zb2rhfrCjaF8LnRoBC7VjLhyH34te5hxTKm4w4KUxrrYHFJnE")
+	fmt.Printf("block type :%d, strlen:%d, value:%s!\n", len(blk.RawData()), len("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c"), blk.RawData()[:34])
+	blockData := d.Fs.BlockDataOfAny(blk)
+	fmt.Printf("blk.cid %s, len:%d\n", blk.Cid().String(), len(blockData))
+}
+
 func TestStartDspNode4(t *testing.T) {
 	log.InitLog(1, log.PATH, log.Stdout)
 	dspCfg := &config.DspConfig{
@@ -383,7 +411,7 @@ func TestDownloadFile(t *testing.T) {
 		}
 	}()
 	addrs := []string{node1ListAddr}
-	err = d.DownloadFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", true, addrs)
+	err = d.DownloadFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", true, addrs, "")
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}

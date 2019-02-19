@@ -51,3 +51,13 @@ func TestGetUndownloadedBlockIndex(t *testing.T) {
 	hash, index, err := fileDB.GetUndownloadedBlockInfo(fileHashStr, fileHashStr)
 	fmt.Printf("undownloaded hash:%s index:%d, err :%s\n", hash, index, err)
 }
+
+func TestGetPrefix(t *testing.T) {
+	fileDB := NewFileDB("../testdata/db1/")
+	if fileDB == nil {
+		fmt.Printf("DB is nil\n")
+		return
+	}
+	pre := fileDB.FilePrefix("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
+	fmt.Printf("prefix :%s\n", pre)
+}

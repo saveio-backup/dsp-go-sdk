@@ -66,6 +66,11 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 				log.Errorf("add fileblockhashes failed:%s", err)
 				return
 			}
+			err = this.taskMgr.AddFilePrefix(fileMsg.Hash, fileMsg.Prefix)
+			if err != nil {
+				log.Errorf("add file prefix failed:%s", err)
+				return
+			}
 		}
 		newMsg := message.NewFileFetchAck(fileMsg.GetHash())
 		this.Network.Send(newMsg, peer)
@@ -118,7 +123,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			}
 		}
 		// TODO: verify price
-		replyMsg := message.NewFileDownloadAck(fileMsg.Hash, this.taskMgr.FileBlockHashes(fileMsg.Hash), this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+		replyMsg := message.NewFileDownloadAck(fileMsg.Hash, this.taskMgr.FileBlockHashes(fileMsg.Hash), this.Chain.Native.Fs.DefAcc.Address.ToBase58(), this.taskMgr.FilePrefix(fileMsg.Hash))
 		err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply download ack  msg failed", err)

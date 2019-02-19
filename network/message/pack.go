@@ -60,7 +60,7 @@ func NewBlockMsg(index int32, fileHash, hash string, blockData, tag []byte, offs
 }
 
 // NewFileMsg file msg
-func NewFileMsg(hash string, blkHashes []string, op int32, walletAddr string, asset int32, pricePerBlk uint64, errorCode int32) *Message {
+func NewFileMsg(hash string, blkHashes []string, op int32, walletAddr, prefix string, asset int32, pricePerBlk uint64, errorCode int32) *Message {
 	msg := &Message{
 		Header: MessageHeader(),
 	}
@@ -69,6 +69,7 @@ func NewFileMsg(hash string, blkHashes []string, op int32, walletAddr string, as
 		Hash:        hash,
 		BlockHashes: blkHashes,
 		Operation:   op,
+		Prefix:      prefix,
 		PayInfo: &file.Payment{
 			WalletAddress: walletAddr,
 			Asset:         asset,
@@ -95,41 +96,41 @@ func NewFileMsg(hash string, blkHashes []string, op int32, walletAddr string, as
 }
 
 // NewFileFetchAsk
-func NewFileFetchAsk(hash string, blkHashes []string, walletAddr string) *Message {
-	return NewFileMsg(hash, blkHashes, common.FILE_OP_FETCH_ASK, walletAddr, common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+func NewFileFetchAsk(hash string, blkHashes []string, walletAddr, prefix string) *Message {
+	return NewFileMsg(hash, blkHashes, common.FILE_OP_FETCH_ASK, walletAddr, prefix, common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileFetchAck
 func NewFileFetchAck(hash string) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_FETCH_ACK, "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(hash, nil, common.FILE_OP_FETCH_ACK, "", "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileFetchRdy
 func NewFileFetchRdy(hash string) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_FETCH_RDY, "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(hash, nil, common.FILE_OP_FETCH_RDY, "", "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileDownload download file from server msg
 func NewFileDownload(hash, walletAddr string, asset int32, pricePerBlk uint64) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_DOWNLOAD, walletAddr, asset, pricePerBlk, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(hash, nil, common.FILE_OP_DOWNLOAD, walletAddr, "", asset, pricePerBlk, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileDownloadAck
-func NewFileDownloadAck(hash string, blkHashes []string, walletAddr string) *Message {
-	return NewFileMsg(hash, blkHashes, common.FILE_OP_DOWNLOAD_ACK, walletAddr, common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+func NewFileDownloadAck(hash string, blkHashes []string, walletAddr, prefix string) *Message {
+	return NewFileMsg(hash, blkHashes, common.FILE_OP_DOWNLOAD_ACK, walletAddr, prefix, common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileDownloadAckErr
 func NewFileDownloadAckErr(hash string, errorCode int32) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_DOWNLOAD_ACK, "", common.ASSET_NONE, 0, errorCode)
+	return NewFileMsg(hash, nil, common.FILE_OP_DOWNLOAD_ACK, "", "", common.ASSET_NONE, 0, errorCode)
 }
 
 // NewFileDelete
 func NewFileDelete(hash, walletAddr string) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_DELETE, walletAddr, common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(hash, nil, common.FILE_OP_DELETE, walletAddr, "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileDeleteAck
 func NewFileDeleteAck(hash string) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_DELETE_ACK, "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(hash, nil, common.FILE_OP_DELETE_ACK, "", "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
 }
