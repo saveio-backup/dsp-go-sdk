@@ -335,24 +335,17 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 		return errors.New("no peer for download")
 	}
 	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v\n", fileHashStr, len(blockHashes), prefix)
-	err = this.taskMgr.AddFileBlockHashes(fileHashStr, blockHashes)
-	if err != nil {
-		return err
+	if !this.taskMgr.IsDownloadInfoExist(fileHashStr) {
+		err = this.taskMgr.AddFileBlockHashes(fileHashStr, blockHashes)
+		if err != nil {
+			return err
+		}
+		err = this.taskMgr.AddFilePrefix(fileHashStr, prefix)
+		if err != nil {
+			return err
+		}
 	}
-	err = this.taskMgr.AddFilePrefix(fileHashStr, prefix)
-	if err != nil {
-		return err
-	}
-	err = createTempDir()
-	if err != nil {
-		return err
-	}
-	err = createDownloadDir(this.Config.FsFileRoot)
-	if err != nil {
-		return err
-	}
-
-	file, err := os.OpenFile(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	file, err := createDownloadFile(this.Config.FsFileRoot, fileHashStr)
 	if err != nil {
 		return err
 	}
@@ -366,7 +359,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 		log.Debugf("download %s-%s-%d from %s", fHash, bHash, index, pAddr)
 		return this.downloadBlock(fHash, bHash, index, pAddr, respCh)
 	}
-	this.taskMgr.NewWorkers(fileHashStr, addrs, inOrder, job)
+	this.taskMgr.NewWorkers(fileHashStr, peers, inOrder, job)
 	go this.taskMgr.WorkBackground(fileHashStr)
 	if inOrder {
 		hash, index, err := this.taskMgr.GetUndownloadedBlockInfo(fileHashStr, fileHashStr)
@@ -798,16 +791,23 @@ func uploadOptValid(filePath string, opt *common.UploadOption) error {
 	return nil
 }
 
-func createTempDir() error {
+// createDownloadFile. create file handler for write downloading file
+func createDownloadFile(dir, fileName string) (*os.File, error) {
 	if _, err := os.Stat(common.DOWNLOAD_FILE_TEMP_DIR_PATH); os.IsNotExist(err) {
-		return os.MkdirAll(common.DOWNLOAD_FILE_TEMP_DIR_PATH, 0755)
+		err = os.MkdirAll(common.DOWNLOAD_FILE_TEMP_DIR_PATH, 0755)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return nil
-}
-
-func createDownloadDir(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return os.MkdirAll(path, 0755)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return nil
+	file, err := os.OpenFile(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
 }

@@ -40,14 +40,11 @@ func TestGetUploadedBlockNodeList(t *testing.T) {
 }
 
 func TestGetUndownloadedBlockIndex(t *testing.T) {
-	fileDB := NewFileDB("./test_db")
+	fileDB := NewFileDB("../testdata/db3")
 	if fileDB == nil {
 		return
 	}
-	fileHashStr := "QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr"
-	// fileDB.AddFileBlockHashes("QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr", []string{"QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr", "QmVtQx8uhZooZxEv8W81EHUeATdD7wuUEZJcvTvLhqe7Ry", "QmT5frdJnVs7ApVvMmCeyJ67CU41qNVeuDxfQthKYWsb8f", "QmZgSgH8xjTp6jY95pV5PRKKKNGLSuHddCchQbL1LC45pm", "QmW2WwMVh6BaVgckyCwMEsUG5edgDKcL41aveWKdCycVCx", "QmSvBSQG3G3ct8Nq6MnXXjXvLbHFBTdMa8ErR9q5bhAPWG"})
-	// fileDB.SetBlockDownloaded(fileHashStr, fileHashStr, "1", 0, 0, []string{"QmVtQx8uhZooZxEv8W81EHUeATdD7wuUEZJcvTvLhqe7Ry", "QmT5frdJnVs7ApVvMmCeyJ67CU41qNVeuDxfQthKYWsb8f"})
-	fileDB.SetBlockDownloaded(fileHashStr, "QmSvBSQG3G3ct8Nq6MnXXjXvLbHFBTdMa8ErR9q5bhAPWG", "1", 5, 0, []string{})
+	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	hash, index, err := fileDB.GetUndownloadedBlockInfo(fileHashStr, fileHashStr)
 	fmt.Printf("undownloaded hash:%s index:%d, err :%s\n", hash, index, err)
 }
