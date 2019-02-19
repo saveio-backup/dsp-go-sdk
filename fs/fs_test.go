@@ -61,6 +61,7 @@ func TestEncodedToBlock(t *testing.T) {
 	rootData := fs.BlockDataOfAny(root)
 	fmt.Printf("rootData :%d\n", len(rootData))
 	rootBlock := fs.EncodedToBlockWithCid(rootData, root.Cid().String())
+	fmt.Printf("blockDataLen:%d\n", len(fs.BlockData(rootBlock)))
 	rootBytes, _ := fs.BlockToBytes(root)
 	fmt.Printf("rootBlock cid:%s, len:%d, lenbtes :%d \n", rootBlock.Cid(), len(rootBlock.RawData()), len(rootBytes))
 	for _, rootC := range root.Links() {
@@ -134,5 +135,20 @@ func TestGetBlock(t *testing.T) {
 	fmt.Printf("cid %s\n", blk.Cid().String())
 	blockData := fs.BlockDataOfAny(blk)
 	fmt.Printf("raw data :%d\n", len(blockData))
+
+}
+
+func TestNewFs(t *testing.T) {
+	cfg := &FsConfig{
+		RepoRoot: "../testdata/onifs_test",
+		FsRoot:   "../testdata",
+		GcPeriod: "1h",
+		FsType:   config.FS_BLOCKSTORE,
+	}
+	fs := NewFs(cfg)
+	if fs == nil {
+		t.Fatal(fs)
+	}
+	fmt.Printf("fs :%v\n", fs)
 
 }

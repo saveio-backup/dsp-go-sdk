@@ -243,6 +243,7 @@ func (this *FileDB) SetBlockDownloaded(fileHashStr, blockHashStr, nodeAddr strin
 		Hash:       blockHashStr,
 		State:      1,
 		LinkHashes: make([]string, 0),
+		DataOffset: uint64(offset),
 	}
 	for _, l := range links {
 		recv.LinkHashes = append(recv.LinkHashes, l)

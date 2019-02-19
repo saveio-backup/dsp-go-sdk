@@ -18,11 +18,11 @@ func TestPutFileUploadInfo(t *testing.T) {
 }
 
 func TestGetBlockOffset(t *testing.T) {
-	fileDB := NewFileDB("../db3")
+	fileDB := NewFileDB("../testdata/db1")
 	if fileDB == nil {
 		return
 	}
-	off, err := fileDB.BlockOffset("QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr", "QmVtQx8uhZooZxEv8W81EHUeATdD7wuUEZJcvTvLhqe7Ry", 1)
+	off, err := fileDB.BlockOffset("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", "zb2rhiZuEBDquFNx7YcDHgRgsHEiyxjnvimq9XZawLeaJKgWc", 2)
 	if err != nil {
 		fmt.Printf("ERR :%s\n", err)
 		return

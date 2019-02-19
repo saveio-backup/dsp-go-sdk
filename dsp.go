@@ -36,6 +36,7 @@ func NewDsp(c *config.DspConfig) *Dsp {
 			RepoRoot:  c.FsRepoRoot,
 			FsRoot:    c.FsFileRoot,
 			FsType:    c.FsType,
+			GcPeriod:  c.FsGcPeriod,
 			ChunkSize: common.CHUNK_SIZE,
 			Chain:     d.Chain,
 		})

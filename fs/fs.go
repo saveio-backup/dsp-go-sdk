@@ -29,6 +29,7 @@ type FsConfig struct {
 	FsRoot    string
 	FsType    config.FSType
 	ChunkSize uint64
+	GcPeriod  string
 	Chain     *sdk.Chain
 }
 
@@ -36,9 +37,8 @@ func NewFs(config *FsConfig) *Fs {
 	if config == nil {
 		config = defaultFSConfig()
 	}
-
 	fsType := oniFs.FSType(config.FsType)
-	fs, err := oniFs.NewOniFSService(config.RepoRoot, config.FsRoot, fsType, config.ChunkSize, config.Chain)
+	fs, err := oniFs.NewOniFSService(config.RepoRoot, config.FsRoot, fsType, config.ChunkSize, config.GcPeriod, config.Chain)
 	if err != nil {
 		return nil
 	}
@@ -206,6 +206,14 @@ func (this *Fs) BlocksListToMap(list []*helpers.UnixfsNode) (map[string]*helpers
 
 func (this *Fs) PutBlock(block blocks.Block) error {
 	return this.fs.PutBlock(block)
+}
+
+func (this *Fs) SetFsFilePrefix(fileName, prefix string) error {
+	return this.fs.SetFilePrefix(fileName, prefix)
+}
+
+func (this *Fs) PutBlockForFileStore(fileName string, block blocks.Block, offset uint64) error {
+	return this.fs.PutBlockForFilestore(fileName, block, offset)
 }
 
 func (this *Fs) PutTag(blockHash string, fileHash string, index uint64, tag []byte) error {

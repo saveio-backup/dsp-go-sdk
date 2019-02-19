@@ -206,7 +206,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 			if err != nil {
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 			}
-			log.Debugf("send block success %s, index:%d, taglen:%d, add uploaded block to db", reqInfo.Hash, reqInfo.Index, len(tag))
+			log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d add uploaded block to db", reqInfo.Hash, reqInfo.Index, len(tag), offset-dataLen)
 			// stored
 			this.taskMgr.AddUploadedBlock(fileHashStr, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 			// update progress
@@ -302,6 +302,7 @@ func (this *Dsp) StartShareServices() {
 				log.Errorf("get block offset err%s", err)
 				continue
 			}
+			log.Debugf("share block %s, index:%d,  offset %d", req.Hash, req.Index, offset)
 			msg := message.NewBlockMsg(req.Index, req.FileHash, req.Hash, blockData, nil, int64(offset))
 			this.Network.Send(msg, req.PeerAddr)
 		}
@@ -367,6 +368,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 			return err
 		}
 		if len(hash) == 0 {
+			removeTempFile(fileHashStr)
 			return errors.New("no undownloaded block")
 		}
 		blockIndex := int32(index)
@@ -374,6 +376,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 		if err != nil {
 			return err
 		}
+		fullFilePath := this.Config.FsFileRoot + "/" + fileHashStr
 		for {
 			value, ok := <-this.taskMgr.TaskNotify(fileHashStr)
 			if !ok {
@@ -388,13 +391,34 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 			if err != nil {
 				return err
 			}
-			err = this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset, links)
-			if err != nil {
-				return err
+			if block.Cid().String() == fileHashStr {
+				log.Debugf("set file prefix %s %s", fullFilePath, prefix)
+				this.Fs.SetFsFilePrefix(fullFilePath, prefix)
 			}
-			err = this.Fs.PutBlock(block)
+			err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(value.Offset))
+			log.Debugf("put block for filestore %s, offset:%d", block.Cid(), value.Offset)
 			if err != nil {
 				log.Errorf("put block err %s", err)
+				return err
+			}
+			if len(links) == 0 {
+				data := this.Fs.BlockData(block)
+				// Test: performance
+				fileStat, err := file.Stat()
+				if err != nil {
+					return err
+				}
+				// cut prefix
+				if fileStat.Size() == 0 && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
+					data = data[len(prefix):]
+				}
+				_, err = file.Write(data)
+				if err != nil {
+					return err
+				}
+			}
+			err = this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset, links)
+			if err != nil {
 				return err
 			}
 			go this.taskMgr.EmitProgress(fileHashStr)
@@ -409,21 +433,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 			if len(links) != 0 {
 				continue
 			}
-			data := this.Fs.BlockData(block)
-			// Test: performance
-			fileStat, err := file.Stat()
-			if err != nil {
-				return err
-			}
-			// cut prefix
-			if fileStat.Size() == 0 && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
-				data = data[len(prefix):]
-				log.Debugf("cut prefix len:%d", len(data))
-			}
-			_, err = file.Write(data)
-			if err != nil {
-				return err
-			}
+			// find a more accurate way
 			if value.Index != blockIndex {
 				continue
 			}
@@ -434,7 +444,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 		if len(decryptPwd) > 0 {
 			// TODO: decrypt file
 		}
-		return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, this.Config.FsFileRoot+"/"+fileHashStr)
+		return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, fullFilePath)
 	}
 	// TODO: support out-of-order download
 	return nil
@@ -810,4 +820,9 @@ func createDownloadFile(dir, fileName string) (*os.File, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+// removeTempFile. remove the temp download file
+func removeTempFile(fileName string) {
+	os.Remove(common.DOWNLOAD_FILE_TEMP_DIR_PATH + "/" + fileName)
 }

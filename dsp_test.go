@@ -176,6 +176,7 @@ func TestStartDspNode(t *testing.T) {
 		DBPath:       "./testdata/db1",
 		FsRepoRoot:   "./testdata/onifs1",
 		FsFileRoot:   "./testdata",
+		FsGcPeriod:   "1h",
 		FsType:       config.FS_BLOCKSTORE,
 		ChainRpcAddr: rpcAddr,
 	}
@@ -235,6 +236,7 @@ func TestStartDspNode4(t *testing.T) {
 		DBPath:       "./db3",
 		FsRepoRoot:   "./onifs",
 		FsFileRoot:   "./onifs",
+		FsGcPeriod:   "1h",
 		FsType:       config.FS_BLOCKSTORE,
 		ChainRpcAddr: rpcAddr,
 	}
