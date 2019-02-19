@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/oniio/dsp-go-sdk/common"
+	"github.com/oniio/dsp-go-sdk/config"
 	oniFs "github.com/oniio/oniFS/onifs"
 )
 
@@ -46,9 +47,9 @@ func TestBlockToBytes(t *testing.T) {
 
 func TestEncodedToBlock(t *testing.T) {
 	fs := NewFs(&FsConfig{
-		RepoRoot:  "../testdata/onifs3",
+		RepoRoot:  "../testdata/onifs_test",
 		FsRoot:    "../testdata",
-		FsType:    FS_FILESTORE,
+		FsType:    config.FS_FILESTORE,
 		ChunkSize: common.CHUNK_SIZE,
 	})
 	root, l, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
@@ -56,16 +57,22 @@ func TestEncodedToBlock(t *testing.T) {
 		fmt.Printf("node from file err:%s\n", err)
 		return
 	}
-	fmt.Printf("root:%s, child len:%d\n", root.Cid().String(), len(l))
-	block, _ := l[3].GetDagNode()
-	rawData := fs.BlockDataOfAny(l[3])
-	if err != nil {
-		fmt.Printf("bytes to block err:%s\n", err)
-		return
+	rootData := fs.BlockDataOfAny(root)
+	rootBlock := fs.EncodedToBlockWithCid(rootData, root.Cid().String())
+	rootBytes, _ := fs.BlockToBytes(root)
+	fmt.Printf("rootBlock cid:%s, len:%d, lenbtes :%d \n", rootBlock.Cid(), len(rootBlock.RawData()), len(rootBytes))
+	for _, rootC := range root.Links() {
+		fmt.Printf("rootC %s\n", rootC.Cid.String())
 	}
-	fmt.Printf("block content, len:%d\n", len(rawData))
-	encodedBlock := fs.EncodedToBlockWithCid(rawData, block.Cid().String())
-	fmt.Printf("block cid:%s, encoded %s\n", block.Cid().String(), encodedBlock.Cid().String())
+
+	fmt.Printf("root:%s, child len:%d\n", root.Cid().String(), len(l))
+	for _, item := range l {
+		dagNode, _ := item.GetDagNode()
+		rawData := fs.BlockDataOfAny(item)
+		itemBytes, _ := fs.BlockToBytes(dagNode)
+		block := fs.EncodedToBlockWithCid(rawData, dagNode.Cid().String())
+		fmt.Printf("block type %s, rawData len:%d, data:%d, bytes:%d\n", block.Cid(), len(rawData), len(block.RawData()), len(itemBytes))
+	}
 }
 
 func TestReadWithOffset(t *testing.T) {

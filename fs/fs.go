@@ -11,6 +11,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/oniio/dsp-go-sdk/common"
+	"github.com/oniio/dsp-go-sdk/config"
 	sdk "github.com/oniio/oniChain-go-sdk"
 
 	"github.com/oniio/oniFS/importer/helpers"
@@ -23,17 +24,10 @@ type Fs struct {
 	fs *oniFs.OniFSService
 }
 
-type FSType int
-
-const (
-	FS_FILESTORE = iota
-	FS_BLOCKSTORE
-)
-
 type FsConfig struct {
 	RepoRoot  string
 	FsRoot    string
-	FsType    FSType
+	FsType    config.FSType
 	ChunkSize uint64
 	Chain     *sdk.Chain
 }
@@ -106,10 +100,12 @@ func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, 
 	return root, newList, nil
 }
 
+// BlockData. get block data from blocks.BlockData
 func (this *Fs) BlockData(block blocks.Block) []byte {
 	return block.RawData()
 }
 
+// BlockDataOfAny. get block data from ipld.Node or *helpers.UnixfsNode
 func (this *Fs) BlockDataOfAny(node interface{}) []byte {
 	ipldN, ok := node.(ipld.Node)
 	if ok && ipldN != nil {
@@ -126,12 +122,16 @@ func (this *Fs) BlockDataOfAny(node interface{}) []byte {
 	return nil
 }
 
+// BlockToBytes. get block decoded data bytes
 func (this *Fs) BlockToBytes(block blocks.Block) ([]byte, error) {
-	dagNode, err := ml.DecodeProtobufBlock(block)
-	if err != nil {
+	_, isRawNode := block.(*ml.RawNode)
+	if isRawNode {
 		return block.RawData(), nil
 	}
-
+	dagNode, err := ml.DecodeProtobufBlock(block)
+	if err != nil {
+		return nil, err
+	}
 	pb := new(ftpb.Data)
 	if err := proto.Unmarshal(dagNode.(*ml.ProtoNode).Data(), pb); err != nil {
 		return nil, err
@@ -139,10 +139,7 @@ func (this *Fs) BlockToBytes(block blocks.Block) ([]byte, error) {
 	return pb.Data, nil
 }
 
-func (this *Fs) EncodedToBlock(data []byte) blocks.Block {
-	return blocks.NewBlock(data)
-}
-
+// EncodedToBlockWithCid. encode block data to block with its cid hash string.
 func (this *Fs) EncodedToBlockWithCid(data []byte, cid string) blocks.Block {
 	if len(cid) < 2 {
 		return nil
@@ -156,16 +153,23 @@ func (this *Fs) EncodedToBlockWithCid(data []byte, cid string) blocks.Block {
 	return nil
 }
 
-func (this *Fs) BlockToDagNode(block blocks.Block) (ipld.Node, error) {
-	return ml.DecodeProtobufBlock(block)
-}
-
-func (this *Fs) DecodeDagNode(dagNode ipld.Node) ([]byte, error) {
-	pb := new(ftpb.Data)
-	if err := proto.Unmarshal(dagNode.(*ml.ProtoNode).Data(), pb); err != nil {
+// BlockLinks. get links from a block
+func (this *Fs) BlockLinks(block blocks.Block) ([]string, error) {
+	links := make([]string, 0)
+	_, ok := block.(*ml.ProtoNode)
+	if !ok {
+		// for *ml.RawNode, it has no links
+		return nil, nil
+	}
+	// for *ml.ProtoNode, it has links
+	dagNode, err := ml.DecodeProtobufBlock(block)
+	if err != nil {
 		return nil, err
 	}
-	return pb.Data, nil
+	for _, l := range dagNode.Links() {
+		links = append(links, l.Cid.String())
+	}
+	return links, nil
 }
 
 func (this *Fs) AllBlockHashes(root ipld.Node, list []*helpers.UnixfsNode) ([]string, error) {

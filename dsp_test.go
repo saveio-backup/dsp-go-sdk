@@ -348,9 +348,9 @@ func TestDeleteFile(t *testing.T) {
 
 func TestDownloadFile(t *testing.T) {
 	dspCfg := &config.DspConfig{
-		DBPath:       "./db2",
-		FsRepoRoot:   "./onifs",
-		FsFileRoot:   "./onifs",
+		DBPath:       "./testdata/db3",
+		FsRepoRoot:   "./testdata/onifs3",
+		FsFileRoot:   "./testdata",
 		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
 	}
@@ -383,7 +383,7 @@ func TestDownloadFile(t *testing.T) {
 		}
 	}()
 	addrs := []string{node1ListAddr}
-	err = d.DownloadFile("QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr", true, addrs)
+	err = d.DownloadFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", true, addrs)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}

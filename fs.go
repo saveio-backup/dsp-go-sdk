@@ -380,41 +380,37 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string) 
 			if !ok {
 				return errors.New("download internal error")
 			}
-			// this.taskMgr.DelBlockReq(fileHashStr, value.Hash, value.Index)
 			if this.taskMgr.IsBlockDownloaded(fileHashStr, value.Hash, uint32(value.Index)) {
 				log.Debugf("%s-%s-%d is downloaded", fileHashStr, value.Hash, value.Index)
 				continue
 			}
-
 			block := this.Fs.EncodedToBlockWithCid(value.Block, value.Hash)
-			dagNode, err := this.Fs.BlockToDagNode(block)
+			links, err := this.Fs.BlockLinks(block)
 			if err != nil {
 				return err
-			}
-			links := make([]string, 0)
-			for _, l := range dagNode.Links() {
-				links = append(links, l.Cid.String())
 			}
 			err = this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset, links)
 			if err != nil {
 				return err
 			}
+			err = this.Fs.PutBlock(block)
+			if err != nil {
+				log.Errorf("put block err %s", err)
+				return err
+			}
 			go this.taskMgr.EmitProgress(fileHashStr)
 			log.Debugf("%s-%s-%d set downloaded", fileHashStr, value.Hash, value.Index)
-			for _, l := range dagNode.Links() {
+			for _, l := range links {
 				blockIndex++
-				err := this.taskMgr.AddBlockReq(fileHashStr, l.Cid.String(), blockIndex)
+				err := this.taskMgr.AddBlockReq(fileHashStr, l, blockIndex)
 				if err != nil {
 					return err
 				}
 			}
-			if len(dagNode.Links()) != 0 {
+			if len(links) != 0 {
 				continue
 			}
-			data, err := this.Fs.DecodeDagNode(dagNode)
-			if err != nil {
-				return err
-			}
+			data := this.Fs.BlockData(block)
 			_, err = file.Write(data)
 			if err != nil {
 				return err
