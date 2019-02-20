@@ -257,6 +257,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 	if info.FileOwner.ToBase58() != this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
 		return "", fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
 	}
+	storingNode, _ := this.getFileProveNode(fileHashStr, info.ChallengeTimes)
 	txHash, err := this.Chain.Native.Fs.DeleteFile(fileHashStr)
 	if err != nil {
 		return "", err
@@ -266,8 +267,8 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 	if err != nil || !confirmed {
 		return "", errors.New("wait for tx confirmed failed")
 	}
-	storingNode, _ := this.getFileProveNode(fileHashStr, info.ChallengeTimes)
 	if len(storingNode) == 0 {
+		// find breakpoint keep nodelist
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(fileHashStr, fileHashStr, 0)...)
 	}
 	msg := message.NewFileDelete(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
@@ -446,7 +447,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 			break
 		}
 		if len(decryptPwd) > 0 {
-			// TODO: decrypt file
+			return this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
 		}
 		return nil
 		// return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, fullFilePath)

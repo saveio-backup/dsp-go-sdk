@@ -243,3 +243,8 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 func (this *Fs) DeleteFile(fileHashStr string) error {
 	return this.fs.DeleteFile(fileHashStr)
 }
+
+// AESDecryptFile. descypt file
+func (this *Fs) AESDecryptFile(file, password, outputPath string) error {
+	return oniFs.DecryptFile(file, password, outputPath)
+}

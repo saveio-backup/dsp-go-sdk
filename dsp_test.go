@@ -373,10 +373,15 @@ func TestUploadFile(t *testing.T) {
 }
 
 func TestDeleteFile(t *testing.T) {
+	fileRoot, err := filepath.Abs("./testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
 	dspCfg := &config.DspConfig{
-		DBPath:       "./testdata/db2",
-		FsRepoRoot:   "./testdata/onifs2",
-		FsFileRoot:   "./testdata",
+		DBPath:       "testdata/db2",
+		FsRepoRoot:   "testdata/onifs2",
+		FsFileRoot:   fileRoot,
 		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
 	}
@@ -399,6 +404,17 @@ func TestDeleteFile(t *testing.T) {
 		return
 	}
 	log.Infof("delete file success, ret:%v", ret)
+	// wait for msg sent
+	time.Sleep(time.Duration(5) * time.Second)
+}
+
+func TestGetFileProveNode(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
+	n1, n2 := d.getFileProveNode("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", 3)
+	fmt.Printf("n1:%v, n2:%v\n", n1, n2)
 }
 
 func TestDownloadFile(t *testing.T) {
