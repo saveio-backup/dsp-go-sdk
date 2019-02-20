@@ -395,12 +395,6 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 				log.Debugf("set file prefix %s %s", fullFilePath, prefix)
 				this.Fs.SetFsFilePrefix(fullFilePath, prefix)
 			}
-			err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(value.Offset))
-			log.Debugf("put block for filestore %s, offset:%d", block.Cid(), value.Offset)
-			if err != nil {
-				log.Errorf("put block err %s", err)
-				return err
-			}
 			if len(links) == 0 {
 				data := this.Fs.BlockData(block)
 				// Test: performance
@@ -416,6 +410,16 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 				if err != nil {
 					return err
 				}
+			}
+			err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(value.Offset))
+			log.Debugf("put block for file %s filestore %s, offset:%d", fullFilePath, block.Cid(), value.Offset)
+			if err != nil {
+				log.Errorf("put block err %s", err)
+				return err
+			}
+			testGetBlk := this.Fs.GetBlock(block.Cid().String())
+			if testGetBlk == nil {
+				return errors.New("get block is nil")
 			}
 			err = this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset, links)
 			if err != nil {
@@ -444,7 +448,8 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 		if len(decryptPwd) > 0 {
 			// TODO: decrypt file
 		}
-		return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, fullFilePath)
+		return nil
+		// return os.Rename(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileHashStr, fullFilePath)
 	}
 	// TODO: support out-of-order download
 	return nil
@@ -815,7 +820,8 @@ func createDownloadFile(dir, fileName string) (*os.File, error) {
 			return nil, err
 		}
 	}
-	file, err := os.OpenFile(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	// file, err := os.OpenFile(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	file, err := os.OpenFile(dir+"/"+fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		return nil, err
 	}

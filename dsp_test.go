@@ -2,6 +2,7 @@ package dsp
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -172,10 +173,15 @@ func TestNodeWithdrawProfit(t *testing.T) {
 }
 func TestStartDspNode(t *testing.T) {
 	log.InitLog(1, log.PATH, log.Stdout)
+	fileRoot, err := filepath.Abs("./testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
 	dspCfg := &config.DspConfig{
-		DBPath:       "./testdata/db1",
-		FsRepoRoot:   "./testdata/onifs1",
-		FsFileRoot:   "./testdata",
+		DBPath:       fileRoot + "/db1",
+		FsRepoRoot:   fileRoot + "/onifs1",
+		FsFileRoot:   fileRoot,
 		FsGcPeriod:   "1h",
 		FsType:       config.FS_BLOCKSTORE,
 		ChainRpcAddr: rpcAddr,
@@ -202,16 +208,22 @@ func TestStartDspNode(t *testing.T) {
 	}
 }
 
-func TestDspGetBlock(t *testing.T) {
+func TestStartDspNode3(t *testing.T) {
+	fileRoot, err := filepath.Abs("./testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
 	dspCfg := &config.DspConfig{
-		DBPath:       "./testdata/db1",
-		FsRepoRoot:   "./testdata/onifs1",
-		FsFileRoot:   "./testdata",
-		FsType:       config.FS_BLOCKSTORE,
+		DBPath:       "testdata/db3",
+		FsRepoRoot:   "testdata/onifs3",
+		FsFileRoot:   fileRoot,
+		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg)
-	w, err := wallet.OpenWallet(walletFile)
+	d.Start(node3ListAddr)
+	w, err := wallet.OpenWallet(wallet3File)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
 		return
@@ -221,23 +233,48 @@ func TestDspGetBlock(t *testing.T) {
 		log.Errorf("get default acc err:%s\n", err)
 		return
 	}
-	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d.Chain.SetDefaultAccount(acc)
-	// blk := d.Fs.GetBlock("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
-	blk := d.Fs.GetBlock("zb2rhfrCjaF8LnRoBC7VjLhyH34te5hxTKm4w4KUxrrYHFJnE")
-	fmt.Printf("block type :%d, strlen:%d, value:%s!\n", len(blk.RawData()), len("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c"), blk.RawData()[:34])
-	blockData := d.Fs.BlockDataOfAny(blk)
-	fmt.Printf("blk.cid %s, len:%d\n", blk.Cid().String(), len(blockData))
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d.taskMgr.RegProgressCh()
+	go func() {
+		stop := false
+		for {
+			v := <-d.taskMgr.ProgressCh()
+			for node, cnt := range v.Count {
+				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
+				stop = (cnt == v.Total)
+			}
+			if stop {
+				break
+			}
+		}
+	}()
+	addrs := []string{node1ListAddr}
+	err = d.DownloadFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", true, addrs, "")
+	if err != nil {
+		log.Errorf("download err %s\n", err)
+	}
+	// use for testing go routines for tasks are released or not
+	time.Sleep(time.Duration(5) * time.Second)
+	go d.StartShareServices()
+	tick := time.NewTicker(time.Second)
+	for {
+		<-tick.C
+	}
 }
 
 func TestStartDspNode4(t *testing.T) {
 	log.InitLog(1, log.PATH, log.Stdout)
+	fileRoot, err := filepath.Abs("./testdata2")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
 	dspCfg := &config.DspConfig{
-		DBPath:       "./db3",
-		FsRepoRoot:   "./onifs",
-		FsFileRoot:   "./onifs",
-		FsGcPeriod:   "1h",
-		FsType:       config.FS_BLOCKSTORE,
+		DBPath:       fileRoot + "/db4",
+		FsRepoRoot:   fileRoot + "/onifs4",
+		FsFileRoot:   fileRoot,
+		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg)
@@ -253,45 +290,33 @@ func TestStartDspNode4(t *testing.T) {
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d.Chain.SetDefaultAccount(acc)
-
 	d.Start(node4ListAddr)
+	d.taskMgr.RegProgressCh()
+	go func() {
+		stop := false
+		for {
+			v := <-d.taskMgr.ProgressCh()
+			for node, cnt := range v.Count {
+				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
+				stop = (cnt == v.Total)
+			}
+			if stop {
+				break
+			}
+		}
+	}()
+	addrs := []string{node3ListAddr}
+	err = d.DownloadFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", true, addrs, "")
+	if err != nil {
+		log.Errorf("download err %s\n", err)
+	}
+	// use for testing go routines for tasks are released or not
+	time.Sleep(time.Duration(5) * time.Second)
 	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
 	for {
 		<-tick.C
 	}
-}
-
-func TestNodeFromFile(t *testing.T) {
-	dspCfg := &config.DspConfig{
-		DBPath:       "./testdata/db2",
-		FsRepoRoot:   "./testdata/onifs2",
-		FsFileRoot:   "./testdata",
-		FsType:       config.FS_FILESTORE,
-		ChainRpcAddr: rpcAddr,
-	}
-	d := NewDsp(dspCfg)
-	w, err := wallet.OpenWallet(wallet2File)
-	if err != nil {
-		log.Errorf("open wallet err:%s\n", err)
-		return
-	}
-	acc, err := w.GetDefaultAccount([]byte(walletPwd))
-	if err != nil {
-		log.Errorf("get default acc err:%s\n", err)
-		return
-	}
-
-	r, l, err := d.Fs.NodesFromFile(uploadTestFile, acc.Address.ToBase58(), false, "")
-	if err != nil {
-		fmt.Printf("nodes from file err %s", err)
-		return
-	}
-	for _, li := range l {
-		lid, _ := li.GetDagNode()
-		fmt.Printf("li %s\n", lid.Cid())
-	}
-	fmt.Printf("r :%s, l:%d\n", r.Cid().String(), len(l))
 }
 
 func TestUploadFile(t *testing.T) {
@@ -377,10 +402,15 @@ func TestDeleteFile(t *testing.T) {
 }
 
 func TestDownloadFile(t *testing.T) {
+	fileRoot, err := filepath.Abs("./testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
 	dspCfg := &config.DspConfig{
-		DBPath:       "./testdata/db3",
-		FsRepoRoot:   "./testdata/onifs3",
-		FsFileRoot:   "./testdata",
+		DBPath:       "testdata/db3",
+		FsRepoRoot:   "testdata/onifs3",
+		FsFileRoot:   fileRoot,
 		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
 	}
