@@ -244,7 +244,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	}, nil
 }
 
-// DeleteUploadedFile. delete uploaded file from the owner
+// DeleteUploadedFile. Delete uploaded file from remote nodes. it is called by the owner
 func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 	if len(fileHashStr) == 0 {
 		return "", errors.New("delete file hash string is empty")
@@ -454,6 +454,14 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 	}
 	// TODO: support out-of-order download
 	return nil
+}
+
+// DeleteDownloadedFile. Delete downloaded file in local.
+func (this *Dsp) DeleteDownloadedFile(fileHashStr string) error {
+	if len(fileHashStr) == 0 {
+		return errors.New("delete file hash string is empty")
+	}
+	return this.deleteFile(fileHashStr)
 }
 
 func (this *Dsp) StartBackupFileService() {

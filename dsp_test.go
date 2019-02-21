@@ -258,6 +258,8 @@ func TestStartDspNode3(t *testing.T) {
 	time.Sleep(time.Duration(5) * time.Second)
 	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
+	// err = d.DeleteDownloadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
+	log.Debugf("delete file result:%s", err)
 	for {
 		<-tick.C
 	}
@@ -372,7 +374,7 @@ func TestUploadFile(t *testing.T) {
 	log.Infof("upload file success, ret:%v", ret)
 }
 
-func TestDeleteFile(t *testing.T) {
+func TestDeleteFileFromUploader(t *testing.T) {
 	fileRoot, err := filepath.Abs("./testdata")
 	if err != nil {
 		t.Fatal(err)
@@ -406,6 +408,28 @@ func TestDeleteFile(t *testing.T) {
 	log.Infof("delete file success, ret:%v", ret)
 	// wait for msg sent
 	time.Sleep(time.Duration(5) * time.Second)
+}
+func TestDeleteFileLocally(t *testing.T) {
+	fileRoot, err := filepath.Abs("./testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	dspCfg := &config.DspConfig{
+		DBPath:       "testdata/db3",
+		FsRepoRoot:   "testdata/onifs3",
+		FsFileRoot:   fileRoot,
+		FsType:       config.FS_FILESTORE,
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg)
+	d.Start(node3ListAddr)
+	err = d.DeleteDownloadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
+	if err != nil {
+		log.Errorf("delete file failed, err:%s", err)
+		return
+	}
+	log.Infof("delete file success")
 }
 
 func TestGetFileProveNode(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
+	"os"
 	"strings"
 
 	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
@@ -20,10 +21,6 @@ import (
 	ftpb "github.com/oniio/oniFS/unixfs/pb"
 )
 
-type Fs struct {
-	fs *oniFs.OniFSService
-}
-
 type FsConfig struct {
 	RepoRoot  string
 	FsRoot    string
@@ -31,6 +28,11 @@ type FsConfig struct {
 	ChunkSize uint64
 	GcPeriod  string
 	Chain     *sdk.Chain
+}
+
+type Fs struct {
+	fs  *oniFs.OniFSService
+	cfg *FsConfig
 }
 
 func NewFs(config *FsConfig) *Fs {
@@ -43,7 +45,10 @@ func NewFs(config *FsConfig) *Fs {
 		return nil
 	}
 
-	return &Fs{fs: fs}
+	return &Fs{
+		fs:  fs,
+		cfg: config,
+	}
 }
 
 func defaultFSConfig() *FsConfig {
@@ -241,6 +246,9 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 // DeleteFile. delete file, unpin root block if needed
 // If a block is referenced to other file, ignore it.
 func (this *Fs) DeleteFile(fileHashStr string) error {
+	if this.fs.IsFileStore() && this.cfg.FsType == config.FS_FILESTORE {
+		return os.Remove(this.cfg.FsRoot + "/" + fileHashStr)
+	}
 	return this.fs.DeleteFile(fileHashStr)
 }
 

@@ -116,7 +116,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			return
 		}
 		if this.taskMgr.TaskNum() >= common.MAX_TASKS_NUM {
-			replyMsg := message.NewFileDownloadAckErr(fileMsg.Hash, netcom.MSG_ERROR_CODE_FILE_NOT_EXIST)
+			replyMsg := message.NewFileDownloadAckErr(fileMsg.Hash, netcom.MSG_ERROR_CODE_TOO_MANY_TASKS)
 			err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 			if err != nil {
 				log.Errorf("reply download ack err msg failed", err)
