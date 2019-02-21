@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/config"
-	oniFs "github.com/oniio/oniFS/onifs"
 )
 
 var testbigFile = "../testdata/testuploadbigfile.txt"
@@ -48,12 +48,18 @@ func TestBlockToBytes(t *testing.T) {
 }
 
 func TestEncodedToBlock(t *testing.T) {
-	fs := NewFs(&FsConfig{
-		RepoRoot:  "../testdata/onifs_test",
-		FsRoot:    "../testdata",
-		FsType:    config.FS_FILESTORE,
-		ChunkSize: common.CHUNK_SIZE,
-	})
+	fileRoot, err := filepath.Abs("../testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	dspCfg := &config.DspConfig{
+		FsRepoRoot:  fileRoot + "/testdata/onifs_test",
+		FsFileRoot:  fileRoot,
+		FsType:      config.FS_FILESTORE,
+		FsChunkSize: common.CHUNK_SIZE,
+	}
+	fs := NewFs(dspCfg, nil)
 	root, l, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
 	if err != nil {
 		fmt.Printf("node from file err:%s\n", err)
@@ -102,12 +108,18 @@ func TestWriteAtOffset(t *testing.T) {
 }
 
 func TestGetBlock(t *testing.T) {
-	fs := NewFs(&FsConfig{
-		RepoRoot:  "../testdata/onifs1",
-		FsRoot:    "../testdata",
-		FsType:    oniFs.FS_BLOCKSTORE,
-		ChunkSize: common.CHUNK_SIZE,
-	})
+	fileRoot, err := filepath.Abs("../testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	dspCfg := &config.DspConfig{
+		FsRepoRoot:  fileRoot + "/testdata/onifs_test",
+		FsFileRoot:  fileRoot,
+		FsType:      config.FS_FILESTORE,
+		FsChunkSize: common.CHUNK_SIZE,
+	}
+	fs := NewFs(dspCfg, nil)
 	// root, _, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
 	// if err != nil {
 	// 	fmt.Printf("err:%v\n", err)
@@ -140,13 +152,18 @@ func TestGetBlock(t *testing.T) {
 }
 
 func TestNewFs(t *testing.T) {
-	cfg := &FsConfig{
-		RepoRoot: "../testdata/onifs_test",
-		FsRoot:   "../testdata",
-		GcPeriod: "1h",
-		FsType:   config.FS_BLOCKSTORE,
+	fileRoot, err := filepath.Abs("../testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
 	}
-	fs := NewFs(cfg)
+	dspCfg := &config.DspConfig{
+		FsRepoRoot:  fileRoot + "/testdata/onifs_test",
+		FsFileRoot:  fileRoot,
+		FsType:      config.FS_FILESTORE,
+		FsChunkSize: common.CHUNK_SIZE,
+	}
+	fs := NewFs(dspCfg, nil)
 	if fs == nil {
 		t.Fatal(fs)
 	}
@@ -156,12 +173,18 @@ func TestNewFs(t *testing.T) {
 
 func TestGetBlockFromFileStore(t *testing.T) {
 	prefix := "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c"
-	fs2 := NewFs(&FsConfig{
-		RepoRoot:  "../testdata/onifs_test2",
-		FsRoot:    "../testdata",
-		FsType:    oniFs.FS_FILESTORE,
-		ChunkSize: common.CHUNK_SIZE,
-	})
+	fileRoot, err := filepath.Abs("../testdata")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	dspCfg := &config.DspConfig{
+		FsRepoRoot:  fileRoot + "/testdata/onifs_test",
+		FsFileRoot:  fileRoot,
+		FsType:      config.FS_FILESTORE,
+		FsChunkSize: common.CHUNK_SIZE,
+	}
+	fs2 := NewFs(dspCfg, nil)
 	fullFilePath := "../testdata/QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	l0data := []byte{}
 	for i := 850000; i <= 887443; i++ {

@@ -32,14 +32,7 @@ func NewDsp(c *config.DspConfig) *Dsp {
 		d.taskMgr.FileDB = store.NewFileDB(c.DBPath)
 	}
 	if len(c.FsRepoRoot) > 0 {
-		d.Fs = fs.NewFs(&fs.FsConfig{
-			RepoRoot:  c.FsRepoRoot,
-			FsRoot:    c.FsFileRoot,
-			FsType:    c.FsType,
-			GcPeriod:  c.FsGcPeriod,
-			ChunkSize: common.CHUNK_SIZE,
-			Chain:     d.Chain,
-		})
+		d.Fs = fs.NewFs(c, d.Chain)
 	}
 	return d
 }

@@ -21,42 +21,22 @@ import (
 	ftpb "github.com/oniio/oniFS/unixfs/pb"
 )
 
-type FsConfig struct {
-	RepoRoot  string
-	FsRoot    string
-	FsType    config.FSType
-	ChunkSize uint64
-	GcPeriod  string
-	Chain     *sdk.Chain
-}
-
 type Fs struct {
 	fs  *oniFs.OniFSService
-	cfg *FsConfig
+	cfg *config.DspConfig
 }
 
-func NewFs(config *FsConfig) *Fs {
-	if config == nil {
-		config = defaultFSConfig()
+func NewFs(cfg *config.DspConfig, chain *sdk.Chain) *Fs {
+	if cfg == nil {
+		cfg = config.DefaultDspConfig()
 	}
-	fsType := oniFs.FSType(config.FsType)
-	fs, err := oniFs.NewOniFSService(config.RepoRoot, config.FsRoot, fsType, config.ChunkSize, config.GcPeriod, config.Chain)
+	fs, err := oniFs.NewOniFSService(cfg.FsRepoRoot, cfg.FsFileRoot, oniFs.FSType(cfg.FsType), cfg.FsChunkSize, cfg.FsGcPeriod, chain)
 	if err != nil {
 		return nil
 	}
-
 	return &Fs{
 		fs:  fs,
-		cfg: config,
-	}
-}
-
-func defaultFSConfig() *FsConfig {
-	return &FsConfig{
-		RepoRoot:  "./",
-		FsRoot:    "./",
-		FsType:    oniFs.FS_BLOCKSTORE,
-		ChunkSize: common.CHUNK_SIZE,
+		cfg: cfg,
 	}
 }
 
@@ -247,7 +227,7 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 // If a block is referenced to other file, ignore it.
 func (this *Fs) DeleteFile(fileHashStr string) error {
 	if this.fs.IsFileStore() && this.cfg.FsType == config.FS_FILESTORE {
-		return os.Remove(this.cfg.FsRoot + "/" + fileHashStr)
+		return os.Remove(this.cfg.FsFileRoot + "/" + fileHashStr)
 	}
 	return this.fs.DeleteFile(fileHashStr)
 }
