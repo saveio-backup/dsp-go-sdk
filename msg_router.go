@@ -89,6 +89,10 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if !this.taskMgr.IsDownloadInfoExist(fileMsg.Hash) {
 			return
 		}
+		if this.taskMgr.TaskExist(fileMsg.Hash) {
+			log.Debugf("task is exist")
+			return
+		}
 		err := this.startFetchBlocks(fileMsg.Hash, peer.Address)
 		if err != nil {
 			log.Errorf("start fetch blocks for file %s failed, err:%s", fileMsg.Hash, err)
@@ -129,7 +133,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			log.Errorf("reply download ack  msg failed", err)
 		}
 		this.taskMgr.NewTask(fileMsg.Hash, task.TaskTypeDownload)
-		// TODO: delete task finally
+		// TODO: delete tasks finally
 	default:
 	}
 }

@@ -21,7 +21,7 @@ func TestNetworkReceiveMsg(t *testing.T) {
 		if msg == nil {
 			return
 		}
-		fmt.Printf("receive msg:%v, from address %s\n", msg, ctx.Client().Address)
+		fmt.Printf("receive msg:%v, from address %s， id:%s, pubkey:%s\n", msg, ctx.Client().Address, ctx.Client().ID.String(), ctx.Client().ID.PublicKeyHex())
 		// err := ctx.Reply(context.Background(), msg.ToProtoMsg())
 		// if err != nil {
 		// 	fmt.Printf("reply err:%v\n", err)

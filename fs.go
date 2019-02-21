@@ -99,6 +99,9 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		return nil, err
 	}
 	fileHashStr = root.Cid().String()
+	if this.taskMgr.TaskExist(fileHashStr) {
+		return nil, errors.New("task is exist")
+	}
 	log.Debugf("root:%s, list.len:%d", fileHashStr, len(list))
 	// get nodeList
 	nodeList, err := this.getUploadNodeList(filePath, fileHashStr)
@@ -313,6 +316,9 @@ func (this *Dsp) StartShareServices() {
 // DownloadFile. download file, peice by peice from addrs.
 // inOrder: if true, the file will be downloaded block by block in order
 func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, decryptPwd string) error {
+	if this.taskMgr.TaskExist(fileHashStr) {
+		return errors.New("task is exist")
+	}
 	msg := message.NewFileDownload(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), 0, 0)
 	peers := make([]string, 0)
 	blockHashes := make([]string, 0)
@@ -407,6 +413,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, inOrder bool, addrs []string, 
 				if fileStat.Size() == 0 && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
 					data = data[len(prefix):]
 				}
+				// TODO: write at offset
 				_, err = file.Write(data)
 				if err != nil {
 					return err
