@@ -18,6 +18,7 @@ type FileInfoType int
 const (
 	FileInfoTypeUpload FileInfoType = iota
 	FileInfoTypeDownload
+	FileInfoTypeShare
 )
 
 type linkInfo struct {
@@ -41,6 +42,13 @@ type blockInfo struct {
 	LinkInfos      map[string]*linkInfo `json:"link_info"`                     // child link info
 }
 
+type Payment struct {
+	WalletAddress string `json:"wallet_address"`
+	Asset         int32  `json:"asset"`
+	Amount        uint64 `json:"amount"`
+	PaymentId     uint64 `json:"paymentId"`
+}
+
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type fileInfo struct {
 	Tx           string                `json:"tx,omitempty"`
@@ -49,16 +57,12 @@ type fileInfo struct {
 	Progress     map[string]uint64     `json:"progress"`
 	ProvePrivKey []byte                `json:"prove_private_key,omitempty"`
 	Prefix       string                `json:"prefix"`
+	UnitPrice    map[int32]uint64      `json:"uint_price"`
+	Unpaid       map[string]*Payment   `json:"unpaid"`
+	ShareTo      map[string]struct{}   `json:"shareto"`
 }
 
-func NewFileDB(dbPath string) *FileDB {
-	db, err := NewLevelDBStore(dbPath)
-	if err != nil {
-		return nil
-	}
-	if db == nil {
-		return nil
-	}
+func NewFileDB(db *LevelDBStore) *FileDB {
 	return &FileDB{
 		db: db,
 	}
@@ -191,6 +195,41 @@ func (this *FileDB) AddFilePrefix(fileHashStr, prefix string) error {
 	}
 	fi.Prefix = prefix
 	return this.putFileInfo(fileHashStr, fi, FileInfoTypeDownload)
+}
+
+func (this *FileDB) SetFileUnitPrice(fileHashStr string, asset int32, uintPrice uint64) error {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
+	if err != nil || fi == nil {
+		return errors.New("file info not found")
+	}
+	if fi.UnitPrice == nil {
+		fi.UnitPrice = make(map[int32]uint64, 0)
+	}
+	fi.UnitPrice[asset] = uintPrice
+	return this.putFileInfo(fileHashStr, fi, FileInfoTypeDownload)
+}
+
+func (this *FileDB) AddDownloadFileUnpaid(fileHashStr, walletAddress string, asset int32, amount uint64) error {
+	return this.addFileUnpaid(fileHashStr, walletAddress, asset, amount, FileInfoTypeDownload)
+}
+
+func (this *FileDB) DeleteDownloadFileUnpaid(fileHashStr, walletAddress string, asset int32, amount uint64) error {
+	return this.deleteFileUnpaid(fileHashStr, walletAddress, asset, amount, FileInfoTypeDownload)
+}
+
+func (this *FileDB) FileUnitPrice(fileHashStr string, asset int32) (uint64, error) {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeDownload)
+	if err != nil || fi == nil {
+		return 0, errors.New("file info not found")
+	}
+	if fi.UnitPrice == nil {
+		return 0, errors.New("unit price not found")
+	}
+	p, ok := fi.UnitPrice[asset]
+	if !ok {
+		return 0, errors.New("asset not found of unit price")
+	}
+	return p, nil
 }
 
 // IsDownloadInfoExist return a file is exist or not
@@ -343,6 +382,59 @@ func (this *FileDB) DeleteFileDownloadInfo(fileHashStr string) error {
 	return this.db.Delete(downloadFileInfoKey(fileHashStr))
 }
 
+func (this *FileDB) NewFileShareInfo(fileHashStr string) error {
+	fi := &fileInfo{
+		Unpaid:  make(map[string]*Payment, 0),
+		ShareTo: make(map[string]struct{}, 0),
+	}
+	return this.putFileInfo(fileHashStr, fi, FileInfoTypeShare)
+}
+
+func (this *FileDB) IsShareInfoExists(fileHashStr string) bool {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeShare)
+	if err != nil || fi == nil {
+		return false
+	}
+	return true
+}
+
+func (this *FileDB) AddShareTo(fileHashStr, walletAddress string) error {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeShare)
+	if err != nil || fi == nil {
+		return errors.New("file info not found")
+	}
+	fi.ShareTo[walletAddress] = struct{}{}
+	return this.putFileInfo(fileHashStr, fi, FileInfoTypeShare)
+}
+
+func (this *FileDB) AddShareFileUnpaid(fileHashStr, walletAddress string, asset int32, amount uint64) error {
+	return this.addFileUnpaid(fileHashStr, walletAddress, asset, amount, FileInfoTypeShare)
+}
+
+func (this *FileDB) DeleteShareFileUnpaid(fileHashStr, walletAddress string, asset int32, amount uint64) error {
+	return this.deleteFileUnpaid(fileHashStr, walletAddress, asset, amount, FileInfoTypeShare)
+}
+
+func (this *FileDB) CanShareTo(fileHashStr, walletAddress string) (bool, error) {
+	fi, err := this.getFileInfo(fileHashStr, FileInfoTypeShare)
+	if err != nil || fi == nil {
+		return false, errors.New("file info not found")
+	}
+	_, exist := fi.ShareTo[walletAddress]
+	if !exist {
+		return false, errors.New("unknown wallet address")
+	}
+	info, ok := fi.Unpaid[walletAddress]
+	if !ok || info.Amount == 0 {
+		return true, nil
+	}
+	return false, errors.New("has unpaid amount")
+}
+
+func (this *FileDB) DeleteFileShareInfo(fileHashStr string) error {
+	return this.db.Delete(shareFileInfoKey(fileHashStr))
+}
+
 // getFileUploadInfo. helper function, get file upload info from db. if fileinfo not found, return (nil, nil)
 func (this *FileDB) getFileInfo(fileHashStr string, fileType FileInfoType) (*fileInfo, error) {
 	var key []byte
@@ -351,6 +443,10 @@ func (this *FileDB) getFileInfo(fileHashStr string, fileType FileInfoType) (*fil
 		key = uploadFileInfoKey(fileHashStr)
 	case FileInfoTypeDownload:
 		key = downloadFileInfoKey(fileHashStr)
+	case FileInfoTypeShare:
+		key = shareFileInfoKey(fileHashStr)
+	default:
+		return nil, errors.New("unrecognized key")
 	}
 	value, err := this.db.Get(key)
 	if err != nil {
@@ -378,12 +474,52 @@ func (this *FileDB) putFileInfo(fileHashStr string, info *fileInfo, fileType Fil
 		key = uploadFileInfoKey(fileHashStr)
 	case FileInfoTypeDownload:
 		key = downloadFileInfoKey(fileHashStr)
+	case FileInfoTypeShare:
+		key = shareFileInfoKey(fileHashStr)
+	default:
+		return errors.New("unrecognized key")
 	}
 	buf, err := json.Marshal(info)
 	if err != nil {
 		return err
 	}
 	return this.db.Put(key, buf)
+}
+
+func (this *FileDB) addFileUnpaid(fileHashStr, walletAddress string, asset int32, amount uint64, infoType FileInfoType) error {
+	fi, err := this.getFileInfo(fileHashStr, infoType)
+	if err != nil || fi == nil {
+		return errors.New("file info not found")
+	}
+	if fi.Unpaid == nil {
+		fi.Unpaid = make(map[string]*Payment, 0)
+	}
+	fi.Unpaid[walletAddress] = &Payment{
+		WalletAddress: walletAddress,
+		Asset:         asset,
+		Amount:        amount,
+	}
+	return this.putFileInfo(fileHashStr, fi, infoType)
+}
+
+func (this *FileDB) deleteFileUnpaid(fileHashStr, walletAddress string, asset int32, amount uint64, infoType FileInfoType) error {
+	fi, err := this.getFileInfo(fileHashStr, infoType)
+	if err != nil || fi == nil {
+		return errors.New("file info not found")
+	}
+	if fi.Unpaid == nil {
+		return nil
+	}
+	v, ok := fi.Unpaid[walletAddress]
+	if !ok {
+		return errors.New("unpaid not found")
+	}
+	if v.Amount <= amount {
+		delete(fi.Unpaid, walletAddress)
+	} else {
+		v.Amount = v.Amount - amount
+	}
+	return this.putFileInfo(fileHashStr, fi, infoType)
 }
 
 // uploadFileInfoKey. key constructor
@@ -404,4 +540,14 @@ func downloadFileInfoKey(fileHashStr string) []byte {
 // downloadFileBlockKey. key constructor
 func downloadFileBlockKey(fileHashStr string, blockHashStr string, index uint32) string {
 	return fmt.Sprintf("type=%d&file=%s&block=%s&index=%d", FileInfoTypeDownload, fileHashStr, blockHashStr, index)
+}
+
+// shareFileInfoKey. key constructor
+func shareFileInfoKey(fileHashStr string) []byte {
+	return []byte(fmt.Sprintf("type=%d&hash=%s", FileInfoTypeShare, fileHashStr))
+}
+
+// shareFileBlockKey. key constructor
+func shareFileBlockKey(fileHashStr string, blockHashStr string, index uint32) string {
+	return fmt.Sprintf("type=%d&file=%s&block=%s&index=%d", FileInfoTypeShare, fileHashStr, blockHashStr, index)
 }

@@ -6,19 +6,34 @@ import (
 )
 
 func TestGetFileUploadInfo(t *testing.T) {
-	fileDB := NewFileDB("./db")
+	dbPath := "./db1"
+	db, err := NewLevelDBStore(dbPath)
+	if err != nil || db == nil {
+		return
+	}
+	fileDB := NewFileDB(db)
 	info, err := fileDB.getFileInfo("123", FileInfoTypeUpload)
 	fmt.Printf("info:%v, err:%s\n", info, err)
 }
 
 func TestPutFileUploadInfo(t *testing.T) {
-	fileDB := NewFileDB("./db")
-	err := fileDB.PutFileUploadInfo("1", "123", []byte("privatekey"))
+	dbPath := "./db1"
+	db, err := NewLevelDBStore(dbPath)
+	if err != nil || db == nil {
+		return
+	}
+	fileDB := NewFileDB(db)
+	err = fileDB.PutFileUploadInfo("1", "123", []byte("privatekey"))
 	fmt.Printf("put err:%s\n", err)
 }
 
 func TestGetBlockOffset(t *testing.T) {
-	fileDB := NewFileDB("../testdata/db1")
+	dbPath := "../testdata/db1"
+	db, err := NewLevelDBStore(dbPath)
+	if err != nil || db == nil {
+		return
+	}
+	fileDB := NewFileDB(db)
 	if fileDB == nil {
 		return
 	}
@@ -31,16 +46,23 @@ func TestGetBlockOffset(t *testing.T) {
 }
 
 func TestGetUploadedBlockNodeList(t *testing.T) {
-	fileDB := NewFileDB("../db1")
-	if fileDB == nil {
+	dbPath := "./db1"
+	db, err := NewLevelDBStore(dbPath)
+	if err != nil || db == nil {
 		return
 	}
+	fileDB := NewFileDB(db)
 	nodes := fileDB.GetUploadedBlockNodeList("QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr", "QmQgTa5UDCfBBokfvi4UBCPx9FkpWCaqEer9f59hE7EyTr", 0)
 	fmt.Printf("nodes:%v\n", nodes)
 }
 
 func TestGetUndownloadedBlockIndex(t *testing.T) {
-	fileDB := NewFileDB("../testdata/db3")
+	dbPath := "../testdata/db3"
+	db, err := NewLevelDBStore(dbPath)
+	if err != nil || db == nil {
+		return
+	}
+	fileDB := NewFileDB(db)
 	if fileDB == nil {
 		return
 	}
@@ -50,7 +72,12 @@ func TestGetUndownloadedBlockIndex(t *testing.T) {
 }
 
 func TestGetPrefix(t *testing.T) {
-	fileDB := NewFileDB("../testdata/db1/")
+	dbPath := "../testdata/db1"
+	db, err := NewLevelDBStore(dbPath)
+	if err != nil || db == nil {
+		return
+	}
+	fileDB := NewFileDB(db)
 	if fileDB == nil {
 		fmt.Printf("DB is nil\n")
 		return

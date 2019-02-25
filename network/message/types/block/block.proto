@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "payment.proto";
 package block;
 
 message Block {
@@ -10,4 +11,5 @@ message Block {
    bytes tag = 5; // used for pdp
    int32 operation = 6; // block operation
    int64 offset = 7; // data offset of file
+   payment.Payment payment = 8; // payment detail
 }

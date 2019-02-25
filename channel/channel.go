@@ -7,6 +7,7 @@ import (
 
 	dspcom "github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/config"
+	"github.com/oniio/dsp-go-sdk/store"
 	sdk "github.com/oniio/oniChain-go-sdk"
 	"github.com/oniio/oniChain-go-sdk/ong"
 	chaincomm "github.com/oniio/oniChain/common"
@@ -17,8 +18,10 @@ import (
 )
 
 type Channel struct {
-	channel *ch.Channel
-	closeCh chan struct{}
+	channel    *ch.Channel
+	closeCh    chan struct{}
+	unitPrices map[int32]uint64
+	paymentDB  *store.PaymentDB
 }
 
 func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) *Channel {
@@ -54,6 +57,10 @@ func (this *Channel) StartService() error {
 
 func (this *Channel) StopService() {
 	close(this.closeCh)
+}
+
+func (this *Channel) SetPaymentDB(db *store.PaymentDB) {
+	this.paymentDB = db
 }
 
 // WaitForConnected. wait for conected for a period.
@@ -136,6 +143,40 @@ func (this *Channel) GetTargetBalance(targetAddress string) (uint64, error) {
 	return uint64(state.GetContractBalance()), nil
 }
 
+// SetUnitPrices
+func (this *Channel) SetUnitPrices(asset int32, price uint64) {
+	if this.unitPrices == nil {
+		this.unitPrices = make(map[int32]uint64, 0)
+	}
+	this.unitPrices[asset] = price
+}
+
+func (this *Channel) GetUnitPrices(asset int32) (uint64, error) {
+	if this.unitPrices == nil {
+		return 0, errors.New("no unit prices")
+	}
+	p, ok := this.unitPrices[asset]
+	if !ok {
+		return 0, errors.New("no unit prices")
+	}
+	return p, nil
+}
+
+func (this *Channel) CleanUninPrices(asset int32) {
+	if this.unitPrices == nil {
+		return
+	}
+	delete(this.unitPrices, asset)
+}
+
+func (this *Channel) GetPayment(paymentId uint64) (*store.Payment, error) {
+	return this.paymentDB.GetPayment(paymentId)
+}
+
+func (this *Channel) DeletePayment(paymentId uint64) error {
+	return this.paymentDB.RemovePayment(paymentId)
+}
+
 // registerReceiveNotification. register receive payment notification
 func (this *Channel) registerReceiveNotification() {
 	receiveChan := make(chan *transfer.EventPaymentReceivedSuccess)
@@ -149,6 +190,7 @@ func (this *Channel) registerReceiveNotification() {
 			}
 			fmt.Printf("PaymentReceive amount %d from %s with paymentID %d\n",
 				event.Amount, addr.ToBase58(), event.Identifier)
+			this.paymentDB.AddPayment(addr.ToBase58(), uint64(event.Identifier), uint64(event.Amount))
 		case <-this.closeCh:
 			return
 		}

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/config"
 )
 
@@ -54,10 +53,9 @@ func TestEncodedToBlock(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		FsRepoRoot:  fileRoot + "/testdata/onifs_test",
-		FsFileRoot:  fileRoot,
-		FsType:      config.FS_FILESTORE,
-		FsChunkSize: common.CHUNK_SIZE,
+		FsRepoRoot: fileRoot + "/testdata/onifs_test",
+		FsFileRoot: fileRoot,
+		FsType:     config.FS_FILESTORE,
 	}
 	fs := NewFs(dspCfg, nil)
 	root, l, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
@@ -114,10 +112,9 @@ func TestGetBlock(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		FsRepoRoot:  fileRoot + "/testdata/onifs_test",
-		FsFileRoot:  fileRoot,
-		FsType:      config.FS_FILESTORE,
-		FsChunkSize: common.CHUNK_SIZE,
+		FsRepoRoot: fileRoot + "/testdata/onifs_test",
+		FsFileRoot: fileRoot,
+		FsType:     config.FS_FILESTORE,
 	}
 	fs := NewFs(dspCfg, nil)
 	// root, _, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
@@ -158,10 +155,9 @@ func TestNewFs(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		FsRepoRoot:  fileRoot + "/testdata/onifs_test",
-		FsFileRoot:  fileRoot,
-		FsType:      config.FS_FILESTORE,
-		FsChunkSize: common.CHUNK_SIZE,
+		FsRepoRoot: fileRoot + "/testdata/onifs_test",
+		FsFileRoot: fileRoot,
+		FsType:     config.FS_FILESTORE,
 	}
 	fs := NewFs(dspCfg, nil)
 	if fs == nil {
@@ -179,10 +175,9 @@ func TestGetBlockFromFileStore(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		FsRepoRoot:  fileRoot + "/testdata/onifs_test",
-		FsFileRoot:  fileRoot,
-		FsType:      config.FS_FILESTORE,
-		FsChunkSize: common.CHUNK_SIZE,
+		FsRepoRoot: fileRoot + "/testdata/onifs_test",
+		FsFileRoot: fileRoot,
+		FsType:     config.FS_FILESTORE,
 	}
 	fs2 := NewFs(dspCfg, nil)
 	fullFilePath := "../testdata/QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"

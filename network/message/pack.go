@@ -6,6 +6,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/network/message/pb"
 	"github.com/oniio/dsp-go-sdk/network/message/types/block"
 	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/oniio/dsp-go-sdk/network/message/types/payment"
 )
 
 func MessageHeader() *Header {
@@ -15,7 +16,7 @@ func MessageHeader() *Header {
 }
 
 // NewBlockMsg block req msg
-func NewBlockReqMsg(fileHash, blockHash string, index int32) *Message {
+func NewBlockReqMsg(fileHash, blockHash string, index int32, walletAddress string, asset int32) *Message {
 	msg := &Message{
 		Header: MessageHeader(),
 	}
@@ -25,6 +26,10 @@ func NewBlockReqMsg(fileHash, blockHash string, index int32) *Message {
 		FileHash:  fileHash,
 		Hash:      blockHash,
 		Operation: common.BLOCK_OP_GET,
+		Payment: &payment.Payment{
+			Sender: walletAddress,
+			Asset:  asset,
+		},
 	}
 	msg.Payload = b
 	data, err := msg.ToProtoMsg().(*pb.Message).XXX_Marshal(nil, false)
@@ -60,23 +65,12 @@ func NewBlockMsg(index int32, fileHash, hash string, blockData, tag []byte, offs
 }
 
 // NewFileMsg file msg
-func NewFileMsg(hash string, blkHashes []string, op int32, walletAddr, prefix string, asset int32, pricePerBlk uint64, errorCode int32) *Message {
+func NewFileMsg(file *file.File, errorCode int32) *Message {
 	msg := &Message{
 		Header: MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_FILE
-	f := &file.File{
-		Hash:        hash,
-		BlockHashes: blkHashes,
-		Operation:   op,
-		Prefix:      prefix,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-			Asset:         asset,
-			Price:         pricePerBlk,
-		},
-	}
-	msg.Payload = f
+	msg.Payload = file
 	if errorCode != common.MSG_ERROR_CODE_NONE {
 		errorMsg, ok := common.MSG_ERROR_MSG[errorCode]
 		if !ok {
@@ -97,40 +91,127 @@ func NewFileMsg(hash string, blkHashes []string, op int32, walletAddr, prefix st
 
 // NewFileFetchAsk
 func NewFileFetchAsk(hash string, blkHashes []string, walletAddr, prefix string) *Message {
-	return NewFileMsg(hash, blkHashes, common.FILE_OP_FETCH_ASK, walletAddr, prefix, common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	f := &file.File{
+		Hash:        hash,
+		BlockHashes: blkHashes,
+		Operation:   common.FILE_OP_FETCH_ASK,
+		Prefix:      prefix,
+		PayInfo: &file.Payment{
+			WalletAddress: walletAddr,
+		},
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileFetchAck
 func NewFileFetchAck(hash string) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_FETCH_ACK, "", "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	f := &file.File{
+		Hash:      hash,
+		Operation: common.FILE_OP_FETCH_ACK,
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileFetchRdy
 func NewFileFetchRdy(hash string) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_FETCH_RDY, "", "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	f := &file.File{
+		Hash:      hash,
+		Operation: common.FILE_OP_FETCH_RDY,
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
-// NewFileDownload download file from server msg
-func NewFileDownload(hash, walletAddr string, asset int32, pricePerBlk uint64) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_DOWNLOAD, walletAddr, "", asset, pricePerBlk, common.MSG_ERROR_CODE_NONE)
+// NewFileDownloadAsk
+func NewFileDownloadAsk(hash, walletAddr string, asset int32) *Message {
+	f := &file.File{
+		Hash:      hash,
+		Operation: common.FILE_OP_DOWNLOAD_ASK,
+		PayInfo: &file.Payment{
+			WalletAddress: walletAddr,
+			Asset:         asset,
+		},
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileDownloadAck
-func NewFileDownloadAck(hash string, blkHashes []string, walletAddr, prefix string) *Message {
-	return NewFileMsg(hash, blkHashes, common.FILE_OP_DOWNLOAD_ACK, walletAddr, prefix, common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+func NewFileDownloadAck(hash string, blkHashes []string, walletAddr, prefix string, uintPrice uint64, errorCode int32) *Message {
+	f := &file.File{
+		Hash:        hash,
+		BlockHashes: blkHashes,
+		Operation:   common.FILE_OP_DOWNLOAD_ACK,
+		Prefix:      prefix,
+		PayInfo: &file.Payment{
+			WalletAddress: walletAddr,
+			UnitPrice:     uintPrice,
+		},
+	}
+	return NewFileMsg(f, errorCode)
 }
 
-// NewFileDownloadAckErr
-func NewFileDownloadAckErr(hash string, errorCode int32) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_DOWNLOAD_ACK, "", "", common.ASSET_NONE, 0, errorCode)
+// NewFileDownload download file from server msg
+func NewFileDownload(hash, walletAddr string, asset int32) *Message {
+	f := &file.File{
+		Hash:      hash,
+		Operation: common.FILE_OP_DOWNLOAD,
+		PayInfo: &file.Payment{
+			WalletAddress: walletAddr,
+			Asset:         asset,
+		},
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileDelete
 func NewFileDelete(hash, walletAddr string) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_DELETE, walletAddr, "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	f := &file.File{
+		Hash:      hash,
+		Operation: common.FILE_OP_DELETE,
+		PayInfo: &file.Payment{
+			WalletAddress: walletAddr,
+		},
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileDeleteAck
 func NewFileDeleteAck(hash string) *Message {
-	return NewFileMsg(hash, nil, common.FILE_OP_DELETE_ACK, "", "", common.ASSET_NONE, 0, common.MSG_ERROR_CODE_NONE)
+	f := &file.File{
+		Hash:      hash,
+		Operation: common.FILE_OP_DELETE_ACK,
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+}
+
+// NewPayment new payment msg
+func NewPayment(sender, receiver string, paymentId uint64, asset int32, amount uint64, fileHash string, errorCode int32) *Message {
+	msg := &Message{
+		Header: MessageHeader(),
+	}
+	msg.Header.Type = common.MSG_TYPE_PAYMENT
+	pay := &payment.Payment{
+		Sender:    sender,
+		Receiver:  receiver,
+		PaymentId: paymentId,
+		Asset:     asset,
+		Amount:    amount,
+		FileHash:  fileHash,
+	}
+	msg.Payload = pay
+	if errorCode != common.MSG_ERROR_CODE_NONE {
+		errorMsg, ok := common.MSG_ERROR_MSG[errorCode]
+		if !ok {
+			errorMsg = "error"
+		}
+		msg.Error = &Error{
+			Code:    errorCode,
+			Message: errorMsg,
+		}
+	}
+	data, err := proto.Marshal(msg.ToProtoMsg())
+	if err != nil {
+		return nil
+	}
+	msg.Header.MsgLength = int32(len(data))
+	return msg
 }

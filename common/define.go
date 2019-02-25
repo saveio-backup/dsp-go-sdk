@@ -21,3 +21,9 @@ type PayStoreFileReulst struct {
 	ParamsBuf  []byte
 	PrivateKey []byte
 }
+
+type PayInfo struct {
+	WalletAddress string
+	Asset         int32
+	UnitPrice     uint64
+}

@@ -3,9 +3,9 @@ syntax = "proto3";
 package file;
 
 message Payment {
-    string walletAddress = 1;
-    int32 asset = 2;
-    uint64 price = 3;
+    string walletAddress = 1; // payer wallet address
+    int32 asset = 2; // asset id
+    uint64 unitPrice = 3; // unit price per byte
 }
 
 message File {
@@ -13,5 +13,6 @@ message File {
    repeated string blockHashes = 2;
    int32 operation = 3;
    string prefix = 4;
-   Payment payInfo = 5;
+   int32 chunkSize = 5;
+   Payment payInfo = 6;
 }

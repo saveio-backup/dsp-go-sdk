@@ -3,12 +3,14 @@ package dsp
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/oniio/dsp-go-sdk/common"
 	netcom "github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/types/block"
 	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/oniio/dsp-go-sdk/network/message/types/payment"
 	"github.com/oniio/dsp-go-sdk/task"
 	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniP2p/network"
@@ -31,6 +33,8 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 		this.handleFileMsg(ctx, peer, msg)
 	case netcom.MSG_TYPE_BLOCK:
 		this.handleBlockMsg(ctx, peer, msg)
+	case netcom.MSG_TYPE_PAYMENT:
+		this.handlePaymentMsg(ctx, peer, msg)
 	default:
 		log.Debugf("unrecongized msg type %s", msg.Header.Type)
 	}
@@ -110,9 +114,9 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		}
 		// TODO: check file owner
 		this.deleteFile(fileMsg.Hash)
-	case netcom.FILE_OP_DOWNLOAD:
+	case netcom.FILE_OP_DOWNLOAD_ASK:
 		if !this.taskMgr.IsDownloadInfoExist(fileMsg.Hash) {
-			replyMsg := message.NewFileDownloadAckErr(fileMsg.Hash, netcom.MSG_ERROR_CODE_FILE_NOT_EXIST)
+			replyMsg := message.NewFileDownloadAck(fileMsg.Hash, nil, "", "", 0, netcom.MSG_ERROR_CODE_FILE_NOT_EXIST)
 			err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 			if err != nil {
 				log.Errorf("reply download ack err msg failed", err)
@@ -120,19 +124,64 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			return
 		}
 		if this.taskMgr.TaskNum() >= common.MAX_TASKS_NUM {
-			replyMsg := message.NewFileDownloadAckErr(fileMsg.Hash, netcom.MSG_ERROR_CODE_TOO_MANY_TASKS)
+			replyMsg := message.NewFileDownloadAck(fileMsg.Hash, nil, "", "", 0, netcom.MSG_ERROR_CODE_TOO_MANY_TASKS)
 			err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 			if err != nil {
 				log.Errorf("reply download ack err msg failed", err)
 			}
+			return
 		}
-		// TODO: verify price
-		replyMsg := message.NewFileDownloadAck(fileMsg.Hash, this.taskMgr.FileBlockHashes(fileMsg.Hash), this.Chain.Native.Fs.DefAcc.Address.ToBase58(), this.taskMgr.FilePrefix(fileMsg.Hash))
-		err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+		price, err := this.GetFileUnitPrice(fileMsg.Hash, fileMsg.PayInfo.Asset)
+		if err != nil {
+			replyMsg := message.NewFileDownloadAck(fileMsg.Hash, nil, "", "", 0, netcom.MSG_ERROR_CODE_FILE_UNITPRICE_ERROR)
+			err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+			if err != nil {
+				log.Errorf("reply download ack err msg failed", err)
+			}
+			return
+		}
+		replyMsg := message.NewFileDownloadAck(fileMsg.Hash, this.taskMgr.FileBlockHashes(fileMsg.Hash),
+			this.Chain.Native.Fs.DefAcc.Address.ToBase58(), this.taskMgr.FilePrefix(fileMsg.Hash),
+			price, netcom.MSG_ERROR_CODE_NONE)
+		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply download ack  msg failed", err)
 		}
-		this.taskMgr.NewTask(fileMsg.Hash, task.TaskTypeDownload)
+	case netcom.FILE_OP_DOWNLOAD:
+		// check deposit price
+		err := this.Channel.WaitForConnected(fileMsg.PayInfo.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+		if err != nil {
+			log.Errorf("wait channel connected err %s", err)
+			return
+		}
+		if this.Config.CheckDepositBlkNum > 0 {
+			price, err := this.GetFileUnitPrice(fileMsg.Hash, fileMsg.PayInfo.Asset)
+			if err != nil {
+				log.Errorf("get file unit price err %s", err)
+				return
+			}
+			if price > 0 {
+				balance, err := this.Channel.GetTargetBalance(fileMsg.PayInfo.WalletAddress)
+				if err != nil {
+					log.Errorf("get target balance err %s", err)
+					return
+				}
+				// calulate
+				if price*this.Config.CheckDepositBlkNum > balance {
+					log.Errorf("insufficient deposit balance")
+					return
+				}
+			}
+		}
+		this.taskMgr.NewTask(fileMsg.Hash, task.TaskTypeShare)
+		log.Debugf("new share task %s", fileMsg.Hash)
+		if !this.taskMgr.IsShareInfoExists(fileMsg.Hash) {
+			err = this.taskMgr.NewFileShareInfo(fileMsg.Hash)
+			if err != nil {
+				return
+			}
+		}
+		this.taskMgr.AddShareTo(fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 		// TODO: delete tasks finally
 	default:
 	}
@@ -183,15 +232,48 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				PeerAddr: peer.Address,
 			}
 			return
-		case task.TaskTypeDownload:
+		case task.TaskTypeDownload, task.TaskTypeShare:
 			reqCh := this.taskMgr.BlockReqCh()
 			reqCh <- &task.GetBlockReq{
-				FileHash: blockMsg.FileHash,
-				Hash:     blockMsg.Hash,
-				Index:    blockMsg.Index,
-				PeerAddr: peer.Address,
+				FileHash:      blockMsg.FileHash,
+				Hash:          blockMsg.Hash,
+				Index:         blockMsg.Index,
+				PeerAddr:      peer.Address,
+				WalletAddress: blockMsg.Payment.Sender,
+				Asset:         blockMsg.Payment.Asset,
 			}
 		}
 	default:
+	}
+}
+
+// handlePaymentMsg. handle payment msg
+func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
+	paymentMsg := msg.Payload.(*payment.Payment)
+	log.Debugf("received paymentmsg:%v", paymentMsg)
+	// check
+	pay, err := this.Channel.GetPayment(paymentMsg.PaymentId)
+	if err != nil || pay == nil {
+		log.Errorf("get payment from db err %s, pay %v", err, pay)
+		return
+	}
+	if pay.WalletAddress != paymentMsg.Sender || pay.Asset != paymentMsg.Asset || pay.Amount != paymentMsg.Amount {
+		log.Errorf("payment %v is different from payment msg %v", pay, paymentMsg)
+		return
+	}
+	err = this.Channel.DeletePayment(paymentMsg.PaymentId)
+	if err != nil {
+		log.Errorf("delete payment from db err %s", err)
+		return
+	}
+	// delete record
+	err = this.taskMgr.DeleteShareFileUnpaid(paymentMsg.FileHash, paymentMsg.Sender, paymentMsg.Asset, paymentMsg.Amount)
+	if err != nil {
+		log.Debugf("delete share file info %s", err)
+		return
+	}
+	err = ctx.Reply(context.Background(), nil)
+	if err != nil {
+		log.Errorf("reply delete ok msg failed", err)
 	}
 }

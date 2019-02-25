@@ -12,6 +12,7 @@ const (
 	BLOCK_FETCH_TIMEOUT          = 10 // fetch block and get block response timeout
 	CHECK_PROVE_TIMEOUT          = 60 // client upload file and check prove timeout
 	CHECK_CHANNEL_STATE_INTERVAL = 3  // check channel state interval
+	WAIT_CHANNEL_CONNECT_TIMEOUT = 60 // wait for channel connected
 )
 
 const (
@@ -24,4 +25,11 @@ const (
 	MAX_GOROUTINES_FOR_WORK_TASK = 8   // max goroutines for choose worker to do job
 	BACKUP_FILE_DURATION         = 10  // 10s check
 	MAX_EXPIRED_PROVE_TASK_NUM   = 100 // max backup tasks
+)
+
+const (
+	FILE_UNIT_PRICE_TYPE_BYTE  = 1
+	FILE_UNIT_PRICE_TYPE_KBYTE = 2
+	FILE_UNIT_PRICE_TYPE_MBYTE = 3
+	FILE_UNIT_PRICE_TYPE_GBYTE = 4
 )

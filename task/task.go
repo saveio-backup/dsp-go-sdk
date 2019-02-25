@@ -17,14 +17,17 @@ const (
 	TaskTypeNone TaskType = iota
 	TaskTypeUpload
 	TaskTypeDownload
+	TaskTypeShare
 	TaskTypeBackup
 )
 
 type GetBlockReq struct {
-	FileHash string
-	Hash     string
-	Index    int32
-	PeerAddr string
+	FileHash      string
+	Hash          string
+	Index         int32
+	PeerAddr      string
+	WalletAddress string
+	Asset         int32
 }
 
 type BlockResp struct {

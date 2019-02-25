@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package payment;
+option go_package="github.com/oniio/dsp-go-sdk/network/message/types/payment";
+
+message Payment {
+    string sender = 1; // payer wallet address
+    string receiver = 2; // receiver wallet address
+    uint64 paymentId = 3; // paymentId
+    int32 asset = 4; // asset id
+    uint64 unitPrice = 5; // unit price per byte
+    uint64 amount = 6; // amount
+    string fileHash = 7; // file hash string
+    string blockHash = 8; // block hash string
+}

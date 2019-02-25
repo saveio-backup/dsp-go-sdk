@@ -6,6 +6,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/network/message/pb"
 	"github.com/oniio/dsp-go-sdk/network/message/types/block"
 	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/oniio/dsp-go-sdk/network/message/types/payment"
 )
 
 type Header struct {
@@ -57,6 +58,13 @@ func ReadMessage(msg proto.Message) *Message {
 				return nil
 			}
 			newMsg.Payload = file
+		case common.MSG_TYPE_PAYMENT:
+			pay := &payment.Payment{}
+			err := proto.Unmarshal(data, pay)
+			if err != nil {
+				return nil
+			}
+			newMsg.Payload = pay
 		}
 	}
 	if pbMsg.GetError() != nil {

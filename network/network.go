@@ -44,7 +44,7 @@ func (this *Network) Start() error {
 		return fmt.Errorf("already listening at %s", this.listenAddr)
 	}
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	opcode.RegisterMessageType(opcode.Opcode(1000), &pb.Message{})
+	opcode.RegisterMessageType(opcode.Opcode(common.MSG_OP_CODE), &pb.Message{})
 	builder := network.NewBuilder()
 	builder.SetAddress(this.listenAddr)
 	builder.SetKeys(ed25519.RandomKeyPair())
@@ -91,6 +91,7 @@ func (this *Network) Send(msg *message.Message, peer interface{}) error {
 	return client.Tell(context.Background(), msg.ToProtoMsg())
 }
 
+// Request. send msg to peer and wait for response synchronously
 func (this *Network) Request(msg *message.Message, peer interface{}) (*message.Message, error) {
 	client, err := this.loadClient(peer)
 	if err != nil {
