@@ -19,7 +19,7 @@ func NewPaymentDB(d *LevelDBStore) *PaymentDB {
 }
 
 // AddPayment. put payment info to db
-func (this *PaymentDB) AddPayment(walletAddr string, paymentId, amount uint64) error {
+func (this *PaymentDB) AddPayment(walletAddr string, paymentId int32, amount uint64) error {
 	key := []byte(fmt.Sprintf("payment:%d", paymentId))
 	info := &Payment{
 		WalletAddress: walletAddr,
@@ -34,7 +34,7 @@ func (this *PaymentDB) AddPayment(walletAddr string, paymentId, amount uint64) e
 }
 
 // GetPayment. get payment info from db
-func (this *PaymentDB) GetPayment(paymentId uint64) (*Payment, error) {
+func (this *PaymentDB) GetPayment(paymentId int32) (*Payment, error) {
 	key := []byte(fmt.Sprintf("payment:%d", paymentId))
 	value, err := this.db.Get(key)
 	if err != nil {
@@ -55,7 +55,7 @@ func (this *PaymentDB) GetPayment(paymentId uint64) (*Payment, error) {
 }
 
 // RemovePayment. remove payment info from db
-func (this *PaymentDB) RemovePayment(paymentId uint64) error {
+func (this *PaymentDB) RemovePayment(paymentId int32) error {
 	key := []byte(fmt.Sprintf("payment:%d", paymentId))
 	return this.db.Delete(key)
 }

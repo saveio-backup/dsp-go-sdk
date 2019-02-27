@@ -85,3 +85,27 @@ func TestGetPrefix(t *testing.T) {
 	pre := fileDB.FilePrefix("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
 	fmt.Printf("prefix :%s\n", pre)
 }
+
+func TestDeleteUnpaid(t *testing.T) {
+	dbPath := "../testdata/db1"
+	db, err := NewLevelDBStore(dbPath)
+	if err != nil || db == nil {
+
+		return
+	}
+	fileDB := NewFileDB(db)
+	if fileDB == nil {
+		fmt.Printf("DB is nil\n")
+		return
+	}
+	can, err := fileDB.CanShareTo("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", "AGeTrARjozPVLhuzMxZq36THMtvsrZNAHq")
+	fmt.Printf("can share %t, err: %s\n", can, err)
+
+	// err = fileDB.DeleteShareFileUnpaid("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", "AGeTrARjozPVLhuzMxZq36THMtvsrZNAHq", 2, 158)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	// can, err = fileDB.CanShareTo("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", "AGeTrARjozPVLhuzMxZq36THMtvsrZNAHq")
+	// fmt.Printf("can share %t, err: %s\n", can, err)
+}

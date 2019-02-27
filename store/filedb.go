@@ -46,7 +46,7 @@ type Payment struct {
 	WalletAddress string `json:"wallet_address"`
 	Asset         int32  `json:"asset"`
 	Amount        uint64 `json:"amount"`
-	PaymentId     uint64 `json:"paymentId"`
+	PaymentId     int32  `json:"paymentId"`
 }
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags

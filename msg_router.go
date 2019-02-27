@@ -44,9 +44,12 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
 	log.Debugf("handleFileMsg %s from peer:%s, length:%d\n", map[int32]string{
-		netcom.FILE_OP_FETCH_ASK: "fetch_ask",
-		netcom.FILE_OP_FETCH_ACK: "fetch_ack",
-		netcom.FILE_OP_FETCH_RDY: "fetch_rdy",
+		netcom.FILE_OP_FETCH_ASK:    "fetch_ask",
+		netcom.FILE_OP_FETCH_ACK:    "fetch_ack",
+		netcom.FILE_OP_FETCH_RDY:    "fetch_rdy",
+		netcom.FILE_OP_DOWNLOAD_ASK: "download_ask",
+		netcom.FILE_OP_DOWNLOAD_ACK: "download_ack",
+		netcom.FILE_OP_DOWNLOAD:     "download",
 	}[fileMsg.Operation], peer.Address, msg.Header.MsgLength)
 	switch fileMsg.Operation {
 	case netcom.FILE_OP_FETCH_ASK:
@@ -162,6 +165,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			}
 			if price > 0 {
 				balance, err := this.Channel.GetTargetBalance(fileMsg.PayInfo.WalletAddress)
+				log.Debugf("get deposit balance %d", balance)
 				if err != nil {
 					log.Errorf("get target balance err %s", err)
 					return
@@ -182,6 +186,10 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			}
 		}
 		this.taskMgr.AddShareTo(fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+		err = ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply download msg failed, err %s", err)
+		}
 		// TODO: delete tasks finally
 	default:
 	}
@@ -268,11 +276,12 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.P
 	}
 	// delete record
 	err = this.taskMgr.DeleteShareFileUnpaid(paymentMsg.FileHash, paymentMsg.Sender, paymentMsg.Asset, paymentMsg.Amount)
+	log.Debugf("delete unpaid success %v", paymentMsg)
 	if err != nil {
 		log.Debugf("delete share file info %s", err)
 		return
 	}
-	err = ctx.Reply(context.Background(), nil)
+	err = ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 	if err != nil {
 		log.Errorf("reply delete ok msg failed", err)
 	}

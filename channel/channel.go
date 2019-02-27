@@ -2,7 +2,6 @@ package channel
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	dspcom "github.com/oniio/dsp-go-sdk/common"
@@ -11,6 +10,7 @@ import (
 	sdk "github.com/oniio/oniChain-go-sdk"
 	"github.com/oniio/oniChain-go-sdk/ong"
 	chaincomm "github.com/oniio/oniChain/common"
+	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/smartcontract/service/native/utils"
 	ch "github.com/oniio/oniChannel"
 	"github.com/oniio/oniChannel/common"
@@ -111,7 +111,7 @@ func (this *Channel) SetDeposit(targetAddress string, amount uint64) error {
 }
 
 // DirectTransfer. direct transfer to with payment id, and amount
-func (this *Channel) DirectTransfer(paymentId, amount uint64, to string) error {
+func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) error {
 	target, err := chaincomm.AddressFromBase58(to)
 	if err != nil {
 		return err
@@ -169,11 +169,11 @@ func (this *Channel) CleanUninPrices(asset int32) {
 	delete(this.unitPrices, asset)
 }
 
-func (this *Channel) GetPayment(paymentId uint64) (*store.Payment, error) {
+func (this *Channel) GetPayment(paymentId int32) (*store.Payment, error) {
 	return this.paymentDB.GetPayment(paymentId)
 }
 
-func (this *Channel) DeletePayment(paymentId uint64) error {
+func (this *Channel) DeletePayment(paymentId int32) error {
 	return this.paymentDB.RemovePayment(paymentId)
 }
 
@@ -188,9 +188,9 @@ func (this *Channel) registerReceiveNotification() {
 			if err != nil {
 				continue
 			}
-			fmt.Printf("PaymentReceive amount %d from %s with paymentID %d\n",
+			log.Debugf("PaymentReceive amount %d from %s with paymentID %d\n",
 				event.Amount, addr.ToBase58(), event.Identifier)
-			this.paymentDB.AddPayment(addr.ToBase58(), uint64(event.Identifier), uint64(event.Amount))
+			this.paymentDB.AddPayment(addr.ToBase58(), int32(event.Identifier), uint64(event.Amount))
 		case <-this.closeCh:
 			return
 		}

@@ -408,7 +408,9 @@ func (this *TaskMgr) WorkBackground(fileHash string) {
 				flight = append(flight, flightKey)
 				flightMap[flightKey] = struct{}{}
 				workLock.Unlock()
+				log.Debugf("start request block %s", req.Hash)
 				ret, err := worker.Do(fileHash, req.Hash, worker.RemoteAddress(), req.Index, v.blockResp)
+				log.Debugf("request block %s, err %s", req.Hash, err)
 				workLock.Lock()
 				// remove the request from flight
 				for j, key := range flight {
@@ -462,8 +464,9 @@ func (this *TaskMgr) AddBlockReq(fileHash, blockHash string, index int32) error 
 	}
 	log.Debugf("add block req %s-%s-%d", fileHash, blockHash, index)
 	v.blockReqPool = append(v.blockReqPool, &GetBlockReq{
-		Hash:  blockHash,
-		Index: index,
+		FileHash: fileHash,
+		Hash:     blockHash,
+		Index:    index,
 	})
 	return nil
 }

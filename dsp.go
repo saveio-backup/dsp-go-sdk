@@ -36,7 +36,8 @@ func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
 	}
 	var dbstore *store.LevelDBStore
 	if len(c.DBPath) > 0 {
-		dbstore, err := store.NewLevelDBStore(c.DBPath)
+		var err error
+		dbstore, err = store.NewLevelDBStore(c.DBPath)
 		if err != nil || dbstore == nil {
 			return nil
 		}
@@ -44,9 +45,15 @@ func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
 	}
 	if len(c.FsRepoRoot) > 0 {
 		d.Fs = fs.NewFs(c, d.Chain)
+		if d.Fs == nil {
+			return nil
+		}
 	}
 	if len(c.ChannelListenAddr) > 0 {
 		d.Channel = channel.NewChannelService(c, d.Chain)
+		if d.Channel == nil {
+			return nil
+		}
 		if dbstore != nil {
 			paymentDB := store.NewPaymentDB(dbstore)
 			d.Channel.SetPaymentDB(paymentDB)
@@ -59,12 +66,16 @@ func (this *Dsp) GetVersion() string {
 	return common.DSP_SDK_VERSION
 }
 
-func (this *Dsp) Start(addr string) {
+func (this *Dsp) Start(addr string) error {
 	this.Network = network.NewNetwork(addr, this.Receive)
 	this.Network.Start()
 	if this.Channel != nil {
-		this.Channel.StartService()
+		err := this.Channel.StartService()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (this *Dsp) Stop() {

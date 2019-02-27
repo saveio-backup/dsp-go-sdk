@@ -14,6 +14,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/types/file"
 	"github.com/oniio/dsp-go-sdk/task"
+	"github.com/oniio/dsp-go-sdk/utils"
 	chainCom "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/crypto/pdp"
@@ -300,6 +301,7 @@ func (this *Dsp) StartShareServices() {
 			// check if has unpaid block request
 			canShare, err := this.taskMgr.CanShareTo(req.FileHash, req.WalletAddress)
 			if err != nil || !canShare {
+				log.Errorf("cant share to %s for file %s, can:%t err %s", req.WalletAddress, req.FileHash, canShare, err)
 				break
 			}
 			// send block if requester has paid all block
@@ -328,8 +330,33 @@ func (this *Dsp) StartShareServices() {
 	}
 }
 
-// GetDownloadPeerPrices. get peers and the download price of the file. if free flag is set, return price-free peers.
-func (this *Dsp) GetDownloadPeerPrices(fileHashStr string, asset int32, free bool) (map[string]*file.Payment, error) {
+// DownloadFile. download file, peice by peice from addrs.
+// inOrder: if true, the file will be downloaded block by block in order
+// free: if true, query nodes who can share file free
+// maxPeeCnt: download with max number peers with min price
+func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
+	// set use free peers
+	quotation, err := this.GetDownloadQuotation(fileHashStr, asset, free)
+	if err != nil {
+		return err
+	}
+	if len(quotation) == 0 {
+		return errors.New("no peer to download")
+	}
+	if !free {
+		// filter peers
+		quotation = utils.SortPeersByPrice(quotation, 100)
+	}
+	err = this.SetupChannel(fileHashStr, quotation)
+	if err != nil {
+		return err
+	}
+	log.Debugf("set up channel success: %v\n", quotation)
+	return this.DownloadFileWithQuotation(fileHashStr, asset, inOrder, quotation, decryptPwd)
+}
+
+// GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
+func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool) (map[string]*file.Payment, error) {
 	// TODO: get addrs from tracker
 	addrs := []string{"tcp://127.0.0.1:4001"}
 	msg := message.NewFileDownloadAsk(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), asset)
@@ -390,25 +417,26 @@ func (this *Dsp) SetupChannel(fileHashStr string, peerPrices map[string]*file.Pa
 	}
 	// TODO: optimize to parallel operation
 	for _, info := range peerPrices {
-		_, err := this.Channel.OpenChannel(info.WalletAddress)
+		id, err := this.Channel.OpenChannel(info.WalletAddress)
+		log.Debugf("channel id %d", id)
 		if err != nil {
 			return err
 		}
 		if info.UnitPrice == 0 {
-			log.Debugf("waiting for connected...")
 			err = this.Channel.WaitForConnected(info.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
-			log.Debugf("waiting for connected done.")
 			if err != nil {
 				return err
 			}
 			continue
 		}
 		totalAmount := info.UnitPrice * uint64(len(blockHashes)) * uint64(common.CHUNK_SIZE)
-		log.Debugf("deposit price:%d, cnt:%d, chunsize:%d, total:%d", info.UnitPrice, len(blockHashes), common.CHUNK_SIZE)
+		log.Debugf("deposit to %s price:%d, cnt:%d, chunsize:%d, total:%d", info.WalletAddress, info.UnitPrice, len(blockHashes), common.CHUNK_SIZE, totalAmount)
 		if totalAmount/info.UnitPrice != uint64(len(blockHashes))*uint64(common.CHUNK_SIZE) {
 			return errors.New("deposit amount overflow")
 		}
+		log.Debugf("depositing...")
 		err = this.Channel.SetDeposit(info.WalletAddress, totalAmount)
+		log.Debugf("deposit result %s", err)
 		if err != nil {
 			return err
 		}
@@ -421,7 +449,7 @@ func (this *Dsp) SetupChannel(fileHashStr string, peerPrices map[string]*file.Pa
 }
 
 // PayForData. pay for block
-func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, blockSize uint64) (uint64, error) {
+func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, blockSize uint64) (int32, error) {
 	if payInfo == nil {
 		return 0, nil
 	}
@@ -437,7 +465,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		return 0, err
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	paymentId := r.Uint64()
+	paymentId := r.Int31()
 	err = this.Channel.DirectTransfer(paymentId, amount, payInfo.WalletAddress)
 	if err != nil {
 		return 0, err
@@ -446,8 +474,8 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	// send payment msg
 	msg := message.NewPayment(this.Chain.Native.Fs.DefAcc.Address.ToBase58(), payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
-	res, err := this.Network.Request(msg, addr)
-	log.Debugf("payment msg response :%v, err:%s", res, err)
+	_, err = this.Network.Request(msg, addr)
+	log.Debugf("payment msg response :%d, err:%s", paymentId, err)
 	if err != nil {
 		return 0, err
 	}
@@ -456,6 +484,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	if err != nil {
 		return 0, err
 	}
+	log.Debugf("delete unpaid %d", amount)
 	return paymentId, nil
 }
 
@@ -465,14 +494,14 @@ func (this *Dsp) PayUnpaidFile(fileHashStr string) error {
 	return nil
 }
 
-// DownloadFile. download file, peice by peice from addrs.
+// DownloadFileWithQuotation. download file, peice by peice from addrs.
 // inOrder: if true, the file will be downloaded block by block in order
-func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, peerPayments map[string]*file.Payment, decryptPwd string) error {
+func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOrder bool, quotation map[string]*file.Payment, decryptPwd string) error {
 	// task exist at runtime
 	if this.taskMgr.TaskExist(fileHashStr) {
 		return errors.New("task is exist")
 	}
-	if len(peerPayments) == 0 {
+	if len(quotation) == 0 {
 		return errors.New("no peer for download")
 	}
 	if !this.taskMgr.IsDownloadInfoExist(fileHashStr) {
@@ -487,10 +516,10 @@ func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, pee
 	// new download logic
 	msg := message.NewFileDownload(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), asset)
 	addrs := make([]string, 0)
-	for addr, _ := range peerPayments {
+	for addr, _ := range quotation {
 		addrs = append(addrs, addr)
 	}
-	err = this.Network.Broadcast(addrs, msg, false, nil, nil)
+	err = this.Network.Broadcast(addrs, msg, true, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -563,7 +592,7 @@ func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, pee
 					return err
 				}
 			}
-			payInfo := peerPayments[value.PeerAddr]
+			payInfo := quotation[value.PeerAddr]
 			_, err = this.PayForBlock(payInfo, value.PeerAddr, fileHashStr, uint64(len(value.Block)))
 			if err != nil {
 				return err

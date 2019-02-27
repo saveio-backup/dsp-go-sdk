@@ -3,11 +3,10 @@ package dsp
 import (
 	"fmt"
 	"path/filepath"
-	"sort"
 	"testing"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/oniio/dsp-go-sdk/utils"
 
 	"github.com/oniio/oniChain-go-sdk/wallet"
 
@@ -208,9 +207,15 @@ func TestStartDspNode(t *testing.T) {
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d := NewDsp(dspCfg, acc)
-	d.Start(node1ListAddr)
-	// set free share for all file
-	d.Channel.SetUnitPrices(netcom.ASSET_ONG, 0)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	err = d.Start(node1ListAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// set price for all file
+	d.Channel.SetUnitPrices(netcom.ASSET_ONG, 1)
 	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
 	for {
@@ -259,38 +264,7 @@ func TestStartDspNode3(t *testing.T) {
 		}
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	// set use free peers
-	useFree := false
-	peerPaymentInfo, err := d.GetDownloadPeerPrices(fileHashStr, netcom.ASSET_ONG, useFree)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// filter peers
-	infos := make([]*file.Payment, 0)
-	keyMap := make(map[string]string, 0)
-	for addr, info := range peerPaymentInfo {
-		infos = append(infos, info)
-		keyMap[fmt.Sprintf("%s%d%d", info.WalletAddress, info.Asset, info.UnitPrice)] = addr
-	}
-	sort.SliceStable(infos, func(i, j int) bool {
-		return infos[i].UnitPrice < infos[j].UnitPrice
-	})
-
-	// use max cnt peers
-	maxPeerCnt := 5
-	if maxPeerCnt > len(infos) {
-		maxPeerCnt = len(infos)
-	}
-	peerPaymentInfo = nil
-	for i := 0; i < maxPeerCnt; i++ {
-		peerPaymentInfo[keyMap[fmt.Sprintf("%s%d%d", infos[i].WalletAddress, infos[i].Asset, infos[i].UnitPrice)]] = infos[i]
-	}
-
-	err = d.SetupChannel(fileHashStr, peerPaymentInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, peerPaymentInfo, "")
+	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, "", true, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -347,38 +321,7 @@ func TestStartDspNode4(t *testing.T) {
 		}
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	// set use free peers
-	useFree := false
-	peerPaymentInfo, err := d.GetDownloadPeerPrices(fileHashStr, netcom.ASSET_ONG, useFree)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// filter peers
-	infos := make([]*file.Payment, 0)
-	keyMap := make(map[string]string, 0)
-	for addr, info := range peerPaymentInfo {
-		infos = append(infos, info)
-		keyMap[fmt.Sprintf("%s%d%d", info.WalletAddress, info.Asset, info.UnitPrice)] = addr
-	}
-	sort.SliceStable(infos, func(i, j int) bool {
-		return infos[i].UnitPrice < infos[j].UnitPrice
-	})
-
-	// use max cnt peers
-	maxPeerCnt := 5
-	if maxPeerCnt > len(infos) {
-		maxPeerCnt = len(infos)
-	}
-	peerPaymentInfo = nil
-	for i := 0; i < maxPeerCnt; i++ {
-		peerPaymentInfo[keyMap[fmt.Sprintf("%s%d%d", infos[i].WalletAddress, infos[i].Asset, infos[i].UnitPrice)]] = infos[i]
-	}
-
-	err = d.SetupChannel(fileHashStr, peerPaymentInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, peerPaymentInfo, "")
+	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, "", true, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -537,7 +480,65 @@ func TestDownloadFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := NewDsp(dspCfg, acc)
-	d.Start(node3ListAddr)
+	err = d.Start(node3ListAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d.taskMgr.RegProgressCh()
+	go func() {
+		stop := false
+		for {
+			v := <-d.taskMgr.ProgressCh()
+			for node, cnt := range v.Count {
+				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
+				stop = (cnt == v.Total)
+			}
+			if stop {
+				break
+			}
+		}
+	}()
+	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
+	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, "", false, 100)
+	if err != nil {
+		log.Errorf("download err %s\n", err)
+	}
+	// use for testing go routines for tasks are released or not
+	time.Sleep(time.Duration(5) * time.Second)
+}
+
+func TestDownloadFileWithQuotation(t *testing.T) {
+	fileRoot, err := filepath.Abs("./testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dspCfg := &config.DspConfig{
+		DBPath:               fileRoot + "/db3",
+		FsRepoRoot:           fileRoot + "/onifs3",
+		FsFileRoot:           fileRoot,
+		FsType:               config.FS_FILESTORE,
+		ChainRpcAddr:         rpcAddr,
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    channel3Addr,
+		ChannelProtocol:      "tcp",
+		ChannelRevealTimeout: "1000",
+	}
+
+	w, err := wallet.OpenWallet(wallet3File)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := NewDsp(dspCfg, acc)
+	fmt.Printf("TestDownloadFileWithQuotation d:%v\n", d)
+	err = d.Start(node3ListAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d.taskMgr.RegProgressCh()
 	go func() {
@@ -557,37 +558,23 @@ func TestDownloadFile(t *testing.T) {
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	// set use free peers
 	useFree := false
-	peerPaymentInfo, err := d.GetDownloadPeerPrices(fileHashStr, netcom.ASSET_ONG, useFree)
+	quotation, err := d.GetDownloadQuotation(fileHashStr, netcom.ASSET_ONG, useFree)
+	if len(quotation) == 0 {
+		log.Errorf("no peer to download")
+		return
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !useFree {
 		// filter peers
-		infos := make([]*file.Payment, 0)
-		keyMap := make(map[string]string, 0)
-		for addr, info := range peerPaymentInfo {
-			infos = append(infos, info)
-			keyMap[fmt.Sprintf("%s%d%d", info.WalletAddress, info.Asset, info.UnitPrice)] = addr
-		}
-		sort.SliceStable(infos, func(i, j int) bool {
-			return infos[i].UnitPrice < infos[j].UnitPrice
-		})
-
-		// use max cnt peers
-		maxPeerCnt := 5
-		if maxPeerCnt > len(infos) {
-			maxPeerCnt = len(infos)
-		}
-		peerPaymentInfo = make(map[string]*file.Payment, 0)
-		for i := 0; i < maxPeerCnt; i++ {
-			peerPaymentInfo[keyMap[fmt.Sprintf("%s%d%d", infos[i].WalletAddress, infos[i].Asset, infos[i].UnitPrice)]] = infos[i]
-		}
+		quotation = utils.SortPeersByPrice(quotation, 100)
 	}
-	err = d.SetupChannel(fileHashStr, peerPaymentInfo)
+	err = d.SetupChannel(fileHashStr, quotation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, peerPaymentInfo, "")
+	err = d.DownloadFileWithQuotation(fileHashStr, netcom.ASSET_ONG, true, quotation, "")
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -620,5 +607,51 @@ func TestStartPDPVerify(t *testing.T) {
 	tick := time.NewTicker(time.Second)
 	for {
 		<-tick.C
+	}
+}
+func TestOpenChannel(t *testing.T) {
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr:         rpcAddr,
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    channel1Addr,
+		ChannelProtocol:      "tcp",
+		ChannelRevealTimeout: "1000",
+	}
+	d := NewDsp(dspCfg, acc)
+	id, err := d.Channel.OpenChannel("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("id = %d\n", id)
+}
+
+func TestDepositChannel(t *testing.T) {
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr:         rpcAddr,
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    channel1Addr,
+		ChannelProtocol:      "tcp",
+		ChannelRevealTimeout: "1000",
+	}
+	d := NewDsp(dspCfg, acc)
+	err = d.Channel.SetDeposit("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", 100)
+	if err != nil {
+		t.Fatal(err)
 	}
 }

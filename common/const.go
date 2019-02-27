@@ -25,6 +25,7 @@ const (
 	MAX_GOROUTINES_FOR_WORK_TASK = 8   // max goroutines for choose worker to do job
 	BACKUP_FILE_DURATION         = 10  // 10s check
 	MAX_EXPIRED_PROVE_TASK_NUM   = 100 // max backup tasks
+	MAX_WORKER_FAILED_NUM        = 10  // max failed count from a worker
 )
 
 const (

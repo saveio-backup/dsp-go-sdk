@@ -15,6 +15,19 @@ func MessageHeader() *Header {
 	}
 }
 
+func NewEmptyMsg() *Message {
+	msg := &Message{
+		Header: MessageHeader(),
+	}
+	msg.Header.Type = common.MSG_TYPE_NONE
+	data, err := msg.ToProtoMsg().(*pb.Message).XXX_Marshal(nil, false)
+	if err != nil {
+		return nil
+	}
+	msg.Header.MsgLength = int32(len(data))
+	return msg
+}
+
 // NewBlockMsg block req msg
 func NewBlockReqMsg(fileHash, blockHash string, index int32, walletAddress string, asset int32) *Message {
 	msg := &Message{
@@ -184,7 +197,7 @@ func NewFileDeleteAck(hash string) *Message {
 }
 
 // NewPayment new payment msg
-func NewPayment(sender, receiver string, paymentId uint64, asset int32, amount uint64, fileHash string, errorCode int32) *Message {
+func NewPayment(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, errorCode int32) *Message {
 	msg := &Message{
 		Header: MessageHeader(),
 	}
