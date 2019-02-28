@@ -357,8 +357,10 @@ func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, dec
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
 func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool) (map[string]*file.Payment, error) {
-	// TODO: get addrs from tracker
-	addrs := []string{"tcp://127.0.0.1:4001"}
+	addrs := this.GetPeerFromTracker(fileHashStr, this.Config.TrackerUrls)
+	if len(addrs) == 0 {
+		return nil, errors.New("no peer for download")
+	}
 	msg := message.NewFileDownloadAsk(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), asset)
 	peerPayInfos := make(map[string]*file.Payment, 0)
 	blockHashes := make([]string, 0)
@@ -631,6 +633,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			this.taskMgr.SetTaskDone(fileHashStr, true)
 			break
 		}
+		this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
 		if len(decryptPwd) > 0 {
 			return this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
 		}
@@ -937,7 +940,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 	if !this.taskMgr.IsFileDownloaded(fileHashStr) {
 		return errors.New("all blocks have sent but file not be stored")
 	}
-	// TODO: push to tracker
+	this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
 	log.Infof("received all block, start pdp verify")
 	// all block is saved, prove it
 	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0)

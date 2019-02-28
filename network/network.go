@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,18 @@ func NewNetwork(addr string, handler func(*network.ComponentContext)) *Network {
 		listenAddr: addr,
 		handler:    handler,
 	}
+}
+
+func (this *Network) ListenAddr() string {
+	return this.listenAddr
+}
+
+func (this *Network) Protocol() string {
+	idx := strings.Index(this.listenAddr, "://")
+	if idx == -1 {
+		return "tcp"
+	}
+	return this.listenAddr[:idx]
 }
 
 func (this *Network) Receive(ctx *network.ComponentContext) error {

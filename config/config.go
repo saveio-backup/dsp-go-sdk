@@ -21,6 +21,9 @@ type DspConfig struct {
 	ChannelListenAddr    string // channel listen address. e.g: "127.0.0.1:3001"
 	ChannelProtocol      string // channel network protocol. e.g: "tcp"
 	ChannelRevealTimeout string // channel reveal time out. e.g: "1000"
+
+	TrackerUrls  []string // tracker urls. e.g: ['udp://127.0.0.1:6369/announce']
+	SeedInterval int      // push file to tracker interval in second, if it's 0, no push
 }
 
 func DefaultDspConfig() *DspConfig {

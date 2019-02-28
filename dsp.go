@@ -75,6 +75,9 @@ func (this *Dsp) Start(addr string) error {
 			return err
 		}
 	}
+	if this.Config.SeedInterval > 0 {
+		go this.StartSeedService()
+	}
 	return nil
 }
 

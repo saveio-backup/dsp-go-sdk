@@ -193,6 +193,9 @@ func TestStartDspNode(t *testing.T) {
 		ChannelListenAddr:    channel1Addr,
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
+
+		TrackerUrls:  []string{"udp://127.0.0.1:6369/announce"},
+		SeedInterval: 3600, //  1h
 	}
 
 	w, err := wallet.OpenWallet(walletFile)
@@ -469,6 +472,9 @@ func TestDownloadFile(t *testing.T) {
 		ChannelListenAddr:    channel3Addr,
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
+
+		TrackerUrls:  []string{"udp://127.0.0.1:6369/announce"},
+		SeedInterval: 3600, //  1h
 	}
 
 	w, err := wallet.OpenWallet(wallet3File)
@@ -653,5 +659,95 @@ func TestDepositChannel(t *testing.T) {
 	err = d.Channel.SetDeposit("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", 100)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPushTracker(t *testing.T) {
+	fileRoot, err := filepath.Abs("./testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dspCfg := &config.DspConfig{
+		DBPath:               fileRoot + "/db1",
+		FsRepoRoot:           fileRoot + "/onifs1",
+		FsFileRoot:           fileRoot,
+		FsGcPeriod:           "1h",
+		FsType:               config.FS_BLOCKSTORE,
+		ChainRpcAddr:         rpcAddr,
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    channel1Addr,
+		ChannelProtocol:      "tcp",
+		ChannelRevealTimeout: "1000",
+	}
+
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	err = d.PushToTrackers("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", []string{"udp://127.0.0.1:6369/announce"}, "tcp://127.0.0.1:6370")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetPeersFromTracker(t *testing.T) {
+	d := NewDsp(nil, nil)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	d.GetPeerFromTracker("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", []string{"udp://127.0.0.1:6369/announce"})
+}
+
+func TestSeedServices(t *testing.T) {
+	fileRoot, err := filepath.Abs("./testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dspCfg := &config.DspConfig{
+		DBPath:               fileRoot + "/db1",
+		FsRepoRoot:           fileRoot + "/onifs1",
+		FsFileRoot:           fileRoot,
+		FsGcPeriod:           "1h",
+		FsType:               config.FS_BLOCKSTORE,
+		ChainRpcAddr:         rpcAddr,
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    channel1Addr,
+		ChannelProtocol:      "tcp",
+		ChannelRevealTimeout: "1000",
+
+		TrackerUrls:  []string{"udp://127.0.0.1:6369/announce"},
+		SeedInterval: 10,
+	}
+
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		log.Errorf("open wallet err:%s\n", err)
+		return
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		log.Errorf("get default acc err:%s\n", err)
+		return
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	d.Start(node1ListAddr)
+	tick := time.NewTicker(time.Second)
+	for {
+		<-tick.C
 	}
 }
