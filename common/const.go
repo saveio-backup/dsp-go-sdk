@@ -3,16 +3,19 @@ package common
 const (
 	CHUNK_SIZE                  = 256 * 1024 // chunk size
 	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"   // download temp file path
+	FILE_HASH_LEN               = 46         // file hash length
+	FILE_URL_CUSTOM_HEADER      = "dsp"      // file url custom header
 )
 
 // timeout
 const (
-	TX_CONFIRM_TIMEOUT           = 60 // wait for tx confirmed timeout
-	FILE_FETCH_ACK_TIMEOUT       = 10 // wait for file fetch ack timeout
-	BLOCK_FETCH_TIMEOUT          = 10 // fetch block and get block response timeout
-	CHECK_PROVE_TIMEOUT          = 60 // client upload file and check prove timeout
-	CHECK_CHANNEL_STATE_INTERVAL = 3  // check channel state interval
-	WAIT_CHANNEL_CONNECT_TIMEOUT = 60 // wait for channel connected
+	TX_CONFIRM_TIMEOUT           = 60      // wait for tx confirmed timeout
+	FILE_FETCH_ACK_TIMEOUT       = 10      // wait for file fetch ack timeout
+	BLOCK_FETCH_TIMEOUT          = 10      // fetch block and get block response timeout
+	CHECK_PROVE_TIMEOUT          = 60      // client upload file and check prove timeout
+	CHECK_CHANNEL_STATE_INTERVAL = 3       // check channel state interval
+	WAIT_CHANNEL_CONNECT_TIMEOUT = 60      // wait for channel connected
+	FILE_DNS_TTL                 = 10 * 60 //10m
 )
 
 const (

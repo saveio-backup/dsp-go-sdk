@@ -367,6 +367,9 @@ func TestUploadFile(t *testing.T) {
 		CopyNum:         0,
 		Encrypt:         false,
 		EncryptPassword: "",
+		RegisterDns:     true,
+		BindDns:         true,
+		DnsUrl:          fmt.Sprintf("dsp://file%d", time.Now().Unix()),
 	}
 	d.taskMgr.RegProgressCh()
 	go func() {
@@ -507,6 +510,22 @@ func TestDownloadFile(t *testing.T) {
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, "", false, 100)
+	if err != nil {
+		log.Errorf("download err %s\n", err)
+	}
+	// use for testing go routines for tasks are released or not
+	time.Sleep(time.Duration(5) * time.Second)
+
+	link := "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123"
+	err = d.DownloadFileByLink(link, netcom.ASSET_ONG, true, "", false, 100)
+	if err != nil {
+		log.Errorf("download err %s\n", err)
+	}
+	// use for testing go routines for tasks are released or not
+	time.Sleep(time.Duration(5) * time.Second)
+
+	url := "dsp://ok.com"
+	err = d.DownloadFileByUrl(url, netcom.ASSET_ONG, true, "", false, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -750,4 +769,97 @@ func TestSeedServices(t *testing.T) {
 	for {
 		<-tick.C
 	}
+}
+
+func TestInitDnsSC(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	tx, err := d.Chain.Native.Dns.RegisterHeader(common.FILE_URL_CUSTOM_HEADER, common.FILE_URL_CUSTOM_HEADER, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("hash :%v\n", tx)
+}
+
+func TestRegisterDns(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	hash, err := d.RegisterFileUrl("dsp://file1", "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("hash: %s\n", hash)
+}
+
+func TestBindDns(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	hash, err := d.BindFileUrl("dsp://ok.com", "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("hash: %s\n", hash)
+}
+
+func TestQueryDns(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	link := d.GetLinkFromUrl("dsp://ok.com")
+	fmt.Printf("link: %s\n", link)
 }

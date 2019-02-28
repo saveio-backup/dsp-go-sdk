@@ -243,10 +243,22 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	if err != nil {
 		log.Errorf("delete file upload info err: %s", err)
 	}
+
+	oniLink := utils.GenOniLink(fileHashStr, opt.FileDesc, 0, totalCount, this.Config.TrackerUrls)
+	var dnsRegTx, dnsBindTx string
+	if opt.RegisterDns && len(opt.DnsUrl) > 0 {
+		dnsRegTx, err = this.RegisterFileUrl(opt.DnsUrl, oniLink)
+	}
+	if opt.BindDns && len(opt.DnsUrl) > 0 {
+		dnsBindTx, _ = this.BindFileUrl(opt.DnsUrl, oniLink)
+	}
+
 	return &common.UploadResult{
-		Tx:       tx,
-		FileHash: fileHashStr,
-		Link:     "oni://" + fileHashStr + "&tr=",
+		Tx:            tx,
+		FileHash:      fileHashStr,
+		Link:          oniLink,
+		RegisterDnsTx: dnsRegTx,
+		BindDnsTx:     dnsBindTx,
 	}, nil
 }
 
@@ -353,6 +365,18 @@ func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, dec
 	}
 	log.Debugf("set up channel success: %v\n", quotation)
 	return this.DownloadFileWithQuotation(fileHashStr, asset, inOrder, quotation, decryptPwd)
+}
+
+// DownloadFileByLink. download file by link, e.g oni://Qm...&name=xxx&tr=xxx
+func (this *Dsp) DownloadFileByLink(link string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
+	fileHashStr := utils.GetFileHashFromLink(link)
+	return this.DownloadFile(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt)
+}
+
+// DownloadFileByUrl. download file by link, e.g dsp://file1
+func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
+	fileHashStr := this.GetFileHashFromUrl(url)
+	return this.DownloadFile(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt)
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.

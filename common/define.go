@@ -8,12 +8,17 @@ type UploadOption struct {
 	CopyNum         uint32
 	Encrypt         bool
 	EncryptPassword string
+	RegisterDns     bool
+	BindDns         bool
+	DnsUrl          string
 }
 
 type UploadResult struct {
-	Tx       string
-	FileHash string
-	Link     string
+	Tx            string
+	FileHash      string
+	Link          string
+	RegisterDnsTx string
+	BindDnsTx     string
 }
 
 type PayStoreFileReulst struct {

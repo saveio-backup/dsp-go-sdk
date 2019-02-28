@@ -1,6 +1,8 @@
 package dsp
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -9,7 +11,10 @@ import (
 	"time"
 
 	"github.com/oniio/dsp-go-sdk/common"
+	"github.com/oniio/dsp-go-sdk/utils"
+	chaincom "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/log"
+	"github.com/oniio/oniChain/smartcontract/service/native/dns"
 	"github.com/oniio/oniDNS/tracker"
 )
 
@@ -87,4 +92,51 @@ func (this *Dsp) StartSeedService() {
 			this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
 		}
 	}
+}
+
+func (this *Dsp) RegisterFileUrl(url, link string) (string, error) {
+	urlPrefix := fmt.Sprintf("%s://", common.FILE_URL_CUSTOM_HEADER)
+	if !strings.HasPrefix(url, urlPrefix) {
+		return "", fmt.Errorf("url should start with %s", urlPrefix)
+	}
+	if !utils.ValidateDomainName(url[len(urlPrefix):]) {
+		return "", errors.New("domain name is invalid")
+	}
+	hash, err := this.Chain.Native.Dns.RegisterUrl(url, dns.CUSTOM_URL, link, link, common.FILE_DNS_TTL)
+	if err != nil {
+		return "", err
+	}
+	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, hash[:])
+	if err != nil || !confirmed {
+		return "", errors.New("tx confirme err")
+	}
+	return hex.EncodeToString(chaincom.ToArrayReverse(hash[:])), nil
+}
+
+func (this *Dsp) BindFileUrl(url, link string) (string, error) {
+	hash, err := this.Chain.Native.Dns.Binding(url, link, link, common.FILE_DNS_TTL)
+	if err != nil {
+		return "", err
+	}
+	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, hash[:])
+	if err != nil || !confirmed {
+		return "", errors.New("tx confirme err")
+	}
+	return hex.EncodeToString(chaincom.ToArrayReverse(hash[:])), nil
+}
+
+func (this *Dsp) GetLinkFromUrl(url string) string {
+	info, err := this.Chain.Native.Dns.QueryUrl(url, this.Chain.Native.Dns.DefAcc.Address)
+	if err != nil || info == nil {
+		return ""
+	}
+	return string(info.Name)
+}
+
+func (this *Dsp) GetFileHashFromUrl(url string) string {
+	link := this.GetLinkFromUrl(url)
+	if len(link) == 0 {
+		return ""
+	}
+	return utils.GetFileHashFromLink(link)
 }
