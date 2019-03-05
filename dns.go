@@ -80,7 +80,8 @@ func (this *Dsp) StartSeedService() {
 		// TODO: add store node files push
 		files := make([]string, 0)
 		for _, info := range fileInfos {
-			if info.IsDir() || !strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) {
+			if info.IsDir() ||
+				(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
 				continue
 			}
 			files = append(files, info.Name())

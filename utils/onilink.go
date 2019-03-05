@@ -26,8 +26,13 @@ func GenOniLink(fileHashStr, fileName string, fileSize, blockNum uint64, tracker
 
 func GetFileHashFromLink(link string) string {
 	idx := strings.Index(link, fmt.Sprintf("://%s", common.PROTO_NODE_PREFIX))
-	if idx == -1 {
-		return ""
+	if idx != -1 {
+		return link[idx+3 : idx+3+common.FILE_HASH_LEN]
 	}
-	return link[idx+3 : idx+3+common.FILE_HASH_LEN]
+	idx = strings.Index(link, fmt.Sprintf("://%s", common.RAW_NODE_PREFIX))
+	if idx != -1 {
+		return link[idx+3 : idx+3+common.FILE_HASH_LEN]
+	}
+	return ""
+
 }
