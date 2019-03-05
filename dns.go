@@ -77,6 +77,7 @@ func (this *Dsp) StartSeedService() {
 		if err != nil || len(fileInfos) == 0 {
 			continue
 		}
+		// TODO: add store node files push
 		files := make([]string, 0)
 		for _, info := range fileInfos {
 			if info.IsDir() || !strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) {

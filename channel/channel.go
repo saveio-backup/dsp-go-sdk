@@ -24,7 +24,7 @@ type Channel struct {
 	paymentDB  *store.PaymentDB
 }
 
-func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) *Channel {
+func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error) {
 	if cfg == nil {
 		cfg = config.DefaultDspConfig()
 	}
@@ -37,12 +37,12 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) *Channel {
 	}
 	channel, err := ch.NewChannelService(channelConfig, chain.Native.Channel.DefAcc)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	return &Channel{
 		channel: channel,
 		closeCh: make(chan struct{}, 1),
-	}
+	}, nil
 }
 
 // StartService. start channel service
@@ -73,6 +73,7 @@ func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) 
 	}
 	for i := 0; i < secs; i++ {
 		state := transfer.GetNodeNetworkStatus(this.channel.Service.StateFromChannel(), common.Address(target))
+		log.Debugf("state %s, target:%s\n", state, target.ToBase58())
 		if state == transfer.NetworkReachable {
 			return nil
 		}

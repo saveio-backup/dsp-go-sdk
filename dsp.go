@@ -10,6 +10,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/task"
 	"github.com/oniio/oniChain-go-sdk"
 	"github.com/oniio/oniChain/account"
+	"github.com/oniio/oniChain/common/log"
 )
 
 type Dsp struct {
@@ -38,20 +39,25 @@ func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
 	if len(c.DBPath) > 0 {
 		var err error
 		dbstore, err = store.NewLevelDBStore(c.DBPath)
-		if err != nil || dbstore == nil {
+		if err != nil {
+			log.Errorf("init db err %s", err)
 			return nil
 		}
 		d.taskMgr.FileDB = store.NewFileDB(dbstore)
 	}
 	if len(c.FsRepoRoot) > 0 {
-		d.Fs = fs.NewFs(c, d.Chain)
-		if d.Fs == nil {
+		var err error
+		d.Fs, err = fs.NewFs(c, d.Chain)
+		if err != nil {
+			log.Errorf("init fs err %s", err)
 			return nil
 		}
 	}
 	if len(c.ChannelListenAddr) > 0 {
-		d.Channel = channel.NewChannelService(c, d.Chain)
-		if d.Channel == nil {
+		var err error
+		d.Channel, err = channel.NewChannelService(c, d.Chain)
+		if err != nil {
+			log.Errorf("init channel err %s", err)
 			return nil
 		}
 		if dbstore != nil {

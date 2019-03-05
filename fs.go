@@ -114,7 +114,6 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	if uint32(len(nodeList)) < opt.CopyNum+1 {
 		return nil, fmt.Errorf("node is not enough %d, copyNum %d", len(nodeList), opt.CopyNum)
 	}
-
 	totalCount = uint64(len(list) + 1)
 
 	// pay file
@@ -409,7 +408,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	}
 	err := this.Network.Broadcast(addrs, msg, true, nil, reply)
 	if err != nil {
-		return nil, err
+		log.Errorf("file download err %s", err)
 	}
 	if len(peerPayInfos) == 0 {
 		return nil, errors.New("no peer for download")
@@ -466,7 +465,9 @@ func (this *Dsp) SetupChannel(fileHashStr string, peerPrices map[string]*file.Pa
 		if err != nil {
 			return err
 		}
+		log.Debugf("waiting for connected")
 		err = this.Channel.WaitForConnected(info.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+		log.Debugf("waiting for connected duccess")
 		if err != nil {
 			return err
 		}
@@ -673,6 +674,21 @@ func (this *Dsp) DeleteDownloadedFile(fileHashStr string) error {
 		return errors.New("delete file hash string is empty")
 	}
 	return this.deleteFile(fileHashStr)
+}
+
+// RegProgressChannel. register progress channel
+func (this *Dsp) RegProgressChannel() {
+	this.taskMgr.RegProgressCh()
+}
+
+// GetProgressChannel.
+func (this *Dsp) ProgressChannel() chan *task.ProgressInfo {
+	return this.taskMgr.ProgressCh()
+}
+
+// CloseProgressChannel.
+func (this *Dsp) CloseProgressChannel() {
+	this.taskMgr.CloseProgressCh()
 }
 
 func (this *Dsp) StartBackupFileService() {
@@ -984,7 +1000,7 @@ func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr inter
 	} else {
 		walletAddress = this.Chain.Native.Channel.DefAcc.Address.ToBase58()
 	}
-	msg := message.NewBlockReqMsg(fileHashStr, hash, index, walletAddress, netcom.ASSET_ONG)
+	msg := message.NewBlockReqMsg(fileHashStr, hash, index, walletAddress, common.ASSET_ONG)
 	err := this.Network.Send(msg, addr)
 	if err != nil {
 		return nil, err

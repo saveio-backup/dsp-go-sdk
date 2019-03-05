@@ -280,6 +280,11 @@ func (this *TaskMgr) ProgressCh() chan *ProgressInfo {
 	return this.progress
 }
 
+func (this *TaskMgr) CloseProgressCh() {
+	close(this.progress)
+	this.progress = nil
+}
+
 func (this *TaskMgr) EmitProgress(fileHash string) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()

@@ -12,19 +12,19 @@ import (
 
 	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/config"
-	netcom "github.com/oniio/dsp-go-sdk/network/common"
+	"github.com/oniio/oniChain/account"
 	"github.com/oniio/oniChain/common/log"
 )
 
 var rpcAddr = "http://127.0.0.1:20336"
-var node1ListAddr = "tcp://127.0.0.1:4001"
-var node2ListAddr = "tcp://127.0.0.1:4002"
-var node3ListAddr = "tcp://127.0.0.1:4003"
-var node4ListAddr = "tcp://127.0.0.1:4004"
+var node1ListAddr = "tcp://127.0.0.1:14001"
+var node2ListAddr = "tcp://127.0.0.1:14002"
+var node3ListAddr = "tcp://127.0.0.1:14003"
+var node4ListAddr = "tcp://127.0.0.1:14004"
 
-var uploadTestFile = "./testdata/testuploadbigfile.txt"
+// var uploadTestFile = "./testdata/testuploadbigfile.txt"
 
-// var uploadTestFile = "./testdata/testuploadfile.txt"
+var uploadTestFile = "./testdata/testuploadfile.txt"
 
 var walletFile = "./testdata/wallet.dat"
 var wallet2File = "./testdata/wallet2.dat"
@@ -34,12 +34,33 @@ var wallet1Addr = "AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS"
 var walletPwd = "pwd"
 
 var channel1Addr = "127.0.0.1:3001"
-var channel2Addr = "127.0.0.1:3002"
+var channel2Addr = "127.0.0.1:11260"
 var channel3Addr = "127.0.0.1:3003"
 var channel4Addr = "127.0.0.1:3004"
 
 func init() {
 	log.InitLog(1, log.PATH, log.Stdout)
+}
+
+func newLocalDsp(r, w, wp string) *Dsp {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: r,
+	}
+	var acc *account.Account
+	if len(w) > 0 {
+		wal, err := wallet.OpenWallet(w)
+		if err != nil {
+			log.Errorf("open wallet err:%s\n", err)
+			return nil
+		}
+		acc, err = wal.GetDefaultAccount([]byte(wp))
+		if err != nil {
+			log.Errorf("get default acc err:%s\n", err)
+			return nil
+		}
+	}
+	d := NewDsp(dspCfg, acc)
+	return d
 }
 
 func TestChainGetBlockHeight(t *testing.T) {
@@ -218,7 +239,7 @@ func TestStartDspNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	// set price for all file
-	d.Channel.SetUnitPrices(netcom.ASSET_ONG, 1)
+	d.Channel.SetUnitPrices(common.ASSET_ONG, 1)
 	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
 	for {
@@ -252,11 +273,11 @@ func TestStartDspNode3(t *testing.T) {
 	d := NewDsp(dspCfg, acc)
 	d.Start(node3ListAddr)
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d.taskMgr.RegProgressCh()
+	d.RegProgressChannel()
 	go func() {
 		stop := false
 		for {
-			v := <-d.taskMgr.ProgressCh()
+			v := <-d.ProgressChannel()
 			for node, cnt := range v.Count {
 				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
 				stop = (cnt == v.Total)
@@ -267,7 +288,7 @@ func TestStartDspNode3(t *testing.T) {
 		}
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, "", true, 100)
+	err = d.DownloadFile(fileHashStr, common.ASSET_ONG, true, "", true, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -309,11 +330,11 @@ func TestStartDspNode4(t *testing.T) {
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d := NewDsp(dspCfg, acc)
 	d.Start(node4ListAddr)
-	d.taskMgr.RegProgressCh()
+	d.RegProgressChannel()
 	go func() {
 		stop := false
 		for {
-			v := <-d.taskMgr.ProgressCh()
+			v := <-d.ProgressChannel()
 			for node, cnt := range v.Count {
 				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
 				stop = (cnt == v.Total)
@@ -324,7 +345,7 @@ func TestStartDspNode4(t *testing.T) {
 		}
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, "", true, 100)
+	err = d.DownloadFile(fileHashStr, common.ASSET_ONG, true, "", true, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -371,11 +392,11 @@ func TestUploadFile(t *testing.T) {
 		BindDns:         true,
 		DnsUrl:          fmt.Sprintf("dsp://file%d", time.Now().Unix()),
 	}
-	d.taskMgr.RegProgressCh()
+	d.RegProgressChannel()
 	go func() {
 		stop := false
 		for {
-			v := <-d.taskMgr.ProgressCh()
+			v := <-d.ProgressChannel()
 			for node, cnt := range v.Count {
 				log.Infof("file:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
 				stop = (cnt == v.Total)
@@ -419,7 +440,7 @@ func TestDeleteFileFromUploader(t *testing.T) {
 	}
 	d := NewDsp(dspCfg, acc)
 	d.Start(node2ListAddr)
-	ret, err := d.DeleteUploadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
+	ret, err := d.DeleteUploadedFile("zb2rhe6p9sYx9tKFQMwkpuKtnEP4g6TgEZQBArd1YtEgNWiAk")
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
 		return
@@ -495,10 +516,11 @@ func TestDownloadFile(t *testing.T) {
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d.taskMgr.RegProgressCh()
+	d.RegProgressChannel()
 	go func() {
 		stop := false
 		for {
-			v := <-d.taskMgr.ProgressCh()
+			v := <-d.ProgressChannel()
 			for node, cnt := range v.Count {
 				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
 				stop = (cnt == v.Total)
@@ -509,7 +531,7 @@ func TestDownloadFile(t *testing.T) {
 		}
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	err = d.DownloadFile(fileHashStr, netcom.ASSET_ONG, true, "", false, 100)
+	err = d.DownloadFile(fileHashStr, common.ASSET_ONG, true, "", false, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -517,7 +539,7 @@ func TestDownloadFile(t *testing.T) {
 	time.Sleep(time.Duration(5) * time.Second)
 
 	link := "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123"
-	err = d.DownloadFileByLink(link, netcom.ASSET_ONG, true, "", false, 100)
+	err = d.DownloadFileByLink(link, common.ASSET_ONG, true, "", false, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -525,7 +547,7 @@ func TestDownloadFile(t *testing.T) {
 	time.Sleep(time.Duration(5) * time.Second)
 
 	url := "dsp://ok.com"
-	err = d.DownloadFileByUrl(url, netcom.ASSET_ONG, true, "", false, 100)
+	err = d.DownloadFileByUrl(url, common.ASSET_ONG, true, "", false, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -565,11 +587,11 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d.taskMgr.RegProgressCh()
+	d.RegProgressChannel()
 	go func() {
 		stop := false
 		for {
-			v := <-d.taskMgr.ProgressCh()
+			v := <-d.ProgressChannel()
 			for node, cnt := range v.Count {
 				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
 				stop = (cnt == v.Total)
@@ -583,7 +605,7 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	// set use free peers
 	useFree := false
-	quotation, err := d.GetDownloadQuotation(fileHashStr, netcom.ASSET_ONG, useFree)
+	quotation, err := d.GetDownloadQuotation(fileHashStr, common.ASSET_ONG, useFree)
 	if len(quotation) == 0 {
 		log.Errorf("no peer to download")
 		return
@@ -599,7 +621,7 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = d.DownloadFileWithQuotation(fileHashStr, netcom.ASSET_ONG, true, quotation, "")
+	err = d.DownloadFileWithQuotation(fileHashStr, common.ASSET_ONG, true, quotation, "")
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -659,7 +681,7 @@ func TestOpenChannel(t *testing.T) {
 }
 
 func TestDepositChannel(t *testing.T) {
-	w, err := wallet.OpenWallet(walletFile)
+	w, err := wallet.OpenWallet(wallet2File)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -670,12 +692,13 @@ func TestDepositChannel(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr:         rpcAddr,
 		ChannelClientType:    "rpc",
-		ChannelListenAddr:    channel1Addr,
+		ChannelListenAddr:    channel2Addr,
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 	}
 	d := NewDsp(dspCfg, acc)
-	err = d.Channel.SetDeposit("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", 100)
+	d.Start(node2ListAddr)
+	err = d.Channel.SetDeposit("AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS", 662144)
 	if err != nil {
 		t.Fatal(err)
 	}

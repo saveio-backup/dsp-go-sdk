@@ -26,18 +26,18 @@ type Fs struct {
 	cfg *config.DspConfig
 }
 
-func NewFs(cfg *config.DspConfig, chain *sdk.Chain) *Fs {
+func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 	if cfg == nil {
 		cfg = config.DefaultDspConfig()
 	}
 	fs, err := oniFs.NewOniFSService(cfg.FsRepoRoot, cfg.FsFileRoot, oniFs.FSType(cfg.FsType), common.CHUNK_SIZE, cfg.FsGcPeriod, chain)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	return &Fs{
 		fs:  fs,
 		cfg: cfg,
-	}
+	}, nil
 }
 
 func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) (ipld.Node, []*helpers.UnixfsNode, error) {

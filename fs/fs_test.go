@@ -57,7 +57,7 @@ func TestEncodedToBlock(t *testing.T) {
 		FsFileRoot: fileRoot,
 		FsType:     config.FS_FILESTORE,
 	}
-	fs := NewFs(dspCfg, nil)
+	fs, _ := NewFs(dspCfg, nil)
 	root, l, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
 	if err != nil {
 		fmt.Printf("node from file err:%s\n", err)
@@ -116,7 +116,7 @@ func TestGetBlock(t *testing.T) {
 		FsFileRoot: fileRoot,
 		FsType:     config.FS_FILESTORE,
 	}
-	fs := NewFs(dspCfg, nil)
+	fs, _ := NewFs(dspCfg, nil)
 	// root, _, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
 	// if err != nil {
 	// 	fmt.Printf("err:%v\n", err)
@@ -159,7 +159,7 @@ func TestNewFs(t *testing.T) {
 		FsFileRoot: fileRoot,
 		FsType:     config.FS_FILESTORE,
 	}
-	fs := NewFs(dspCfg, nil)
+	fs, _ := NewFs(dspCfg, nil)
 	if fs == nil {
 		t.Fatal(fs)
 	}
@@ -179,7 +179,7 @@ func TestGetBlockFromFileStore(t *testing.T) {
 		FsFileRoot: fileRoot,
 		FsType:     config.FS_FILESTORE,
 	}
-	fs2 := NewFs(dspCfg, nil)
+	fs2, _ := NewFs(dspCfg, nil)
 	fullFilePath := "../testdata/QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	l0data := []byte{}
 	for i := 850000; i <= 887443; i++ {

@@ -37,3 +37,9 @@ const (
 	FILE_UNIT_PRICE_TYPE_MBYTE = 3
 	FILE_UNIT_PRICE_TYPE_GBYTE = 4
 )
+
+const (
+	ASSET_NONE = 0
+	ASSET_ONT  = 1
+	ASSET_ONG  = 2
+)

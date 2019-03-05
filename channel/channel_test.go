@@ -16,11 +16,11 @@ import (
 var rpcAddr = "http://127.0.0.1:20336"
 
 var walletFile = "../testdata/wallet.dat"
-var wallet2File = "../testdata/wallet3.dat"
+var wallet2File = "../testdata/wallet2.dat"
 var walletPwd = "pwd"
 
-var channel1Addr = "127.0.0.1:3001"
-var channel2Addr = "127.0.0.1:3002"
+var channel1Addr = "127.0.0.1:11259"
+var channel2Addr = "127.0.0.1:11260"
 var channel3Addr = "127.0.0.1:3003"
 var channel4Addr = "127.0.0.1:3004"
 
@@ -34,9 +34,7 @@ func TestCloseChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Printf("acc %v\n", acc)
-	chain := chain.NewChain()
-	chain.NewRpcClient().SetAddress(rpcAddr)
-	chain.SetDefaultAccount(acc)
+
 	w2, err := wallet.OpenWallet(wallet2File)
 	if err != nil {
 		t.Fatal(err)
@@ -45,9 +43,12 @@ func TestCloseChannel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	chain := chain.NewChain()
+	chain.NewRpcClient().SetAddress(rpcAddr)
+	chain.SetDefaultAccount(acc2)
 
-	target := acc2.Address
-	id, err := chain.Native.Channel.GetChannelIdentifier(acc.Address, target)
+	target := acc.Address
+	id, err := chain.Native.Channel.GetChannelIdentifier(acc2.Address, target)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +62,7 @@ func TestCloseChannel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hash, err := chain.Native.Channel.CloseChannel(id, acc.Address, target, nil, nonce, nil, sig, keypair.SerializePublicKey(acc2.PublicKey))
+	hash, err := chain.Native.Channel.CloseChannel(id, acc2.Address, target, nil, nonce, nil, sig, keypair.SerializePublicKey(acc2.PublicKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +99,7 @@ func TestDepositChannel(t *testing.T) {
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 	}
-	c := NewChannelService(cfg, chain)
+	c, _ := NewChannelService(cfg, chain)
 	id, err := c.OpenChannel(acc.Address.ToBase58())
 	if err != nil {
 		t.Fatal(err)

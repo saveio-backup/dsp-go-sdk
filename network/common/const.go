@@ -32,12 +32,6 @@ const (
 )
 
 const (
-	ASSET_NONE = 0
-	ASSET_ONT  = 1
-	ASSET_ONG  = 2
-)
-
-const (
 	MAX_GOROUTINES_IN_LOOP = 10
 	REQUEST_MSG_TIMEOUT    = 60   // 60s
 	MSG_OP_CODE            = 2000 // msg op code
