@@ -151,6 +151,10 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			log.Errorf("reply download ack  msg failed", err)
 		}
 	case netcom.FILE_OP_DOWNLOAD:
+		if !this.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
+			log.Debugf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
+			return
+		}
 		// check deposit price
 		err := this.Channel.WaitForConnected(fileMsg.PayInfo.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		if err != nil {
