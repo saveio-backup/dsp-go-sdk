@@ -30,7 +30,16 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 	if cfg == nil {
 		cfg = config.DefaultDspConfig()
 	}
-	fs, err := oniFs.NewOniFSService(cfg.FsRepoRoot, cfg.FsFileRoot, oniFs.FSType(cfg.FsType), common.CHUNK_SIZE, cfg.FsGcPeriod, chain)
+
+	fsConfig := &oniFs.FSConfig{
+		RepoRoot:  cfg.FsRepoRoot,
+		FsRoot:    cfg.FsFileRoot,
+		FsType:    oniFs.FSType(cfg.FsType),
+		ChunkSize: common.CHUNK_SIZE,
+		GcPeriod:  cfg.FsGcPeriod,
+	}
+
+	fs, err := oniFs.NewOniFSService(fsConfig, chain)
 	if err != nil {
 		return nil, err
 	}
