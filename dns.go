@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/oniio/dsp-go-sdk/common"
+	"github.com/oniio/dsp-go-sdk/config"
 	"github.com/oniio/dsp-go-sdk/utils"
 	chaincom "github.com/oniio/oniChain/common"
-	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/smartcontract/service/native/dns"
 	"github.com/oniio/oniDNS/tracker"
 )
@@ -77,23 +77,26 @@ func (this *Dsp) StartSeedService() {
 		if len(this.Config.TrackerUrls) == 0 {
 			continue
 		}
-		fileInfos, err := ioutil.ReadDir(this.Config.FsFileRoot)
-		if err != nil || len(fileInfos) == 0 {
-			continue
-		}
-		// TODO: add store node files push
 		files := make([]string, 0)
-		for _, info := range fileInfos {
-			if info.IsDir() ||
-				(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
+		switch this.Config.FsType {
+		case config.FS_FILESTORE:
+			fileInfos, err := ioutil.ReadDir(this.Config.FsFileRoot)
+			if err != nil || len(fileInfos) == 0 {
 				continue
 			}
-			files = append(files, info.Name())
+			for _, info := range fileInfos {
+				if info.IsDir() ||
+					(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
+					continue
+				}
+				files = append(files, info.Name())
+			}
+		case config.FS_BLOCKSTORE:
+			files, _ = this.taskMgr.AllDownloadFiles()
 		}
 		if len(files) == 0 {
 			continue
 		}
-		log.Debugf("push file to tracker %v", files)
 		for _, fileHashStr := range files {
 			this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
 		}

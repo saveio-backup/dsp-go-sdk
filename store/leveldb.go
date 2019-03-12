@@ -5,6 +5,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 type LevelDBStore struct {
@@ -54,4 +55,34 @@ func (self *LevelDBStore) Has(key []byte) (bool, error) {
 //Delete the the in leveldb
 func (self *LevelDBStore) Delete(key []byte) error {
 	return self.db.Delete(key, nil)
+}
+
+// QueryKeysByPrefix. find all keys by prefix
+func (self *LevelDBStore) QueryKeysByPrefix(prefix []byte) ([][]byte, error) {
+	iter := self.db.NewIterator(util.BytesPrefix(prefix), nil)
+	keys := make([][]byte, 0)
+	for iter.Next() {
+		keys = append(keys, iter.Key())
+	}
+	iter.Release()
+	err := iter.Error()
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
+// QueryStringKeysByPrefix. find all keys by prefix
+func (self *LevelDBStore) QueryStringKeysByPrefix(prefix []byte) ([]string, error) {
+	iter := self.db.NewIterator(util.BytesPrefix(prefix), nil)
+	keys := make([]string, 0)
+	for iter.Next() {
+		keys = append(keys, string(iter.Key()))
+	}
+	iter.Release()
+	err := iter.Error()
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
 }

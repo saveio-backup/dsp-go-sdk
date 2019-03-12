@@ -879,7 +879,6 @@ func (this *Dsp) getUploadNodeList(filePath, fileHashStr string) ([]string, erro
 		}
 		fullAddress := string(info.NodeAddr)
 		if fullAddress == this.Network.ListenAddr() {
-			log.Debugf("remove self %s", fullAddress)
 			continue
 		}
 		nodeList = append(nodeList, fullAddress)

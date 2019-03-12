@@ -382,6 +382,20 @@ func (this *FileDB) DeleteFileDownloadInfo(fileHashStr string) error {
 	return this.db.Delete(downloadFileInfoKey(fileHashStr))
 }
 
+// AllDownloadFiles. get all download files from db
+func (this *FileDB) AllDownloadFiles() ([]string, error) {
+	prefix := fmt.Sprintf("type=%d&hash=", FileInfoTypeDownload)
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		return nil, err
+	}
+	files := make([]string, 0)
+	for _, k := range keys {
+		files = append(files, k[len(prefix):])
+	}
+	return files, nil
+}
+
 func (this *FileDB) NewFileShareInfo(fileHashStr string) error {
 	fi := &fileInfo{
 		Unpaid:  make(map[string]*Payment, 0),
