@@ -334,6 +334,7 @@ func TestUploadFile(t *testing.T) {
 		FsFileRoot:   "./testdata",
 		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
+		TrackerUrls:  []string{"udp://127.0.0.1:6369/announce"},
 	}
 	w, err := wallet.OpenWallet(wallet2File)
 	if err != nil {
@@ -373,6 +374,8 @@ func TestUploadFile(t *testing.T) {
 				break
 			}
 		}
+		// TODO: why need close
+		d.CloseProgressChannel()
 	}()
 	ret, err := d.UploadFile(uploadTestFile, opt)
 	log.Debugf("upload file ret %v", ret)
@@ -409,7 +412,7 @@ func TestDeleteFileFromUploader(t *testing.T) {
 	}
 	d := NewDsp(dspCfg, acc)
 	d.Start(node2ListAddr)
-	ret, err := d.DeleteUploadedFile("zb2rhe6p9sYx9tKFQMwkpuKtnEP4g6TgEZQBArd1YtEgNWiAk")
+	ret, err := d.DeleteUploadedFile("zb2rhkaiU6xcVbt1TtJeLDMJGPb94WxxQho1bBLvMH57Rww8b")
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
 		return

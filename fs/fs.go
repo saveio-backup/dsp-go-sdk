@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
@@ -221,6 +222,15 @@ func (this *Fs) GetTag(blockHash string, fileHash string, index uint64) ([]byte,
 
 func (this *Fs) StartPDPVerify(fileHash string, luckyNum uint64, bakHeight uint64, bakNum uint64, borkenWalletAddr chainCom.Address) error {
 	return this.fs.StartPDPVerify(fileHash, luckyNum, bakHeight, bakNum, borkenWalletAddr)
+}
+
+// PinRoot. pin root to prevent GC
+func (this *Fs) PinRoot(ctx context.Context, fileHash string) error {
+	rootCid, err := cid.Decode(fileHash)
+	if err != nil {
+		return err
+	}
+	return this.fs.PinRoot(ctx, rootCid)
 }
 
 // GetBlock get blocks

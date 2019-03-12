@@ -226,6 +226,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 	case netcom.BLOCK_OP_GET:
 		log.Debugf("handle get block %s-%s-%d", blockMsg.FileHash, blockMsg.Hash, blockMsg.Index)
 		taskType := this.taskMgr.TaskType(blockMsg.FileHash)
+
 		switch taskType {
 		case task.TaskTypeUpload:
 			reqCh, err := this.taskMgr.TaskBlockReq(blockMsg.FileHash)
@@ -250,6 +251,8 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				WalletAddress: blockMsg.Payment.Sender,
 				Asset:         blockMsg.Payment.Asset,
 			}
+		default:
+			log.Debugf("handle block get msg, tasktype not found")
 		}
 	default:
 	}

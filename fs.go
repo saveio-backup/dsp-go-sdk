@@ -1,6 +1,7 @@
 package dsp
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -248,11 +249,12 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	var dnsRegTx, dnsBindTx string
 	if opt.RegisterDns && len(opt.DnsUrl) > 0 {
 		dnsRegTx, err = this.RegisterFileUrl(opt.DnsUrl, oniLink)
+		log.Debugf("reg dns %s, err %s", dnsRegTx, err)
 	}
 	if opt.BindDns && len(opt.DnsUrl) > 0 {
-		dnsBindTx, _ = this.BindFileUrl(opt.DnsUrl, oniLink)
+		dnsBindTx, err = this.BindFileUrl(opt.DnsUrl, oniLink)
+		log.Debugf("bind dns %s, err %s", dnsBindTx, err)
 	}
-
 	return &common.UploadResult{
 		Tx:            tx,
 		FileHash:      fileHashStr,
@@ -377,6 +379,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	prefix := ""
 	reply := func(msg *message.Message, addr string) {
 		if msg.Error != nil {
+			log.Errorf("get download ask err %s", msg.Error.Message)
 			return
 		}
 		fileMsg := msg.Payload.(*file.File)
@@ -398,7 +401,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 		log.Errorf("file download err %s", err)
 	}
 	if len(peerPayInfos) == 0 {
-		return nil, errors.New("no peer for download")
+		return nil, errors.New("no peerPayInfos for download")
 	}
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if this.taskMgr.IsDownloadInfoExist(fileHashStr) {
@@ -516,7 +519,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		return errors.New("task is exist")
 	}
 	if len(quotation) == 0 {
-		return errors.New("no peer for download")
+		return errors.New("no peer quotation for download")
 	}
 	if !this.taskMgr.IsDownloadInfoExist(fileHashStr) {
 		return errors.New("download info not exist")
@@ -695,7 +698,6 @@ func (this *Dsp) StartBackupFileService() {
 	backupingCnt := 0
 	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
 	for {
-		log.Debugf("backup ticker")
 		select {
 		case <-ticker.C:
 			if this.Chain == nil {
@@ -716,7 +718,7 @@ func (this *Dsp) StartBackupFileService() {
 					(t.BrokenAddr.ToBase58() == this.Chain.Native.Fs.DefAcc.Address.ToBase58()) ||
 					(t.BrokenAddr.ToBase58() == t.BackUpAddr.ToBase58())
 				if addrCheckFailed {
-					log.Debugf("address check faield, lucky: %s, backup: %s, broken: %s", t.LuckyAddr.ToBase58(), t.BackUpAddr.ToBase58(), t.BrokenAddr.ToBase58())
+					log.Debugf("address check faield file %s, lucky: %s, backup: %s, broken: %s", string(t.FileHash), t.LuckyAddr.ToBase58(), t.BackUpAddr.ToBase58(), t.BrokenAddr.ToBase58())
 					continue
 				}
 				if len(t.FileHash) == 0 || len(t.BakSrvAddr) == 0 || len(t.BackUpAddr.ToBase58()) == 0 {
@@ -728,6 +730,11 @@ func (this *Dsp) StartBackupFileService() {
 				err := this.downloadFileFromPeers(string(t.FileHash), common.ASSET_ONG, true, "", false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
 				if err != nil {
 					log.Errorf("download file err %s", err)
+					continue
+				}
+				err = this.Fs.PinRoot(context.TODO(), string(t.FileHash))
+				if err != nil {
+					log.Errorf("pin root file err %s", err)
 					continue
 				}
 				log.Debugf("prove file %s, luckynum %d, bakheight:%d, baknum:%d", string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum)
@@ -871,6 +878,10 @@ func (this *Dsp) getUploadNodeList(filePath, fileHashStr string) ([]string, erro
 			continue
 		}
 		fullAddress := string(info.NodeAddr)
+		if fullAddress == this.Network.ListenAddr() {
+			log.Debugf("remove self %s", fullAddress)
+			continue
+		}
 		nodeList = append(nodeList, fullAddress)
 	}
 	return nodeList, nil
@@ -889,7 +900,6 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 			break
 		}
 		retry++
-		log.Debugf("time.Duration %d", timewait)
 		time.Sleep(time.Duration(timewait) * time.Second)
 	}
 	return true
@@ -923,6 +933,7 @@ func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []s
 			return
 		}
 	}
+	// TODO: make stop func sense in parallel mode
 	stop := func() bool {
 		return len(receivers) >= receiverCount
 	}
@@ -930,6 +941,9 @@ func (this *Dsp) waitFileReceivers(fileHashStr string, nodeList, blockHashes []s
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err")
 		return nil, err
+	}
+	if len(receivers) >= receiverCount {
+		receivers = receivers[:receiverCount]
 	}
 	log.Debugf("receives :%v", receivers)
 	return receivers, nil
@@ -988,8 +1002,14 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 	if !this.taskMgr.IsFileDownloaded(fileHashStr) {
 		return errors.New("all blocks have sent but file not be stored")
 	}
+	err = this.Fs.PinRoot(context.TODO(), fileHashStr)
+	if err != nil {
+		log.Errorf("pin root file err %s", err)
+		return err
+	}
 	this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
 	log.Infof("received all block, start pdp verify")
+
 	// all block is saved, prove it
 	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
 	if err != nil {
