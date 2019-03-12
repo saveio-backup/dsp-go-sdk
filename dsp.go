@@ -81,8 +81,14 @@ func (this *Dsp) Start(addr string) error {
 			return err
 		}
 	}
+	if this.Config == nil {
+		return nil
+	}
 	if this.Config.SeedInterval > 0 {
 		go this.StartSeedService()
+	}
+	if this.Config.FsType == config.FS_BLOCKSTORE {
+		go this.StartBackupFileService()
 	}
 	return nil
 }

@@ -52,13 +52,17 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 	copy(hashBytes[:], []byte(hash)[:])
 
 	peerAddrs := make([]string, 0)
+	networkProtocol := common.DSP_NETWORK_PROTOCOL
+	if this.Network != nil {
+		networkProtocol = this.Network.Protocol()
+	}
 	for _, trackerUrl := range trackerUrls {
 		peers := tracker.GetTorrentPeers(hashBytes, trackerUrl, -1, 1)
 		if len(peers) == 0 {
 			continue
 		}
 		for _, p := range peers {
-			addr := fmt.Sprintf("%s://%s:%d", this.Network.Protocol(), p.IP, p.Port)
+			addr := fmt.Sprintf("%s://%s:%d", networkProtocol, p.IP, p.Port)
 			peerAddrs = append(peerAddrs, addr)
 		}
 		break

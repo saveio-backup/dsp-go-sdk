@@ -5,6 +5,8 @@ const (
 	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"   // download temp file path
 	FILE_HASH_LEN               = 46         // file hash length
 	FILE_URL_CUSTOM_HEADER      = "dsp"      // file url custom header
+	FILE_UNIT_PRICE             = 1          // unit price for all file
+	DSP_NETWORK_PROTOCOL        = "tcp"      // default dsp network protocol
 )
 
 // timeout
@@ -27,8 +29,9 @@ const (
 	MAX_TASKS_NUM                = 50  // max task number
 	MAX_GOROUTINES_FOR_WORK_TASK = 8   // max goroutines for choose worker to do job
 	BACKUP_FILE_DURATION         = 10  // 10s check
-	MAX_EXPIRED_PROVE_TASK_NUM   = 100 // max backup tasks
+	MAX_EXPIRED_PROVE_TASK_NUM   = 10  // max backup tasks one time
 	MAX_WORKER_FAILED_NUM        = 10  // max failed count from a worker
+	MAX_DOWNLOAD_PEERS_NUM       = 100 // max peers for download file
 )
 
 const (

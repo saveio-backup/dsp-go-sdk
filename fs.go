@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/oniio/dsp-go-sdk/common"
+	"github.com/oniio/dsp-go-sdk/config"
 	netcom "github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/types/file"
@@ -328,7 +329,10 @@ func (this *Dsp) StartShareServices() {
 				break
 			}
 			log.Debugf("share block %s, index:%d,  offset %d", req.Hash, req.Index, offset)
-			msg := message.NewBlockMsg(req.Index, req.FileHash, req.Hash, blockData, nil, int64(offset))
+			// TODO: only send tag with tagflag enabled
+			// TEST: client get tag
+			tag, _ := this.Fs.GetTag(req.Hash, req.FileHash, uint64(req.Index))
+			msg := message.NewBlockMsg(req.Index, req.FileHash, req.Hash, blockData, tag, int64(offset))
 			this.Network.Send(msg, req.PeerAddr)
 			up, err := this.GetFileUnitPrice(req.FileHash, req.Asset)
 			if err != nil {
@@ -346,24 +350,8 @@ func (this *Dsp) StartShareServices() {
 // free: if true, query nodes who can share file free
 // maxPeeCnt: download with max number peers with min price
 func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
-	// set use free peers
-	quotation, err := this.GetDownloadQuotation(fileHashStr, asset, free)
-	if err != nil {
-		return err
-	}
-	if len(quotation) == 0 {
-		return errors.New("no peer to download")
-	}
-	if !free {
-		// filter peers
-		quotation = utils.SortPeersByPrice(quotation, 100)
-	}
-	err = this.SetupChannel(fileHashStr, quotation)
-	if err != nil {
-		return err
-	}
-	log.Debugf("set up channel success: %v\n", quotation)
-	return this.DownloadFileWithQuotation(fileHashStr, asset, inOrder, quotation, decryptPwd)
+	addrs := this.GetPeerFromTracker(fileHashStr, this.Config.TrackerUrls)
+	return this.downloadFileFromPeers(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt, addrs)
 }
 
 // DownloadFileByLink. download file by link, e.g oni://Qm...&name=xxx&tr=xxx
@@ -379,8 +367,7 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
-func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool) (map[string]*file.Payment, error) {
-	addrs := this.GetPeerFromTracker(fileHashStr, this.Config.TrackerUrls)
+func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool, addrs []string) (map[string]*file.Payment, error) {
 	if len(addrs) == 0 {
 		return nil, errors.New("no peer for download")
 	}
@@ -553,11 +540,18 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	blockHashes := this.taskMgr.FileBlockHashes(fileHashStr)
 	prefix := this.taskMgr.FilePrefix(fileHashStr)
 	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v\n", fileHashStr, len(blockHashes), prefix)
-	file, err := createDownloadFile(this.Config.FsFileRoot, fileHashStr)
-	if err != nil {
-		return err
+	var file *os.File
+	if this.Config.FsType == config.FS_FILESTORE {
+		file, err = createDownloadFile(this.Config.FsFileRoot, fileHashStr)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			log.Debugf("close file defer")
+			file.Close()
+		}()
 	}
-	defer file.Close()
+
 	// start a task
 	this.taskMgr.NewTask(fileHashStr, task.TaskTypeDownload)
 	defer this.taskMgr.DeleteTask(fileHashStr)
@@ -598,11 +592,11 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			if err != nil {
 				return err
 			}
-			if block.Cid().String() == fileHashStr {
+			if block.Cid().String() == fileHashStr && this.Config.FsType == config.FS_FILESTORE {
 				log.Debugf("set file prefix %s %s", fullFilePath, prefix)
 				this.Fs.SetFsFilePrefix(fullFilePath, prefix)
 			}
-			if len(links) == 0 {
+			if len(links) == 0 && this.Config.FsType == config.FS_FILESTORE {
 				data := this.Fs.BlockData(block)
 				// Test: performance
 				fileStat, err := file.Stat()
@@ -624,15 +618,20 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			if err != nil {
 				return err
 			}
-			err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(value.Offset))
-			log.Debugf("put block for file %s filestore %s, offset:%d", fullFilePath, block.Cid(), value.Offset)
+			if this.Config.FsType == config.FS_FILESTORE {
+				err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(value.Offset))
+			} else {
+				err = this.Fs.PutBlock(block)
+				if err != nil {
+					return err
+				}
+				log.Debugf("block %s value.index %d, value.tag:%d", block.Cid(), value.Index, len(value.Tag))
+				err = this.Fs.PutTag(block.Cid().String(), fileHashStr, uint64(value.Index), value.Tag)
+			}
+			log.Debugf("put block for file %s block: %s, offset:%d", fullFilePath, block.Cid(), value.Offset)
 			if err != nil {
 				log.Errorf("put block err %s", err)
 				return err
-			}
-			testGetBlk := this.Fs.GetBlock(block.Cid().String())
-			if testGetBlk == nil {
-				return errors.New("get block is nil")
 			}
 			err = this.taskMgr.SetBlockDownloaded(fileHashStr, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset, links)
 			if err != nil {
@@ -691,70 +690,79 @@ func (this *Dsp) CloseProgressChannel() {
 	this.taskMgr.CloseProgressCh()
 }
 
+// StartBackupFileService. start a backup file service to find backup jobs.
 func (this *Dsp) StartBackupFileService() {
-	// wait for init contractRequest
+	backupingCnt := 0
 	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
 	for {
+		log.Debugf("backup ticker")
 		select {
 		case <-ticker.C:
 			if this.Chain == nil {
 				break
 			}
 			tasks, err := this.Chain.Native.Fs.GetExpiredProveList()
-			if err != nil {
+			if err != nil || tasks == nil || len(tasks.Tasks) == 0 {
 				break
 			}
-			if tasks == nil || len(tasks.Tasks) == 0 {
-				log.Debugf("expired tasks len:%d", len(tasks.Tasks))
+			if backupingCnt > 0 {
+				log.Debugf("doing backup jobs %d", backupingCnt)
 				break
 			}
-			cnt := 0
+			// TODO: optimize with parallel download
 			for _, t := range tasks.Tasks {
-				if t.LuckyAddr.ToBase58() != this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
-					log.Debugf("get expired list err: lucky node is %s not me", t.LuckyAddr.ToBase58())
-					continue
-				}
-				if t.BackUpAddr.ToBase58() == this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
-					log.Debug("get expired list err: backup to self")
-					continue
-				}
-				if t.BrokenAddr.ToBase58() == this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
-					log.Debug("get expired list err: me is offline")
-					continue
-				}
-				log.Debugf("broken:%s, backupsvr:%s", t.BrokenAddr.ToBase58(), t.BackUpAddr.ToBase58())
-				if t.BrokenAddr.ToBase58() == t.BackUpAddr.ToBase58() {
-					log.Debug("get expired list err: backup from a bad node")
+				addrCheckFailed := (t.LuckyAddr.ToBase58() != this.Chain.Native.Fs.DefAcc.Address.ToBase58()) ||
+					(t.BackUpAddr.ToBase58() == this.Chain.Native.Fs.DefAcc.Address.ToBase58()) ||
+					(t.BrokenAddr.ToBase58() == this.Chain.Native.Fs.DefAcc.Address.ToBase58()) ||
+					(t.BrokenAddr.ToBase58() == t.BackUpAddr.ToBase58())
+				if addrCheckFailed {
+					log.Debugf("address check faield, lucky: %s, backup: %s, broken: %s", t.LuckyAddr.ToBase58(), t.BackUpAddr.ToBase58(), t.BrokenAddr.ToBase58())
 					continue
 				}
 				if len(t.FileHash) == 0 || len(t.BakSrvAddr) == 0 || len(t.BackUpAddr.ToBase58()) == 0 {
 					log.Debugf("get expired prove list params invalid:%v", t)
 					continue
 				}
+				backupingCnt++
 				log.Debugf("go backup file:%s, from:%s %s", t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58())
-				cnt++
-				if cnt >= common.MAX_EXPIRED_PROVE_TASK_NUM {
-					break
+				err := this.downloadFileFromPeers(string(t.FileHash), common.ASSET_ONG, true, "", false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
+				if err != nil {
+					log.Errorf("download file err %s", err)
+					continue
 				}
-				opt := &task.BackupFileOpt{
-					LuckyNum:   t.LuckyNum,
-					BakNum:     t.BakNum,
-					BakHeight:  t.BakHeight,
-					BackUpAddr: t.BackUpAddr.ToBase58(),
-					BrokenAddr: t.BrokenAddr.ToBase58(),
+				log.Debugf("prove file %s, luckynum %d, bakheight:%d, baknum:%d", string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum)
+				err = this.Fs.StartPDPVerify(string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum, t.BrokenAddr)
+				if err != nil {
+					log.Errorf("pdp verify error for backup task")
+					continue
 				}
-				this.taskMgr.NewTask(string(t.FileHash), task.TaskTypeBackup)
-				this.taskMgr.SetBackupOpt(string(t.FileHash), opt)
-				// TODO:
-				// err := bs.backupFileFromNode(context.TODO(), string(t.FileHash), string(t.BakSrvAddr), t.LuckyNum, t.BakHeight, t.BakNum, t.BackUpAddr, t.BrokenAddr)
-				// if err != nil {
-				// 	log.Errorf("back up file:%s failed:%s", t.FileHash, err)
-				// 	continue
-				// }
 				log.Debugf("backup file:%s success", t.FileHash)
 			}
+			// reset
+			backupingCnt = 0
 		}
 	}
+}
+
+// downloadFileFromPeers. downloadfile base methods. download file from peers.
+func (this *Dsp) downloadFileFromPeers(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int, addrs []string) error {
+	quotation, err := this.GetDownloadQuotation(fileHashStr, asset, free, addrs)
+	if err != nil {
+		return err
+	}
+	if len(quotation) == 0 {
+		return errors.New("no quotation from peers")
+	}
+	if !free && len(addrs) > maxPeerCnt {
+		// filter peers
+		quotation = utils.SortPeersByPrice(quotation, maxPeerCnt)
+	}
+	err = this.SetupChannel(fileHashStr, quotation)
+	if err != nil {
+		return err
+	}
+	log.Debugf("set up channel success: %v\n", quotation)
+	return this.DownloadFileWithQuotation(fileHashStr, asset, inOrder, quotation, decryptPwd)
 }
 
 // payForSendFile pay before send a file
@@ -832,7 +840,7 @@ func (this *Dsp) getFileProveNode(fileHashStr string, challengeTimes uint64) ([]
 	}
 	log.Debugf("details :%v, err:%s", len(proveDetails.ProveDetails), err)
 	for _, detail := range proveDetails.ProveDetails {
-		log.Debugf("prove times %d, challenge times %d", detail.ProveTimes, challengeTimes)
+		log.Debugf("node:%s, prove times %d, challenge times %d", string(detail.NodeAddr), detail.ProveTimes, challengeTimes)
 		if detail.ProveTimes < challengeTimes+1 {
 			storing = append(storing, string(detail.NodeAddr))
 		} else {
@@ -983,7 +991,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 	this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
 	log.Infof("received all block, start pdp verify")
 	// all block is saved, prove it
-	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0)
+	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
 	if err != nil {
 		log.Errorf("start pdp verify err %s", err)
 		return err

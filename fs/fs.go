@@ -14,6 +14,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/config"
 	sdk "github.com/oniio/oniChain-go-sdk"
+	chainCom "github.com/oniio/oniChain/common"
 
 	"github.com/oniio/oniFS/importer/helpers"
 	ml "github.com/oniio/oniFS/merkledag"
@@ -214,8 +215,12 @@ func (this *Fs) PutTag(blockHash string, fileHash string, index uint64, tag []by
 	return this.fs.PutTag(blockHash, fileHash, index, tag)
 }
 
-func (this *Fs) StartPDPVerify(fileHash string, luckyNum uint64, bakHeight uint64, bakNum uint64) error {
-	return this.fs.StartPDPVerify(fileHash, luckyNum, bakHeight, bakNum)
+func (this *Fs) GetTag(blockHash string, fileHash string, index uint64) ([]byte, error) {
+	return this.fs.GetTag(blockHash, fileHash, index)
+}
+
+func (this *Fs) StartPDPVerify(fileHash string, luckyNum uint64, bakHeight uint64, bakNum uint64, borkenWalletAddr chainCom.Address) error {
+	return this.fs.StartPDPVerify(fileHash, luckyNum, bakHeight, bakNum, borkenWalletAddr)
 }
 
 // GetBlock get blocks
