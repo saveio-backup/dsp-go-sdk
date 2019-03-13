@@ -34,11 +34,12 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 	}
 
 	fsConfig := &oniFs.FSConfig{
-		RepoRoot:  cfg.FsRepoRoot,
-		FsRoot:    cfg.FsFileRoot,
-		FsType:    oniFs.FSType(cfg.FsType),
-		ChunkSize: common.CHUNK_SIZE,
-		GcPeriod:  cfg.FsGcPeriod,
+		RepoRoot:   cfg.FsRepoRoot,
+		FsRoot:     cfg.FsFileRoot,
+		FsType:     oniFs.FSType(cfg.FsType),
+		ChunkSize:  common.CHUNK_SIZE,
+		GcPeriod:   cfg.FsGcPeriod,
+		MaxStorage: cfg.FsMaxStorage,
 	}
 
 	fs, err := oniFs.NewOniFSService(fsConfig, chain)

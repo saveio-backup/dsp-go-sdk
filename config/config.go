@@ -12,10 +12,11 @@ type DspConfig struct {
 	ChainRpcAddr       string // chain rpc address
 	CheckDepositBlkNum uint64 // check deposit price of block num. if it is 0, no checking
 
-	FsRepoRoot string // fs block store repo root path
-	FsFileRoot string // fs file store root path
-	FsType     FSType // fs type
-	FsGcPeriod string // fs gc period
+	FsRepoRoot   string // fs block store repo root path
+	FsFileRoot   string // fs file store root path
+	FsType       FSType // fs type
+	FsGcPeriod   string // fs gc period
+	FsMaxStorage string // fs max storage
 
 	ChannelClientType    string // channel client type. e.g: "rpc"
 	ChannelListenAddr    string // channel listen address. e.g: "127.0.0.1:3001"
