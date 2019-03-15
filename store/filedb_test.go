@@ -6,18 +6,18 @@ import (
 )
 
 func TestGetFileUploadInfo(t *testing.T) {
-	dbPath := "./db1"
+	dbPath := "../testdata/db1"
 	db, err := NewLevelDBStore(dbPath)
 	if err != nil || db == nil {
 		return
 	}
 	fileDB := NewFileDB(db)
-	info, err := fileDB.getFileInfo("123", FileInfoTypeUpload)
+	info, err := fileDB.getFileInfo([]byte("123"))
 	fmt.Printf("info:%v, err:%s\n", info, err)
 }
 
 func TestPutFileUploadInfo(t *testing.T) {
-	dbPath := "./db1"
+	dbPath := "../testdata/db1"
 	db, err := NewLevelDBStore(dbPath)
 	if err != nil || db == nil {
 		return
@@ -37,7 +37,7 @@ func TestGetBlockOffset(t *testing.T) {
 	if fileDB == nil {
 		return
 	}
-	off, err := fileDB.BlockOffset("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", "zb2rhiZuEBDquFNx7YcDHgRgsHEiyxjnvimq9XZawLeaJKgWc", 2)
+	off, err := fileDB.BlockOffset("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib-AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS-2", "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", 0)
 	if err != nil {
 		fmt.Printf("ERR :%s\n", err)
 		return
@@ -46,7 +46,7 @@ func TestGetBlockOffset(t *testing.T) {
 }
 
 func TestGetUploadedBlockNodeList(t *testing.T) {
-	dbPath := "./db1"
+	dbPath := "../testdata/db1"
 	db, err := NewLevelDBStore(dbPath)
 	if err != nil || db == nil {
 		return

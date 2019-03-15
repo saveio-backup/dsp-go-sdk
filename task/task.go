@@ -95,7 +95,7 @@ func NewTaskMgr() *TaskMgr {
 }
 
 // NewTask. start a task for a file
-func (this *TaskMgr) NewTask(fileHash string, tp TaskType) {
+func (this *TaskMgr) NewTask(fileHash, walletAddress string, tp TaskType) string {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	t := &Task{
@@ -106,7 +106,13 @@ func (this *TaskMgr) NewTask(fileHash string, tp TaskType) {
 		blockResp: make(chan *BlockResp, 1),
 		notify:    make(chan *BlockResp, 100),
 	}
-	this.tasks[fileHash] = t
+	taskKey := this.TaskKey(fileHash, walletAddress, tp)
+	this.tasks[taskKey] = t
+	return taskKey
+}
+
+func (this *TaskMgr) TaskKey(fileHash, walletAddress string, tp TaskType) string {
+	return fmt.Sprintf("%s-%s-%d", fileHash, walletAddress, tp)
 }
 
 func (this *TaskMgr) TaskNum() int {
@@ -117,153 +123,172 @@ func (this *TaskMgr) BlockReqCh() chan *GetBlockReq {
 	return this.blockReqCh
 }
 
-func (this *TaskMgr) TaskType(fileHash string) TaskType {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
-	if !ok {
-		return TaskTypeNone
+func (this *TaskMgr) TryGetTaskKey(fileHashStr, currentAddress, senderAddress string) (string, error) {
+	myUploadTaskKey := this.TaskKey(fileHashStr, currentAddress, TaskTypeUpload)
+	v, ok := this.tasks[myUploadTaskKey]
+	if ok && v != nil {
+		return myUploadTaskKey, nil
 	}
-	return v.taskType
+	myShareTaskKey := this.TaskKey(fileHashStr, senderAddress, TaskTypeShare)
+	v, ok = this.tasks[myShareTaskKey]
+	if ok && v != nil {
+		return myShareTaskKey, nil
+	}
+	return "", errors.New("task key not found")
 }
 
-func (this *TaskMgr) TaskExist(fileHash string) bool {
+// TaskType.
+func (this *TaskMgr) TaskType(taskKey string) TaskType {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	_, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
+	if ok {
+		return v.taskType
+	}
+	return TaskTypeNone
+}
+
+func (this *TaskMgr) TaskExist(taskKey string) bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	_, ok := this.tasks[taskKey]
 	return ok
 }
 
-func (this *TaskMgr) DeleteTask(fileHash string) {
+// DeleteTask. delete task with task id
+func (this *TaskMgr) DeleteTask(taskKey string) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	delete(this.tasks, fileHash)
+	delete(this.tasks, taskKey)
 }
 
-func (this *TaskMgr) TaskTimeout(fileHash string) (bool, error) {
+func (this *TaskMgr) TaskTimeout(taskKey string) (bool, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return false, errors.New("task not found")
 	}
 	return v.askTimeout, nil
 }
 
-func (this *TaskMgr) TaskAck(fileHash string) (chan struct{}, error) {
+func (this *TaskMgr) TaskAck(taskKey string) (chan struct{}, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return nil, errors.New("task not found")
 	}
 	return v.ack, nil
 }
 
-func (this *TaskMgr) TaskReady(fileHash string) (bool, error) {
+func (this *TaskMgr) TaskReady(taskKey string) (bool, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return false, errors.New("task not found")
 	}
 	return v.ready, nil
 }
 
-func (this *TaskMgr) TaskBlockReq(fileHash string) (chan *GetBlockReq, error) {
+func (this *TaskMgr) TaskBlockReq(taskKey string) (chan *GetBlockReq, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return nil, errors.New("task not found")
 	}
 	return v.blockReq, nil
 }
 
-func (this *TaskMgr) TaskBlockResp(fileHash string) (chan *BlockResp, error) {
+func (this *TaskMgr) TaskBlockResp(taskKey string) (chan *BlockResp, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return nil, errors.New("task not found")
 	}
 	return v.blockResp, nil
 }
 
-func (this *TaskMgr) SetTaskTimeout(fileHash string, timeout bool) {
+// SetTaskTimeout. set task timeout with taskid
+func (this *TaskMgr) SetTaskTimeout(taskKey string, timeout bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
 	v.askTimeout = timeout
 }
 
-func (this *TaskMgr) SetTaskReady(fileHash string, ready bool) {
+// SetTaskReady. set task is ready with taskid
+func (this *TaskMgr) SetTaskReady(taskKey string, ready bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
 	v.ready = ready
 }
 
-func (this *TaskMgr) SetFileName(fileHash, fileName string) {
+// SetFileName. set file name of task
+func (this *TaskMgr) SetFileName(taskKey, fileName string) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
 	v.fileName = fileName
 }
 
-func (this *TaskMgr) SetFileBlocksTotalCount(fileHash string, count uint64) {
+func (this *TaskMgr) SetFileBlocksTotalCount(taskKey string, count uint64) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
 	v.total = count
 }
 
-func (this *TaskMgr) SetOnlyBlock(fileHash string, only bool) {
+func (this *TaskMgr) SetOnlyBlock(taskKey string, only bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
 	v.onlyBlock = only
 }
 
-func (this *TaskMgr) SetBackupOpt(fileHash string, opt *BackupFileOpt) {
+func (this *TaskMgr) SetBackupOpt(taskKey string, opt *BackupFileOpt) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
 	v.backupOpt = opt
 }
 
-func (this *TaskMgr) OnTaskAck(fileHash string) {
+func (this *TaskMgr) OnTaskAck(taskKey string) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
 	v.ack <- struct{}{}
 }
 
-func (this *TaskMgr) OnlyBlock(fileHash string) bool {
+func (this *TaskMgr) OnlyBlock(taskKey string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return false
 	}
@@ -285,10 +310,11 @@ func (this *TaskMgr) CloseProgressCh() {
 	this.progress = nil
 }
 
-func (this *TaskMgr) EmitProgress(fileHash string) {
+// EmitProgress. emit progress to channel with taskKey
+func (this *TaskMgr) EmitProgress(taskKey string) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
@@ -299,24 +325,24 @@ func (this *TaskMgr) EmitProgress(fileHash string) {
 	case TaskTypeUpload:
 		this.progress <- &ProgressInfo{
 			FileName: v.fileName,
-			FileHash: fileHash,
+			FileHash: v.fileHash,
 			Total:    v.total,
-			Count:    this.FileProgress(fileHash, store.FileInfoTypeUpload),
+			Count:    this.FileProgress(taskKey),
 		}
 	case TaskTypeDownload:
 		this.progress <- &ProgressInfo{
-			FileHash: fileHash,
+			FileHash: v.fileHash,
 			Total:    v.total,
-			Count:    this.FileProgress(fileHash, store.FileInfoTypeDownload),
+			Count:    this.FileProgress(taskKey),
 		}
 	default:
 	}
 }
 
-func (this *TaskMgr) NewWorkers(fileHash string, addrs []string, inOrder bool, job jobFunc) {
+func (this *TaskMgr) NewWorkers(taskKey string, addrs []string, inOrder bool, job jobFunc) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
@@ -332,14 +358,15 @@ func (this *TaskMgr) NewWorkers(fileHash string, addrs []string, inOrder bool, j
 
 // WorkBackground. Run n goroutines to check request pool one second a time.
 // If there exist a idle request, find the idle worker to do the job
-func (this *TaskMgr) WorkBackground(fileHash string) {
+func (this *TaskMgr) WorkBackground(taskKey string) {
 	this.lock.RLock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		this.lock.RUnlock()
 		return
 	}
 	this.lock.RUnlock()
+	fileHash := v.fileHash
 	addrs := make([]string, 0)
 	for k := range v.workers {
 		addrs = append(addrs, k)
@@ -439,7 +466,7 @@ func (this *TaskMgr) WorkBackground(fileHash string) {
 					}
 					v.notify <- blk
 					delete(blockCache, blkKey)
-					this.DelBlockReq(fileHash, r.Hash, r.Index)
+					this.DelBlockReq(taskKey, r.Hash, r.Index)
 				}
 				workLock.Unlock()
 			}
@@ -447,46 +474,46 @@ func (this *TaskMgr) WorkBackground(fileHash string) {
 	}
 }
 
-func (this *TaskMgr) TaskNotify(fileHash string) chan *BlockResp {
+func (this *TaskMgr) TaskNotify(taskKey string) chan *BlockResp {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return nil
 	}
 	return v.notify
 }
 
-func (this *TaskMgr) AddBlockReq(fileHash, blockHash string, index int32) error {
+func (this *TaskMgr) AddBlockReq(taskKey, blockHash string, index int32) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return errors.New("task not found")
 	}
 	if v.blockReqPool == nil {
 		v.blockReqPool = make([]*GetBlockReq, 0)
 	}
-	log.Debugf("add block req %s-%s-%d", fileHash, blockHash, index)
+	log.Debugf("add block req %s-%s-%d", v.fileHash, blockHash, index)
 	v.blockReqPool = append(v.blockReqPool, &GetBlockReq{
-		FileHash: fileHash,
+		FileHash: v.fileHash,
 		Hash:     blockHash,
 		Index:    index,
 	})
 	return nil
 }
 
-func (this *TaskMgr) DelBlockReq(fileHash, blockHash string, index int32) {
+func (this *TaskMgr) DelBlockReq(taskKey, blockHash string, index int32) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}
 	if v.blockReqPool == nil {
 		return
 	}
-	log.Debugf("del block req %s-%s-%d", fileHash, blockHash, index)
+	log.Debugf("del block req %s-%s-%d", taskKey, blockHash, index)
 	for i, req := range v.blockReqPool {
 		if req.Hash == blockHash && req.Index == index {
 			v.blockReqPool = append(v.blockReqPool[:i], v.blockReqPool[i+1:]...)
@@ -496,10 +523,10 @@ func (this *TaskMgr) DelBlockReq(fileHash, blockHash string, index int32) {
 	log.Debugf("block req pool len: %d", len(v.blockReqPool))
 }
 
-func (this *TaskMgr) SetTaskDone(fileHash string, done bool) {
+func (this *TaskMgr) SetTaskDone(taskKey string, done bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	v, ok := this.tasks[fileHash]
+	v, ok := this.tasks[taskKey]
 	if !ok {
 		return
 	}

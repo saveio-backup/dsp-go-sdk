@@ -26,8 +26,9 @@ var node3ListAddr = "tcp://127.0.0.1:14003"
 var node4ListAddr = "tcp://127.0.0.1:14004"
 var node5ListAddr = "tcp://127.0.0.1:14005"
 
-// var uploadTestFile = "./testdata/testuploadbigfile.txt"
-var uploadTestFile = "./testdata/testuploadfile.txt"
+var uploadTestFile = "./testdata/testuploadbigfile.txt"
+
+// var uploadTestFile = "./testdata/testuploadfile.txt"
 
 var walletFile = "./testdata/wallet.dat"
 var wallet2File = "./testdata/wallet2.dat"
@@ -272,62 +273,6 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 	}
 }
 
-func TestStartDspNode3(t *testing.T) {
-	fileRoot, err := filepath.Abs("./testdata")
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	dspCfg := &config.DspConfig{
-		DBPath:       "testdata/db3",
-		FsRepoRoot:   "testdata/onifs3",
-		FsFileRoot:   fileRoot,
-		FsType:       config.FS_FILESTORE,
-		ChainRpcAddr: rpcAddr,
-	}
-	w, err := wallet.OpenWallet(wallet3File)
-	if err != nil {
-		log.Errorf("open wallet err:%s\n", err)
-		return
-	}
-	acc, err := w.GetDefaultAccount([]byte(walletPwd))
-	if err != nil {
-		log.Errorf("get default acc err:%s\n", err)
-		return
-	}
-	d := NewDsp(dspCfg, acc)
-	d.Start(node3ListAddr)
-	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d.RegProgressChannel()
-	go func() {
-		stop := false
-		for {
-			v := <-d.ProgressChannel()
-			for node, cnt := range v.Count {
-				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
-				stop = (cnt == v.Total)
-			}
-			if stop {
-				break
-			}
-		}
-	}()
-	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	err = d.DownloadFile(fileHashStr, common.ASSET_ONG, true, "", true, 100)
-	if err != nil {
-		log.Errorf("download err %s\n", err)
-	}
-	// use for testing go routines for tasks are released or not
-	time.Sleep(time.Duration(5) * time.Second)
-	go d.StartShareServices()
-	tick := time.NewTicker(time.Second)
-	// err = d.DeleteDownloadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
-	log.Debugf("delete file result:%s", err)
-	for {
-		<-tick.C
-	}
-}
-
 func TestUploadFile(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		DBPath:       "./testdata/db2",
@@ -355,7 +300,7 @@ func TestUploadFile(t *testing.T) {
 		ProveInterval:   100,
 		ProveTimes:      8,
 		Privilege:       1,
-		CopyNum:         1,
+		CopyNum:         0,
 		Encrypt:         false,
 		EncryptPassword: "",
 		RegisterDns:     true,
@@ -467,18 +412,24 @@ func TestGetExpiredTaskList(t *testing.T) {
 }
 
 func TestDownloadFile(t *testing.T) {
+	nodeIdx := 4
 	fileRoot, err := filepath.Abs("./testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	chListenAddrs := []string{"", channel1Addr, channel2Addr, channel3Addr, channel4Addr, channel5Addr}
+	walletFiles := []string{"", walletFile, wallet2File, wallet3File, wallet4File, wallet5File}
+	nodeAddrs := []string{"", node1ListAddr, node2ListAddr, node3ListAddr, node4ListAddr, node5ListAddr}
+
 	dspCfg := &config.DspConfig{
-		DBPath:               fileRoot + "/db3",
-		FsRepoRoot:           fileRoot + "/onifs3",
+		DBPath:               fmt.Sprintf("%s/db%d", fileRoot, nodeIdx),
+		FsRepoRoot:           fmt.Sprintf("%s/onifs%d", fileRoot, nodeIdx),
 		FsFileRoot:           fileRoot,
 		FsType:               config.FS_FILESTORE,
 		ChainRpcAddr:         rpcAddr,
 		ChannelClientType:    "rpc",
-		ChannelListenAddr:    channel3Addr,
+		ChannelListenAddr:    chListenAddrs[nodeIdx],
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 
@@ -486,7 +437,7 @@ func TestDownloadFile(t *testing.T) {
 		SeedInterval: 3600, //  1h
 	}
 
-	w, err := wallet.OpenWallet(wallet3File)
+	w, err := wallet.OpenWallet(walletFiles[nodeIdx])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +446,7 @@ func TestDownloadFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := NewDsp(dspCfg, acc)
-	err = d.Start(node3ListAddr)
+	err = d.Start(nodeAddrs[nodeIdx])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -522,22 +473,29 @@ func TestDownloadFile(t *testing.T) {
 	}
 	// use for testing go routines for tasks are released or not
 	time.Sleep(time.Duration(5) * time.Second)
-
-	link := "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123"
-	err = d.DownloadFileByLink(link, common.ASSET_ONG, true, "", false, 100)
-	if err != nil {
-		log.Errorf("download err %s\n", err)
+	// set price for all file
+	d.Channel.SetUnitPrices(common.ASSET_ONG, 1)
+	go d.StartShareServices()
+	tick := time.NewTicker(time.Second)
+	for {
+		<-tick.C
 	}
-	// use for testing go routines for tasks are released or not
-	time.Sleep(time.Duration(5) * time.Second)
 
-	url := "dsp://ok.com"
-	err = d.DownloadFileByUrl(url, common.ASSET_ONG, true, "", false, 100)
-	if err != nil {
-		log.Errorf("download err %s\n", err)
-	}
-	// use for testing go routines for tasks are released or not
-	time.Sleep(time.Duration(5) * time.Second)
+	// link := "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123"
+	// err = d.DownloadFileByLink(link, common.ASSET_ONG, true, "", false, 100)
+	// if err != nil {
+	// 	log.Errorf("download err %s\n", err)
+	// }
+	// // use for testing go routines for tasks are released or not
+	// time.Sleep(time.Duration(5) * time.Second)
+
+	// url := "dsp://ok.com"
+	// err = d.DownloadFileByUrl(url, common.ASSET_ONG, true, "", false, 100)
+	// if err != nil {
+	// 	log.Errorf("download err %s\n", err)
+	// }
+	// // use for testing go routines for tasks are released or not
+	// time.Sleep(time.Duration(5) * time.Second)
 }
 
 func TestDownloadFileWithQuotation(t *testing.T) {
