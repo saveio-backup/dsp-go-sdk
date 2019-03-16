@@ -440,6 +440,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	if err != nil {
 		return 0, err
 	}
+	this.taskMgr.SetWorkerPaid(taskKey, addr)
 	log.Debugf("delete unpaid %d", amount)
 	return paymentId, nil
 }

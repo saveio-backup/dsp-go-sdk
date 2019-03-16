@@ -9,6 +9,7 @@ type Worker struct {
 	working    bool
 	job        jobFunc
 	failed     map[string]int
+	unpaid     bool
 }
 
 func NewWorker(addr string, j jobFunc) *Worker {
@@ -47,4 +48,12 @@ func (w *Worker) WorkFailed(hash string) bool {
 		return true
 	}
 	return false
+}
+
+func (w *Worker) SetUnpaid(unpaid bool) {
+	w.unpaid = unpaid
+}
+
+func (w *Worker) Unpaid() bool {
+	return w.unpaid
 }

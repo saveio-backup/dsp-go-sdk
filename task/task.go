@@ -423,8 +423,8 @@ func (this *TaskMgr) WorkBackground(taskKey string) {
 						idx = 0
 					}
 					w := v.workers[addrs[idx]]
-					if w.Working() || w.WorkFailed(req.Hash) {
-						log.Debugf("%d worker is working: %t, failed: %t for %s, pool-len: %d, flight-len: %d, cache-len: %d", i, w.Working(), w.WorkFailed(req.Hash), req.Hash, len(v.blockReqPool), len(flight), len(blockCache))
+					if w.Working() || w.WorkFailed(req.Hash) || w.Unpaid() {
+						log.Debugf("%d worker is working: %t, failed: %t, unpaid: %t, for %s, pool-len: %d, flight-len: %d, cache-len: %d", i, w.Working(), w.WorkFailed(req.Hash), w.Unpaid(), req.Hash, len(v.blockReqPool), len(flight), len(blockCache))
 						continue
 					}
 					worker = w
@@ -434,7 +434,7 @@ func (this *TaskMgr) WorkBackground(taskKey string) {
 					// can't find a valid worker
 					workLock.Unlock()
 					log.Debugf("no worker...")
-					time.Sleep(time.Duration(3) * time.Second)
+					time.Sleep(time.Duration(1) * time.Second)
 					continue
 				}
 				flight = append(flight, flightKey)
@@ -456,6 +456,7 @@ func (this *TaskMgr) WorkBackground(taskKey string) {
 					workLock.Unlock()
 					continue
 				}
+				worker.SetUnpaid(true)
 				blockCache[flightKey] = ret
 				// notify outside
 				for _, r := range v.blockReqPool {
@@ -472,6 +473,20 @@ func (this *TaskMgr) WorkBackground(taskKey string) {
 			}
 		}()
 	}
+}
+
+func (this *TaskMgr) SetWorkerPaid(taskKey, addr string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	v, ok := this.tasks[taskKey]
+	if !ok {
+		return
+	}
+	w, ok := v.workers[addr]
+	if !ok {
+		return
+	}
+	w.SetUnpaid(false)
 }
 
 func (this *TaskMgr) TaskNotify(taskKey string) chan *BlockResp {
