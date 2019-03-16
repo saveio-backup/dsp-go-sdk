@@ -412,7 +412,7 @@ func TestGetExpiredTaskList(t *testing.T) {
 }
 
 func TestDownloadFile(t *testing.T) {
-	nodeIdx := 4
+	nodeIdx := 3
 	fileRoot, err := filepath.Abs("./testdata")
 	if err != nil {
 		t.Fatal(err)

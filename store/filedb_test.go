@@ -35,9 +35,10 @@ func TestGetBlockOffset(t *testing.T) {
 	}
 	fileDB := NewFileDB(db)
 	if fileDB == nil {
+		t.Fatal("db is nil")
 		return
 	}
-	off, err := fileDB.BlockOffset("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib-AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS-2", "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", 0)
+	off, err := fileDB.BlockOffset("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib-AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS-2", "zb2rhiZuEBDquFNx7YcDHgRgsHEiyxjnvimq9XZawLeaJKgWc", 2)
 	if err != nil {
 		fmt.Printf("ERR :%s\n", err)
 		return

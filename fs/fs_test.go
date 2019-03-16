@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/oniio/dsp-go-sdk/config"
+	chain "github.com/oniio/oniChain-go-sdk"
+	"github.com/oniio/oniChain-go-sdk/wallet"
 )
 
 var testbigFile = "../testdata/testuploadbigfile.txt"
@@ -112,39 +114,39 @@ func TestGetBlock(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		FsRepoRoot: fileRoot + "/testdata/onifs_test",
-		FsFileRoot: fileRoot,
-		FsType:     config.FS_FILESTORE,
+		DBPath:       fmt.Sprintf("%s/db%d", fileRoot, 1),
+		FsRepoRoot:   fileRoot + "/onifs1",
+		FsFileRoot:   fileRoot,
+		FsType:       config.FS_BLOCKSTORE,
+		FsGcPeriod:   "1h",
+		FsMaxStorage: "10G",
+		ChainRpcAddr: "http://localhost:20336",
 	}
-	fs, _ := NewFs(dspCfg, nil)
-	// root, _, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
-	// if err != nil {
-	// 	fmt.Printf("err:%v\n", err)
-	// 	return
-	// }
-	// err = fs.PutBlock(root)
-	// if err != nil {
-	// 	fmt.Printf("put block err %s\n", err)
-	// 	return
-	// }
-	blk := fs.GetBlock("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
+	c := chain.NewChain()
+	c.NewRpcClient().SetAddress(dspCfg.ChainRpcAddr)
+	w, err := wallet.OpenWallet(fileRoot + "/wallet.dat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte("pwd"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.SetDefaultAccount(acc)
+	fs, _ := NewFs(dspCfg, c)
+	if fs == nil {
+		t.Fatal("fs is nil")
+	}
+	blk := fs.GetBlock("zb2rhfrCjaF8LnRoBC7VjLhyH34te5hxTKm4w4KUxrrYHFJnE")
 	if blk == nil {
-		fmt.Printf("block is nil\n")
-		return
+		t.Fatal("block is nil")
 	}
-	// // for *ml.ProtoNode, it has links
-	// dagNode, err := ml.DecodeProtobufBlock(blk)
-	// if err != nil {
-	// 	return
-	// }
-	// ls, err := fs.BlockLinks(blk)
-	// if err != nil {
-	// 	return
-	// }
-	// fmt.Printf("links :%v, ls:%v\n", dagNode.Links(), ls)
-	// fmt.Printf("cid %s\n", blk.Cid().String())
+	fmt.Printf("blk type:%T", blk)
 	blockData := fs.BlockDataOfAny(blk)
-	fmt.Printf("raw data :%s\n", hex.EncodeToString(blockData))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("raw data len:%d\n", len(blockData))
 
 }
 
@@ -167,7 +169,7 @@ func TestNewFs(t *testing.T) {
 
 }
 
-func TestGetBlockFromFileStore(t *testing.T) {
+func Test2GetBlockFromFileStore(t *testing.T) {
 	prefix := "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c"
 	fileRoot, err := filepath.Abs("../testdata")
 	if err != nil {

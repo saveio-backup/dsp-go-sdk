@@ -541,7 +541,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			}
 			if len(links) == 0 && this.Config.FsType == config.FS_FILESTORE {
 				data := this.Fs.BlockData(block)
-				// Test: performance
+				// TEST: performance
 				fileStat, err := file.Stat()
 				if err != nil {
 					return err
@@ -550,8 +550,12 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 				if fileStat.Size() == 0 && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
 					data = data[len(prefix):]
 				}
-				// TODO: write at offset
-				_, err = file.Write(data)
+				// TEST: offset
+				writeAtPos := int64(0)
+				if value.Offset > 0 {
+					writeAtPos = value.Offset - int64(len(prefix))
+				}
+				_, err = file.WriteAt(data, writeAtPos)
 				if err != nil {
 					return err
 				}
