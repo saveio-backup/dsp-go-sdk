@@ -5,8 +5,10 @@ const (
 	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"   // download temp file path
 	FILE_HASH_LEN               = 46         // file hash length
 	FILE_URL_CUSTOM_HEADER      = "dsp"      // file url custom header
-	FILE_UNIT_PRICE             = 1          // unit price for all file
+	FILE_DOWNLOAD_UNIT_PRICE    = 1          // unit price for all file
 	DSP_NETWORK_PROTOCOL        = "tcp"      // default dsp network protocol
+	TRACKER_PORT                = 6369       // tracker default port
+	TRACKER_NETWORK_PROTOCOL    = "udp"      // tracker network protocol
 )
 
 // timeout
@@ -16,8 +18,10 @@ const (
 	BLOCK_FETCH_TIMEOUT          = 10      // fetch block and get block response timeout
 	CHECK_PROVE_TIMEOUT          = 60      // client upload file and check prove timeout
 	CHECK_CHANNEL_STATE_INTERVAL = 3       // check channel state interval
-	WAIT_CHANNEL_CONNECT_TIMEOUT = 60      // wait for channel connected
+	WAIT_CHANNEL_CONNECT_TIMEOUT = 10      // wait for channel connected
 	FILE_DNS_TTL                 = 10 * 60 //10m
+	CHANNEL_TRANSFER_TIMEOUT     = 60      // 60s
+	CHANNEL_WITHDRAW_TIMEOUT     = 60      // 60s
 )
 
 const (
@@ -43,6 +47,5 @@ const (
 
 const (
 	ASSET_NONE = 0
-	ASSET_ONT  = 1
-	ASSET_ONG  = 2
+	ASSET_USDT = 1
 )

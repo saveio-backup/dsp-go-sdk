@@ -3,7 +3,6 @@ package dsp
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/oniio/dsp-go-sdk/common"
 	netcom "github.com/oniio/dsp-go-sdk/network/common"
@@ -21,7 +20,7 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 	msg := message.ReadMessage(ctx.Message())
 	peer := ctx.Client()
 	if msg == nil || msg.Header == nil {
-		log.Debugf("receive nil msg from %s\n", peer.Address)
+		log.Debugf("receive nil msg from %s", peer.Address)
 		return
 	}
 	if msg.Header.Version != netcom.MESSAGE_VERSION {
@@ -43,7 +42,7 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 // handleFileMsg handle all file msg
 func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	log.Debugf("handleFileMsg %s from peer:%s, length:%d\n", map[int32]string{
+	log.Debugf("handleFileMsg %s from peer:%s, length:%d", map[int32]string{
 		netcom.FILE_OP_FETCH_ASK:    "fetch_ask",
 		netcom.FILE_OP_FETCH_ACK:    "fetch_ack",
 		netcom.FILE_OP_FETCH_RDY:    "fetch_rdy",
@@ -128,6 +127,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		taskKey := this.taskMgr.TaskKey(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 		rootBlk := this.Fs.GetBlock(fileMsg.Hash)
 		if !this.taskMgr.IsDownloadInfoExist(taskKey) || rootBlk == nil {
+			log.Errorf("file ask err root block %t", rootBlk == nil)
 			replyMsg := message.NewFileDownloadAck(fileMsg.Hash, nil, "", "", 0, netcom.MSG_ERROR_CODE_FILE_NOT_EXIST)
 			err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 			if err != nil {
@@ -136,6 +136,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			return
 		}
 		if this.taskMgr.TaskNum() >= common.MAX_TASKS_NUM {
+			log.Errorf("task not mutch")
 			replyMsg := message.NewFileDownloadAck(fileMsg.Hash, nil, "", "", 0, netcom.MSG_ERROR_CODE_TOO_MANY_TASKS)
 			err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 			if err != nil {
@@ -161,7 +162,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		}
 	case netcom.FILE_OP_DOWNLOAD:
 		if !this.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
-			log.Debugf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
+			log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
 			return
 		}
 		taskKey := this.taskMgr.TaskKey(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
@@ -169,42 +170,22 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			log.Errorf("share task exist %s", fileMsg.Hash)
 			return
 		}
-		// check deposit price
-		err := this.Channel.WaitForConnected(fileMsg.PayInfo.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
-		if err != nil {
-			log.Errorf("wait channel connected err %s", err)
-			return
-		}
-		if this.Config.CheckDepositBlkNum > 0 {
-			price, err := this.GetFileUnitPrice(fileMsg.PayInfo.Asset)
-			if err != nil {
-				log.Errorf("get file unit price err %s", err)
-				return
-			}
-			if price > 0 {
-				balance, err := this.Channel.GetTargetBalance(fileMsg.PayInfo.WalletAddress)
-				log.Debugf("get deposit balance %d", balance)
-				if err != nil {
-					log.Errorf("get target balance err %s", err)
-					return
-				}
-				// calulate
-				if price*this.Config.CheckDepositBlkNum > balance {
-					log.Errorf("insufficient deposit balance")
-					return
-				}
-			}
-		}
+		// TODO: check channel balance and router path
 		log.Debugf("new share task %s", fileMsg.Hash)
 		this.taskMgr.NewTask(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
 		if !this.taskMgr.IsShareInfoExists(taskKey) {
-			err = this.taskMgr.NewFileShareInfo(taskKey)
+			err := this.taskMgr.NewFileShareInfo(taskKey)
 			if err != nil {
 				return
 			}
 		}
 		this.taskMgr.AddShareTo(taskKey, fileMsg.PayInfo.WalletAddress)
-		err = ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
+		hostAddr := this.GetExternalIP(fileMsg.PayInfo.WalletAddress)
+		log.Debugf("Set host addr after recv file download %s - %s", fileMsg.PayInfo.WalletAddress, hostAddr)
+		if len(hostAddr) > 0 {
+			this.Channel.SetHostAddr(fileMsg.PayInfo.WalletAddress, hostAddr)
+		}
+		err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply download msg failed, err %s", err)
 		}
@@ -216,7 +197,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 // handleBlockMsg handle all file msg
 func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	blockMsg := msg.Payload.(*block.Block)
-	log.Debugf("handleBlockMsg %s from peer:%s, length:%d\n",
+	log.Debugf("handleBlockMsg %s from peer:%s, length:%d",
 		map[int32]string{
 			netcom.BLOCK_OP_NONE: "block_none",
 			netcom.BLOCK_OP_GET:  "block_get",

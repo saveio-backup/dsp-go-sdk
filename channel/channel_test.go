@@ -10,19 +10,23 @@ import (
 	chain "github.com/oniio/oniChain-go-sdk"
 	"github.com/oniio/oniChain-go-sdk/wallet"
 	cliutil "github.com/oniio/oniChain/cmd/utils"
+	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/crypto/keypair"
+	"github.com/oniio/oniChannel/transfer"
 )
 
 var rpcAddr = "http://127.0.0.1:20336"
 
 var walletFile = "../testdata/wallet.dat"
 var wallet2File = "../testdata/wallet2.dat"
+var wallet3File = "../testdata/wallet3.dat"
 var walletPwd = "pwd"
 
-var channel1Addr = "127.0.0.1:11259"
-var channel2Addr = "127.0.0.1:11260"
-var channel3Addr = "127.0.0.1:3003"
-var channel4Addr = "127.0.0.1:3004"
+var channel1Addr = "127.0.0.1:13001"
+var channel2Addr = "127.0.0.1:13002"
+var channel3Addr = "127.0.0.1:13003"
+var channel4Addr = "127.0.0.1:13004"
+var channel5Addr = "127.0.0.1:13005"
 
 func TestCloseChannel(t *testing.T) {
 	w, err := wallet.OpenWallet(walletFile)
@@ -117,4 +121,54 @@ func TestDepositChannel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestGetTargetBalance(t *testing.T) {
+	log.InitLog(1, log.PATH, log.Stdout)
+	w, err := wallet.OpenWallet(wallet3File)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("acc %v\n", acc)
+
+	chain := chain.NewChain()
+	chain.NewRpcClient().SetAddress(rpcAddr)
+	chain.SetDefaultAccount(acc)
+	cfg := &config.DspConfig{
+		ChainRpcAddr:         rpcAddr,
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    channel3Addr,
+		ChannelProtocol:      "tcp",
+		ChannelRevealTimeout: "1000",
+	}
+	target := "ANa3f9jm2FkWu4NrVn6L1FGu7zadKdvPjL"
+	if target == "" {
+	}
+	c, _ := NewChannelService(cfg, chain)
+	neighbours := transfer.GetNeighbours(c.channel.Service.StateFromChannel())
+	fmt.Printf("len:%d\n", len(neighbours))
+
+	err = c.StartService()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bal, err := c.GetCurrentBalance(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("balance %v\n", bal)
+	c.SetHostAddr(target, "tcp://127.0.0.1:13004")
+	_, err = c.OpenChannel(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.WaitForConnected(target, time.Duration(60)*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("connected\n")
 }

@@ -51,6 +51,7 @@ var channel5Addr = "127.0.0.1:13005"
 
 func init() {
 	log.InitLog(1, log.PATH, log.Stdout)
+	log.AddIgnore("oniChannel")
 }
 
 func newLocalDsp(r, w, wp string) *Dsp {
@@ -99,8 +100,8 @@ func TestNodeRegister(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
 	}
-	// w, err := wallet.OpenWallet(walletFile)
-	w, err := wallet.OpenWallet(wallet4File)
+	w, err := wallet.OpenWallet(walletFile)
+	// w, err := wallet.OpenWallet(wallet4File)
 	// w, err := wallet.OpenWallet(wallet5File)
 	if err != nil {
 		log.Errorf("open wallet err:%s\n", err)
@@ -113,8 +114,8 @@ func TestNodeRegister(t *testing.T) {
 	}
 	d := NewDsp(dspCfg, acc)
 	// register 512G for 12 hours
-	// tx, err := d.RegisterNode(node1ListAddr, 512*1024*1024, 12)
-	tx, err := d.RegisterNode(node4ListAddr, 512*1024*1024, 12)
+	tx, err := d.RegisterNode(node1ListAddr, 512*1024*1024, 12)
+	// tx, err := d.RegisterNode(node4ListAddr, 512*1024*1024, 12)
 	// tx, err := d.RegisterNode(node5ListAddr, 512*1024*1024, 12)
 	if err != nil {
 		log.Errorf("register node err:%s", err)
@@ -151,7 +152,7 @@ func TestNodeQuery(t *testing.T) {
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg, nil)
-	info, err := d.QueryNode(wallet5Addr)
+	info, err := d.QueryNode(wallet1Addr)
 	if err != nil {
 		log.Errorf("query node err %s", err)
 		return
@@ -242,7 +243,7 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 		ChannelListenAddr:    chListenAddrs[nodeIndex],
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
-		TrackerUrls:          []string{"udp://127.0.0.1:6369/announce"},
+		DnsNodeMaxNum:        100,
 		SeedInterval:         3600, //  1h
 	}
 	w, err := wallet.OpenWallet(walletFiles[nodeIndex])
@@ -265,7 +266,8 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	// set price for all file
-	d.Channel.SetUnitPrices(common.ASSET_ONG, 1)
+	d.Channel.SetUnitPrices(common.ASSET_USDT, common.FILE_DOWNLOAD_UNIT_PRICE)
+
 	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
 	for {
@@ -275,12 +277,12 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 
 func TestUploadFile(t *testing.T) {
 	dspCfg := &config.DspConfig{
-		DBPath:       "./testdata/db2",
-		FsRepoRoot:   "./testdata/onifs2",
-		FsFileRoot:   "./testdata",
-		FsType:       config.FS_FILESTORE,
-		ChainRpcAddr: rpcAddr,
-		TrackerUrls:  []string{"udp://127.0.0.1:6369/announce"},
+		DBPath:        "./testdata/db2",
+		FsRepoRoot:    "./testdata/onifs2",
+		FsFileRoot:    "./testdata",
+		FsType:        config.FS_FILESTORE,
+		ChainRpcAddr:  rpcAddr,
+		DnsNodeMaxNum: 100,
 	}
 	w, err := wallet.OpenWallet(wallet2File)
 	if err != nil {
@@ -358,7 +360,7 @@ func TestDeleteFileFromUploader(t *testing.T) {
 	}
 	d := NewDsp(dspCfg, acc)
 	d.Start(node2ListAddr)
-	ret, err := d.DeleteUploadedFile("zb2rhkaiU6xcVbt1TtJeLDMJGPb94WxxQho1bBLvMH57Rww8b")
+	ret, err := d.DeleteUploadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
 		return
@@ -433,8 +435,8 @@ func TestDownloadFile(t *testing.T) {
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 
-		TrackerUrls:  []string{"udp://127.0.0.1:6369/announce"},
-		SeedInterval: 3600, //  1h
+		DnsNodeMaxNum: 100,
+		SeedInterval:  3600, //  1h
 	}
 
 	w, err := wallet.OpenWallet(walletFiles[nodeIdx])
@@ -467,14 +469,14 @@ func TestDownloadFile(t *testing.T) {
 		}
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	err = d.DownloadFile(fileHashStr, common.ASSET_ONG, true, "", false, 100)
+	err = d.DownloadFile(fileHashStr, common.ASSET_USDT, true, "", false, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
 	// use for testing go routines for tasks are released or not
 	time.Sleep(time.Duration(5) * time.Second)
 	// set price for all file
-	d.Channel.SetUnitPrices(common.ASSET_ONG, 1)
+	d.Channel.SetUnitPrices(common.ASSET_USDT, common.FILE_DOWNLOAD_UNIT_PRICE)
 	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
 	for {
@@ -482,7 +484,7 @@ func TestDownloadFile(t *testing.T) {
 	}
 
 	// link := "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123"
-	// err = d.DownloadFileByLink(link, common.ASSET_ONG, true, "", false, 100)
+	// err = d.DownloadFileByLink(link, common.ASSET_USDT, true, "", false, 100)
 	// if err != nil {
 	// 	log.Errorf("download err %s\n", err)
 	// }
@@ -490,7 +492,7 @@ func TestDownloadFile(t *testing.T) {
 	// time.Sleep(time.Duration(5) * time.Second)
 
 	// url := "dsp://ok.com"
-	// err = d.DownloadFileByUrl(url, common.ASSET_ONG, true, "", false, 100)
+	// err = d.DownloadFileByUrl(url, common.ASSET_USDT, true, "", false, 100)
 	// if err != nil {
 	// 	log.Errorf("download err %s\n", err)
 	// }
@@ -513,6 +515,9 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 		ChannelListenAddr:    channel3Addr,
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
+
+		DnsNodeMaxNum: 100,
+		SeedInterval:  3600, //  1h
 	}
 
 	w, err := wallet.OpenWallet(wallet3File)
@@ -548,8 +553,8 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	// set use free peers
 	useFree := false
-	addrs := d.GetPeerFromTracker(fileHashStr, dspCfg.TrackerUrls)
-	quotation, err := d.GetDownloadQuotation(fileHashStr, common.ASSET_ONG, useFree, addrs)
+	addrs := d.GetPeerFromTracker(fileHashStr, d.TrackerUrls)
+	quotation, err := d.GetDownloadQuotation(fileHashStr, common.ASSET_USDT, useFree, addrs)
 	if len(quotation) == 0 {
 		log.Errorf("no peer to download")
 		return
@@ -561,11 +566,11 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 		// filter peers
 		quotation = utils.SortPeersByPrice(quotation, 100)
 	}
-	err = d.SetupChannel(fileHashStr, quotation)
+	err = d.DepositChannelForFile(fileHashStr, quotation)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = d.DownloadFileWithQuotation(fileHashStr, common.ASSET_ONG, true, quotation, "")
+	err = d.DownloadFileWithQuotation(fileHashStr, common.ASSET_USDT, true, quotation, "")
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -702,20 +707,22 @@ func TestSeedServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	dspCfg := &config.DspConfig{
-		DBPath:               fileRoot + "/db1",
-		FsRepoRoot:           fileRoot + "/onifs1",
-		FsFileRoot:           fileRoot,
-		FsGcPeriod:           "1h",
-		FsMaxStorage:         "10G",
-		FsType:               config.FS_BLOCKSTORE,
+		DBPath: fileRoot + "/db1",
+
+		FsRepoRoot:   fileRoot + "/onifs1",
+		FsFileRoot:   fileRoot,
+		FsGcPeriod:   "1h",
+		FsMaxStorage: "10G",
+		FsType:       config.FS_BLOCKSTORE,
+
 		ChainRpcAddr:         rpcAddr,
 		ChannelClientType:    "rpc",
 		ChannelListenAddr:    channel1Addr,
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 
-		TrackerUrls:  []string{"udp://127.0.0.1:6369/announce"},
-		SeedInterval: 10,
+		DnsNodeMaxNum: 100,
+		SeedInterval:  10,
 	}
 
 	w, err := wallet.OpenWallet(walletFile)
@@ -831,4 +838,40 @@ func TestQueryDns(t *testing.T) {
 	}
 	link := d.GetLinkFromUrl("dsp://ok.com")
 	fmt.Printf("link: %s\n", link)
+}
+
+func TestGetSetupDNSNodes(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr:         rpcAddr,
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    "127.0.0.1:3006",
+		ChannelProtocol:      "tcp",
+		ChannelRevealTimeout: "1000",
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc)
+	d.Start(node3ListAddr)
+	if d.Channel == nil {
+		t.Fatal("channel is nil")
+	}
+	err = d.Channel.StartService()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = d.SetupDNSNode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.DNSNode == nil {
+		t.Fatal("dns node can't setup")
+	}
+	fmt.Printf("trackers %v, dns %s:%s\n", d.TrackerUrls, d.DNSNode.WalletAddr, d.DNSNode.ChannelAddr)
 }

@@ -178,7 +178,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		log.Errorf("delete file upload info err: %s", err)
 	}
 
-	oniLink := utils.GenOniLink(fileHashStr, opt.FileDesc, 0, totalCount, this.Config.TrackerUrls)
+	oniLink := utils.GenOniLink(fileHashStr, opt.FileDesc, 0, totalCount, this.TrackerUrls)
 	var dnsRegTx, dnsBindTx string
 	if opt.RegisterDns && len(opt.DnsUrl) > 0 {
 		dnsRegTx, err = this.RegisterFileUrl(opt.DnsUrl, oniLink)
@@ -288,7 +288,7 @@ func (this *Dsp) StartShareServices() {
 // free: if true, query nodes who can share file free
 // maxPeeCnt: download with max number peers with min price
 func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
-	addrs := this.GetPeerFromTracker(fileHashStr, this.Config.TrackerUrls)
+	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
 	return this.downloadFileFromPeers(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt, addrs)
 }
 
@@ -355,8 +355,8 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	return peerPayInfos, nil
 }
 
-// SetupChannel. open and deposit channel. peerPrices: peer network address <=> payment info
-func (this *Dsp) SetupChannel(fileHashStr string, peerPrices map[string]*file.Payment) error {
+// DepositChannelForFile. deposit channel. peerPrices: peer network address <=> payment info
+func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string]*file.Payment) error {
 	taskKey := this.taskMgr.TaskKey(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	if !this.taskMgr.IsDownloadInfoExist(taskKey) {
 		return errors.New("download info not exist")
@@ -368,37 +368,27 @@ func (this *Dsp) SetupChannel(fileHashStr string, peerPrices map[string]*file.Pa
 	if len(blockHashes) == 0 {
 		return errors.New("no blocks")
 	}
-	// TODO: optimize to parallel operation
-	for _, info := range peerPrices {
-		id, err := this.Channel.OpenChannel(info.WalletAddress)
-		log.Debugf("channel id %d", id)
-		if err != nil {
-			return err
-		}
-		if info.UnitPrice == 0 {
-			err = this.Channel.WaitForConnected(info.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
-			if err != nil {
-				return err
-			}
-			continue
-		}
-		totalAmount := info.UnitPrice * uint64(len(blockHashes)) * uint64(common.CHUNK_SIZE)
-		log.Debugf("deposit to %s price:%d, cnt:%d, chunsize:%d, total:%d", info.WalletAddress, info.UnitPrice, len(blockHashes), common.CHUNK_SIZE, totalAmount)
-		if totalAmount/info.UnitPrice != uint64(len(blockHashes))*uint64(common.CHUNK_SIZE) {
-			return errors.New("deposit amount overflow")
-		}
+	totalAmount := common.FILE_DOWNLOAD_UNIT_PRICE * uint64(len(blockHashes)) * uint64(common.CHUNK_SIZE)
+	log.Debugf("deposit to channel price:%d, cnt:%d, chunsize:%d, total:%d", common.FILE_DOWNLOAD_UNIT_PRICE, len(blockHashes), common.CHUNK_SIZE, totalAmount)
+	if totalAmount/common.FILE_DOWNLOAD_UNIT_PRICE != uint64(len(blockHashes))*uint64(common.CHUNK_SIZE) {
+		return errors.New("deposit amount overflow")
+	}
+	curBal, _ := this.Channel.GetCurrentBalance(this.DNSNode.WalletAddr)
+	if curBal < totalAmount {
 		log.Debugf("depositing...")
-		err = this.Channel.SetDeposit(info.WalletAddress, totalAmount)
+		err := this.Channel.SetDeposit(this.DNSNode.WalletAddr, totalAmount)
 		log.Debugf("deposit result %s", err)
 		if err != nil {
 			return err
 		}
-		log.Debugf("waiting for connected")
-		err = this.Channel.WaitForConnected(info.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
-		log.Debugf("waiting for connected duccess")
-		if err != nil {
-			return err
+	}
+	for _, payInfo := range peerPrices {
+		hostAddr := this.GetExternalIP(payInfo.WalletAddress)
+		log.Debugf("Set host addr after deposit channel %s - %s", payInfo.WalletAddress, hostAddr)
+		if len(hostAddr) == 0 {
+			continue
 		}
+		this.Channel.SetHostAddr(payInfo.WalletAddress, hostAddr)
 	}
 	return nil
 }
@@ -422,7 +412,8 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	paymentId := r.Int31()
-	err = this.Channel.DirectTransfer(paymentId, amount, payInfo.WalletAddress)
+	err = this.Channel.MediaTransfer(paymentId, amount, payInfo.WalletAddress)
+	log.Debugf("pay to %s, id %v, err:%s", payInfo.WalletAddress, paymentId, err)
 	if err != nil {
 		return 0, err
 	}
@@ -477,13 +468,15 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	for addr, _ := range quotation {
 		addrs = append(addrs, addr)
 	}
+	log.Debugf("broad cast msg to %v", addrs)
 	err = this.Network.Broadcast(addrs, msg, true, nil, nil)
+	log.Debugf("brocast file download msg err %v", err)
 	if err != nil {
 		return err
 	}
 	blockHashes := this.taskMgr.FileBlockHashes(taskKey)
 	prefix := this.taskMgr.FilePrefix(taskKey)
-	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v\n", fileHashStr, len(blockHashes), prefix)
+	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v", fileHashStr, len(blockHashes), prefix)
 	var file *os.File
 	if this.Config.FsType == config.FS_FILESTORE {
 		file, err = createDownloadFile(this.Config.FsFileRoot, fileHashStr)
@@ -605,7 +598,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			this.taskMgr.SetTaskDone(taskKey, true)
 			break
 		}
-		this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
+		this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
 		if len(decryptPwd) > 0 {
 			return this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
 		}
@@ -672,7 +665,7 @@ func (this *Dsp) StartBackupFileService() {
 				}
 				backupingCnt++
 				log.Debugf("go backup file:%s, from:%s %s", t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58())
-				err := this.downloadFileFromPeers(string(t.FileHash), common.ASSET_ONG, true, "", false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
+				err := this.downloadFileFromPeers(string(t.FileHash), common.ASSET_USDT, true, "", false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
 				if err != nil {
 					log.Errorf("download file err %s", err)
 					continue
@@ -709,11 +702,11 @@ func (this *Dsp) downloadFileFromPeers(fileHashStr string, asset int32, inOrder 
 		// filter peers
 		quotation = utils.SortPeersByPrice(quotation, maxPeerCnt)
 	}
-	err = this.SetupChannel(fileHashStr, quotation)
+	err = this.DepositChannelForFile(fileHashStr, quotation)
 	if err != nil {
 		return err
 	}
-	log.Debugf("set up channel success: %v\n", quotation)
+	log.Debugf("set up channel success: %v", quotation)
 	return this.DownloadFileWithQuotation(fileHashStr, asset, inOrder, quotation, decryptPwd)
 }
 
@@ -724,6 +717,7 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 	var paramsBuf, privateKey []byte
 	var tx string
 	if fileInfo == nil {
+		log.Info("first upload file")
 		minInterval := uint64(0)
 		setting, _ := this.Chain.Native.Fs.GetSetting()
 		if setting != nil {
@@ -867,7 +861,7 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 		select {
 		case <-ack:
 			isAck = true
-			log.Debugf("received ack from %s\n", addr)
+			log.Debugf("received ack from %s", addr)
 			receivers = append(receivers, addr)
 		case <-time.After(time.Duration(common.FILE_FETCH_ACK_TIMEOUT) * time.Second):
 			if isAck {
@@ -957,7 +951,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		log.Errorf("pin root file err %s", err)
 		return err
 	}
-	this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
+	this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
 	log.Infof("received all block, start pdp verify")
 
 	// all block is saved, prove it
@@ -978,7 +972,7 @@ func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr inter
 	} else {
 		walletAddress = this.Chain.Native.Channel.DefAcc.Address.ToBase58()
 	}
-	msg := message.NewBlockReqMsg(fileHashStr, hash, index, walletAddress, common.ASSET_ONG)
+	msg := message.NewBlockReqMsg(fileHashStr, hash, index, walletAddress, common.ASSET_USDT)
 	err := this.Network.Send(msg, addr)
 	if err != nil {
 		return nil, err

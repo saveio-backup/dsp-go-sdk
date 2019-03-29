@@ -14,9 +14,78 @@ import (
 	"github.com/oniio/dsp-go-sdk/config"
 	"github.com/oniio/dsp-go-sdk/utils"
 	chaincom "github.com/oniio/oniChain/common"
+	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/smartcontract/service/native/dns"
 	"github.com/oniio/oniDNS/tracker"
 )
+
+type DNSNodeInfo struct {
+	WalletAddr  string
+	ChannelAddr string
+}
+
+func (this *Dsp) SetupDNSNode() error {
+	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
+	if err != nil {
+		return err
+	}
+	if len(ns) == 0 {
+		return errors.New("no dns nodes")
+	}
+	maxTrackerNum := 1
+	if this.Config.DnsNodeMaxNum > 1 {
+		maxTrackerNum = this.Config.DnsNodeMaxNum
+	}
+	if this.TrackerUrls == nil {
+		this.TrackerUrls = make([]string, 0)
+	}
+	for _, v := range ns {
+		if len(this.TrackerUrls) >= maxTrackerNum {
+			break
+		}
+		if this.DNSNode != nil {
+			trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
+			this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
+			continue
+		}
+		dnsUrl := fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
+		if !this.Network.IsPeerListenning(dnsUrl) {
+			continue
+		}
+		log.Debugf("open channel set addr %s-%s", v.WalletAddr.ToBase58(), dnsUrl)
+		this.Channel.SetHostAddr(v.WalletAddr.ToBase58(), dnsUrl)
+		_, err = this.Channel.OpenChannel(v.WalletAddr.ToBase58())
+		if err != nil {
+			log.Debugf("open channel err ")
+			continue
+		}
+		err = this.Channel.WaitForConnected(v.WalletAddr.ToBase58(), time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+		if err != nil {
+			log.Debugf("wait channel connected err %s", err)
+			// TODO: withdraw and close channel
+			continue
+		}
+		bal, _ := this.Channel.GetCurrentBalance(v.WalletAddr.ToBase58())
+		depositAmount := uint64(0)
+		if this.Config.DnsChannelDeposit > bal {
+			depositAmount = this.Config.DnsChannelDeposit - bal
+		}
+		log.Infof("connect to dns node :%s, deposit %d", dnsUrl, depositAmount)
+		err = this.Channel.SetDeposit(v.WalletAddr.ToBase58(), depositAmount)
+		if err != nil {
+			log.Debugf("deposit result %s", err)
+			// TODO: withdraw and close channel
+			continue
+		}
+		this.DNSNode = &DNSNodeInfo{
+			WalletAddr:  v.WalletAddr.ToBase58(),
+			ChannelAddr: dnsUrl,
+		}
+		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
+		this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
+	}
+	return nil
+}
 
 func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr string) error {
 	index := strings.Index(listenAddr, "://")
@@ -53,8 +122,10 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 
 	peerAddrs := make([]string, 0)
 	networkProtocol := common.DSP_NETWORK_PROTOCOL
+	selfAddr := ""
 	if this.Network != nil {
 		networkProtocol = this.Network.Protocol()
+		selfAddr = this.Network.ExternalAddr()
 	}
 	for _, trackerUrl := range trackerUrls {
 		peers := tracker.GetTorrentPeers(hashBytes, trackerUrl, -1, 1)
@@ -63,6 +134,9 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 		}
 		for _, p := range peers {
 			addr := fmt.Sprintf("%s://%s:%d", networkProtocol, p.IP, p.Port)
+			if addr == selfAddr {
+				continue
+			}
 			peerAddrs = append(peerAddrs, addr)
 		}
 		break
@@ -74,7 +148,7 @@ func (this *Dsp) StartSeedService() {
 	tick := time.NewTicker(time.Duration(this.Config.SeedInterval) * time.Second)
 	for {
 		<-tick.C
-		if len(this.Config.TrackerUrls) == 0 {
+		if len(this.TrackerUrls) == 0 {
 			continue
 		}
 		files := make([]string, 0)
@@ -98,7 +172,7 @@ func (this *Dsp) StartSeedService() {
 			continue
 		}
 		for _, fileHashStr := range files {
-			this.PushToTrackers(fileHashStr, this.Config.TrackerUrls, this.Network.ListenAddr())
+			this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
 		}
 	}
 }
@@ -148,4 +222,23 @@ func (this *Dsp) GetFileHashFromUrl(url string) string {
 		return ""
 	}
 	return utils.GetFileHashFromLink(link)
+}
+
+// GetExternalIP. get external ip of wallet from dns nodes
+func (this *Dsp) GetExternalIP(walletAddr string) string {
+	test := make(map[string]string, 0)
+	test["AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS"] = "tcp://127.0.0.1:13001"
+	test["AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c"] = "tcp://127.0.0.1:13002"
+	test["AGeTrARjozPVLhuzMxZq36THMtvsrZNAHq"] = "tcp://127.0.0.1:13003"
+	test["ANa3f9jm2FkWu4NrVn6L1FGu7zadKdvPjL"] = "tcp://127.0.0.1:13004"
+	test["ANy4eS6oQaX15xpGV7dvsinh2aiqPm9HDf"] = "tcp://127.0.0.1:13005"
+	return test[walletAddr]
+}
+
+// SetupPartnerHost. setup host addr for partners
+func (this *Dsp) SetupPartnerHost(partners []string) {
+	for _, addr := range partners {
+		host := this.GetExternalIP(addr)
+		this.Channel.SetHostAddr(addr, host)
+	}
 }

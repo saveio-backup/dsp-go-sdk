@@ -37,6 +37,11 @@ func (this *Network) ListenAddr() string {
 	return this.listenAddr
 }
 
+// external address
+func (this *Network) ExternalAddr() string {
+	return this.listenAddr
+}
+
 func (this *Network) Protocol() string {
 	idx := strings.Index(this.listenAddr, "://")
 	if idx == -1 {
@@ -77,6 +82,41 @@ func (this *Network) Halt() error {
 	}
 	this.net.Close()
 	return nil
+}
+
+func (this *Network) Dial(addr string) error {
+	if this.net == nil {
+		return errors.New("network is nil")
+	}
+	_, err := this.net.Dial(addr)
+	return err
+}
+
+func (this *Network) Disconnect(addr string) error {
+	if this.net == nil {
+		return errors.New("network is nil")
+	}
+	peer, err := this.net.Client(addr)
+	if err != nil {
+		return err
+	}
+	return peer.Close()
+}
+
+// IsPeerListenning. check the peer is listening or not.
+func (this *Network) IsPeerListenning(addr string) bool {
+	if this.net == nil {
+		return false
+	}
+	err := this.Dial(addr)
+	if err != nil {
+		return false
+	}
+	err = this.Disconnect(addr)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (this *Network) IsConnectionExists(addr string) bool {

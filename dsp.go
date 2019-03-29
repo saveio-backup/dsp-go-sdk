@@ -1,6 +1,8 @@
 package dsp
 
 import (
+	"time"
+
 	"github.com/oniio/dsp-go-sdk/channel"
 	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/config"
@@ -14,12 +16,14 @@ import (
 )
 
 type Dsp struct {
-	Config  *config.DspConfig
-	Chain   *chain.Chain
-	Network *network.Network
-	Fs      *fs.Fs
-	Channel *channel.Channel
-	taskMgr *task.TaskMgr
+	Config      *config.DspConfig
+	Chain       *chain.Chain
+	Network     *network.Network
+	Fs          *fs.Fs
+	Channel     *channel.Channel
+	TrackerUrls []string
+	DNSNode     *DNSNodeInfo
+	taskMgr     *task.TaskMgr
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
@@ -61,8 +65,8 @@ func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
 			return nil
 		}
 		if dbstore != nil {
-			paymentDB := store.NewPaymentDB(dbstore)
-			d.Channel.SetPaymentDB(paymentDB)
+			channelDB := store.NewChannelDB(dbstore)
+			d.Channel.SetChannelDB(channelDB)
 		}
 	}
 	return d
@@ -75,14 +79,20 @@ func (this *Dsp) GetVersion() string {
 func (this *Dsp) Start(addr string) error {
 	this.Network = network.NewNetwork(addr, this.Receive)
 	this.Network.Start()
+	if this.Config == nil {
+		return nil
+	}
 	if this.Channel != nil {
+		this.SetupPartnerHost(this.Channel.GetAllPartners())
 		err := this.Channel.StartService()
 		if err != nil {
 			return err
 		}
-	}
-	if this.Config == nil {
-		return nil
+		time.Sleep(time.Second)
+		err = this.SetupDNSNode()
+		if err != nil {
+			return err
+		}
 	}
 	if this.Config.SeedInterval > 0 {
 		go this.StartSeedService()
