@@ -93,6 +93,7 @@ func (this *Dsp) Start(addr string) error {
 		if err != nil {
 			return err
 		}
+		this.Channel.OverridePartners()
 	}
 	if this.Config.SeedInterval > 0 {
 		go this.StartSeedService()

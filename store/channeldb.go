@@ -60,6 +60,7 @@ func (this *ChannelDB) RemovePayment(paymentId int32) error {
 	return this.db.Delete(key)
 }
 
+// AddPartner. add partner to localDB.  walletAddr <=> map[partnerAddr]struct{}
 func (this *ChannelDB) AddPartner(walletAddr, partnerAddr string) error {
 	key := []byte(fmt.Sprintf("channel:%s", walletAddr))
 	value, _ := this.db.Get(key)
@@ -117,4 +118,17 @@ func (this *ChannelDB) GetPartners(walletAddr string) ([]string, error) {
 		ps = append(ps, addr)
 	}
 	return ps, nil
+}
+
+func (this *ChannelDB) OverridePartners(walletAddr string, partnerAddrs []string) error {
+	key := []byte(fmt.Sprintf("channel:%s", walletAddr))
+	partners := make(map[string]struct{}, 0)
+	for _, addr := range partnerAddrs {
+		partners[addr] = struct{}{}
+	}
+	data, err := json.Marshal(partners)
+	if err != nil {
+		return err
+	}
+	return this.db.Put(key, data)
 }

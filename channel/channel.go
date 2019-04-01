@@ -82,6 +82,17 @@ func (this *Channel) GetAllPartners() []string {
 	return partners
 }
 
+// OverridePartners. override local partners with neighbours from channel
+func (this *Channel) OverridePartners() error {
+	newPartners := make([]string, 0)
+	neighbours := transfer.GetNeighbours(this.channel.Service.StateFromChannel())
+	for _, v := range neighbours {
+		newPartners = append(newPartners, common.ToBase58(v))
+	}
+	log.Debugf("override new partners %v\n", newPartners)
+	return this.channelDB.OverridePartners(this.walletAddr, newPartners)
+}
+
 // WaitForConnected. wait for conected for a period.
 func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) error {
 	interval := time.Duration(dspcom.CHECK_CHANNEL_STATE_INTERVAL) * time.Second

@@ -289,6 +289,9 @@ func (this *Dsp) StartShareServices() {
 // maxPeeCnt: download with max number peers with min price
 func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
 	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
+	if len(addrs) == 0 {
+		log.Debugf("get 0 peer of %s from trackers %v", fileHashStr, this.TrackerUrls)
+	}
 	return this.downloadFileFromPeers(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt, addrs)
 }
 
@@ -412,12 +415,13 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	paymentId := r.Int31()
+	log.Debugf("paying to %s, id %v, err:%s", payInfo.WalletAddress, paymentId, err)
 	err = this.Channel.MediaTransfer(paymentId, amount, payInfo.WalletAddress)
-	log.Debugf("pay to %s, id %v, err:%s", payInfo.WalletAddress, paymentId, err)
 	if err != nil {
+		log.Debugf("payingmentid %d, failed err %s", paymentId, err)
 		return 0, err
 	}
-	log.Debugf("payment id %d, for file:%s, size:%d, price:%d", paymentId, fileHashStr, blockSize, amount)
+	log.Debugf("payment id %d, for file:%s, size:%d, price:%d success", paymentId, fileHashStr, blockSize, amount)
 	// send payment msg
 	msg := message.NewPayment(this.Chain.Native.Fs.DefAcc.Address.ToBase58(), payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)

@@ -65,13 +65,13 @@ func (this *Dsp) SetupDNSNode() error {
 			// TODO: withdraw and close channel
 			continue
 		}
-		bal, _ := this.Channel.GetCurrentBalance(v.WalletAddr.ToBase58())
-		depositAmount := uint64(0)
-		if this.Config.DnsChannelDeposit > bal {
-			depositAmount = this.Config.DnsChannelDeposit - bal
-		}
-		log.Infof("connect to dns node :%s, deposit %d", dnsUrl, depositAmount)
-		err = this.Channel.SetDeposit(v.WalletAddr.ToBase58(), depositAmount)
+		// bal, _ := this.Channel.GetCurrentBalance(v.WalletAddr.ToBase58())
+		// depositAmount := uint64(0)
+		// if this.Config.DnsChannelDeposit > bal {
+		// 	depositAmount = this.Config.DnsChannelDeposit - bal
+		// }
+		log.Infof("connect to dns node :%s, deposit %d", dnsUrl, this.Config.DnsChannelDeposit)
+		err = this.Channel.SetDeposit(v.WalletAddr.ToBase58(), this.Config.DnsChannelDeposit)
 		if err != nil {
 			log.Debugf("deposit result %s", err)
 			// TODO: withdraw and close channel
