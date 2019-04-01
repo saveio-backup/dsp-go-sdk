@@ -12,10 +12,11 @@ const (
 	FILE_OP_DOWNLOAD_ASK = 4  // client ask download file from peers
 	FILE_OP_DOWNLOAD_ACK = 5  // peers send ack to client
 	FILE_OP_DOWNLOAD     = 6  // client send download msg to chosen peers
-	FILE_OP_BACKUP       = 7  // client back up file from peers
-	FILE_OP_BACKUP_ACK   = 8  // client back up file from peers
-	FILE_OP_DELETE       = 9  // client delete file of peers
-	FILE_OP_DELETE_ACK   = 10 // server delete file ack
+	FILE_OP_DOWNLOAD_OK  = 7  // client send download msg to chosen peers
+	FILE_OP_BACKUP       = 8  // client back up file from peers
+	FILE_OP_BACKUP_ACK   = 9  // client back up file from peers
+	FILE_OP_DELETE       = 10 // client delete file of peers
+	FILE_OP_DELETE_ACK   = 11 // server delete file ack
 )
 
 const (

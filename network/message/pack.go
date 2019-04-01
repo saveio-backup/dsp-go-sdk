@@ -175,6 +175,18 @@ func NewFileDownload(hash, walletAddr string, asset int32) *Message {
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
+func NewFileDownloadOk(hash, walletAddr string, asset int32) *Message {
+	f := &file.File{
+		Hash:      hash,
+		Operation: common.FILE_OP_DOWNLOAD_OK,
+		PayInfo: &file.Payment{
+			WalletAddress: walletAddr,
+			Asset:         asset,
+		},
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+}
+
 // NewFileDelete
 func NewFileDelete(hash, walletAddr string) *Message {
 	f := &file.File{

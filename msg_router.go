@@ -189,7 +189,14 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if err != nil {
 			log.Errorf("reply download msg failed, err %s", err)
 		}
-		// TODO: delete tasks finally
+	case netcom.FILE_OP_DOWNLOAD_OK:
+		taskKey := this.taskMgr.TaskKey(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
+		if !this.taskMgr.TaskExist(taskKey) {
+			log.Errorf("share task not exist %s", fileMsg.Hash)
+			return
+		}
+		this.taskMgr.DeleteTask(taskKey)
+		log.Debugf("delete share task of %s", taskKey)
 	default:
 	}
 }

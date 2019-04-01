@@ -875,3 +875,21 @@ func TestGetSetupDNSNodes(t *testing.T) {
 	}
 	fmt.Printf("trackers %v, dns %s:%s\n", d.TrackerUrls, d.DNSNode.WalletAddr, d.DNSNode.ChannelAddr)
 }
+
+func TestGetAllDNSNodes(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	d := NewDsp(dspCfg, nil)
+	nodes, err := d.Chain.Native.Dns.GetAllDnsNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range nodes {
+		fmt.Printf("k=%v, wallet=%v\n", k, v.WalletAddr.ToBase58())
+		fmt.Printf("k=%v, ip=%s\n", k, v.IP)
+		port, _ := strconv.ParseUint(string(v.Port), 10, 64)
+		fmt.Printf("k=%v, port=%d\n", k, port)
+	}
+
+}

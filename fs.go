@@ -506,7 +506,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			return err
 		}
 		if len(hash) == 0 {
-			removeTempFile(fileHashStr)
+			// removeTempFile(fileHashStr)
 			return errors.New("no undownloaded block")
 		}
 		blockIndex := int32(index)
@@ -598,7 +598,11 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			this.taskMgr.SetTaskDone(taskKey, true)
 			break
 		}
-		this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
+		go this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
+		fileDonwloadOkMsg := message.NewFileDownloadOk(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), asset)
+		log.Debugf("broad file donwload ok cast msg to %v", addrs)
+		go this.Network.Broadcast(addrs, fileDonwloadOkMsg, false, nil, nil)
+
 		if len(decryptPwd) > 0 {
 			return this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
 		}
@@ -1023,12 +1027,12 @@ func uploadOptValid(filePath string, opt *common.UploadOption) error {
 
 // createDownloadFile. create file handler for write downloading file
 func createDownloadFile(dir, fileName string) (*os.File, error) {
-	if _, err := os.Stat(common.DOWNLOAD_FILE_TEMP_DIR_PATH); os.IsNotExist(err) {
-		err = os.MkdirAll(common.DOWNLOAD_FILE_TEMP_DIR_PATH, 0755)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// if _, err := os.Stat(common.DOWNLOAD_FILE_TEMP_DIR_PATH); os.IsNotExist(err) {
+	// 	err = os.MkdirAll(common.DOWNLOAD_FILE_TEMP_DIR_PATH, 0755)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		err = os.MkdirAll(dir, 0755)
 		if err != nil {
@@ -1045,5 +1049,5 @@ func createDownloadFile(dir, fileName string) (*os.File, error) {
 
 // removeTempFile. remove the temp download file
 func removeTempFile(fileName string) {
-	os.Remove(common.DOWNLOAD_FILE_TEMP_DIR_PATH + "/" + fileName)
+	// os.Remove(common.DOWNLOAD_FILE_TEMP_DIR_PATH + "/" + fileName)
 }
