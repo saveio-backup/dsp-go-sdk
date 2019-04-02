@@ -212,7 +212,11 @@ func (this *Channel) GetTargetBalance(targetAddress string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if this.channel.Service.Wal == nil {
+		return 0, errors.New("channel sqlite init failed")
+	}
 	chainState := this.channel.Service.StateFromChannel()
+
 	channelState := transfer.GetChannelStateFor(chainState, common.PaymentNetworkID(common.Address(utils.MicroPayContractAddress)),
 		common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS), common.Address(target))
 	if channelState == nil {
@@ -269,6 +273,16 @@ func (this *Channel) Withdraw(targetAddress string, amount uint64) (bool, error)
 	case <-time.After(time.Duration(dspcom.CHANNEL_WITHDRAW_TIMEOUT) * time.Second):
 		return false, errors.New("withdraw timeout")
 	}
+}
+
+// CooperativeSettle. settle channel cooperatively
+func (this *Channel) CooperativeSettle(targetAddress string) error {
+	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
+	target, err := chaincomm.AddressFromBase58(targetAddress)
+	if err != nil {
+		return err
+	}
+	return this.channel.Service.ChannelCooperativeSettle(token, common.Address(target))
 }
 
 // SetUnitPrices

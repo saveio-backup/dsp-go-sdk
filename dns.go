@@ -49,7 +49,7 @@ func (this *Dsp) SetupDNSNode() error {
 			continue
 		}
 		dnsUrl := fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
-		if !this.Network.IsPeerListenning(dnsUrl) {
+		if this.Network != nil && !this.Network.IsPeerListenning(dnsUrl) {
 			continue
 		}
 		log.Debugf("open channel set addr %s-%s", v.WalletAddr.ToBase58(), dnsUrl)

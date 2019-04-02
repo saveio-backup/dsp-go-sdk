@@ -1,6 +1,7 @@
 package dsp
 
 import (
+	"errors"
 	"time"
 
 	"github.com/oniio/dsp-go-sdk/channel"
@@ -83,17 +84,14 @@ func (this *Dsp) Start(addr string) error {
 		return nil
 	}
 	if this.Channel != nil {
-		this.SetupPartnerHost(this.Channel.GetAllPartners())
-		err := this.Channel.StartService()
+		err := this.StartChannelService()
 		if err != nil {
 			return err
 		}
-		time.Sleep(time.Second)
 		err = this.SetupDNSNode()
 		if err != nil {
 			return err
 		}
-		this.Channel.OverridePartners()
 	}
 	if this.Config.SeedInterval > 0 {
 		go this.StartSeedService()
@@ -101,6 +99,20 @@ func (this *Dsp) Start(addr string) error {
 	if this.Config.FsType == config.FS_BLOCKSTORE {
 		go this.StartBackupFileService()
 	}
+	return nil
+}
+
+func (this *Dsp) StartChannelService() error {
+	if this.Channel == nil {
+		return errors.New("channel is nil")
+	}
+	this.SetupPartnerHost(this.Channel.GetAllPartners())
+	err := this.Channel.StartService()
+	if err != nil {
+		return err
+	}
+	time.Sleep(time.Second)
+	this.Channel.OverridePartners()
 	return nil
 }
 
