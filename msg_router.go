@@ -197,6 +197,10 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		}
 		this.taskMgr.DeleteTask(taskKey)
 		log.Debugf("delete share task of %s", taskKey)
+		err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply download msg failed, err %s", err)
+		}
 	default:
 	}
 }

@@ -605,8 +605,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		go this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
 		fileDonwloadOkMsg := message.NewFileDownloadOk(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), asset)
 		log.Debugf("broad file donwload ok cast msg to %v", addrs)
-		go this.Network.Broadcast(addrs, fileDonwloadOkMsg, false, nil, nil)
-
+		this.Network.Broadcast(addrs, fileDonwloadOkMsg, true, nil, nil)
 		if len(decryptPwd) > 0 {
 			return this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
 		}
