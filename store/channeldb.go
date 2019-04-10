@@ -18,6 +18,10 @@ func NewChannelDB(d *LevelDBStore) *ChannelDB {
 	return p
 }
 
+func (this *ChannelDB) Close() {
+	this.db.Close()
+}
+
 // AddPayment. put payment info to db
 func (this *ChannelDB) AddPayment(walletAddr string, paymentId int32, amount uint64) error {
 	key := []byte(fmt.Sprintf("payment:%d", paymentId))

@@ -6,6 +6,9 @@ import (
 
 // SetUnitPriceForAllFile. set unit price for block sharing for all files
 func (this *Dsp) SetUnitPriceForAllFile(asset int32, price uint64) {
+	if this.Channel == nil {
+		return
+	}
 	this.Channel.SetUnitPrices(asset, price)
 }
 

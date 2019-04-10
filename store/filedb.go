@@ -68,6 +68,10 @@ func NewFileDB(db *LevelDBStore) *FileDB {
 	}
 }
 
+func (this *FileDB) Close() error {
+	return this.db.Close()
+}
+
 // PutFileUploadInfo. put info when upload file
 func (this *FileDB) PutFileUploadInfo(tx, fileInfoKey string, provePrivKey []byte) error {
 	key := []byte(fileInfoKey)

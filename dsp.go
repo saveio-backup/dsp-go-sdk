@@ -58,7 +58,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
 			return nil
 		}
 	}
-	if len(c.ChannelListenAddr) > 0 {
+	if len(c.ChannelListenAddr) > 0 && acc != nil {
 		var err error
 		d.Channel, err = channel.NewChannelService(c, d.Chain)
 		if err != nil {
@@ -116,8 +116,31 @@ func (this *Dsp) StartChannelService() error {
 	return nil
 }
 
-func (this *Dsp) Stop() {
+func (this *Dsp) Stop() error {
+	if this.taskMgr.FileDB != nil {
+		err := this.taskMgr.FileDB.Close()
+		if err != nil {
+			log.Errorf("close fileDB err %s", err)
+			return err
+		}
+	}
 	if this.Channel != nil {
 		this.Channel.StopService()
 	}
+	if this.Fs != nil {
+		err := this.Fs.Close()
+		if err != nil {
+			log.Errorf("close fs err %s", err)
+			return err
+		}
+	}
+	if this.Network != nil {
+		err := this.Network.Halt()
+		if err != nil {
+			log.Errorf("close dsp p2p err %s", err)
+			return err
+		}
+	}
+
+	return nil
 }

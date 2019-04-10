@@ -5,13 +5,18 @@ import (
 	"fmt"
 
 	"github.com/oniio/dsp-go-sdk/config"
+	"github.com/oniio/oniChain/account"
 	chainCom "github.com/oniio/oniChain/common"
 	fs "github.com/oniio/oniChain/smartcontract/service/native/onifs"
 )
 
+func (this *Dsp) CurrentAccount() *account.Account {
+	return this.Chain.Native.Fs.DefAcc
+}
+
 // WalletAddress. get base58 address
 func (this *Dsp) WalletAddress() string {
-	return this.Chain.Native.Fs.DefAcc.Address.ToBase58()
+	return this.CurrentAccount().Address.ToBase58()
 }
 
 // RegisterNode. register node to chain
@@ -111,4 +116,39 @@ func (this *Dsp) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
 		}
 	}
 	return false
+}
+
+// GetUserSpace. get user space of client
+func (this *Dsp) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
+	address, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return nil, err
+	}
+	return this.Chain.Native.Fs.GetUserSpace(address)
+}
+
+func (this *Dsp) AddUserSpace(walletAddr string, size, blockCount uint64) (string, error) {
+	address, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return "", err
+	}
+	txHash, err := this.Chain.Native.Fs.AddUserSpace(address, size, blockCount)
+	if err != nil {
+		return "", err
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
+}
+
+func (this *Dsp) RevokeUserSpace(walletAddr string, size, blockCount uint64) (string, error) {
+	address, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return "", err
+	}
+	txHash, err := this.Chain.Native.Fs.RevokeUserSpace(address, size, blockCount)
+	if err != nil {
+		return "", err
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
 }

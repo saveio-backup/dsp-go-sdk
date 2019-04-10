@@ -9,6 +9,7 @@ import (
 	"github.com/oniio/dsp-go-sdk/store"
 	sdk "github.com/oniio/oniChain-go-sdk"
 	"github.com/oniio/oniChain-go-sdk/usdt"
+	cmdutils "github.com/oniio/oniChain/cmd/utils"
 	chaincomm "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/smartcontract/service/native/utils"
@@ -23,6 +24,15 @@ type Channel struct {
 	unitPrices map[int32]uint64
 	channelDB  *store.ChannelDB
 	walletAddr string
+}
+
+type ChannelInfo struct {
+	ChannelId     uint32
+	Balance       uint64
+	BalanceFormat string
+	Address       string
+	HostAddr      string
+	TokenAddr     string
 }
 
 func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error) {
@@ -69,6 +79,8 @@ func (this *Channel) StartService() error {
 }
 
 func (this *Channel) StopService() {
+	this.channel.Stop()
+	this.channelDB.Close()
 	close(this.closeCh)
 }
 
@@ -317,6 +329,35 @@ func (this *Channel) GetPayment(paymentId int32) (*store.Payment, error) {
 
 func (this *Channel) DeletePayment(paymentId int32) error {
 	return this.channelDB.RemovePayment(paymentId)
+}
+
+func (this *Channel) AllChannels() []*ChannelInfo {
+	allPartners := this.GetAllPartners()
+	infos := make([]*ChannelInfo, 0)
+	for _, partner := range allPartners {
+		partnerAddress, err := chaincomm.AddressFromBase58(partner)
+		if err != nil {
+			continue
+		}
+		bal, err := this.GetTargetBalance(partner)
+		if err != nil {
+			continue
+		}
+		host, err := this.channel.Service.GetHostAddr(common.Address(partnerAddress))
+		if err != nil {
+			continue
+		}
+		info := &ChannelInfo{
+			ChannelId:     uint32(this.channel.Service.GetChannelIdentifier(common.Address(partnerAddress))),
+			Address:       partner,
+			Balance:       bal,
+			BalanceFormat: cmdutils.FormatUsdt(bal),
+			HostAddr:      host,
+			TokenAddr:     usdt.USDT_CONTRACT_ADDRESS.ToBase58(),
+		}
+		infos = append(infos, info)
+	}
+	return infos
 }
 
 // registerReceiveNotification. register receive payment notification

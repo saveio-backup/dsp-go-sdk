@@ -86,3 +86,8 @@ func (self *LevelDBStore) QueryStringKeysByPrefix(prefix []byte) ([]string, erro
 	}
 	return keys, nil
 }
+
+//Close close leveldb
+func (self *LevelDBStore) Close() error {
+	return self.db.Close()
+}

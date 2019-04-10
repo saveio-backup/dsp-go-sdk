@@ -52,6 +52,10 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 	}, nil
 }
 
+func (this *Fs) Close() error {
+	return this.fs.Close()
+}
+
 func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) (ipld.Node, []*helpers.UnixfsNode, error) {
 	root, list, err := this.fs.NodesFromFile(fileName, filePrefix, encrypt, password)
 	if err != nil {
