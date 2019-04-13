@@ -1,14 +1,14 @@
 package common
 
 const (
-	CHUNK_SIZE                  = 256 * 1024 // chunk size
-	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"   // download temp file path
-	FILE_HASH_LEN               = 46         // file hash length
-	FILE_URL_CUSTOM_HEADER      = "dsp"      // file url custom header
-	FILE_DOWNLOAD_UNIT_PRICE    = 1          // unit price for all file
-	DSP_NETWORK_PROTOCOL        = "tcp"      // default dsp network protocol
-	TRACKER_PORT                = 6369       // tracker default port
-	TRACKER_NETWORK_PROTOCOL    = "udp"      // tracker network protocol
+	CHUNK_SIZE                  = 256 * 1024      // chunk size
+	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"        // download temp file path
+	FILE_HASH_LEN               = 46              // file hash length
+	FILE_URL_CUSTOM_HEADER      = "save://share/" // file url custom header
+	FILE_DOWNLOAD_UNIT_PRICE    = 1               // unit price for all file
+	DSP_NETWORK_PROTOCOL        = "tcp"           // default dsp network protocol
+	TRACKER_PORT                = 6369            // tracker default port
+	TRACKER_NETWORK_PROTOCOL    = "udp"           // tracker network protocol
 )
 
 // timeout
@@ -20,8 +20,9 @@ const (
 	CHECK_CHANNEL_STATE_INTERVAL = 3       // check channel state interval
 	WAIT_CHANNEL_CONNECT_TIMEOUT = 10      // wait for channel connected
 	FILE_DNS_TTL                 = 10 * 60 //10m
-	CHANNEL_TRANSFER_TIMEOUT     = 60      // 60s
-	CHANNEL_WITHDRAW_TIMEOUT     = 60      // 60s
+	// CHANNEL_TRANSFER_TIMEOUT     = 60      // 60s
+	CHANNEL_TRANSFER_TIMEOUT = 20 // 60s
+	CHANNEL_WITHDRAW_TIMEOUT = 60 // 60s
 )
 
 const (

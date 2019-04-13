@@ -40,6 +40,7 @@ type BlockResp struct {
 }
 
 type ProgressInfo struct {
+	Type     TaskType          //task type
 	FileName string            // file name
 	FileHash string            // file hash
 	Total    uint64            // total file's blocks count
@@ -324,6 +325,7 @@ func (this *TaskMgr) EmitProgress(taskKey string) {
 	switch v.taskType {
 	case TaskTypeUpload:
 		this.progress <- &ProgressInfo{
+			Type:     v.taskType,
 			FileName: v.fileName,
 			FileHash: v.fileHash,
 			Total:    v.total,
@@ -331,6 +333,7 @@ func (this *TaskMgr) EmitProgress(taskKey string) {
 		}
 	case TaskTypeDownload:
 		this.progress <- &ProgressInfo{
+			Type:     v.taskType,
 			FileHash: v.fileHash,
 			Total:    v.total,
 			Count:    this.FileProgress(taskKey),

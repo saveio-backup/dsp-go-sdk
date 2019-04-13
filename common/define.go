@@ -11,6 +11,8 @@ type UploadOption struct {
 	RegisterDns     bool
 	BindDns         bool
 	DnsUrl          string
+	WhiteList       []string
+	Share           bool
 }
 
 type UploadResult struct {

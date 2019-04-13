@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/oniio/dsp-go-sdk/common"
@@ -188,6 +190,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		dnsBindTx, err = this.BindFileUrl(opt.DnsUrl, oniLink)
 		log.Debugf("bind dns %s, err %s", dnsBindTx, err)
 	}
+	log.Debug("upload success!!")
 	return &common.UploadResult{
 		Tx:            tx,
 		FileHash:      fileHashStr,
@@ -235,6 +238,25 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 		log.Errorf("delete upload info from db err: %s", err)
 	}
 	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
+}
+
+func (this *Dsp) Progress() {
+	this.RegProgressChannel()
+	go func() {
+		stop := false
+		for {
+			v := <-this.ProgressChannel()
+			for node, cnt := range v.Count {
+				log.Infof("file:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
+				stop = (cnt == v.Total)
+			}
+			if stop {
+				break
+			}
+		}
+		// TODO: why need close
+		this.CloseProgressChannel()
+	}()
 }
 
 func (this *Dsp) StartShareServices() {
@@ -694,6 +716,32 @@ func (this *Dsp) StartBackupFileService() {
 			backupingCnt = 0
 		}
 	}
+}
+
+// AllDownloadFiles. get all downloaded file names
+func (this *Dsp) AllDownloadFiles() []string {
+	files := make([]string, 0)
+	switch this.Config.FsType {
+	case config.FS_FILESTORE:
+		fileInfos, err := ioutil.ReadDir(this.Config.FsFileRoot)
+		if err != nil || len(fileInfos) == 0 {
+			return files
+		}
+		for _, info := range fileInfos {
+			if info.IsDir() ||
+				(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
+				continue
+			}
+			files = append(files, info.Name())
+		}
+	case config.FS_BLOCKSTORE:
+		files, _ = this.taskMgr.AllDownloadFiles()
+	}
+	return files
+}
+
+func (this *Dsp) FileInfo(fileInfoKey string) {
+
 }
 
 // downloadFileFromPeers. downloadfile base methods. download file from peers.

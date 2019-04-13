@@ -697,7 +697,7 @@ func TestGetPeersFromTracker(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	peers := d.GetPeerFromTracker("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", []string{"udp://127.0.0.1:6369/announce"})
+	peers := d.GetPeerFromTracker("QmNZrZcmMC1tkF8jsp2Ze73HY1aLXcr3uHXUFJZNLmVECG", []string{"udp://127.0.0.1:6369/announce"})
 	fmt.Printf("peers %v\n", peers)
 }
 
@@ -771,6 +771,30 @@ func TestInitDnsSC(t *testing.T) {
 	fmt.Printf("hash :%v\n", tx)
 }
 
+func TestRegisterHeader(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr: rpcAddr,
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	hash, err := d.Chain.Native.Dns.RegisterHeader("save", "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("hash: %s\n", hash)
+}
+
 func TestRegisterDns(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
@@ -788,7 +812,7 @@ func TestRegisterDns(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	hash, err := d.RegisterFileUrl("dsp://file1", "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123")
+	hash, err := d.RegisterFileUrl("save://share/123123", "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -812,7 +836,7 @@ func TestBindDns(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	hash, err := d.BindFileUrl("dsp://ok.com", "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123")
+	hash, err := d.BindFileUrl("save://share/123123", "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123")
 	if err != nil {
 		t.Fatal(err)
 	}

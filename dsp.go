@@ -99,6 +99,16 @@ func (this *Dsp) Start(addr string) error {
 	if this.Config.FsType == config.FS_BLOCKSTORE {
 		go this.StartBackupFileService()
 	}
+
+	// if addr == "tcp://127.0.0.1:14003" {
+	// 	log.Debugf("Test MT")
+	// 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	// 	paymentId := r.Int31()
+	// 	target := "AMkN2sRQyT3qHZQqwEycHCX2ezdZNpXNdJ"
+	// 	this.Channel.SetHostAddr(target, this.GetExternalIP(target))
+	// 	err := this.Channel.MediaTransfer(paymentId, 1, target)
+	// 	log.Errorf("Media Transfer Error %s", err)
+	// }
 	return nil
 }
 

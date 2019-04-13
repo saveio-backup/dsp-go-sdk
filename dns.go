@@ -40,6 +40,7 @@ func (this *Dsp) SetupDNSNode() error {
 		this.TrackerUrls = make([]string, 0)
 	}
 	for _, v := range ns {
+		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
 		if len(this.TrackerUrls) >= maxTrackerNum {
 			break
 		}
@@ -85,6 +86,7 @@ func (this *Dsp) SetupDNSNode() error {
 		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
 		this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
 	}
+	log.Debugf("this.TrackerUrls len %d", len(this.TrackerUrls))
 	return nil
 }
 
@@ -179,7 +181,7 @@ func (this *Dsp) StartSeedService() {
 }
 
 func (this *Dsp) RegisterFileUrl(url, link string) (string, error) {
-	urlPrefix := fmt.Sprintf("%s://", common.FILE_URL_CUSTOM_HEADER)
+	urlPrefix := this.Chain.Native.Dns.GetCustomUrlHeader()
 	if !strings.HasPrefix(url, urlPrefix) {
 		return "", fmt.Errorf("url should start with %s", urlPrefix)
 	}
@@ -233,11 +235,17 @@ func (this *Dsp) GetExternalIP(walletAddr string) string {
 	test["AGeTrARjozPVLhuzMxZq36THMtvsrZNAHq"] = "tcp://127.0.0.1:13003"
 	test["ANa3f9jm2FkWu4NrVn6L1FGu7zadKdvPjL"] = "tcp://127.0.0.1:13004"
 	test["ANy4eS6oQaX15xpGV7dvsinh2aiqPm9HDf"] = "tcp://127.0.0.1:13005"
+	test["AJtzEUDLzsRKbHC1Tfc1oNh8a1edpnVAUf"] = "tcp://127.0.0.1:13008"
+	test["AMkN2sRQyT3qHZQqwEycHCX2ezdZNpXNdJ"] = "tcp://127.0.0.1:13001"
+	test["AWpW2ukMkgkgRKtwWxC3viXEX8ijLio2Ng"] = "tcp://127.0.0.1:13003"
+	test["AKTfgYTAEzGG5FXsM8HHc8M3j95N495TBP"] = "tcp://127.0.0.1:13003"
+	test["AGGTaoJ8Ygim7zVi5ZZqrXy8EQqgNQJxYx"] = "tcp://127.0.0.1:13001"
 	return test[walletAddr]
 }
 
 // SetupPartnerHost. setup host addr for partners
 func (this *Dsp) SetupPartnerHost(partners []string) {
+	log.Debugf("partners %v\n", partners)
 	for _, addr := range partners {
 		host := this.GetExternalIP(addr)
 		this.Channel.SetHostAddr(addr, host)
