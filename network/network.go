@@ -120,6 +120,9 @@ func (this *Network) IsPeerListenning(addr string) bool {
 }
 
 func (this *Network) IsConnectionExists(addr string) bool {
+	if this.net == nil {
+		return false
+	}
 	return this.net.ConnectionStateExists(addr)
 }
 
@@ -174,6 +177,7 @@ func (this *Network) Broadcast(addrs []string, msg *message.Message, needReply b
 		wg.Add(1)
 		go func(to string) {
 			defer wg.Done()
+			log.Debugf("broadcast check is exists to %s", to)
 			if !this.IsConnectionExists(to) {
 				err := this.Connect(to)
 				if err != nil {

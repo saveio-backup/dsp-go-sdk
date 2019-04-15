@@ -79,7 +79,10 @@ func (this *Dsp) GetVersion() string {
 
 func (this *Dsp) Start(addr string) error {
 	this.Network = network.NewNetwork(addr, this.Receive)
-	this.Network.Start()
+	err := this.Network.Start()
+	if err != nil {
+		return err
+	}
 	if this.Config == nil {
 		return nil
 	}

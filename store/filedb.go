@@ -50,7 +50,7 @@ type Payment struct {
 }
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
-type fileInfo struct {
+type FileInfo struct {
 	Tx           string                `json:"tx,omitempty"`
 	Blocks       map[string]*blockInfo `json:"blocks"`
 	BlockHashes  []string              `json:"block_hashes,omitempty"`
@@ -75,12 +75,12 @@ func (this *FileDB) Close() error {
 // PutFileUploadInfo. put info when upload file
 func (this *FileDB) PutFileUploadInfo(tx, fileInfoKey string, provePrivKey []byte) error {
 	key := []byte(fileInfoKey)
-	fi, err := this.getFileInfo(key)
+	fi, err := this.GetFileInfo(key)
 	if err != nil {
 		return err
 	}
 	if fi == nil {
-		fi = &fileInfo{}
+		fi = &FileInfo{}
 	}
 	fi.Tx = tx
 	fi.ProvePrivKey = provePrivKey
@@ -95,7 +95,7 @@ func (this *FileDB) DeleteFileUploadInfo(fileInfoKey string) error {
 
 // AddUploadedBlock. add a uploaded block into db
 func (this *FileDB) AddUploadedBlock(fileInfoKey, blockHashStr, nodeAddr string, index uint32) error {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (this *FileDB) AddUploadedBlock(fileInfoKey, blockHashStr, nodeAddr string,
 
 // IsBlockUploaded. check if a block is uploaded
 func (this *FileDB) IsBlockUploaded(fileinfoKey, blockHashStr, nodeAddr string, index uint32) bool {
-	fi, err := this.getFileInfo([]byte(fileinfoKey))
+	fi, err := this.GetFileInfo([]byte(fileinfoKey))
 	if err != nil || fi == nil {
 		return false
 	}
@@ -144,7 +144,7 @@ func (this *FileDB) IsBlockUploaded(fileinfoKey, blockHashStr, nodeAddr string, 
 
 // GetUploadedBlockNodeList. get uploaded block nodelist
 func (this *FileDB) GetUploadedBlockNodeList(fileinfoKey, blockHashStr string, index uint32) []string {
-	fi, err := this.getFileInfo([]byte(fileinfoKey))
+	fi, err := this.GetFileInfo([]byte(fileinfoKey))
 	if err != nil || fi == nil {
 		return nil
 	}
@@ -158,7 +158,7 @@ func (this *FileDB) GetUploadedBlockNodeList(fileinfoKey, blockHashStr string, i
 
 // GetFileProvePrivKey
 func (this *FileDB) GetFileProvePrivKey(fileInfoKey string) []byte {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return nil
 	}
@@ -167,7 +167,7 @@ func (this *FileDB) GetFileProvePrivKey(fileInfoKey string) []byte {
 
 // GetStoreFileTx
 func (this *FileDB) GetStoreFileTx(fileInfoKey string) string {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return ""
 	}
@@ -176,7 +176,7 @@ func (this *FileDB) GetStoreFileTx(fileInfoKey string) string {
 
 // UploadedBlockCount
 func (this *FileDB) UploadedBlockCount(fileInfoKey string) int {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return 0
 	}
@@ -185,7 +185,7 @@ func (this *FileDB) UploadedBlockCount(fileInfoKey string) int {
 
 // AddFileBlockHashes add all blocks' hash, using for detect whether the node has stored the file
 func (this *FileDB) AddFileBlockHashes(fileInfoKey string, blocks []string) error {
-	fi := &fileInfo{
+	fi := &FileInfo{
 		BlockHashes: blocks,
 		Blocks:      make(map[string]*blockInfo, 0),
 	}
@@ -194,7 +194,7 @@ func (this *FileDB) AddFileBlockHashes(fileInfoKey string, blocks []string) erro
 
 // AddFilePrefix add file prefix
 func (this *FileDB) AddFilePrefix(fileInfoKey, prefix string) error {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (this *FileDB) DeleteDownloadFileUnpaid(fileInfoKey, walletAddress string, 
 
 // IsDownloadInfoExist return a file is exist or not
 func (this *FileDB) IsDownloadInfoExist(fileInfoKey string) bool {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return false
 	}
@@ -221,7 +221,7 @@ func (this *FileDB) IsDownloadInfoExist(fileInfoKey string) bool {
 
 // FileBlockHashes. return file block hashes
 func (this *FileDB) FileBlockHashes(fileInfoKey string) []string {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return nil
 	}
@@ -230,7 +230,7 @@ func (this *FileDB) FileBlockHashes(fileInfoKey string) []string {
 
 // FilePrefix. return file prefix
 func (this *FileDB) FilePrefix(fileInfoKey string) string {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return ""
 	}
@@ -239,7 +239,7 @@ func (this *FileDB) FilePrefix(fileInfoKey string) string {
 
 // FileProgress. return each node count progress
 func (this *FileDB) FileProgress(fileInfoKey string) map[string]uint64 {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return nil
 	}
@@ -248,7 +248,7 @@ func (this *FileDB) FileProgress(fileInfoKey string) map[string]uint64 {
 
 //  SetBlockStored set the flag of store state
 func (this *FileDB) SetBlockDownloaded(fileInfoKey, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func (this *FileDB) SetBlockDownloaded(fileInfoKey, blockHashStr, nodeAddr strin
 
 //  IsBlockDownloaded
 func (this *FileDB) IsBlockDownloaded(fileInfoKey, blockHashStr string, index uint32) bool {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return false
 	}
@@ -290,7 +290,7 @@ func (this *FileDB) IsBlockDownloaded(fileInfoKey, blockHashStr string, index ui
 
 //  BlockOffset
 func (this *FileDB) BlockOffset(fileInfoKey, blockHashStr string, index uint32) (uint64, error) {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return 0, errors.New("file not found")
 	}
@@ -304,7 +304,7 @@ func (this *FileDB) BlockOffset(fileInfoKey, blockHashStr string, index uint32) 
 
 // IsFileDownloaded check if a downloaded file task has finished storing all blocks
 func (this *FileDB) IsFileDownloaded(fileInfoKey string) bool {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return false
 	}
@@ -313,7 +313,7 @@ func (this *FileDB) IsFileDownloaded(fileInfoKey string) bool {
 
 // GetUndownloadedBlockInfo. check undownloaded block in-order
 func (this *FileDB) GetUndownloadedBlockInfo(fileInfoKey, rootBlockHash string) (string, uint32, error) {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return "", 0, errors.New("file not found")
 	}
@@ -375,7 +375,7 @@ func (this *FileDB) AllDownloadFiles() ([]string, error) {
 }
 
 func (this *FileDB) NewFileShareInfo(fileInfoKey string) error {
-	fi := &fileInfo{
+	fi := &FileInfo{
 		Unpaid:  make(map[string]*Payment, 0),
 		ShareTo: make(map[string]struct{}, 0),
 	}
@@ -383,7 +383,7 @@ func (this *FileDB) NewFileShareInfo(fileInfoKey string) error {
 }
 
 func (this *FileDB) IsShareInfoExists(fileInfoKey string) bool {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return false
 	}
@@ -391,7 +391,7 @@ func (this *FileDB) IsShareInfoExists(fileInfoKey string) bool {
 }
 
 func (this *FileDB) AddShareTo(fileInfoKey, walletAddress string) error {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return errors.New("file info not found")
 	}
@@ -408,7 +408,7 @@ func (this *FileDB) DeleteShareFileUnpaid(fileInfoKey, walletAddress string, ass
 }
 
 func (this *FileDB) CanShareTo(fileInfoKey, walletAddress string) (bool, error) {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return false, errors.New("file info not found")
 	}
@@ -428,7 +428,7 @@ func (this *FileDB) DeleteFileShareInfo(fileInfoKey string) error {
 }
 
 // getFileUploadInfo. helper function, get file upload info from db. if fileinfo not found, return (nil, nil)
-func (this *FileDB) getFileInfo(key []byte) (*fileInfo, error) {
+func (this *FileDB) GetFileInfo(key []byte) (*FileInfo, error) {
 	value, err := this.db.Get(key)
 	if err != nil {
 		if err != leveldb.ErrNotFound {
@@ -439,7 +439,7 @@ func (this *FileDB) getFileInfo(key []byte) (*fileInfo, error) {
 		return nil, nil
 	}
 
-	info := &fileInfo{}
+	info := &FileInfo{}
 	err = json.Unmarshal(value, info)
 	if err != nil {
 		return nil, err
@@ -448,7 +448,7 @@ func (this *FileDB) getFileInfo(key []byte) (*fileInfo, error) {
 }
 
 // putFileInfo. helper function, put fileinfo to db
-func (this *FileDB) putFileInfo(key []byte, info *fileInfo) error {
+func (this *FileDB) putFileInfo(key []byte, info *FileInfo) error {
 	buf, err := json.Marshal(info)
 	if err != nil {
 		return err
@@ -457,7 +457,7 @@ func (this *FileDB) putFileInfo(key []byte, info *fileInfo) error {
 }
 
 func (this *FileDB) addFileUnpaid(fileInfoKey, walletAddress string, asset int32, amount uint64) error {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return errors.New("file info not found")
 	}
@@ -473,7 +473,7 @@ func (this *FileDB) addFileUnpaid(fileInfoKey, walletAddress string, asset int32
 }
 
 func (this *FileDB) deleteFileUnpaid(fileInfoKey, walletAddress string, asset int32, amount uint64) error {
-	fi, err := this.getFileInfo([]byte(fileInfoKey))
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return errors.New("file info not found")
 	}

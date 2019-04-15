@@ -17,6 +17,7 @@ import (
 	netcom "github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/oniio/dsp-go-sdk/store"
 	"github.com/oniio/dsp-go-sdk/task"
 	"github.com/oniio/dsp-go-sdk/utils"
 	chainCom "github.com/oniio/oniChain/common"
@@ -647,6 +648,9 @@ func (this *Dsp) DeleteDownloadedFile(fileHashStr string) error {
 
 // RegProgressChannel. register progress channel
 func (this *Dsp) RegProgressChannel() {
+	if this == nil {
+		log.Errorf("this.taskMgr == nil")
+	}
 	this.taskMgr.RegProgressCh()
 }
 
@@ -740,8 +744,10 @@ func (this *Dsp) AllDownloadFiles() []string {
 	return files
 }
 
-func (this *Dsp) FileInfo(fileInfoKey string) {
-
+func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.FileInfo, error) {
+	// my task. use my wallet address
+	fileInfoKey := this.taskMgr.TaskKey(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	return this.taskMgr.GetFileInfo([]byte(fileInfoKey))
 }
 
 // downloadFileFromPeers. downloadfile base methods. download file from peers.
