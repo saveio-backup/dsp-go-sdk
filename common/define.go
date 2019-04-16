@@ -16,11 +16,12 @@ type UploadOption struct {
 }
 
 type UploadResult struct {
-	Tx            string
-	FileHash      string
-	Link          string
-	RegisterDnsTx string
-	BindDnsTx     string
+	Tx             string
+	FileHash       string
+	Link           string
+	RegisterDnsTx  string
+	BindDnsTx      string
+	AddWhiteListTx string
 }
 
 type PayStoreFileReulst struct {

@@ -40,11 +40,14 @@ type BlockResp struct {
 }
 
 type ProgressInfo struct {
+	TaskKey  string
 	Type     TaskType          //task type
 	FileName string            // file name
 	FileHash string            // file hash
 	Total    uint64            // total file's blocks count
 	Count    map[string]uint64 // address <=> count
+	Result   interface{}       // finish result
+	Error    error             // interrupt error
 }
 
 type BackupFileOpt struct {
@@ -56,6 +59,7 @@ type BackupFileOpt struct {
 }
 
 type Task struct {
+	id         string        // id
 	fileHash   string        // task file hash
 	fileName   string        // file name
 	total      uint64        // total blockes count
@@ -322,24 +326,54 @@ func (this *TaskMgr) EmitProgress(taskKey string) {
 	if this.progress == nil {
 		return
 	}
-	switch v.taskType {
-	case TaskTypeUpload:
-		this.progress <- &ProgressInfo{
-			Type:     v.taskType,
-			FileName: v.fileName,
-			FileHash: v.fileHash,
-			Total:    v.total,
-			Count:    this.FileProgress(taskKey),
-		}
-	case TaskTypeDownload:
-		this.progress <- &ProgressInfo{
-			Type:     v.taskType,
-			FileHash: v.fileHash,
-			Total:    v.total,
-			Count:    this.FileProgress(taskKey),
-		}
-	default:
+	pInfo := &ProgressInfo{
+		TaskKey:  taskKey,
+		Type:     v.taskType,
+		FileName: v.fileName,
+		FileHash: v.fileHash,
+		Total:    v.total,
+		Count:    this.FileProgress(taskKey),
 	}
+	this.progress <- pInfo
+}
+
+func (this *TaskMgr) GetTask(taskKey string) *Task {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	v, ok := this.tasks[taskKey]
+	if !ok {
+		return nil
+	}
+	v.id = taskKey
+	return v
+}
+
+// EmitResult. emit result or error async
+func (this *TaskMgr) EmitResult(taskKey string, ret interface{}, err error) {
+	v := this.GetTask(taskKey)
+	if v == nil {
+		return
+	}
+	if this.progress == nil {
+		return
+	}
+	pInfo := &ProgressInfo{
+		TaskKey:  v.id,
+		Type:     v.taskType,
+		FileName: v.fileName,
+		FileHash: v.fileHash,
+		Total:    v.total,
+		Count:    this.FileProgress(v.id),
+	}
+	fmt.Printf("EmitReuslt %t, %t\n", ret != nil, err != nil)
+	if err != nil {
+		pInfo.Error = err
+	} else if ret != nil {
+		pInfo.Result = ret
+	}
+	go func() {
+		this.progress <- pInfo
+	}()
 }
 
 func (this *TaskMgr) NewWorkers(taskKey string, addrs []string, inOrder bool, job jobFunc) {

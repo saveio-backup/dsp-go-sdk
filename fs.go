@@ -25,9 +25,33 @@ import (
 	"github.com/oniio/oniChain/crypto/pdp"
 )
 
-// UploadFile upload file logic
+func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption) (uint64, error) {
+	fee := uint64(0)
+	fi, err := os.Open(filePath)
+	if err != nil {
+		return 0, err
+	}
+	fsSetting, err := this.Chain.Native.Fs.GetSetting()
+	if err != nil {
+		return 0, err
+	}
+	if opt.ProveInterval == 0 && opt.ProveTimes == 0 && opt.CopyNum == 0 {
+		gasPrice := 1000000000 * fsSetting.GasForChallenge
+		fee = gasPrice
+	}
+
+	err = fi.Close()
+	if err != nil {
+		log.Errorf("close file %s err %s", filePath, err)
+	}
+	return fee, nil
+}
+
+// UploadFile upload file logic synchronously
 func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.UploadResult, error) {
-	if err := uploadOptValid(filePath, opt); err != nil {
+	var uploadRet *common.UploadResult
+	var err error
+	if err = uploadOptValid(filePath, opt); err != nil {
 		return nil, err
 	}
 	if this.Chain.Native.Fs.DefAcc == nil {
@@ -42,12 +66,25 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	}
 	fileHashStr = root.Cid().String()
 	taskKey := this.taskMgr.TaskKey(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
+	// emit result
+	defer func() {
+		this.taskMgr.EmitResult(taskKey, uploadRet, err)
+		// delete task from cache in the end
+		this.taskMgr.DeleteTask(taskKey)
+		err = this.taskMgr.DeleteFileUploadInfo(taskKey)
+		if err != nil {
+			log.Errorf("delete file upload info err: %s", err)
+		}
+	}()
 	if this.taskMgr.TaskExist(taskKey) {
-		return nil, errors.New("upload task is exist")
+		err = errors.New("upload task is exist")
+		return nil, err
 	}
 	this.taskMgr.NewTask(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
-	// delete task from cache in the end
-	defer this.taskMgr.DeleteTask(taskKey)
+
+	this.taskMgr.SetFileName(taskKey, opt.FileDesc)
+	go this.taskMgr.EmitProgress(taskKey)
+	time.Sleep(time.Duration(3) * time.Second)
 	log.Debugf("root:%s, list.len:%d", fileHashStr, len(list))
 	// get nodeList
 	nodeList, err := this.getUploadNodeList(filePath, taskKey, fileHashStr)
@@ -55,13 +92,21 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		return nil, err
 	}
 	if uint32(len(nodeList)) < opt.CopyNum+1 {
-		return nil, fmt.Errorf("node is not enough %d, copyNum %d", len(nodeList), opt.CopyNum)
+		err = fmt.Errorf("node is not enough %d, copyNum %d", len(nodeList), opt.CopyNum)
+		return nil, err
 	}
 	totalCount = uint64(len(list) + 1)
 	// pay file
 	payRet, err := this.payForSendFile(filePath, taskKey, fileHashStr, uint64(len(list)+1), opt)
 	if err != nil {
 		return nil, err
+	}
+	var addWhiteListTx string
+	if len(opt.WhiteList) > 0 {
+		addWhiteListTx, err = this.addWhitelistsForFile(fileHashStr, opt.WhiteList, opt.ProveInterval*uint64(opt.ProveTimes))
+		if err != nil {
+			return nil, err
+		}
 	}
 	tx = payRet.Tx
 	p, err := this.Chain.Native.Fs.ProveParamDes(payRet.ParamsBuf)
@@ -77,16 +122,15 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	if err != nil {
 		return nil, err
 	}
-	this.taskMgr.SetFileName(taskKey, opt.FileDesc)
 	this.taskMgr.SetFileBlocksTotalCount(taskKey, uint64(len(list)+1))
-	go this.taskMgr.EmitProgress(taskKey)
 	receivers, err := this.waitFileReceivers(taskKey, fileHashStr, nodeList, hashes, int(opt.CopyNum)+1)
 	if err != nil {
 		return nil, err
 	}
 	log.Debugf("receivers:%v", receivers)
 	if len(receivers) < int(opt.CopyNum)+1 {
-		return nil, errors.New("file receivers is not enough")
+		err = errors.New("file receivers is not enough")
+		return nil, err
 	}
 	// notify fetch ready to all receivers
 	err = this.notifyFetchReady(taskKey, fileHashStr, receivers)
@@ -97,6 +141,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	if err != nil {
 		return nil, err
 	}
+	go this.taskMgr.EmitProgress(taskKey)
 	log.Debugf("wait for fetching block")
 	finish := false
 	timeout := time.NewTimer(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
@@ -148,6 +193,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 			err = this.Network.Send(msg, reqInfo.PeerAddr)
 			if err != nil {
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
+				return nil, err
 			}
 			log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d add uploaded block to db", reqInfo.Hash, reqInfo.Index, len(tag), offset-dataLen)
 			// stored
@@ -164,21 +210,18 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 				break
 			}
 		case <-timeout.C:
-			return nil, errors.New("wait for fetch block timeout")
+			err = errors.New("wait for fetch block timeout")
+			return nil, err
 		}
 		if finish {
 			break
 		}
 	}
-	log.Debugf("checking file proved")
 	proved := this.checkFileBeProved(fileHashStr, opt.ProveTimes, opt.CopyNum)
 	log.Debugf("checking file proved done %t", proved)
 	if !proved {
-		return nil, errors.New("file has sent, but no enought prove is finished")
-	}
-	err = this.taskMgr.DeleteFileUploadInfo(taskKey)
-	if err != nil {
-		log.Errorf("delete file upload info err: %s", err)
+		err = errors.New("file has sent, but no enought prove is finished")
+		return nil, err
 	}
 
 	oniLink := utils.GenOniLink(fileHashStr, opt.FileDesc, 0, totalCount, this.TrackerUrls)
@@ -191,14 +234,16 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		dnsBindTx, err = this.BindFileUrl(opt.DnsUrl, oniLink)
 		log.Debugf("bind dns %s, err %s", dnsBindTx, err)
 	}
-	log.Debug("upload success!!")
-	return &common.UploadResult{
-		Tx:            tx,
-		FileHash:      fileHashStr,
-		Link:          oniLink,
-		RegisterDnsTx: dnsRegTx,
-		BindDnsTx:     dnsBindTx,
-	}, nil
+	uploadRet = &common.UploadResult{
+		Tx:             tx,
+		FileHash:       fileHashStr,
+		Link:           oniLink,
+		RegisterDnsTx:  dnsRegTx,
+		BindDnsTx:      dnsBindTx,
+		AddWhiteListTx: addWhiteListTx,
+	}
+	log.Debug("upload success uploadRet: %v!!", uploadRet)
+	return uploadRet, nil
 }
 
 // DeleteUploadedFile. Delete uploaded file from remote nodes. it is called by the owner
@@ -311,11 +356,18 @@ func (this *Dsp) StartShareServices() {
 // free: if true, query nodes who can share file free
 // maxPeeCnt: download with max number peers with min price
 func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
+	// start a task
+	taskKey := this.taskMgr.NewTask(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	go this.taskMgr.EmitProgress(taskKey)
 	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
 	if len(addrs) == 0 {
 		log.Debugf("get 0 peer of %s from trackers %v", fileHashStr, this.TrackerUrls)
 	}
-	return this.downloadFileFromPeers(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt, addrs)
+	err := this.downloadFileFromPeers(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt, addrs)
+	this.taskMgr.EmitResult(taskKey, nil, err)
+	// delete task from cache in the end
+	this.taskMgr.DeleteTask(taskKey)
+	return err
 }
 
 // DownloadFileByLink. download file by link, e.g oni://Qm...&name=xxx&tr=xxx
@@ -474,9 +526,9 @@ func (this *Dsp) PayUnpaidFile(fileHashStr string) error {
 func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOrder bool, quotation map[string]*file.Payment, decryptPwd string) error {
 	// task exist at runtime
 	taskKey := this.taskMgr.TaskKey(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
-	if this.taskMgr.TaskExist(taskKey) {
-		return errors.New("download task is exist")
-	}
+	// if this.taskMgr.TaskExist(taskKey) {
+	// 	return errors.New("download task is exist")
+	// }
 	if len(quotation) == 0 {
 		return errors.New("no peer quotation for download")
 	}
@@ -515,11 +567,9 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			file.Close()
 		}()
 	}
-
-	// start a task
-	this.taskMgr.NewTask(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
-	defer this.taskMgr.DeleteTask(taskKey)
 	this.taskMgr.SetFileBlocksTotalCount(taskKey, uint64(len(blockHashes)))
+	go this.taskMgr.EmitProgress(taskKey)
+	time.Sleep(time.Duration(3) * time.Second)
 	// declare job for workers
 	job := func(fHash, bHash, pAddr string, index int32, respCh chan *task.BlockResp) (*task.BlockResp, error) {
 		log.Debugf("download %s-%s-%d from %s", fHash, bHash, index, pAddr)
@@ -836,6 +886,16 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 		ParamsBuf:  paramsBuf,
 		PrivateKey: privateKey,
 	}, nil
+}
+
+// addWhitelistsForFile. add whitelist for file with added blockcount to current height
+func (this *Dsp) addWhitelistsForFile(fileHashStr string, walletAddrs []string, blockCount uint64) (string, error) {
+	txHash, err := this.Chain.Native.Fs.AddWhiteLists(fileHashStr, walletAddrs, blockCount)
+	if err != nil {
+		return "", err
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
 }
 
 // getFileProveNode. get file storing nodes  and stored (expired) nodes
