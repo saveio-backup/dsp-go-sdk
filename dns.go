@@ -227,6 +227,10 @@ func (this *Dsp) GetFileHashFromUrl(url string) string {
 	return utils.GetFileHashFromLink(link)
 }
 
+func (this *Dsp) GetLinkValues(link string) map[string]string {
+	return utils.GetFilePropertiesFromLink(link)
+}
+
 // GetExternalIP. get external ip of wallet from dns nodes
 func (this *Dsp) GetExternalIP(walletAddr string) string {
 	test := make(map[string]string, 0)

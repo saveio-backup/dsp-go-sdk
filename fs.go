@@ -25,9 +25,13 @@ import (
 	"github.com/oniio/oniChain/crypto/pdp"
 )
 
-func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption) (uint64, error) {
+func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, whitelistCnt uint64) (uint64, error) {
 	fee := uint64(0)
 	fi, err := os.Open(filePath)
+	if err != nil {
+		return 0, err
+	}
+	fileInfo, err := fi.Stat()
 	if err != nil {
 		return 0, err
 	}
@@ -35,15 +39,40 @@ func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption) (
 	if err != nil {
 		return 0, err
 	}
-	if opt.ProveInterval == 0 && opt.ProveTimes == 0 && opt.CopyNum == 0 {
-		gasPrice := 1000000000 * fsSetting.GasForChallenge
-		fee = gasPrice
-	}
-
-	err = fi.Close()
+	userSpace, _ := this.Chain.Native.Fs.GetUserSpace(this.CurrentAccount().Address)
+	currentHeight, err := this.Chain.GetCurrentBlockHeight()
 	if err != nil {
-		log.Errorf("close file %s err %s", filePath, err)
+		return 0, err
 	}
+	estimatedTimes := uint64(math.Ceil((float64(userSpace.ExpireHeight) - float64(currentHeight)) / float64(fsSetting.DefaultProvePeriod)))
+	defer func() {
+		err = fi.Close()
+		if err != nil {
+			log.Errorf("close file %s err %s", filePath, err)
+		}
+	}()
+	txGas := uint64(10000000)
+	log.Debugf("opt.interval:%d", opt.ProveInterval)
+	log.Debugf("opt.ProveTimes:%d", opt.ProveTimes)
+	log.Debugf("opt.CopyNum:%d", opt.CopyNum)
+	useDefalut := (opt.ProveInterval == 0 && opt.ProveTimes == 0 && opt.CopyNum == 0) ||
+		(userSpace != nil && opt.ProveInterval == fsSetting.DefaultProvePeriod && uint64(opt.ProveTimes) == estimatedTimes && uint64(opt.CopyNum) == fsSetting.DefaultCopyNum)
+	log.Debugf("estimatedTimes: %d, userspace.expired %d, current %d, usedDefault:%t", estimatedTimes, userSpace.ExpireHeight, currentHeight, useDefalut)
+	if whitelistCnt > 0 {
+		fee = txGas * 4
+	} else {
+		fee = txGas * 3
+	}
+	if useDefalut {
+		return fee, nil
+	}
+	fileSize := uint64(fileInfo.Size()) / 1024
+	if fileSize < 0 {
+		fileSize = 1
+	}
+	log.Debugf("fileSize :%d", fileSize)
+	fee += (opt.ProveInterval*fileSize*fsSetting.GasPerKBPerBlock +
+		fsSetting.GasForChallenge) * uint64(opt.ProveTimes) * fsSetting.FsGasPrice * (uint64(opt.CopyNum) + 1)
 	return fee, nil
 }
 
@@ -84,7 +113,6 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 
 	this.taskMgr.SetFileName(taskKey, opt.FileDesc)
 	go this.taskMgr.EmitProgress(taskKey)
-	time.Sleep(time.Duration(3) * time.Second)
 	log.Debugf("root:%s, list.len:%d", fileHashStr, len(list))
 	// get nodeList
 	nodeList, err := this.getUploadNodeList(filePath, taskKey, fileHashStr)
@@ -237,6 +265,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	uploadRet = &common.UploadResult{
 		Tx:             tx,
 		FileHash:       fileHashStr,
+		Url:            opt.DnsUrl,
 		Link:           oniLink,
 		RegisterDnsTx:  dnsRegTx,
 		BindDnsTx:      dnsBindTx,
@@ -569,7 +598,6 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	}
 	this.taskMgr.SetFileBlocksTotalCount(taskKey, uint64(len(blockHashes)))
 	go this.taskMgr.EmitProgress(taskKey)
-	time.Sleep(time.Duration(3) * time.Second)
 	// declare job for workers
 	job := func(fHash, bHash, pAddr string, index int32, respCh chan *task.BlockResp) (*task.BlockResp, error) {
 		log.Debugf("download %s-%s-%d from %s", fHash, bHash, index, pAddr)
@@ -680,7 +708,11 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		log.Debugf("broad file donwload ok cast msg to %v", addrs)
 		this.Network.Broadcast(addrs, fileDonwloadOkMsg, true, nil, nil)
 		if len(decryptPwd) > 0 {
-			return this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
+			err := this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
+			if err != nil {
+				return err
+			}
+			return os.Rename(fullFilePath+"-decrypted", fullFilePath)
 		}
 		return nil
 	}

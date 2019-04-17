@@ -26,13 +26,19 @@ type Channel struct {
 	walletAddr string
 }
 
-type ChannelInfo struct {
+type channelInfo struct {
 	ChannelId     uint32
 	Balance       uint64
 	BalanceFormat string
 	Address       string
 	HostAddr      string
 	TokenAddr     string
+}
+
+type ChannelInfosResp struct {
+	Balance       uint64
+	BalanceFormat string
+	Channels      []*channelInfo
 }
 
 func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error) {
@@ -45,6 +51,7 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 		ListenAddress: cfg.ChannelListenAddr,
 		Protocol:      cfg.ChannelProtocol,
 		RevealTimeout: cfg.ChannelRevealTimeout,
+		DBPath:        cfg.ChannelDBPath,
 	}
 	channel, err := ch.NewChannelService(channelConfig, chain.Native.Channel.DefAcc)
 	if err != nil {
@@ -331,9 +338,11 @@ func (this *Channel) DeletePayment(paymentId int32) error {
 	return this.channelDB.RemovePayment(paymentId)
 }
 
-func (this *Channel) AllChannels() []*ChannelInfo {
+func (this *Channel) AllChannels() *ChannelInfosResp {
+	resp := &ChannelInfosResp{}
+	totalBalance := uint64(0)
 	allPartners := this.GetAllPartners()
-	infos := make([]*ChannelInfo, 0)
+	infos := make([]*channelInfo, 0)
 	for _, partner := range allPartners {
 		partnerAddress, err := chaincomm.AddressFromBase58(partner)
 		if err != nil {
@@ -347,7 +356,7 @@ func (this *Channel) AllChannels() []*ChannelInfo {
 		if err != nil {
 			continue
 		}
-		info := &ChannelInfo{
+		info := &channelInfo{
 			ChannelId:     uint32(this.channel.Service.GetChannelIdentifier(common.Address(partnerAddress))),
 			Address:       partner,
 			Balance:       bal,
@@ -355,9 +364,13 @@ func (this *Channel) AllChannels() []*ChannelInfo {
 			HostAddr:      host,
 			TokenAddr:     usdt.USDT_CONTRACT_ADDRESS.ToBase58(),
 		}
+		totalBalance += bal
 		infos = append(infos, info)
 	}
-	return infos
+	resp.Balance = totalBalance
+	resp.BalanceFormat = cmdutils.FormatUsdt(totalBalance)
+	resp.Channels = infos
+	return resp
 }
 
 // registerReceiveNotification. register receive payment notification

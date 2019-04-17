@@ -22,6 +22,7 @@ type DspConfig struct {
 	ChannelListenAddr    string // channel listen address. e.g: "127.0.0.1:3001"
 	ChannelProtocol      string // channel network protocol. e.g: "tcp"
 	ChannelRevealTimeout string // channel reveal time out. e.g: "1000"
+	ChannelDBPath        string
 
 	DnsNodeMaxNum     int    // dns node max count
 	DnsChannelDeposit uint64 //  deposit amount of channel between self and dns node

@@ -41,6 +41,12 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 		GcPeriod:   cfg.FsGcPeriod,
 		MaxStorage: cfg.FsMaxStorage,
 	}
+	if _, err := os.Stat(cfg.FsFileRoot); os.IsNotExist(err) {
+		err = os.MkdirAll(cfg.FsFileRoot, 0755)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	fs, err := oniFs.NewOniFSService(fsConfig, chain)
 	if err != nil {
@@ -264,4 +270,9 @@ func (this *Fs) DeleteFile(fileHashStr string) error {
 // AESDecryptFile. descypt file
 func (this *Fs) AESDecryptFile(file, password, outputPath string) error {
 	return oniFs.DecryptFile(file, password, outputPath)
+}
+
+// AESEncryptFile. encrypt file
+func (this *Fs) AESEncryptFile(file, password, outputPath string) error {
+	return oniFs.EncryptFile(file, password, outputPath)
 }

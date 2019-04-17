@@ -18,6 +18,7 @@ type UploadOption struct {
 type UploadResult struct {
 	Tx             string
 	FileHash       string
+	Url            string
 	Link           string
 	RegisterDnsTx  string
 	BindDnsTx      string
