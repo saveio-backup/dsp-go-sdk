@@ -250,6 +250,16 @@ func (this *TaskMgr) SetFileName(taskKey, fileName string) {
 	v.fileName = fileName
 }
 
+func (this *TaskMgr) FileNameFromTask(taskKey string) string {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	v, ok := this.tasks[taskKey]
+	if !ok {
+		return ""
+	}
+	return v.fileName
+}
+
 func (this *TaskMgr) SetFileBlocksTotalCount(taskKey string, count uint64) {
 	this.lock.Lock()
 	defer this.lock.Unlock()

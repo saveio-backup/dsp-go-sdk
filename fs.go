@@ -110,8 +110,8 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		return nil, err
 	}
 	this.taskMgr.NewTask(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
-
 	this.taskMgr.SetFileName(taskKey, opt.FileDesc)
+	// this.taskMgr.AddFileName(taskKey, opt.FileDesc)
 	go this.taskMgr.EmitProgress(taskKey)
 	log.Debugf("root:%s, list.len:%d", fileHashStr, len(list))
 	// get nodeList
@@ -384,10 +384,11 @@ func (this *Dsp) StartShareServices() {
 // inOrder: if true, the file will be downloaded block by block in order
 // free: if true, query nodes who can share file free
 // maxPeeCnt: download with max number peers with min price
-func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
+func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
 	// start a task
 	taskKey := this.taskMgr.NewTask(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	go this.taskMgr.EmitProgress(taskKey)
+	this.taskMgr.SetFileName(taskKey, fileName)
 	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
 	if len(addrs) == 0 {
 		log.Debugf("get 0 peer of %s from trackers %v", fileHashStr, this.TrackerUrls)
@@ -402,13 +403,17 @@ func (this *Dsp) DownloadFile(fileHashStr string, asset int32, inOrder bool, dec
 // DownloadFileByLink. download file by link, e.g oni://Qm...&name=xxx&tr=xxx
 func (this *Dsp) DownloadFileByLink(link string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
 	fileHashStr := utils.GetFileHashFromLink(link)
-	return this.DownloadFile(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt)
+	linkvalues := this.GetLinkValues(link)
+	fileName := linkvalues[common.FILE_LINK_NAME_KEY]
+	return this.DownloadFile(fileHashStr, fileName, asset, inOrder, decryptPwd, free, maxPeerCnt)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
 func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
 	fileHashStr := this.GetFileHashFromUrl(url)
-	return this.DownloadFile(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt)
+	linkvalues := this.GetLinkValues(this.GetLinkFromUrl(url))
+	fileName := linkvalues[common.FILE_LINK_NAME_KEY]
+	return this.DownloadFile(fileHashStr, fileName, asset, inOrder, decryptPwd, free, maxPeerCnt)
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
@@ -459,6 +464,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	if err != nil {
 		return nil, err
 	}
+	this.taskMgr.AddFileName(taskKey, this.taskMgr.FileNameFromTask(taskKey))
 	return peerPayInfos, nil
 }
 

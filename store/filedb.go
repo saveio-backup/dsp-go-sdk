@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -52,6 +53,7 @@ type Payment struct {
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type FileInfo struct {
 	Tx           string                `json:"tx,omitempty"`
+	FileName     string                `json:"name"`
 	Blocks       map[string]*blockInfo `json:"blocks"`
 	BlockHashes  []string              `json:"block_hashes,omitempty"`
 	Progress     map[string]uint64     `json:"progress"`
@@ -60,6 +62,7 @@ type FileInfo struct {
 	UnitPrice    map[int32]uint64      `json:"uint_price"`
 	Unpaid       map[string]*Payment   `json:"unpaid"`
 	ShareTo      map[string]struct{}   `json:"shareto"`
+	CreatedAt    uint64                `json:"createdAt"`
 }
 
 func NewFileDB(db *LevelDBStore) *FileDB {
@@ -80,7 +83,9 @@ func (this *FileDB) PutFileUploadInfo(tx, fileInfoKey string, provePrivKey []byt
 		return err
 	}
 	if fi == nil {
-		fi = &FileInfo{}
+		fi = &FileInfo{
+			CreatedAt: uint64(time.Now().Unix()),
+		}
 	}
 	fi.Tx = tx
 	fi.ProvePrivKey = provePrivKey
@@ -188,6 +193,7 @@ func (this *FileDB) AddFileBlockHashes(fileInfoKey string, blocks []string) erro
 	fi := &FileInfo{
 		BlockHashes: blocks,
 		Blocks:      make(map[string]*blockInfo, 0),
+		CreatedAt:   uint64(time.Now().Unix()),
 	}
 	return this.putFileInfo([]byte(fileInfoKey), fi)
 }
@@ -199,6 +205,16 @@ func (this *FileDB) AddFilePrefix(fileInfoKey, prefix string) error {
 		return err
 	}
 	fi.Prefix = prefix
+	return this.putFileInfo([]byte(fileInfoKey), fi)
+}
+
+// AddFileName add file name
+func (this *FileDB) AddFileName(fileInfoKey, name string) error {
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
+	if err != nil {
+		return err
+	}
+	fi.FileName = name
 	return this.putFileInfo([]byte(fileInfoKey), fi)
 }
 
@@ -235,6 +251,15 @@ func (this *FileDB) FilePrefix(fileInfoKey string) string {
 		return ""
 	}
 	return fi.Prefix
+}
+
+// FileName. return file name
+func (this *FileDB) FileName(fileInfoKey string) string {
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
+	if err != nil || fi == nil {
+		return ""
+	}
+	return fi.FileName
 }
 
 // FileProgress. return each node count progress
@@ -376,8 +401,9 @@ func (this *FileDB) AllDownloadFiles() ([]string, error) {
 
 func (this *FileDB) NewFileShareInfo(fileInfoKey string) error {
 	fi := &FileInfo{
-		Unpaid:  make(map[string]*Payment, 0),
-		ShareTo: make(map[string]struct{}, 0),
+		Unpaid:    make(map[string]*Payment, 0),
+		ShareTo:   make(map[string]struct{}, 0),
+		CreatedAt: uint64(time.Now().Unix()),
 	}
 	return this.putFileInfo([]byte(fileInfoKey), fi)
 }
