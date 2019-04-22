@@ -91,7 +91,7 @@ func (this *Dsp) Start(addr string) error {
 		if err != nil {
 			return err
 		}
-		err = this.SetupDNSNode()
+		err = this.SetupDNSChannels()
 		if err != nil {
 			return err
 		}
@@ -119,8 +119,12 @@ func (this *Dsp) StartChannelService() error {
 	if this.Channel == nil {
 		return errors.New("channel is nil")
 	}
+	err := this.SetupDNSTrackers()
+	if err != nil {
+		return err
+	}
 	this.SetupPartnerHost(this.Channel.GetAllPartners())
-	err := this.Channel.StartService()
+	err = this.Channel.StartService()
 	if err != nil {
 		return err
 	}

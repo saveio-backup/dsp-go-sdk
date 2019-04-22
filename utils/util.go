@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/oniio/dsp-go-sdk/network/message/types/file"
 )
@@ -46,4 +47,11 @@ func ValidateDomainName(domain string) bool {
 	regExp := regexp.MustCompile(`^(([a-zA-Z]{1})|([a-zA-Z]{1}[a-zA-Z]{1})|([a-zA-Z]{1}[0-9]{1})|([0-9]{1}[a-zA-Z]{1})|([a-zA-Z0-9][a-zA-Z0-9-_]{1,61}[a-zA-Z0-9]))\.([a-zA-Z]{2,6}|[a-zA-Z0-9-]{2,30}\.[a-zA-Z
 ]{2,3})$`)
 	return regExp.MatchString(domain)
+}
+
+func FullHostAddr(hostAddr, protocol string) string {
+	if strings.Index(hostAddr, protocol) != -1 {
+		return hostAddr
+	}
+	return fmt.Sprintf("%s://%s", protocol, hostAddr)
 }

@@ -66,10 +66,12 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 
 // SetHostAddr. set host address for wallet
 func (this *Channel) SetHostAddr(walletAddr, host string) error {
+	log.Debugf("SetHostAddr %v %v", walletAddr, host)
 	addr, err := chaincomm.AddressFromBase58(walletAddr)
 	if err != nil {
 		return err
 	}
+	log.Debugf("SetHostAddr %v %v", walletAddr, host)
 	this.channel.Service.SetHostAddr(common.Address(addr), host)
 	this.channelDB.AddPartner(this.walletAddr, walletAddr)
 	return nil
@@ -225,8 +227,8 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) er
 	}
 }
 
-// GetTargetBalance. check target deposit balance
-func (this *Channel) GetTargetBalance(targetAddress string) (uint64, error) {
+// GetTargetBalance. check total deposit balance
+func (this *Channel) GetTotalDepositBalance(targetAddress string) (uint64, error) {
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
 		return 0, err
@@ -243,6 +245,39 @@ func (this *Channel) GetTargetBalance(targetAddress string) (uint64, error) {
 	}
 	state := channelState.GetChannelEndState(0)
 	return uint64(state.GetContractBalance()), nil
+}
+
+// GetAvaliableBalance. get avaliable balance
+func (this *Channel) GetAvaliableBalance(partnerAddress string) (uint64, error) {
+	partner, err := chaincomm.AddressFromBase58(partnerAddress)
+	if err != nil {
+		return 0, err
+	}
+	registryAddress := common.PaymentNetworkID(utils.MicroPayContractAddress)
+	tokenAddress := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
+	chainState := this.channel.Service.GetChannel(registryAddress, tokenAddress, common.Address(partner))
+	if chainState == nil {
+		return 0, nil
+	}
+	amount := transfer.GetDistributable(chainState.OurState, chainState.PartnerState)
+	log.Debugf("get distributable from partner %s %d", partnerAddress, amount)
+	return uint64(amount), nil
+}
+
+func (this *Channel) GetTotalWithdraw(partnerAddress string) (uint64, error) {
+	partner, err := chaincomm.AddressFromBase58(partnerAddress)
+	if err != nil {
+		return 0, err
+	}
+	registryAddress := common.PaymentNetworkID(utils.MicroPayContractAddress)
+	tokenAddress := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
+	chainState := this.channel.Service.GetChannel(registryAddress, tokenAddress, common.Address(partner))
+	if chainState == nil {
+		return 0, nil
+	}
+	amount := chainState.OurState.GetTotalWithdraw()
+	log.Debugf("GetTotalWithdraw from partner %s %d", partnerAddress, amount)
+	return uint64(amount), nil
 }
 
 func (this *Channel) GetCurrentBalance(partnerAddress string) (uint64, error) {
@@ -348,7 +383,7 @@ func (this *Channel) AllChannels() *ChannelInfosResp {
 		if err != nil {
 			continue
 		}
-		bal, err := this.GetTargetBalance(partner)
+		bal, err := this.GetAvaliableBalance(partner)
 		if err != nil {
 			continue
 		}

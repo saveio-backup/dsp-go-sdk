@@ -24,7 +24,7 @@ type DNSNodeInfo struct {
 	ChannelAddr string
 }
 
-func (this *Dsp) SetupDNSNode() error {
+func (this *Dsp) SetupDNSTrackers() error {
 	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
 	if err != nil {
 		return err
@@ -44,11 +44,23 @@ func (this *Dsp) SetupDNSNode() error {
 		if len(this.TrackerUrls) >= maxTrackerNum {
 			break
 		}
-		if this.DNSNode != nil {
-			trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
-			this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
-			continue
-		}
+		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
+		this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
+	}
+	log.Debugf("this.TrackerUrls len %d", this.TrackerUrls)
+	return nil
+}
+
+func (this *Dsp) SetupDNSChannels() error {
+	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
+	if err != nil {
+		return err
+	}
+	if len(ns) == 0 {
+		return errors.New("no dns nodes")
+	}
+	for _, v := range ns {
+		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
 		dnsUrl := fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
 		if this.Network != nil && !this.Network.IsPeerListenning(dnsUrl) {
 			continue
@@ -74,7 +86,7 @@ func (this *Dsp) SetupDNSNode() error {
 		// }
 		log.Infof("connect to dns node :%s, deposit %d", dnsUrl, this.Config.DnsChannelDeposit)
 		err = this.Channel.SetDeposit(v.WalletAddr.ToBase58(), this.Config.DnsChannelDeposit)
-		if err != nil {
+		if err != nil && strings.Index(err.Error(), "totalDeposit must big than contractBalance") == -1 {
 			log.Debugf("deposit result %s", err)
 			// TODO: withdraw and close channel
 			continue
@@ -83,10 +95,8 @@ func (this *Dsp) SetupDNSNode() error {
 			WalletAddr:  v.WalletAddr.ToBase58(),
 			ChannelAddr: dnsUrl,
 		}
-		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
-		this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
+		break
 	}
-	log.Debugf("this.TrackerUrls len %d", len(this.TrackerUrls))
 	return nil
 }
 
@@ -111,6 +121,7 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	var hashBytes [46]byte
 	copy(hashBytes[:], []byte(hash)[:])
 	for _, trackerUrl := range trackerUrls {
+		log.Debugf("trackerurl %s hashBytes: %v netIp:%v netPort:%v", trackerUrl, hashBytes, netIp, netPort)
 		err := tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
 		if err != nil {
 			return err
@@ -231,20 +242,57 @@ func (this *Dsp) GetLinkValues(link string) map[string]string {
 	return utils.GetFilePropertiesFromLink(link)
 }
 
+func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr string) error {
+	index := strings.Index(endpointAddr, "://")
+	hostPort := endpointAddr
+	if index != -1 {
+		hostPort = endpointAddr[index+3:]
+	}
+	host, port, err := net.SplitHostPort(hostPort)
+	log.Debugf("hostPort %v, host %v", hostPort, host)
+	if err != nil {
+		return err
+	}
+	netIp := net.ParseIP(host).To4()
+	if netIp == nil {
+		netIp = net.ParseIP(host).To16()
+	}
+	netPort, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return err
+	}
+
+	var wallet [20]byte
+	copy(wallet[:], walletAddr[:])
+	for _, trackerUrl := range this.TrackerUrls {
+		log.Debugf("trackerurl %s walletAddr: %v netIp:%v netPort:%v", trackerUrl, wallet, netIp, netPort)
+		err := tracker.RegEndPoint(trackerUrl, wallet, netIp, uint16(netPort))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetExternalIP. get external ip of wallet from dns nodes
 func (this *Dsp) GetExternalIP(walletAddr string) string {
-	test := make(map[string]string, 0)
-	test["AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS"] = "tcp://127.0.0.1:13001"
-	test["AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c"] = "tcp://127.0.0.1:13002"
-	test["AGeTrARjozPVLhuzMxZq36THMtvsrZNAHq"] = "tcp://127.0.0.1:13003"
-	test["ANa3f9jm2FkWu4NrVn6L1FGu7zadKdvPjL"] = "tcp://127.0.0.1:13004"
-	test["ANy4eS6oQaX15xpGV7dvsinh2aiqPm9HDf"] = "tcp://127.0.0.1:13005"
-	test["AJtzEUDLzsRKbHC1Tfc1oNh8a1edpnVAUf"] = "tcp://127.0.0.1:13008"
-	test["AMkN2sRQyT3qHZQqwEycHCX2ezdZNpXNdJ"] = "tcp://127.0.0.1:13001"
-	test["AWpW2ukMkgkgRKtwWxC3viXEX8ijLio2Ng"] = "tcp://127.0.0.1:13003"
-	test["AKTfgYTAEzGG5FXsM8HHc8M3j95N495TBP"] = "tcp://127.0.0.1:13003"
-	test["AGGTaoJ8Ygim7zVi5ZZqrXy8EQqgNQJxYx"] = "tcp://127.0.0.1:13001"
-	return test[walletAddr]
+	address, err := chaincom.AddressFromBase58(walletAddr)
+	if err != nil {
+		log.Errorf("address from b58 failed %s", err)
+		return ""
+	}
+	for _, url := range this.TrackerUrls {
+		hostAddr, err := tracker.ReqEndPoint(url, address)
+		if err != nil {
+			log.Errorf("address from req failed %s", err)
+			continue
+		}
+		log.Debugf("string(hostAddr) :%v", hostAddr)
+		hostAddrStr := utils.FullHostAddr(string(hostAddr), this.Config.ChannelProtocol)
+		return hostAddrStr
+	}
+	log.Debugf("no request %v", this.TrackerUrls)
+	return ""
 }
 
 // SetupPartnerHost. setup host addr for partners
@@ -252,6 +300,7 @@ func (this *Dsp) SetupPartnerHost(partners []string) {
 	log.Debugf("partners %v\n", partners)
 	for _, addr := range partners {
 		host := this.GetExternalIP(addr)
+		log.Debugf("get external ip %v, %v", addr, host)
 		this.Channel.SetHostAddr(addr, host)
 	}
 }
