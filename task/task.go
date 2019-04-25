@@ -49,6 +49,22 @@ type ProgressInfo struct {
 	Result   interface{}       // finish result
 	Error    error             // interrupt error
 }
+type ShareState int
+
+const (
+	ShareStateBegin ShareState = iota
+	ShareStateReceivedPaying
+	ShareStateEnd
+)
+
+type ShareNotification struct {
+	TaskKey       string
+	State         ShareState
+	FileHash      string
+	ToWalletAddr  string
+	PaymentId     uint64
+	PaymentAmount uint64
+}
 
 type BackupFileOpt struct {
 	LuckyNum   uint64
@@ -82,10 +98,11 @@ type Task struct {
 // TaskMgr. implement upload/download task manager.
 // only save needed information to db by fileDB, the other field save in memory
 type TaskMgr struct {
-	tasks      map[string]*Task
-	lock       sync.RWMutex
-	blockReqCh chan *GetBlockReq
-	progress   chan *ProgressInfo // progress channel
+	tasks         map[string]*Task
+	lock          sync.RWMutex
+	blockReqCh    chan *GetBlockReq
+	progress      chan *ProgressInfo // progress channel
+	shareNoticeCh chan *ShareNotification
 	*store.FileDB
 }
 
@@ -375,7 +392,6 @@ func (this *TaskMgr) EmitResult(taskKey string, ret interface{}, err error) {
 		Total:    v.total,
 		Count:    this.FileProgress(v.id),
 	}
-	fmt.Printf("EmitReuslt %t, %t\n", ret != nil, err != nil)
 	if err != nil {
 		pInfo.Error = err
 	} else if ret != nil {
@@ -383,6 +399,39 @@ func (this *TaskMgr) EmitResult(taskKey string, ret interface{}, err error) {
 	}
 	go func() {
 		this.progress <- pInfo
+	}()
+}
+
+// RegShareNotification. register share notification
+func (this *TaskMgr) RegShareNotification() {
+	if this.shareNoticeCh == nil {
+		this.shareNoticeCh = make(chan *ShareNotification, 0)
+	}
+}
+
+// ShareNotification. get share notification channel
+func (this *TaskMgr) ShareNotification() chan *ShareNotification {
+	return this.shareNoticeCh
+}
+
+// CloseShareNotification. close
+func (this *TaskMgr) CloseShareNotification() {
+	close(this.shareNoticeCh)
+	this.shareNoticeCh = nil
+}
+
+// EmitNotification. emit notification
+func (this *TaskMgr) EmitNotification(taskKey string, state ShareState, fileHashStr, toWalletAddr string, paymentId, paymentAmount uint64) {
+	n := &ShareNotification{
+		TaskKey:       taskKey,
+		State:         state,
+		FileHash:      fileHashStr,
+		ToWalletAddr:  toWalletAddr,
+		PaymentId:     paymentId,
+		PaymentAmount: paymentAmount,
+	}
+	go func() {
+		this.shareNoticeCh <- n
 	}()
 }
 

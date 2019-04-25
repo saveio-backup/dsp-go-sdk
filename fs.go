@@ -486,6 +486,8 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 	if totalAmount/common.FILE_DOWNLOAD_UNIT_PRICE != uint64(len(blockHashes))*uint64(common.CHUNK_SIZE) {
 		return errors.New("deposit amount overflow")
 	}
+	log.Debugf("this %v", this)
+	log.Debugf("this.ch %v", this.Channel)
 	curBal, _ := this.Channel.GetCurrentBalance(this.DNSNode.WalletAddr)
 	if curBal < totalAmount {
 		log.Debugf("depositing...")
@@ -535,7 +537,9 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	// send payment msg
 	msg := message.NewPayment(this.Chain.Native.Fs.DefAcc.Address.ToBase58(), payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
-	_, err = this.Network.Request(msg, addr)
+	// TODO: wait for receiver received notification (need optimized)
+	time.Sleep(time.Second)
+	_, err = this.Network.RequestWithRetry(msg, addr, common.MAX_NETWORK_REQUEST_RETRY)
 	log.Debugf("payment msg response :%d, err:%s", paymentId, err)
 	if err != nil {
 		return 0, err
@@ -672,6 +676,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			}
 			if this.Config.FsType == config.FS_FILESTORE {
 				err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(value.Offset))
+				log.Debugf("put block for store err %v", err)
 			} else {
 				err = this.Fs.PutBlock(block)
 				if err != nil {
@@ -750,6 +755,24 @@ func (this *Dsp) ProgressChannel() chan *task.ProgressInfo {
 // CloseProgressChannel.
 func (this *Dsp) CloseProgressChannel() {
 	this.taskMgr.CloseProgressCh()
+}
+
+// RegShareNotificationChannel. register share channel
+func (this *Dsp) RegShareNotificationChannel() {
+	if this == nil {
+		log.Errorf("this.taskMgr == nil")
+	}
+	this.taskMgr.RegShareNotification()
+}
+
+// ShareNotificationChannel.
+func (this *Dsp) ShareNotificationChannel() chan *task.ShareNotification {
+	return this.taskMgr.ShareNotification()
+}
+
+// CloseShareNotificationChannel.
+func (this *Dsp) CloseShareNotificationChannel() {
+	this.taskMgr.CloseShareNotification()
 }
 
 // StartBackupFileService. start a backup file service to find backup jobs.

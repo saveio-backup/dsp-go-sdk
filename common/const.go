@@ -48,6 +48,7 @@ const (
 	MAX_EXPIRED_PROVE_TASK_NUM   = 10  // max backup tasks one time
 	MAX_WORKER_FAILED_NUM        = 10  // max failed count from a worker
 	MAX_DOWNLOAD_PEERS_NUM       = 100 // max peers for download file
+	MAX_NETWORK_REQUEST_RETRY    = 5   // max network request retry
 )
 
 const (

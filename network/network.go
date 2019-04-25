@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/oniio/dsp-go-sdk/network/common"
 	"github.com/oniio/dsp-go-sdk/network/message"
 	"github.com/oniio/dsp-go-sdk/network/message/pb"
@@ -156,6 +157,27 @@ func (this *Network) Request(msg *message.Message, peer interface{}) (*message.M
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(common.REQUEST_MSG_TIMEOUT)*time.Second)
 	defer cancel()
 	res, err := client.Request(ctx, msg.ToProtoMsg())
+	if err != nil {
+		return nil, err
+	}
+	return message.ReadMessage(res), nil
+}
+
+// RequestWithRetry. send msg to peer and wait for response synchronously
+func (this *Network) RequestWithRetry(msg *message.Message, peer interface{}, retry int) (*message.Message, error) {
+	client, err := this.loadClient(peer)
+	if err != nil {
+		return nil, err
+	}
+	var res proto.Message
+	for i := 0; i < retry; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(common.REQUEST_MSG_TIMEOUT)*time.Second)
+		defer cancel()
+		res, err = client.Request(ctx, msg.ToProtoMsg())
+		if err == nil || err.Error() != "context deadline exceeded" {
+			break
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

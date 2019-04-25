@@ -189,6 +189,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if err != nil {
 			log.Errorf("reply download msg failed, err %s", err)
 		}
+		this.taskMgr.EmitNotification(taskKey, task.ShareStateBegin, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
 	case netcom.FILE_OP_DOWNLOAD_OK:
 		taskKey := this.taskMgr.TaskKey(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
 		if !this.taskMgr.TaskExist(taskKey) {
@@ -201,6 +202,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if err != nil {
 			log.Errorf("reply download msg failed, err %s", err)
 		}
+		this.taskMgr.EmitNotification(taskKey, task.ShareStateEnd, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
 	default:
 	}
 }
@@ -311,4 +313,5 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.P
 	if err != nil {
 		log.Errorf("reply delete ok msg failed", err)
 	}
+	this.taskMgr.EmitNotification(taskKey, task.ShareStateReceivedPaying, paymentMsg.FileHash, paymentMsg.Sender, uint64(paymentMsg.PaymentId), uint64(paymentMsg.Amount))
 }

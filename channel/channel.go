@@ -222,7 +222,8 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) er
 			return nil
 		}
 		return errors.New("media transfer payment failed")
-	case <-time.After(time.Duration(dspcom.CHANNEL_TRANSFER_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(10) * time.Second):
+		// case <-time.After(time.Duration(dspcom.CHANNEL_TRANSFER_TIMEOUT) * time.Second):
 		return errors.New("media transfer timeout")
 	}
 }
@@ -419,7 +420,7 @@ func (this *Channel) registerReceiveNotification() {
 			if err != nil {
 				continue
 			}
-			log.Debugf("PaymentReceive amount %d from %s with paymentID %d\n",
+			log.Debugf("PaymentReceive2 amount %d from %s with paymentID %d\n",
 				event.Amount, addr.ToBase58(), event.Identifier)
 			this.channelDB.AddPayment(addr.ToBase58(), int32(event.Identifier), uint64(event.Amount))
 		case <-this.closeCh:
