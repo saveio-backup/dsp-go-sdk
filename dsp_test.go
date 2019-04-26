@@ -890,7 +890,7 @@ func TestGetSetupDNSNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = d.SetupDNSNode()
+	err = d.SetupDNSChannels()
 	if err != nil {
 		t.Fatal(err)
 	}

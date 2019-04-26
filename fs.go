@@ -5,12 +5,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
+
+	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
 
 	"github.com/oniio/dsp-go-sdk/common"
 	"github.com/oniio/dsp-go-sdk/config"
@@ -23,6 +26,7 @@ import (
 	chainCom "github.com/oniio/oniChain/common"
 	"github.com/oniio/oniChain/common/log"
 	"github.com/oniio/oniChain/crypto/pdp"
+	"github.com/oniio/oniFS/importer/helpers"
 )
 
 func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, whitelistCnt uint64) (uint64, error) {
@@ -93,6 +97,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		log.Errorf("node from file err: %s", err)
 		return nil, err
 	}
+
 	fileHashStr = root.Cid().String()
 	taskKey := this.taskMgr.TaskKey(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
 	// emit result
@@ -151,6 +156,9 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		return nil, err
 	}
 	this.taskMgr.SetFileBlocksTotalCount(taskKey, uint64(len(list)+1))
+	if opt != nil && opt.Share {
+		go this.shareUploadedFile(filePath, opt.FileDesc, this.WalletAddress(), hashes, root, list)
+	}
 	receivers, err := this.waitFileReceivers(taskKey, fileHashStr, nodeList, hashes, int(opt.CopyNum)+1)
 	if err != nil {
 		return nil, err
@@ -1190,6 +1198,105 @@ func (this *Dsp) deleteFile(fileHashStr string) error {
 	log.Debugf("delete file success")
 	taskKey := this.taskMgr.TaskKey(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	return this.taskMgr.DeleteFileDownloadInfo(taskKey)
+}
+
+// shareUploadedFile. share uploaded file when upload success
+func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, blockHashes []string, root ipld.Node, list []*helpers.UnixfsNode) error {
+	log.Debugf("shareUploadedFile path: %s filename:%s prefix:%s hashes:%d", filePath, fileName, prefix, blockHashes)
+	if this.Config.FsType != config.FS_FILESTORE {
+		return errors.New("fs type is not file store")
+	}
+	fileHashStr := root.Cid().String()
+	taskKey := this.taskMgr.TaskKey(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	if this.taskMgr.IsDownloadInfoExist(taskKey) {
+		return nil
+	}
+	err := this.taskMgr.AddFileBlockHashes(taskKey, blockHashes)
+	if err != nil {
+		return err
+	}
+	err = this.taskMgr.AddFilePrefix(taskKey, prefix)
+	if err != nil {
+		return err
+	}
+	input, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	fullFilePath := this.Config.FsFileRoot + "/" + fileHashStr
+	output, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	n, err := io.Copy(output, input)
+	log.Debugf("copy %d bytes", n)
+	if err != nil {
+		return err
+	}
+
+	blockOffset := int64(0)
+	this.Fs.SetFsFilePrefix(fullFilePath, prefix)
+	if !this.taskMgr.IsBlockDownloaded(taskKey, fileHashStr, uint32(0)) {
+		log.Debugf("%s-%s-%d is downloaded", fileHashStr, fileHashStr, 0)
+		links, err := this.Fs.BlockLinks(root)
+		if err != nil {
+			return err
+		}
+		log.Debugf("links count %d", len(links))
+		err = this.Fs.PutBlockForFileStore(fullFilePath, root, uint64(0))
+		if err != nil {
+			log.Errorf("put block err %s", err)
+			return err
+		}
+		err = this.taskMgr.SetBlockDownloaded(taskKey, fileHashStr, this.Network.ListenAddr(), uint32(0), 0, links)
+		if err != nil {
+			return err
+		}
+		log.Debugf("%s-%s-%d set downloaded", fileHashStr, 0, 0)
+		blockDecodedData, err := this.Fs.BlockToBytes(root)
+		if err != nil {
+			return err
+		}
+		dataLen := int64(len(blockDecodedData))
+		blockOffset += dataLen
+	}
+	for index, dagBlock := range list {
+		blockIndex := index + 1
+		block, err := dagBlock.GetDagNode()
+		if err != nil {
+			return err
+		}
+		blockHash := block.Cid().String()
+		// send block
+		blockDecodedData, err := this.Fs.BlockToBytes(block)
+		if err != nil {
+			return err
+		}
+		dataLen := int64(len(blockDecodedData))
+		if this.taskMgr.IsBlockDownloaded(taskKey, blockHash, uint32(blockIndex)) {
+			log.Debugf("%s-%s-%d is downloaded", fileHashStr, blockHash, blockIndex)
+			continue
+		}
+		links := make([]string, 0, len(block.Links()))
+		for _, l := range block.Links() {
+			links = append(links, l.Cid.String())
+		}
+		err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(blockOffset))
+		log.Debugf("put block for file %s block: %s, offset:%d", fullFilePath, block.Cid(), blockOffset)
+		if err != nil {
+			log.Errorf("put block err %s", err)
+			return err
+		}
+		err = this.taskMgr.SetBlockDownloaded(taskKey, blockHash, this.Network.ListenAddr(), uint32(blockIndex), blockOffset, links)
+		if err != nil {
+			return err
+		}
+		log.Debugf("%s-%s-%d set downloaded", fileHashStr, blockHash, blockIndex)
+		blockOffset += dataLen
+	}
+	go this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
+	return nil
 }
 
 // uploadOptValid check upload opt valid

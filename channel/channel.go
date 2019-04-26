@@ -2,6 +2,7 @@ package channel
 
 import (
 	"errors"
+	"os"
 	"time"
 
 	dspcom "github.com/oniio/dsp-go-sdk/common"
@@ -52,6 +53,12 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 		Protocol:      cfg.ChannelProtocol,
 		RevealTimeout: cfg.ChannelRevealTimeout,
 		DBPath:        cfg.ChannelDBPath,
+	}
+	if _, err := os.Stat(channelConfig.DBPath); os.IsNotExist(err) {
+		err = os.MkdirAll(channelConfig.DBPath, 0755)
+		if err != nil {
+			return nil, err
+		}
 	}
 	channel, err := ch.NewChannelService(channelConfig, chain.Native.Channel.DefAcc)
 	if err != nil {
@@ -392,8 +399,12 @@ func (this *Channel) AllChannels() *ChannelInfosResp {
 		if err != nil {
 			continue
 		}
+		id := uint32(this.channel.Service.GetChannelIdentifier(common.Address(partnerAddress)))
+		if id == 0 {
+			continue
+		}
 		info := &channelInfo{
-			ChannelId:     uint32(this.channel.Service.GetChannelIdentifier(common.Address(partnerAddress))),
+			ChannelId:     id,
 			Address:       partner,
 			Balance:       bal,
 			BalanceFormat: cmdutils.FormatUsdt(bal),
