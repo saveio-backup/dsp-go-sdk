@@ -2,6 +2,7 @@ package dsp
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -13,10 +14,12 @@ import (
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/dsp-go-sdk/utils"
+	"github.com/saveio/scan/tracker"
+	dnscom "github.com/saveio/scan/tracker/common"
+	chainsdk "github.com/saveio/themis-go-sdk/utils"
 	chaincom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/smartcontract/service/native/dns"
-	"github.com/saveio/scan/tracker"
 )
 
 type DNSNodeInfo struct {
@@ -303,7 +306,22 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 	copy(wallet[:], walletAddr[:])
 	for _, trackerUrl := range this.TrackerUrls {
 		log.Debugf("trackerurl %s walletAddr: %v netIp:%v netPort:%v", trackerUrl, wallet, netIp, netPort)
-		err := tracker.RegEndPoint(trackerUrl, wallet, netIp, uint16(netPort))
+		params := dnscom.ApiParams{
+			TrackerUrl: trackerUrl,
+			Wallet:     wallet,
+			IP:         netIp,
+			Port:       uint16(netPort),
+		}
+		rawData, err := json.Marshal(params)
+		if err != nil {
+			return err
+		}
+
+		sigData, err := chainsdk.Sign(this.CurrentAccount(), rawData)
+		if err != nil {
+			return err
+		}
+		err = tracker.RegEndPoint(trackerUrl, sigData, this.CurrentAccount().PublicKey, wallet, netIp, uint16(netPort))
 		if err != nil {
 			return err
 		}
