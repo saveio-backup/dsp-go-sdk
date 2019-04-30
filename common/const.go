@@ -3,7 +3,8 @@ package common
 const (
 	CHUNK_SIZE                  = 256 * 1024      // chunk size
 	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"        // download temp file path
-	FILE_HASH_LEN               = 46              // file hash length
+	PROTO_NODE_FILE_HASH_LEN    = 46              // proto node file hash length
+	RAW_NODE_FILE_HASH_LEN      = 49              // raw node file hash length
 	FILE_URL_CUSTOM_HEADER      = "save://share/" // file url custom header
 
 	FILE_DOWNLOAD_UNIT_PRICE = 1     // unit price for all file
