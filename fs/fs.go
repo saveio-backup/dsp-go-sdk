@@ -18,13 +18,13 @@ import (
 	chainCom "github.com/saveio/themis/common"
 
 	"github.com/saveio/max/importer/helpers"
+	max "github.com/saveio/max/max"
 	ml "github.com/saveio/max/merkledag"
-	oniFs "github.com/saveio/max/onifs"
 	ftpb "github.com/saveio/max/unixfs/pb"
 )
 
 type Fs struct {
-	fs  *oniFs.OniFSService
+	fs  *max.MaxService
 	cfg *config.DspConfig
 }
 
@@ -33,10 +33,10 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 		cfg = config.DefaultDspConfig()
 	}
 
-	fsConfig := &oniFs.FSConfig{
+	fsConfig := &max.FSConfig{
 		RepoRoot:   cfg.FsRepoRoot,
 		FsRoot:     cfg.FsFileRoot,
-		FsType:     oniFs.FSType(cfg.FsType),
+		FsType:     max.FSType(cfg.FsType),
 		ChunkSize:  common.CHUNK_SIZE,
 		GcPeriod:   cfg.FsGcPeriod,
 		MaxStorage: cfg.FsMaxStorage,
@@ -48,7 +48,7 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 		}
 	}
 
-	fs, err := oniFs.NewOniFSService(fsConfig, chain)
+	fs, err := max.NewMaxService(fsConfig, chain)
 	if err != nil {
 		return nil, err
 	}
@@ -269,10 +269,10 @@ func (this *Fs) DeleteFile(fileHashStr string) error {
 
 // AESDecryptFile. descypt file
 func (this *Fs) AESDecryptFile(file, password, outputPath string) error {
-	return oniFs.DecryptFile(file, password, outputPath)
+	return max.DecryptFile(file, password, outputPath)
 }
 
 // AESEncryptFile. encrypt file
 func (this *Fs) AESEncryptFile(file, password, outputPath string) error {
-	return oniFs.EncryptFile(file, password, outputPath)
+	return max.EncryptFile(file, password, outputPath)
 }

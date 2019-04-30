@@ -55,7 +55,7 @@ func TestEncodedToBlock(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		FsRepoRoot: fileRoot + "/testdata/onifs_test",
+		FsRepoRoot: fileRoot + "/testdata/max_test",
 		FsFileRoot: fileRoot,
 		FsType:     config.FS_FILESTORE,
 	}
@@ -115,7 +115,7 @@ func TestGetBlock(t *testing.T) {
 	}
 	dspCfg := &config.DspConfig{
 		DBPath:       fmt.Sprintf("%s/db%d", fileRoot, 1),
-		FsRepoRoot:   fileRoot + "/onifs1",
+		FsRepoRoot:   fileRoot + "/max1",
 		FsFileRoot:   fileRoot,
 		FsType:       config.FS_BLOCKSTORE,
 		FsGcPeriod:   "1h",
@@ -157,7 +157,7 @@ func TestNewFs(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		FsRepoRoot: fileRoot + "/testdata/onifs_test",
+		FsRepoRoot: fileRoot + "/testdata/max_test",
 		FsFileRoot: fileRoot,
 		FsType:     config.FS_FILESTORE,
 	}
@@ -177,7 +177,7 @@ func Test2GetBlockFromFileStore(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		FsRepoRoot: fileRoot + "/testdata/onifs_test",
+		FsRepoRoot: fileRoot + "/testdata/max_test",
 		FsFileRoot: fileRoot,
 		FsType:     config.FS_FILESTORE,
 	}

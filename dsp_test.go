@@ -233,7 +233,7 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 	nodeAddrs := []string{"", node1ListAddr, node2ListAddr, node3ListAddr, node4ListAddr, node5ListAddr}
 	dspCfg := &config.DspConfig{
 		DBPath:               fmt.Sprintf("%s/db%d", fileRoot, nodeIndex),
-		FsRepoRoot:           fmt.Sprintf("%s/onifs%d", fileRoot, nodeIndex),
+		FsRepoRoot:           fmt.Sprintf("%s/max%d", fileRoot, nodeIndex),
 		FsFileRoot:           fileRoot,
 		FsGcPeriod:           "1h",
 		FsMaxStorage:         "10G",
@@ -278,7 +278,7 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 func TestUploadFile(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		DBPath:        "./testdata/db2",
-		FsRepoRoot:    "./testdata/onifs2",
+		FsRepoRoot:    "./testdata/max2",
 		FsFileRoot:    "./testdata",
 		FsType:        config.FS_FILESTORE,
 		ChainRpcAddr:  rpcAddr,
@@ -342,7 +342,7 @@ func TestDeleteFileFromUploader(t *testing.T) {
 	}
 	dspCfg := &config.DspConfig{
 		DBPath:       "testdata/db2",
-		FsRepoRoot:   "testdata/onifs2",
+		FsRepoRoot:   "testdata/max2",
 		FsFileRoot:   fileRoot,
 		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
@@ -377,7 +377,7 @@ func TestDeleteFileLocally(t *testing.T) {
 	}
 	dspCfg := &config.DspConfig{
 		DBPath:       "testdata/db3",
-		FsRepoRoot:   "testdata/onifs3",
+		FsRepoRoot:   "testdata/max3",
 		FsFileRoot:   fileRoot,
 		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
@@ -426,7 +426,7 @@ func TestDownloadFile(t *testing.T) {
 
 	dspCfg := &config.DspConfig{
 		DBPath:               fmt.Sprintf("%s/db%d", fileRoot, nodeIdx),
-		FsRepoRoot:           fmt.Sprintf("%s/onifs%d", fileRoot, nodeIdx),
+		FsRepoRoot:           fmt.Sprintf("%s/max%d", fileRoot, nodeIdx),
 		FsFileRoot:           fileRoot,
 		FsType:               config.FS_FILESTORE,
 		ChainRpcAddr:         rpcAddr,
@@ -507,7 +507,7 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	}
 	dspCfg := &config.DspConfig{
 		DBPath:               fileRoot + "/db3",
-		FsRepoRoot:           fileRoot + "/onifs3",
+		FsRepoRoot:           fileRoot + "/max3",
 		FsFileRoot:           fileRoot,
 		FsType:               config.FS_FILESTORE,
 		ChainRpcAddr:         rpcAddr,
@@ -581,7 +581,7 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 func TestStartPDPVerify(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		DBPath:       "./testdata/db1",
-		FsRepoRoot:   "./testdata/onifs1",
+		FsRepoRoot:   "./testdata/max1",
 		FsFileRoot:   "./testdata",
 		FsType:       config.FS_BLOCKSTORE,
 		ChainRpcAddr: rpcAddr,
@@ -659,7 +659,7 @@ func TestPushTracker(t *testing.T) {
 	}
 	dspCfg := &config.DspConfig{
 		DBPath:               fileRoot + "/db1",
-		FsRepoRoot:           fileRoot + "/onifs1",
+		FsRepoRoot:           fileRoot + "/max1",
 		FsFileRoot:           fileRoot,
 		FsGcPeriod:           "1h",
 		FsMaxStorage:         "10G",
@@ -709,7 +709,7 @@ func TestSeedServices(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		DBPath: fileRoot + "/db1",
 
-		FsRepoRoot:   fileRoot + "/onifs1",
+		FsRepoRoot:   fileRoot + "/max1",
 		FsFileRoot:   fileRoot,
 		FsGcPeriod:   "1h",
 		FsMaxStorage: "10G",
