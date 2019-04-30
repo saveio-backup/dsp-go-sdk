@@ -78,6 +78,7 @@ func (this *Dsp) GetVersion() string {
 }
 
 func (this *Dsp) Start(addr string) error {
+	// start p2p network
 	this.Network = network.NewNetwork(addr, this.Receive)
 	err := this.Network.Start()
 	if err != nil {
@@ -86,32 +87,30 @@ func (this *Dsp) Start(addr string) error {
 	if this.Config == nil {
 		return nil
 	}
+
+	// start dns service
 	if this.Channel != nil {
 		err := this.StartChannelService()
 		if err != nil {
 			return err
 		}
-		err = this.SetupDNSChannels()
-		if err != nil {
-			return err
+		if this.Config.AutoSetupDNSEnable {
+			err = this.SetupDNSChannels()
+			if err != nil {
+				return err
+			}
 		}
 	}
+
+	// start seed service
 	if this.Config.SeedInterval > 0 {
 		go this.StartSeedService()
 	}
+
+	// start backup service
 	if this.Config.FsType == config.FS_BLOCKSTORE {
 		go this.StartBackupFileService()
 	}
-
-	// if addr == "tcp://127.0.0.1:14003" {
-	// 	log.Debugf("Test MT")
-	// 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	// 	paymentId := r.Int31()
-	// 	target := "AMkN2sRQyT3qHZQqwEycHCX2ezdZNpXNdJ"
-	// 	this.Channel.SetHostAddr(target, this.GetExternalIP(target))
-	// 	err := this.Channel.MediaTransfer(paymentId, 1, target)
-	// 	log.Errorf("Media Transfer Error %s", err)
-	// }
 	return nil
 }
 

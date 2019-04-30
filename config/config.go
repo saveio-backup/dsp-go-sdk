@@ -24,19 +24,13 @@ type DspConfig struct {
 	ChannelRevealTimeout string // channel reveal time out. e.g: "1000"
 	ChannelDBPath        string
 
-	DnsNodeMaxNum     int    // dns node max count
-	DnsChannelDeposit uint64 //  deposit amount of channel between self and dns node
-	SeedInterval      int    // push file to tracker interval in second, if it's 0, no push
+	AutoSetupDNSEnable bool   // enable auto setup DNS node or not
+	DnsNodeMaxNum      int    // dns node max count
+	DnsChannelDeposit  uint64 //  deposit amount of channel between self and dns node
+	SeedInterval       int    // push file to tracker interval in second, if it's 0, no push
 }
 
 func DefaultDspConfig() *DspConfig {
-	config := &DspConfig{
-		// 		DBPath:       "./db",
-		// 		FsRepoRoot:   ".",
-		// 		FsFileRoot:   ".",
-		// 		FsType:       FS_BLOCKSTORE,
-		// FsGcPeriod:   "1h",
-		// ChainRpcAddr: "http://localhost:20336",
-	}
+	config := &DspConfig{}
 	return config
 }

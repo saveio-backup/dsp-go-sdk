@@ -59,45 +59,82 @@ func (this *Dsp) SetupDNSChannels() error {
 	if len(ns) == 0 {
 		return errors.New("no dns nodes")
 	}
-	for _, v := range ns {
-		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
-		dnsUrl := fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
+	oldNodes := this.Channel.GetAllPartners()
+
+	setDNSNodeFunc := func(dnsUrl, walletAddr string) error {
+		log.Debugf("set dns node func %s %s", dnsUrl, walletAddr)
 		if this.Network != nil && !this.Network.IsPeerListenning(dnsUrl) {
-			continue
+			return errors.New("connect peer failed")
 		}
-		log.Debugf("open channel set addr %s-%s", v.WalletAddr.ToBase58(), dnsUrl)
-		this.Channel.SetHostAddr(v.WalletAddr.ToBase58(), dnsUrl)
-		_, err = this.Channel.OpenChannel(v.WalletAddr.ToBase58())
+		err = this.Channel.SetHostAddr(walletAddr, dnsUrl)
+		if err != nil {
+			return err
+		}
+		_, err = this.Channel.OpenChannel(walletAddr)
 		if err != nil {
 			log.Debugf("open channel err ")
-			continue
+			return err
 		}
-		err = this.Channel.WaitForConnected(v.WalletAddr.ToBase58(), time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		if err != nil {
-			log.Debugf("wait channel connected err %s", err)
-			// TODO: withdraw and close channel
-			continue
+			log.Errorf("wait channel connected err %s %s", walletAddr, err)
+			// return err
 		}
-		bal, _ := this.Channel.GetCurrentBalance(v.WalletAddr.ToBase58())
+		bal, _ := this.Channel.GetCurrentBalance(walletAddr)
 		log.Debugf("current balance %d", bal)
-		// depositAmount := uint64(0)
-		// if this.Config.DnsChannelDeposit > bal {
-		// 	depositAmount = this.Config.DnsChannelDeposit - bal
-		// }
 		log.Infof("connect to dns node :%s, deposit %d", dnsUrl, this.Config.DnsChannelDeposit)
-		err = this.Channel.SetDeposit(v.WalletAddr.ToBase58(), this.Config.DnsChannelDeposit)
+		err = this.Channel.SetDeposit(walletAddr, this.Config.DnsChannelDeposit)
 		if err != nil && strings.Index(err.Error(), "totalDeposit must big than contractBalance") == -1 {
 			log.Debugf("deposit result %s", err)
 			// TODO: withdraw and close channel
-			continue
+			return err
 		}
 		this.DNSNode = &DNSNodeInfo{
-			WalletAddr:  v.WalletAddr.ToBase58(),
+			WalletAddr:  walletAddr,
 			ChannelAddr: dnsUrl,
+		}
+		return nil
+	}
+
+	// setup old nodes
+	// TODO: get more acculatey nodes list from channel
+	if !this.Config.AutoSetupDNSEnable && len(oldNodes) > 0 {
+		log.Debugf("set up old dns nodes %v, ns:%v", oldNodes, ns)
+		for _, walletAddr := range oldNodes {
+			address, err := chaincom.AddressFromBase58(walletAddr)
+			if err != nil {
+				continue
+			}
+			if _, ok := ns[address.ToHexString()]; !ok {
+				continue
+			}
+			dnsUrl := this.GetExternalIP(walletAddr)
+			if len(dnsUrl) == 0 {
+				dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, ns[address.ToHexString()].IP, ns[address.ToHexString()].Port)
+			}
+			err = setDNSNodeFunc(dnsUrl, walletAddr)
+			if err != nil {
+				continue
+			}
+			break
+		}
+		return err
+	}
+
+	// first init
+	for _, v := range ns {
+		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
+		dnsUrl := this.GetExternalIP(v.WalletAddr.ToBase58())
+		if len(dnsUrl) == 0 {
+			dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
+		}
+		err = setDNSNodeFunc(dnsUrl, v.WalletAddr.ToBase58())
+		if err != nil {
+			continue
 		}
 		break
 	}
-	return nil
+	return err
 }
 
 func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr string) error {
@@ -287,7 +324,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) string {
 			log.Errorf("address from req failed %s", err)
 			continue
 		}
-		log.Debugf("string(hostAddr) :%v", hostAddr)
+		log.Debugf("GetExternalIP %s :%v", walletAddr, hostAddr)
 		hostAddrStr := utils.FullHostAddr(string(hostAddr), this.Config.ChannelProtocol)
 		return hostAddrStr
 	}
