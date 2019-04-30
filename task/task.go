@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/common"
-	"github.com/oniio/dsp-go-sdk/store"
-	"github.com/oniio/oniChain/common/log"
+	"github.com/saveio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/store"
+	"github.com/saveio/themis/common/log"
 )
 
 type TaskType int

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 )
 
 func TestReadMsg(t *testing.T) {

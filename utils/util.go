@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/oniio/dsp-go-sdk/network/message/types/file"
+	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 )
 
 // SortPeersByPrice. sort peer paymentInfo by its unitprice with max peer count

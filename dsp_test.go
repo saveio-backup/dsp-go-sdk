@@ -8,15 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/utils"
+	"github.com/saveio/dsp-go-sdk/utils"
 
-	"github.com/oniio/oniChain-go-sdk/wallet"
+	"github.com/saveio/themis-go-sdk/wallet"
 
-	"github.com/oniio/dsp-go-sdk/common"
-	"github.com/oniio/dsp-go-sdk/config"
-	"github.com/oniio/oniChain/account"
-	chainCom "github.com/oniio/oniChain/common"
-	"github.com/oniio/oniChain/common/log"
+	"github.com/saveio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/config"
+	"github.com/saveio/themis/account"
+	chainCom "github.com/saveio/themis/common"
+	"github.com/saveio/themis/common/log"
 )
 
 var rpcAddr = "http://127.0.0.1:20336"

@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/common"
-	"github.com/oniio/dsp-go-sdk/config"
-	"github.com/oniio/dsp-go-sdk/utils"
-	chaincom "github.com/oniio/oniChain/common"
-	"github.com/oniio/oniChain/common/log"
-	"github.com/oniio/oniChain/smartcontract/service/native/dns"
-	"github.com/oniio/oniDNS/tracker"
+	"github.com/saveio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/config"
+	"github.com/saveio/dsp-go-sdk/utils"
+	chaincom "github.com/saveio/themis/common"
+	"github.com/saveio/themis/common/log"
+	"github.com/saveio/themis/smartcontract/service/native/dns"
+	"github.com/saveio/scan/tracker"
 )
 
 type DNSNodeInfo struct {

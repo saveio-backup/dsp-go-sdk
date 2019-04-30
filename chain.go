@@ -4,10 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/oniio/dsp-go-sdk/config"
-	"github.com/oniio/oniChain/account"
-	chainCom "github.com/oniio/oniChain/common"
-	fs "github.com/oniio/oniChain/smartcontract/service/native/onifs"
+	"github.com/saveio/dsp-go-sdk/config"
+	"github.com/saveio/themis/account"
+	chainCom "github.com/saveio/themis/common"
+	fs "github.com/saveio/themis/smartcontract/service/native/onifs"
 )
 
 func (this *Dsp) CurrentAccount() *account.Account {

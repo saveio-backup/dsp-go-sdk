@@ -1,6 +1,6 @@
 package task
 
-import "github.com/oniio/dsp-go-sdk/common"
+import "github.com/saveio/dsp-go-sdk/common"
 
 type jobFunc func(string, string, string, int32, chan *BlockResp) (*BlockResp, error)
 

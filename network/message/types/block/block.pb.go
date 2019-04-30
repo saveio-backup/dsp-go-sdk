@@ -6,7 +6,7 @@ package block
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import payment "github.com/oniio/dsp-go-sdk/network/message/types/payment"
+import payment "github.com/saveio/dsp-go-sdk/network/message/types/payment"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

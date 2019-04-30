@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/oniio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/common"
 )
 
 func GenOniLink(fileHashStr, fileName string, fileSize, blockNum uint64, trackers []string) string {

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/network/common"
-	"github.com/oniio/dsp-go-sdk/network/message"
-	"github.com/oniio/oniP2p/network"
+	"github.com/saveio/dsp-go-sdk/network/common"
+	"github.com/saveio/dsp-go-sdk/network/message"
+	"github.com/saveio/carrier/network"
 )
 
 var node1ListAddr = "tcp://127.0.0.1:50001"

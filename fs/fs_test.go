@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oniio/dsp-go-sdk/config"
-	chain "github.com/oniio/oniChain-go-sdk"
-	"github.com/oniio/oniChain-go-sdk/wallet"
+	"github.com/saveio/dsp-go-sdk/config"
+	chain "github.com/saveio/themis-go-sdk"
+	"github.com/saveio/themis-go-sdk/wallet"
 )
 
 var testbigFile = "../testdata/testuploadbigfile.txt"

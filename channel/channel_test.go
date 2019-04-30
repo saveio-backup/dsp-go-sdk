@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oniio/dsp-go-sdk/config"
-	chain "github.com/oniio/oniChain-go-sdk"
-	"github.com/oniio/oniChain-go-sdk/wallet"
-	cliutil "github.com/oniio/oniChain/cmd/utils"
-	"github.com/oniio/oniChain/common/log"
-	"github.com/oniio/oniChain/crypto/keypair"
-	"github.com/oniio/oniChannel/transfer"
+	"github.com/saveio/dsp-go-sdk/config"
+	chain "github.com/saveio/themis-go-sdk"
+	"github.com/saveio/themis-go-sdk/wallet"
+	cliutil "github.com/saveio/themis/cmd/utils"
+	"github.com/saveio/themis/common/log"
+	"github.com/saveio/themis/crypto/keypair"
+	"github.com/saveio/pylons/transfer"
 )
 
 var rpcAddr = "http://127.0.0.1:20336"

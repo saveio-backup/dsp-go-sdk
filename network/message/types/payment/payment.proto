@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package payment;
-option go_package="github.com/oniio/dsp-go-sdk/network/message/types/payment";
+option go_package="github.com/saveio/dsp-go-sdk/network/message/types/payment";
 
 message Payment {
     string sender = 1; // payer wallet address

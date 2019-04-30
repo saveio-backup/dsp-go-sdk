@@ -2,11 +2,11 @@ package message
 
 import (
 	"github.com/gogo/protobuf/proto"
-	"github.com/oniio/dsp-go-sdk/network/common"
-	"github.com/oniio/dsp-go-sdk/network/message/pb"
-	"github.com/oniio/dsp-go-sdk/network/message/types/block"
-	"github.com/oniio/dsp-go-sdk/network/message/types/file"
-	"github.com/oniio/dsp-go-sdk/network/message/types/payment"
+	"github.com/saveio/dsp-go-sdk/network/common"
+	"github.com/saveio/dsp-go-sdk/network/message/pb"
+	"github.com/saveio/dsp-go-sdk/network/message/types/block"
+	"github.com/saveio/dsp-go-sdk/network/message/types/file"
+	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 )
 
 type Header struct {
