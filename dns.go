@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/dsp-go-sdk/utils"
@@ -50,7 +51,7 @@ func (this *Dsp) SetupDNSTrackers() error {
 		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
 		this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
 	}
-	log.Debugf("this.TrackerUrls len %d", this.TrackerUrls)
+	log.Debugf("this.TrackerUrls %v", this.TrackerUrls)
 	return nil
 }
 
@@ -66,8 +67,11 @@ func (this *Dsp) SetupDNSChannels() error {
 
 	setDNSNodeFunc := func(dnsUrl, walletAddr string) error {
 		log.Debugf("set dns node func %s %s", dnsUrl, walletAddr)
-		if this.Network != nil && !this.Network.IsPeerListenning(dnsUrl) {
-			return errors.New("connect peer failed")
+		if err := client.P2pIsPeerListening(dnsUrl); err != nil {
+			return err
+		}
+		if strings.Index(dnsUrl, "0.0.0.0:0") != -1 {
+			return errors.New("invalid host addr")
 		}
 		err = this.Channel.SetHostAddr(walletAddr, dnsUrl)
 		if err != nil {
@@ -81,9 +85,9 @@ func (this *Dsp) SetupDNSChannels() error {
 		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		if err != nil {
 			log.Errorf("wait channel connected err %s %s", walletAddr, err)
-			// return err
+			return err
 		}
-		bal, _ := this.Channel.GetCurrentBalance(walletAddr)
+		bal, _ := this.Channel.GetAvaliableBalance(walletAddr)
 		log.Debugf("current balance %d", bal)
 		log.Infof("connect to dns node :%s, deposit %d", dnsUrl, this.Config.DnsChannelDeposit)
 		err = this.Channel.SetDeposit(walletAddr, this.Config.DnsChannelDeposit)
@@ -96,6 +100,7 @@ func (this *Dsp) SetupDNSChannels() error {
 			WalletAddr:  walletAddr,
 			ChannelAddr: dnsUrl,
 		}
+		log.Debugf("DNSNode wallet: %v, addr: %v", this.DNSNode.WalletAddr, this.DNSNode.ChannelAddr)
 		return nil
 	}
 
@@ -109,14 +114,17 @@ func (this *Dsp) SetupDNSChannels() error {
 				continue
 			}
 			if _, ok := ns[address.ToHexString()]; !ok {
+				log.Debugf("dns not found %s", address.ToHexString())
 				continue
 			}
-			dnsUrl := this.GetExternalIP(walletAddr)
+			dnsUrl, _ := this.GetExternalIP(walletAddr)
 			if len(dnsUrl) == 0 {
 				dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, ns[address.ToHexString()].IP, ns[address.ToHexString()].Port)
 			}
+			log.Debugf("dns url of oldnodes %s", dnsUrl)
 			err = setDNSNodeFunc(dnsUrl, walletAddr)
 			if err != nil {
+				log.Debugf("set dns node func err %s", err)
 				continue
 			}
 			break
@@ -127,7 +135,7 @@ func (this *Dsp) SetupDNSChannels() error {
 	// first init
 	for _, v := range ns {
 		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
-		dnsUrl := this.GetExternalIP(v.WalletAddr.ToBase58())
+		dnsUrl, _ := this.GetExternalIP(v.WalletAddr.ToBase58())
 		if len(dnsUrl) == 0 {
 			dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
 		}
@@ -162,10 +170,7 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	copy(hashBytes[:], []byte(hash)[:])
 	for _, trackerUrl := range trackerUrls {
 		log.Debugf("trackerurl %s hashBytes: %v netIp:%v netPort:%v", trackerUrl, hashBytes, netIp, netPort)
-		err := tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
-		if err != nil {
-			return err
-		}
+		tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
 	}
 	return nil
 }
@@ -173,14 +178,9 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string {
 	var hashBytes [46]byte
 	copy(hashBytes[:], []byte(hash)[:])
-
 	peerAddrs := make([]string, 0)
 	networkProtocol := common.DSP_NETWORK_PROTOCOL
-	selfAddr := ""
-	if this.Network != nil {
-		networkProtocol = this.Network.Protocol()
-		selfAddr = this.Network.ExternalAddr()
-	}
+	selfAddr := client.P2pGetPublicAddr()
 	for _, trackerUrl := range trackerUrls {
 		peers := tracker.GetTorrentPeers(hashBytes, trackerUrl, -1, 1)
 		if len(peers) == 0 {
@@ -226,7 +226,7 @@ func (this *Dsp) StartSeedService() {
 			continue
 		}
 		for _, fileHashStr := range files {
-			this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
+			this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
 		}
 	}
 }
@@ -330,11 +330,11 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 }
 
 // GetExternalIP. get external ip of wallet from dns nodes
-func (this *Dsp) GetExternalIP(walletAddr string) string {
+func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	address, err := chaincom.AddressFromBase58(walletAddr)
 	if err != nil {
 		log.Errorf("address from b58 failed %s", err)
-		return ""
+		return "", err
 	}
 	for _, url := range this.TrackerUrls {
 		hostAddr, err := tracker.ReqEndPoint(url, address)
@@ -342,20 +342,28 @@ func (this *Dsp) GetExternalIP(walletAddr string) string {
 			log.Errorf("address from req failed %s", err)
 			continue
 		}
-		log.Debugf("GetExternalIP %s :%v", walletAddr, hostAddr)
+		log.Debugf("GetExternalIP %s :%v", walletAddr, string(hostAddr))
+		if len(string(hostAddr)) == 0 {
+			continue
+		}
 		hostAddrStr := utils.FullHostAddr(string(hostAddr), this.Config.ChannelProtocol)
-		return hostAddrStr
+		if strings.Index(hostAddrStr, "0.0.0.0:0") != -1 {
+			continue
+		}
+		return hostAddrStr, nil
 	}
 	log.Debugf("no request %v", this.TrackerUrls)
-	return ""
+	return "", errors.New("host addr not found")
 }
 
 // SetupPartnerHost. setup host addr for partners
 func (this *Dsp) SetupPartnerHost(partners []string) {
-	log.Debugf("partners %v\n", partners)
 	for _, addr := range partners {
-		host := this.GetExternalIP(addr)
-		log.Debugf("get external ip %v, %v", addr, host)
+		host, err := this.GetExternalIP(addr)
+		log.Debugf("[SetupPartnerHost] get external ip %v, %v, err %s", addr, host, err)
+		if err != nil || len(host) == 0 {
+			continue
+		}
 		this.Channel.SetHostAddr(addr, host)
 	}
 }

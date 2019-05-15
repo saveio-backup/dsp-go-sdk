@@ -4,14 +4,16 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ontio/ontology-eventbus/actor"
+	dspActorClient "github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/channel"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/dsp-go-sdk/fs"
-	"github.com/saveio/dsp-go-sdk/network"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
-	"github.com/saveio/themis-go-sdk"
+	chActorClient "github.com/saveio/pylons/actor/client"
+	chain "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis/account"
 	"github.com/saveio/themis/common/log"
 )
@@ -19,7 +21,6 @@ import (
 type Dsp struct {
 	Config      *config.DspConfig
 	Chain       *chain.Chain
-	Network     *network.Network
 	Fs          *fs.Fs
 	Channel     *channel.Channel
 	TrackerUrls []string
@@ -27,7 +28,7 @@ type Dsp struct {
 	taskMgr     *task.TaskMgr
 }
 
-func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
+func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
 	d := &Dsp{
 		taskMgr: task.NewTaskMgr(),
 	}
@@ -58,6 +59,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
 			return nil
 		}
 	}
+	dspActorClient.SetP2pPid(p2pActor)
 	if len(c.ChannelListenAddr) > 0 && acc != nil {
 		var err error
 		d.Channel, err = channel.NewChannelService(c, d.Chain)
@@ -65,6 +67,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account) *Dsp {
 			log.Errorf("init channel err %s", err)
 			return nil
 		}
+		chActorClient.SetP2pPid(p2pActor)
 		if dbstore != nil {
 			channelDB := store.NewChannelDB(dbstore)
 			d.Channel.SetChannelDB(channelDB)
@@ -77,17 +80,10 @@ func (this *Dsp) GetVersion() string {
 	return common.DSP_SDK_VERSION
 }
 
-func (this *Dsp) Start(addr string) error {
-	// start p2p network
-	this.Network = network.NewNetwork(addr, this.Receive)
-	err := this.Network.Start()
-	if err != nil {
-		return err
-	}
+func (this *Dsp) Start() error {
 	if this.Config == nil {
 		return nil
 	}
-
 	// start dns service
 	if this.Channel != nil {
 		err := this.StartChannelService()
@@ -150,13 +146,13 @@ func (this *Dsp) Stop() error {
 			return err
 		}
 	}
-	if this.Network != nil {
-		err := this.Network.Halt()
-		if err != nil {
-			log.Errorf("close dsp p2p err %s", err)
-			return err
-		}
-	}
+	// if this.Network != nil {
+	// 	err := this.Network.Halt()
+	// 	if err != nil {
+	// 		log.Errorf("close dsp p2p err %s", err)
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }

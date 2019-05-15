@@ -1,7 +1,7 @@
 package common
 
 const (
-	CHUNK_SIZE                  = 256 * 1024      // chunk size
+	CHUNK_SIZE                  = 32 * 1024       // chunk size
 	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"        // download temp file path
 	PROTO_NODE_FILE_HASH_LEN    = 46              // proto node file hash length
 	RAW_NODE_FILE_HASH_LEN      = 49              // raw node file hash length
@@ -25,16 +25,19 @@ const (
 
 // timeout
 const (
-	TX_CONFIRM_TIMEOUT           = 60      // wait for tx confirmed timeout
-	FILE_FETCH_ACK_TIMEOUT       = 10      // wait for file fetch ack timeout
-	BLOCK_FETCH_TIMEOUT          = 10      // fetch block and get block response timeout
-	CHECK_PROVE_TIMEOUT          = 60      // client upload file and check prove timeout
-	CHECK_CHANNEL_STATE_INTERVAL = 3       // check channel state interval
-	WAIT_CHANNEL_CONNECT_TIMEOUT = 10      // wait for channel connected
-	FILE_DNS_TTL                 = 10 * 60 //10m
+	TX_CONFIRM_TIMEOUT                  = 60      // wait for tx confirmed timeout
+	FILE_FETCH_ACK_TIMEOUT              = 10      // wait for file fetch ack timeout
+	BLOCK_FETCH_TIMEOUT                 = 10      // fetch block and get block response timeout
+	CHECK_PROVE_TIMEOUT                 = 60      // client upload file and check prove timeout
+	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval
+	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1       // check channel can transfer interval
+	CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT  = 30      // check channel can transfer interval
+	WAIT_CHANNEL_CONNECT_TIMEOUT        = 10      // wait for channel connected
+	FILE_DNS_TTL                        = 10 * 60 //10m
 	// CHANNEL_TRANSFER_TIMEOUT     = 60      // 60s
 	CHANNEL_TRANSFER_TIMEOUT = 20 // 60s
 	CHANNEL_WITHDRAW_TIMEOUT = 60 // 60s
+	P2P_REQ_TIMEOUT          = 5  // 5s
 )
 
 const (

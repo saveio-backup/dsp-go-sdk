@@ -2,25 +2,28 @@ package channel
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
-	ch "github.com/saveio/pylons"
-	"github.com/saveio/pylons/common"
-	"github.com/saveio/pylons/transfer"
+	"github.com/ontio/ontology-eventbus/actor"
 	dspcom "github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/dsp-go-sdk/store"
+	ch "github.com/saveio/pylons"
+	ch_actor "github.com/saveio/pylons/actor/server"
+	"github.com/saveio/pylons/common"
+	"github.com/saveio/pylons/transfer"
 	sdk "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis-go-sdk/usdt"
-	cmdutils "github.com/saveio/themis/cmd/utils"
 	chaincomm "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/smartcontract/service/native/utils"
 )
 
 type Channel struct {
-	channel    *ch.Channel
+	chActor    *ch_actor.ChannelActorServer
+	chActorId  *actor.PID
 	closeCh    chan struct{}
 	unitPrices map[int32]uint64
 	channelDB  *store.ChannelDB
@@ -60,33 +63,40 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 			return nil, err
 		}
 	}
-	channel, err := ch.NewChannelService(channelConfig, chain.Native.Channel.DefAcc)
+	//start channel and actor
+	channelActor, err := ch_actor.NewChannelActor(channelConfig, chain.Native.Channel.DefAcc)
 	if err != nil {
 		return nil, err
 	}
+	chnPid := channelActor.GetLocalPID()
 	return &Channel{
-		channel:    channel,
+		chActorId:  chnPid,
+		chActor:    channelActor,
 		closeCh:    make(chan struct{}, 1),
 		walletAddr: chain.Native.Channel.DefAcc.Address.ToBase58(),
 	}, nil
 }
 
+func (this *Channel) GetChannelPid() *actor.PID {
+	return this.chActorId
+}
+
 // SetHostAddr. set host address for wallet
 func (this *Channel) SetHostAddr(walletAddr, host string) error {
-	log.Debugf("SetHostAddr %v %v", walletAddr, host)
 	addr, err := chaincomm.AddressFromBase58(walletAddr)
 	if err != nil {
 		return err
 	}
 	log.Debugf("SetHostAddr %v %v", walletAddr, host)
-	this.channel.Service.SetHostAddr(common.Address(addr), host)
+	ch_actor.SetHostAddr(common.Address(addr), host)
 	this.channelDB.AddPartner(this.walletAddr, walletAddr)
 	return nil
 }
 
 // StartService. start channel service
 func (this *Channel) StartService() error {
-	err := this.channel.StartService()
+	//start connnect target
+	err := this.chActor.Start()
 	if err != nil {
 		return err
 	}
@@ -95,7 +105,7 @@ func (this *Channel) StartService() error {
 }
 
 func (this *Channel) StopService() {
-	this.channel.Stop()
+	this.chActor.Stop()
 	this.channelDB.Close()
 	close(this.closeCh)
 }
@@ -113,12 +123,13 @@ func (this *Channel) GetAllPartners() []string {
 // OverridePartners. override local partners with neighbours from channel
 func (this *Channel) OverridePartners() error {
 	newPartners := make([]string, 0)
-	neighbours := transfer.GetNeighbours(this.channel.Service.StateFromChannel())
+	neighbours := transfer.GetNeighbours(this.chActor.GetChannelService().Service.StateFromChannel())
 	for _, v := range neighbours {
 		newPartners = append(newPartners, common.ToBase58(v))
 	}
 	log.Debugf("override new partners %v\n", newPartners)
 	return this.channelDB.OverridePartners(this.walletAddr, newPartners)
+	return nil
 }
 
 // WaitForConnected. wait for conected for a period.
@@ -131,6 +142,9 @@ func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) 
 	for i := 0; i < secs; i++ {
 		if this.ChannelReachale(walletAddr) {
 			return nil
+		} else {
+			log.Warn("connect peer failed")
+			this.HealthyCheckNodeState(walletAddr)
 		}
 		<-time.After(interval)
 	}
@@ -140,12 +154,16 @@ func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) 
 // ChannelReachale. is channel open and reachable
 func (this *Channel) ChannelReachale(walletAddr string) bool {
 	target, _ := chaincomm.AddressFromBase58(walletAddr)
-	state := transfer.GetNodeNetworkStatus(this.channel.Service.StateFromChannel(), common.Address(target))
-	log.Debugf("state %s, target:%s", state, target.ToBase58())
-	if state == transfer.NetworkReachable {
-		return true
+	reachable, _ := ch_actor.ChannelReachable(common.Address(target))
+	return reachable
+}
+
+func (this *Channel) HealthyCheckNodeState(walletAddr string) error {
+	target, err := chaincomm.AddressFromBase58(walletAddr)
+	if err != nil {
+		return err
 	}
-	return false
+	return ch_actor.HealthyCheckNodeState(common.Address(target))
 }
 
 // OpenChannel. open channel for target of token.
@@ -155,7 +173,10 @@ func (this *Channel) OpenChannel(targetAddress string) (common.ChannelID, error)
 	if err != nil {
 		return 0, err
 	}
-	channelID := this.channel.Service.OpenChannel(token, common.Address(target))
+	channelID, err := ch_actor.OpenChannel(token, common.Address(target))
+	if err != nil {
+		return 0, err
+	}
 	if channelID == 0 {
 		return 0, errors.New("setup channel failed")
 	}
@@ -163,14 +184,15 @@ func (this *Channel) OpenChannel(targetAddress string) (common.ChannelID, error)
 }
 
 func (this *Channel) ChannelClose(targetAddress string) error {
-	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
 		return err
 	}
-	this.channel.Service.ChannelClose(token, common.Address(target), common.NetworkTimeout(20))
-	this.channelDB.DeletePartner(this.walletAddr, targetAddress)
-	return nil
+	success, err := ch_actor.CloseChannel(common.Address(target))
+	if err == nil && success {
+		this.channelDB.DeletePartner(this.walletAddr, targetAddress)
+	}
+	return err
 }
 
 // SetDeposit. deposit money to target
@@ -184,75 +206,84 @@ func (this *Channel) SetDeposit(targetAddress string, amount uint64) error {
 		return err
 	}
 	depositAmount := common.TokenAmount(amount)
-	err = this.channel.Service.SetTotalChannelDeposit(token, common.Address(target), depositAmount)
+	err = ch_actor.SetTotalChannelDeposit(token, common.Address(target), depositAmount)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// DirectTransfer. direct transfer to with payment id, and amount
-func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) error {
+func (this *Channel) CanTransfer(to string, amount uint64) error {
 	target, err := chaincomm.AddressFromBase58(to)
 	if err != nil {
 		return err
 	}
-	status, err := this.channel.Service.DirectTransferAsync(common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
-	if err != nil {
-		return err
+	interval := time.Duration(dspcom.CHECK_CHANNEL_CAN_TRANSFER_INTERVAL) * time.Second
+	secs := int(dspcom.CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT / interval)
+	if secs <= 0 {
+		secs = 1
 	}
-	select {
-	case ret := <-status:
+	for i := 0; i < secs; i++ {
+		ret, err := ch_actor.CanTransfer(common.Address(target), common.TokenAmount(amount))
 		if ret {
 			return nil
 		}
-		return errors.New("direct transfer payment failed")
-	case <-time.After(time.Duration(dspcom.CHANNEL_TRANSFER_TIMEOUT) * time.Second):
-		return errors.New("direct transfer timeout")
+		log.Debugf("CanTransfer err %s", err)
+		<-time.After(interval)
 	}
+	return errors.New("check can transfer timeout")
+}
+
+// DirectTransfer. direct transfer to with payment id, and amount
+func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) error {
+	err := this.CanTransfer(to, amount)
+	if err != nil {
+		return err
+	}
+	target, err := chaincomm.AddressFromBase58(to)
+	if err != nil {
+		return err
+	}
+	success, err := ch_actor.DirectTransferAsync(common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
+	if err != nil {
+		return err
+	}
+	log.Debugf("direct transfer success: %t", success)
+	if success {
+		return nil
+	}
+	return errors.New(fmt.Sprintf("direct transfer failed: %t", success))
 }
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) error {
+	err := this.CanTransfer(to, amount)
+	if err != nil {
+		return err
+	}
 	registryAddress := common.PaymentNetworkID(utils.MicroPayContractAddress)
 	tokenAddress := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(to)
 	if err != nil {
 		return err
 	}
-	status, err := this.channel.Service.MediaTransfer(registryAddress, tokenAddress, common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
+	success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
 	if err != nil {
 		return err
 	}
-	select {
-	case ret := <-status:
-		if ret {
-			return nil
-		}
-		return errors.New("media transfer payment failed")
-	case <-time.After(time.Duration(10) * time.Second):
-		// case <-time.After(time.Duration(dspcom.CHANNEL_TRANSFER_TIMEOUT) * time.Second):
-		return errors.New("media transfer timeout")
+	log.Debugf("media transfer success: %t", success)
+	if success {
+		return nil
 	}
+	return errors.New(fmt.Sprintf("media transfer failed: %t", success))
 }
 
 // GetTargetBalance. check total deposit balance
 func (this *Channel) GetTotalDepositBalance(targetAddress string) (uint64, error) {
-	target, err := chaincomm.AddressFromBase58(targetAddress)
+	partner, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
 		return 0, err
 	}
-	if this.channel.Service.Wal == nil {
-		return 0, errors.New("channel sqlite init failed")
-	}
-	chainState := this.channel.Service.StateFromChannel()
-
-	channelState := transfer.GetChannelStateFor(chainState, common.PaymentNetworkID(common.Address(utils.MicroPayContractAddress)),
-		common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS), common.Address(target))
-	if channelState == nil {
-		return 0, errors.New("channel state is nil")
-	}
-	state := channelState.GetChannelEndState(0)
-	return uint64(state.GetContractBalance()), nil
+	return ch_actor.GetTotalDepositBalance(common.Address(partner))
 }
 
 // GetAvaliableBalance. get avaliable balance
@@ -261,15 +292,7 @@ func (this *Channel) GetAvaliableBalance(partnerAddress string) (uint64, error) 
 	if err != nil {
 		return 0, err
 	}
-	registryAddress := common.PaymentNetworkID(utils.MicroPayContractAddress)
-	tokenAddress := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
-	chainState := this.channel.Service.GetChannel(registryAddress, tokenAddress, common.Address(partner))
-	if chainState == nil {
-		return 0, nil
-	}
-	amount := transfer.GetDistributable(chainState.OurState, chainState.PartnerState)
-	log.Debugf("get distributable from partner %s %d", partnerAddress, amount)
-	return uint64(amount), nil
+	return ch_actor.GetAvaliableBalance(common.Address(partner))
 }
 
 func (this *Channel) GetTotalWithdraw(partnerAddress string) (uint64, error) {
@@ -277,15 +300,7 @@ func (this *Channel) GetTotalWithdraw(partnerAddress string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	registryAddress := common.PaymentNetworkID(utils.MicroPayContractAddress)
-	tokenAddress := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
-	chainState := this.channel.Service.GetChannel(registryAddress, tokenAddress, common.Address(partner))
-	if chainState == nil {
-		return 0, nil
-	}
-	amount := chainState.OurState.GetTotalWithdraw()
-	log.Debugf("GetTotalWithdraw from partner %s %d", partnerAddress, amount)
-	return uint64(amount), nil
+	return ch_actor.GetTotalWithdraw(common.Address(partner))
 }
 
 func (this *Channel) GetCurrentBalance(partnerAddress string) (uint64, error) {
@@ -293,28 +308,7 @@ func (this *Channel) GetCurrentBalance(partnerAddress string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	registryAddress := common.PaymentNetworkID(utils.MicroPayContractAddress)
-	tokenAddress := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
-	chanState := this.channel.Service.GetChannel(registryAddress, tokenAddress, common.Address(partner))
-	if chanState == nil {
-		return 0, nil
-	}
-	var ourLocked, parLocked common.TokenAmount
-	ourBalance := chanState.OurState.GetGasBalance()
-	outCtBal := chanState.OurState.ContractBalance
-	parBalance := chanState.PartnerState.GetGasBalance()
-	parCtBal := chanState.PartnerState.ContractBalance
-
-	if chanState.OurState.BalanceProof != nil {
-		ourLocked = chanState.OurState.BalanceProof.LockedAmount
-	}
-	if chanState.PartnerState.BalanceProof != nil {
-		parLocked = chanState.PartnerState.BalanceProof.LockedAmount
-	}
-
-	log.Infof("[Balance] Our[BL: %d CT: %d LK: %d] Par[BL: %d CT: %d LK: %d]",
-		ourBalance, outCtBal, ourLocked, parBalance, parCtBal, parLocked)
-	return uint64(ourBalance), nil
+	return ch_actor.GetCurrentBalance(common.Address(partner))
 }
 
 // Withdraw. withdraw balance with target address
@@ -325,26 +319,16 @@ func (this *Channel) Withdraw(targetAddress string, amount uint64) (bool, error)
 		return false, err
 	}
 	withdrawAmount := common.TokenAmount(amount)
-	withdrawCh, err := this.channel.Service.Withdraw(token, common.Address(target), withdrawAmount)
-	if err != nil {
-		return false, err
-	}
-	select {
-	case ret := <-withdrawCh:
-		return ret, nil
-	case <-time.After(time.Duration(dspcom.CHANNEL_WITHDRAW_TIMEOUT) * time.Second):
-		return false, errors.New("withdraw timeout")
-	}
+	return ch_actor.WithDraw(token, common.Address(target), withdrawAmount)
 }
 
 // CooperativeSettle. settle channel cooperatively
 func (this *Channel) CooperativeSettle(targetAddress string) error {
-	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
 		return err
 	}
-	return this.channel.Service.ChannelCooperativeSettle(token, common.Address(target))
+	return ch_actor.CooperativeSettle(common.Address(target))
 }
 
 // SetUnitPrices
@@ -382,48 +366,38 @@ func (this *Channel) DeletePayment(paymentId int32) error {
 }
 
 func (this *Channel) AllChannels() *ChannelInfosResp {
-	resp := &ChannelInfosResp{}
-	totalBalance := uint64(0)
-	allPartners := this.GetAllPartners()
 	infos := make([]*channelInfo, 0)
-	for _, partner := range allPartners {
-		partnerAddress, err := chaincomm.AddressFromBase58(partner)
-		if err != nil {
-			continue
-		}
-		bal, err := this.GetAvaliableBalance(partner)
-		if err != nil {
-			continue
-		}
-		host, err := this.channel.Service.GetHostAddr(common.Address(partnerAddress))
-		if err != nil {
-			continue
-		}
-		id := uint32(this.channel.Service.GetChannelIdentifier(common.Address(partnerAddress)))
-		if id == 0 {
-			continue
-		}
-		info := &channelInfo{
-			ChannelId:     id,
-			Address:       partner,
-			Balance:       bal,
-			BalanceFormat: cmdutils.FormatUsdt(bal),
-			HostAddr:      host,
-			TokenAddr:     usdt.USDT_CONTRACT_ADDRESS.ToBase58(),
-		}
-		totalBalance += bal
-		infos = append(infos, info)
+	resp := &ChannelInfosResp{
+		Balance:       0,
+		BalanceFormat: "0",
+		Channels:      infos,
 	}
-	resp.Balance = totalBalance
-	resp.BalanceFormat = cmdutils.FormatUsdt(totalBalance)
-	resp.Channels = infos
+	all := ch_actor.GetAllChannels()
+	if all == nil {
+		return resp
+	}
+	resp.Balance = all.Balance
+	resp.BalanceFormat = all.BalanceFormat
+	for _, ch := range all.Channels {
+		resp.Channels = append(resp.Channels, &channelInfo{
+			ChannelId:     ch.ChannelId,
+			Address:       ch.Address,
+			Balance:       ch.Balance,
+			BalanceFormat: ch.BalanceFormat,
+			HostAddr:      ch.HostAddr,
+			TokenAddr:     ch.TokenAddr,
+		})
+	}
 	return resp
 }
 
 // registerReceiveNotification. register receive payment notification
 func (this *Channel) registerReceiveNotification() {
-	receiveChan := make(chan *transfer.EventPaymentReceivedSuccess)
-	this.channel.RegisterReceiveNotification(receiveChan)
+	receiveChan, err := ch_actor.RegisterReceiveNotification()
+	log.Debugf("receiveChan:%v, err %v", receiveChan, err)
+	if err != nil {
+		panic(err)
+	}
 	for {
 		select {
 		case event := <-receiveChan:

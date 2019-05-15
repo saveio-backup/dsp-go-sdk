@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/saveio/carrier/network"
+	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	netcom "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
@@ -12,7 +14,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
-	"github.com/saveio/carrier/network"
 )
 
 // Receive p2p message receive router
@@ -81,7 +82,8 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			}
 		}
 		newMsg := message.NewFileFetchAck(fileMsg.GetHash())
-		this.Network.Send(newMsg, peer)
+		log.Debugf("send file_ack msg %v %v", peer, newMsg)
+		client.P2pSend(peer, newMsg.ToProtoMsg())
 	case netcom.FILE_OP_FETCH_ACK:
 		// my task. use my wallet address
 		taskKey := this.taskMgr.TaskKey(fileMsg.Hash, this.WalletAddress(), task.TaskTypeUpload)
@@ -180,12 +182,12 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			}
 		}
 		this.taskMgr.AddShareTo(taskKey, fileMsg.PayInfo.WalletAddress)
-		hostAddr := this.GetExternalIP(fileMsg.PayInfo.WalletAddress)
+		hostAddr, err := this.GetExternalIP(fileMsg.PayInfo.WalletAddress)
 		log.Debugf("Set host addr after recv file download %s - %s", fileMsg.PayInfo.WalletAddress, hostAddr)
-		if len(hostAddr) > 0 {
+		if len(hostAddr) > 0 || err != nil {
 			this.Channel.SetHostAddr(fileMsg.PayInfo.WalletAddress, hostAddr)
 		}
-		err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
+		err = ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply download msg failed, err %s", err)
 		}

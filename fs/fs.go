@@ -6,6 +6,7 @@ import (
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
 	"os"
+	"path/filepath"
 	"strings"
 
 	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
@@ -33,9 +34,13 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 		cfg = config.DefaultDspConfig()
 	}
 
+	root, err := filepath.Abs("/")
+	if err != nil {
+		return nil, err
+	}
 	fsConfig := &max.FSConfig{
 		RepoRoot:   cfg.FsRepoRoot,
-		FsRoot:     cfg.FsFileRoot,
+		FsRoot:     root,
 		FsType:     max.FSType(cfg.FsType),
 		ChunkSize:  common.CHUNK_SIZE,
 		GcPeriod:   cfg.FsGcPeriod,

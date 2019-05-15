@@ -15,6 +15,8 @@ import (
 
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
 
+	"github.com/gogo/protobuf/proto"
+	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
 	netcom "github.com/saveio/dsp-go-sdk/network/common"
@@ -23,10 +25,10 @@ import (
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/dsp-go-sdk/utils"
+	"github.com/saveio/max/importer/helpers"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/crypto/pdp"
-	"github.com/saveio/max/importer/helpers"
 )
 
 func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, whitelistCnt uint64) (uint64, error) {
@@ -226,7 +228,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 				return nil, err
 			}
 			msg := message.NewBlockMsg(int32(reqInfo.Index), fileHashStr, reqInfo.Hash, blockData, tag, offset-dataLen)
-			err = this.Network.Send(msg, reqInfo.PeerAddr)
+			err = client.P2pSend(reqInfo.PeerAddr, msg.ToProtoMsg())
 			if err != nil {
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 				return nil, err
@@ -312,7 +314,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(taskKey, fileHashStr, 0)...)
 	}
 	msg := message.NewFileDelete(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
-	err = this.Network.Broadcast(storingNode, msg, true, nil, nil)
+	err = client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
 	if err != nil {
 		return "", err
 	}
@@ -376,7 +378,7 @@ func (this *Dsp) StartShareServices() {
 			// TEST: client get tag
 			tag, _ := this.Fs.GetTag(req.Hash, req.FileHash, uint64(req.Index))
 			msg := message.NewBlockMsg(req.Index, req.FileHash, req.Hash, blockData, tag, int64(offset))
-			this.Network.Send(msg, req.PeerAddr)
+			client.P2pSend(req.PeerAddr, msg.ToProtoMsg())
 			up, err := this.GetFileUnitPrice(req.Asset)
 			if err != nil {
 				log.Errorf("get file unit price err after send block, err: %s", err)
@@ -433,12 +435,13 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	peerPayInfos := make(map[string]*file.Payment, 0)
 	blockHashes := make([]string, 0)
 	prefix := ""
-	reply := func(msg *message.Message, addr string) {
-		if msg.Error != nil {
-			log.Errorf("get download ask err %s", msg.Error.Message)
+	reply := func(msg proto.Message, addr string) {
+		p2pMsg := message.ReadMessage(msg)
+		if p2pMsg.Error != nil {
+			log.Errorf("get download ask err %s", p2pMsg.Error.Message)
 			return
 		}
-		fileMsg := msg.Payload.(*file.File)
+		fileMsg := p2pMsg.Payload.(*file.File)
 		if len(fileMsg.BlockHashes) < len(blockHashes) {
 			return
 		}
@@ -452,7 +455,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 		peerPayInfos[addr] = fileMsg.PayInfo
 		prefix = fileMsg.Prefix
 	}
-	err := this.Network.Broadcast(addrs, msg, true, nil, reply)
+	err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)
 	if err != nil {
 		log.Errorf("file download err %s", err)
 	}
@@ -496,7 +499,7 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 	}
 	log.Debugf("this %v", this)
 	log.Debugf("this.ch %v", this.Channel)
-	curBal, _ := this.Channel.GetCurrentBalance(this.DNSNode.WalletAddr)
+	curBal, _ := this.Channel.GetAvaliableBalance(this.DNSNode.WalletAddr)
 	if curBal < totalAmount {
 		log.Debugf("depositing...")
 		err := this.Channel.SetDeposit(this.DNSNode.WalletAddr, totalAmount)
@@ -506,9 +509,9 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 		}
 	}
 	for _, payInfo := range peerPrices {
-		hostAddr := this.GetExternalIP(payInfo.WalletAddress)
+		hostAddr, err := this.GetExternalIP(payInfo.WalletAddress)
 		log.Debugf("Set host addr after deposit channel %s - %s", payInfo.WalletAddress, hostAddr)
-		if len(hostAddr) == 0 {
+		if len(hostAddr) == 0 || err != nil {
 			continue
 		}
 		this.Channel.SetHostAddr(payInfo.WalletAddress, hostAddr)
@@ -547,7 +550,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
 	// TODO: wait for receiver received notification (need optimized)
 	time.Sleep(time.Second)
-	_, err = this.Network.RequestWithRetry(msg, addr, common.MAX_NETWORK_REQUEST_RETRY)
+	_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), addr, common.MAX_NETWORK_REQUEST_RETRY)
 	log.Debugf("payment msg response :%d, err:%s", paymentId, err)
 	if err != nil {
 		return 0, err
@@ -595,7 +598,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		addrs = append(addrs, addr)
 	}
 	log.Debugf("broad cast msg to %v", addrs)
-	err = this.Network.Broadcast(addrs, msg, true, nil, nil)
+	err = client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, nil)
 	log.Debugf("brocast file download msg err %v", err)
 	if err != nil {
 		return err
@@ -722,10 +725,10 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			this.taskMgr.SetTaskDone(taskKey, true)
 			break
 		}
-		go this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
+		go this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
 		fileDonwloadOkMsg := message.NewFileDownloadOk(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), asset)
 		log.Debugf("broad file donwload ok cast msg to %v", addrs)
-		this.Network.Broadcast(addrs, fileDonwloadOkMsg, true, nil, nil)
+		client.P2pBroadcast(addrs, fileDonwloadOkMsg.ToProtoMsg(), true, nil, nil)
 		if len(decryptPwd) > 0 {
 			err := this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
 			if err != nil {
@@ -1007,7 +1010,7 @@ func (this *Dsp) getUploadNodeList(filePath, taskKey, fileHashStr string) ([]str
 			continue
 		}
 		fullAddress := string(info.NodeAddr)
-		if fullAddress == this.Network.ListenAddr() {
+		if fullAddress == client.P2pGetPublicAddr() {
 			continue
 		}
 		nodeList = append(nodeList, fullAddress)
@@ -1040,7 +1043,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	receivers := make([]string, 0)
 	msg := message.NewFileFetchAsk(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), this.Chain.Native.Fs.DefAcc.Address.ToBase58())
-	action := func(res *message.Message, addr string) {
+	action := func(res proto.Message, addr string) {
 		log.Debugf("send file ask msg success %s", addr)
 		// block waiting for ack msg or timeout msg
 		isAck := false
@@ -1065,7 +1068,7 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 	stop := func() bool {
 		return len(receivers) >= receiverCount
 	}
-	err := this.Network.Broadcast(nodeList, msg, false, stop, action)
+	err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), false, stop, action)
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err")
 		return nil, err
@@ -1081,7 +1084,7 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 func (this *Dsp) notifyFetchReady(taskKey, fileHashStr string, receivers []string) error {
 	msg := message.NewFileFetchRdy(fileHashStr)
 	this.taskMgr.SetTaskReady(taskKey, true)
-	err := this.Network.Broadcast(receivers, msg, false, nil, nil)
+	err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil, nil)
 	if err != nil {
 		log.Errorf("notify err %s", err)
 		this.taskMgr.SetTaskReady(taskKey, false)
@@ -1102,11 +1105,9 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		log.Errorf("block hashes is empty for file :%s", fileHashStr)
 		return errors.New("block hashes is empty")
 	}
-	if !this.Network.IsConnectionExists(addr) {
-		err := this.Network.Connect(addr)
-		if err != nil {
-			return err
-		}
+	err := client.P2pConnect(addr)
+	if err != nil {
+		return err
 	}
 	this.taskMgr.NewTask(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	defer this.taskMgr.DeleteTask(taskKey)
@@ -1141,7 +1142,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		log.Errorf("pin root file err %s", err)
 		return err
 	}
-	this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
+	this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
 	log.Infof("received all block, start pdp verify")
 
 	// all block is saved, prove it
@@ -1163,7 +1164,7 @@ func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr inter
 		walletAddress = this.Chain.Native.Channel.DefAcc.Address.ToBase58()
 	}
 	msg := message.NewBlockReqMsg(fileHashStr, hash, index, walletAddress, common.ASSET_USDT)
-	err := this.Network.Send(msg, addr)
+	err := client.P2pSend(addr, msg.ToProtoMsg())
 	if err != nil {
 		return nil, err
 	}
@@ -1249,7 +1250,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, blockHashe
 			log.Errorf("put block err %s", err)
 			return err
 		}
-		err = this.taskMgr.SetBlockDownloaded(taskKey, fileHashStr, this.Network.ListenAddr(), uint32(0), 0, links)
+		err = this.taskMgr.SetBlockDownloaded(taskKey, fileHashStr, client.P2pGetPublicAddr(), uint32(0), 0, links)
 		if err != nil {
 			return err
 		}
@@ -1288,14 +1289,14 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, blockHashe
 			log.Errorf("put block err %s", err)
 			return err
 		}
-		err = this.taskMgr.SetBlockDownloaded(taskKey, blockHash, this.Network.ListenAddr(), uint32(blockIndex), blockOffset, links)
+		err = this.taskMgr.SetBlockDownloaded(taskKey, blockHash, client.P2pGetPublicAddr(), uint32(blockIndex), blockOffset, links)
 		if err != nil {
 			return err
 		}
 		log.Debugf("%s-%s-%d set downloaded", fileHashStr, blockHash, blockIndex)
 		blockOffset += dataLen
 	}
-	go this.PushToTrackers(fileHashStr, this.TrackerUrls, this.Network.ListenAddr())
+	go this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
 	return nil
 }
 
