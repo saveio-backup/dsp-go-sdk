@@ -143,7 +143,7 @@ func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) 
 		if this.ChannelReachale(walletAddr) {
 			return nil
 		} else {
-			log.Warn("connect peer failed")
+			log.Warn("connect peer:%s failed", walletAddr)
 			this.HealthyCheckNodeState(walletAddr)
 		}
 		<-time.After(interval)
@@ -225,10 +225,10 @@ func (this *Channel) CanTransfer(to string, amount uint64) error {
 	}
 	for i := 0; i < secs; i++ {
 		ret, err := ch_actor.CanTransfer(common.Address(target), common.TokenAmount(amount))
-		if ret {
+		log.Debugf("CanTransfer ret %t err %s", ret, err)
+		if err == nil {
 			return nil
 		}
-		log.Debugf("CanTransfer err %s", err)
 		<-time.After(interval)
 	}
 	return errors.New("check can transfer timeout")
@@ -257,6 +257,7 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) error {
 	err := this.CanTransfer(to, amount)
+	log.Debugf("can transter err %s", err)
 	if err != nil {
 		return err
 	}
@@ -266,10 +267,21 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) er
 	if err != nil {
 		return err
 	}
+	log.Debugf("start media transfer")
 	success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
-	if err != nil {
-		return err
-	}
+	log.Debugf("media transfer result %v, err %s", success, err)
+	// if err != nil {
+	// 	return err
+	// }
+	// for {
+	// 	select {
+	// 	case ret := <-success:
+	// 		log.Debugf("media transfer success: %t", ret)
+	// 		return nil
+	// 	case <-time.After(time.Minute):
+	// 		return errors.New("media transfer timeout")
+	// 	}
+	// }
 	log.Debugf("media transfer success: %t", success)
 	if success {
 		return nil

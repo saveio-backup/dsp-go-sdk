@@ -228,6 +228,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 				return nil, err
 			}
 			msg := message.NewBlockMsg(int32(reqInfo.Index), fileHashStr, reqInfo.Hash, blockData, tag, offset-dataLen)
+			log.Debugf("send fetched block msg len:%d, block len:%d, tag len:%d", msg.Header.MsgLength, dataLen, len(tag))
 			err = client.P2pSend(reqInfo.PeerAddr, msg.ToProtoMsg())
 			if err != nil {
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)

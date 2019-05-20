@@ -71,7 +71,7 @@ func newLocalDsp(r, w, wp string) *Dsp {
 			return nil
 		}
 	}
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	return d
 }
 
@@ -79,7 +79,7 @@ func TestChainGetBlockHeight(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
 	}
-	d := NewDsp(dspCfg, nil)
+	d := NewDsp(dspCfg, nil, nil)
 	height, err := d.Chain.GetCurrentBlockHeight()
 	if err != nil {
 		fmt.Printf("get block height err: %s", err)
@@ -91,7 +91,7 @@ func TestGetVersion(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
 	}
-	d := NewDsp(dspCfg, nil)
+	d := NewDsp(dspCfg, nil, nil)
 	version := d.GetVersion()
 	fmt.Printf("version: %s\n", version)
 }
@@ -112,7 +112,7 @@ func TestNodeRegister(t *testing.T) {
 		log.Errorf("get default acc err:%s\n", err)
 		return
 	}
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	// register 512G for 12 hours
 	tx, err := d.RegisterNode(node1ListAddr, 512*1024*1024, 12)
 	// tx, err := d.RegisterNode(node4ListAddr, 512*1024*1024, 12)
@@ -138,7 +138,7 @@ func TestNodeUnregister(t *testing.T) {
 		log.Errorf("get default acc err:%s\n", err)
 		return
 	}
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	tx, err := d.UnregisterNode()
 	if err != nil {
 		log.Errorf("register node err:%s", err)
@@ -151,7 +151,7 @@ func TestNodeQuery(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
 	}
-	d := NewDsp(dspCfg, nil)
+	d := NewDsp(dspCfg, nil, nil)
 	info, err := d.QueryNode(wallet1Addr)
 	if err != nil {
 		log.Errorf("query node err %s", err)
@@ -180,7 +180,7 @@ func TestNodeUpdate(t *testing.T) {
 		log.Errorf("get default acc err:%s\n", err)
 		return
 	}
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	tx, err := d.UpdateNode(node1ListAddr, 0, 12)
 	if err != nil {
 		log.Errorf("update node err:%s", err)
@@ -203,7 +203,7 @@ func TestNodeWithdrawProfit(t *testing.T) {
 		log.Errorf("get default acc err:%s\n", err)
 		return
 	}
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	tx, err := d.NodeWithdrawProfit()
 	if err != nil {
 		log.Errorf("register node err:%s", err)
@@ -230,7 +230,6 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 	fmt.Printf("start node %d\n", nodeIndex)
 	chListenAddrs := []string{"", channel1Addr, channel2Addr, channel3Addr, channel4Addr, channel5Addr}
 	walletFiles := []string{"", walletFile, wallet2File, wallet3File, wallet4File, wallet5File}
-	nodeAddrs := []string{"", node1ListAddr, node2ListAddr, node3ListAddr, node4ListAddr, node5ListAddr}
 	dspCfg := &config.DspConfig{
 		DBPath:               fmt.Sprintf("%s/db%d", fileRoot, nodeIndex),
 		FsRepoRoot:           fmt.Sprintf("%s/max%d", fileRoot, nodeIndex),
@@ -257,11 +256,11 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 		return
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	err = d.Start(nodeAddrs[nodeIndex])
+	err = d.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,8 +293,8 @@ func TestUploadFile(t *testing.T) {
 		log.Errorf("get default acc err:%s\n", err)
 		return
 	}
-	d := NewDsp(dspCfg, acc)
-	d.Start(node2ListAddr)
+	d := NewDsp(dspCfg, acc, nil)
+	d.Start()
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	opt := &common.UploadOption{
 		FileDesc:        "file",
@@ -358,8 +357,8 @@ func TestDeleteFileFromUploader(t *testing.T) {
 		log.Errorf("get default acc err:%s\n", err)
 		return
 	}
-	d := NewDsp(dspCfg, acc)
-	d.Start(node2ListAddr)
+	d := NewDsp(dspCfg, acc, nil)
+	d.Start()
 	ret, err := d.DeleteUploadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
@@ -382,8 +381,8 @@ func TestDeleteFileLocally(t *testing.T) {
 		FsType:       config.FS_FILESTORE,
 		ChainRpcAddr: rpcAddr,
 	}
-	d := NewDsp(dspCfg, nil)
-	d.Start(node3ListAddr)
+	d := NewDsp(dspCfg, nil, nil)
+	d.Start()
 	err = d.DeleteDownloadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
@@ -396,7 +395,7 @@ func TestGetFileProveNode(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
 	}
-	d := NewDsp(dspCfg, nil)
+	d := NewDsp(dspCfg, nil, nil)
 	n1, n2 := d.getFileProveNode("zb2rhkaiU6xcVbt1TtJeLDMJGPb94WxxQho1bBLvMH57Rww8b", 8)
 	fmt.Printf("n1:%v, n2:%v\n", n1, n2)
 }
@@ -405,7 +404,7 @@ func TestGetExpiredTaskList(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
 	}
-	d := NewDsp(dspCfg, nil)
+	d := NewDsp(dspCfg, nil, nil)
 	list, err := d.Chain.Native.Fs.GetExpiredProveList()
 	if err != nil {
 		t.Fatal(err)
@@ -422,7 +421,6 @@ func TestDownloadFile(t *testing.T) {
 
 	chListenAddrs := []string{"", channel1Addr, channel2Addr, channel3Addr, channel4Addr, channel5Addr}
 	walletFiles := []string{"", walletFile, wallet2File, wallet3File, wallet4File, wallet5File}
-	nodeAddrs := []string{"", node1ListAddr, node2ListAddr, node3ListAddr, node4ListAddr, node5ListAddr}
 
 	dspCfg := &config.DspConfig{
 		DBPath:               fmt.Sprintf("%s/db%d", fileRoot, nodeIdx),
@@ -447,8 +445,8 @@ func TestDownloadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := NewDsp(dspCfg, acc)
-	err = d.Start(nodeAddrs[nodeIdx])
+	d := NewDsp(dspCfg, acc, nil)
+	err = d.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -528,9 +526,9 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	fmt.Printf("TestDownloadFileWithQuotation d:%v\n", d)
-	err = d.Start(node3ListAddr)
+	err = d.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -597,7 +595,7 @@ func TestStartPDPVerify(t *testing.T) {
 		return
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	d.Fs.StartPDPVerify("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", 0, 0, 0, chainCom.ADDRESS_EMPTY)
 	tick := time.NewTicker(time.Second)
 	for {
@@ -620,7 +618,7 @@ func TestOpenChannel(t *testing.T) {
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 	}
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	id, err := d.Channel.OpenChannel("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c")
 	if err != nil {
 		t.Fatal(err)
@@ -644,8 +642,8 @@ func TestDepositChannel(t *testing.T) {
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 	}
-	d := NewDsp(dspCfg, acc)
-	d.Start(node2ListAddr)
+	d := NewDsp(dspCfg, acc, nil)
+	d.Start()
 	err = d.Channel.SetDeposit("AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS", 662144)
 	if err != nil {
 		t.Fatal(err)
@@ -682,7 +680,7 @@ func TestPushTracker(t *testing.T) {
 		return
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
@@ -693,7 +691,7 @@ func TestPushTracker(t *testing.T) {
 }
 
 func TestGetPeersFromTracker(t *testing.T) {
-	d := NewDsp(nil, nil)
+	d := NewDsp(nil, nil, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
@@ -736,11 +734,11 @@ func TestSeedServices(t *testing.T) {
 		return
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	d.Start(node1ListAddr)
+	d.Start()
 	tick := time.NewTicker(time.Second)
 	for {
 		<-tick.C
@@ -760,7 +758,7 @@ func TestInitDnsSC(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
@@ -784,7 +782,7 @@ func TestRegisterHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
@@ -808,7 +806,7 @@ func TestRegisterDns(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
@@ -832,7 +830,7 @@ func TestBindDns(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
@@ -856,7 +854,7 @@ func TestQueryDns(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
+	d := NewDsp(dspCfg, acc, nil)
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
@@ -881,8 +879,8 @@ func TestGetSetupDNSNodes(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc)
-	d.Start(node3ListAddr)
+	d := NewDsp(dspCfg, acc, nil)
+	d.Start()
 	if d.Channel == nil {
 		t.Fatal("channel is nil")
 	}
@@ -904,7 +902,7 @@ func TestGetAllDNSNodes(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
 	}
-	d := NewDsp(dspCfg, nil)
+	d := NewDsp(dspCfg, nil, nil)
 	nodes, err := d.Chain.Native.Dns.GetAllDnsNodes()
 	if err != nil {
 		t.Fatal(err)
@@ -922,7 +920,7 @@ func TestRegEndpoint(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddr: rpcAddr,
 	}
-	d := NewDsp(dspCfg, nil)
+	d := NewDsp(dspCfg, nil, nil)
 	d.TrackerUrls = []string{"udp://127.0.0.1:6369/announce"}
 	addr, err := chainCom.AddressFromBase58("ARH2cGhdhZgMm69XcVVBNjAbEjxvX4ywpV")
 	if err != nil {
@@ -933,6 +931,21 @@ func TestRegEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	addrStr := d.GetExternalIP(addr.ToBase58())
+	addrStr, _ := d.GetExternalIP(addr.ToBase58())
 	fmt.Printf("addr %s, len:%d\n", addrStr, len(addrStr))
+}
+
+func TestGetPublicIPFromDNS(t *testing.T) {
+	d := &Dsp{}
+	dspCfg := &config.DspConfig{
+		ChannelProtocol: "udp",
+	}
+	d.Config = dspCfg
+	d.TrackerUrls = make([]string, 0)
+	d.TrackerUrls = append(d.TrackerUrls, "udp://10.0.1.224:6369")
+	publicIP, err := d.GetExternalIP("ALs5JNZXLgrDjqKwwZGAaAcA1KLpjPqVFX")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("public ip %s", publicIP)
 }

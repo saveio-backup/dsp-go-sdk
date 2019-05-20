@@ -77,9 +77,10 @@ func (this *Dsp) SetupDNSChannels() error {
 		if err != nil {
 			return err
 		}
+		// FIXME: check connection first
 		_, err = this.Channel.OpenChannel(walletAddr)
 		if err != nil {
-			log.Debugf("open channel err ")
+			log.Debugf("open channel err %s", walletAddr)
 			return err
 		}
 		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
@@ -87,14 +88,18 @@ func (this *Dsp) SetupDNSChannels() error {
 			log.Errorf("wait channel connected err %s %s", walletAddr, err)
 			return err
 		}
-		bal, _ := this.Channel.GetAvaliableBalance(walletAddr)
-		log.Debugf("current balance %d", bal)
 		log.Infof("connect to dns node :%s, deposit %d", dnsUrl, this.Config.DnsChannelDeposit)
-		err = this.Channel.SetDeposit(walletAddr, this.Config.DnsChannelDeposit)
-		if err != nil && strings.Index(err.Error(), "totalDeposit must big than contractBalance") == -1 {
-			log.Debugf("deposit result %s", err)
-			// TODO: withdraw and close channel
-			return err
+		if this.Config.DnsChannelDeposit > 0 {
+			bal, _ := this.Channel.GetTotalDepositBalance(walletAddr)
+			log.Debugf("channel to %s current balance %d", walletAddr, bal)
+			if bal < this.Config.DnsChannelDeposit {
+				err = this.Channel.SetDeposit(walletAddr, this.Config.DnsChannelDeposit)
+				if err != nil && strings.Index(err.Error(), "totalDeposit must big than contractBalance") == -1 {
+					log.Debugf("deposit result %s", err)
+					// TODO: withdraw and close channel
+					return err
+				}
+			}
 		}
 		this.DNSNode = &DNSNodeInfo{
 			WalletAddr:  walletAddr,
@@ -179,15 +184,15 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 	var hashBytes [46]byte
 	copy(hashBytes[:], []byte(hash)[:])
 	peerAddrs := make([]string, 0)
-	networkProtocol := common.DSP_NETWORK_PROTOCOL
 	selfAddr := client.P2pGetPublicAddr()
+	protocol := selfAddr[:strings.Index(selfAddr, "://")]
 	for _, trackerUrl := range trackerUrls {
 		peers := tracker.GetTorrentPeers(hashBytes, trackerUrl, -1, 1)
 		if len(peers) == 0 {
 			continue
 		}
 		for _, p := range peers {
-			addr := fmt.Sprintf("%s://%s:%d", networkProtocol, p.IP, p.Port)
+			addr := fmt.Sprintf("%s://%s:%d", protocol, p.IP, p.Port)
 			if addr == selfAddr {
 				continue
 			}
@@ -304,6 +309,13 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 
 	var wallet [20]byte
 	copy(wallet[:], walletAddr[:])
+	if len(this.TrackerUrls) == 0 {
+		log.Debugf("set up dns trackers before register channel endpoint")
+		err = this.SetupDNSTrackers()
+		if err != nil {
+			return err
+		}
+	}
 	for _, trackerUrl := range this.TrackerUrls {
 		log.Debugf("trackerurl %s walletAddr: %v netIp:%v netPort:%v", trackerUrl, wallet, netIp, netPort)
 		params := dnscom.ApiParams{

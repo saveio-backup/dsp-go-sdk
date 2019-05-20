@@ -1,7 +1,7 @@
 package common
 
 const (
-	CHUNK_SIZE                  = 32 * 1024       // chunk size
+	CHUNK_SIZE                  = 8 * 1024        // chunk size
 	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"        // download temp file path
 	PROTO_NODE_FILE_HASH_LEN    = 46              // proto node file hash length
 	RAW_NODE_FILE_HASH_LEN      = 49              // raw node file hash length
