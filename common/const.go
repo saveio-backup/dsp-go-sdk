@@ -26,7 +26,7 @@ const (
 // timeout
 const (
 	TX_CONFIRM_TIMEOUT                  = 60      // wait for tx confirmed timeout
-	FILE_FETCH_ACK_TIMEOUT              = 10      // wait for file fetch ack timeout
+	FILE_FETCH_ACK_TIMEOUT              = 60      // wait for file fetch ack timeout
 	BLOCK_FETCH_TIMEOUT                 = 10      // fetch block and get block response timeout
 	CHECK_PROVE_TIMEOUT                 = 60      // client upload file and check prove timeout
 	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval

@@ -56,6 +56,8 @@ func (this *Dsp) SetupDNSTrackers() error {
 }
 
 func (this *Dsp) SetupDNSChannels() error {
+	log.Debugf("SetupDNSChannels++++")
+
 	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
 	if err != nil {
 		return err
@@ -67,9 +69,6 @@ func (this *Dsp) SetupDNSChannels() error {
 
 	setDNSNodeFunc := func(dnsUrl, walletAddr string) error {
 		log.Debugf("set dns node func %s %s", dnsUrl, walletAddr)
-		if err := client.P2pIsPeerListening(dnsUrl); err != nil {
-			return err
-		}
 		if strings.Index(dnsUrl, "0.0.0.0:0") != -1 {
 			return errors.New("invalid host addr")
 		}
@@ -77,15 +76,14 @@ func (this *Dsp) SetupDNSChannels() error {
 		if err != nil {
 			return err
 		}
-		// FIXME: check connection first
-		_, err = this.Channel.OpenChannel(walletAddr)
-		if err != nil {
-			log.Debugf("open channel err %s", walletAddr)
-			return err
-		}
 		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		if err != nil {
 			log.Errorf("wait channel connected err %s %s", walletAddr, err)
+			return err
+		}
+		_, err = this.Channel.OpenChannel(walletAddr)
+		if err != nil {
+			log.Debugf("open channel err %s", walletAddr)
 			return err
 		}
 		log.Infof("connect to dns node :%s, deposit %d", dnsUrl, this.Config.DnsChannelDeposit)
@@ -145,11 +143,13 @@ func (this *Dsp) SetupDNSChannels() error {
 			dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
 		}
 		err = setDNSNodeFunc(dnsUrl, v.WalletAddr.ToBase58())
+		log.Debugf("setDNSNodeFunc err %s", err)
 		if err != nil {
 			continue
 		}
 		break
 	}
+	log.Debugf("set dns func return err%s", err)
 	return err
 }
 
