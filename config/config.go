@@ -31,6 +31,24 @@ type DspConfig struct {
 }
 
 func DefaultDspConfig() *DspConfig {
-	config := &DspConfig{}
+	config := &DspConfig{
+		DBPath:               "./DB/dsp",
+		ChainRpcAddr:         "http://127.0.0.1:20336",
+		CheckDepositBlkNum:   0,
+		FsRepoRoot:           "./FS",
+		FsFileRoot:           "/",
+		FsType:               FS_FILESTORE,
+		FsGcPeriod:           "1h",
+		FsMaxStorage:         "10G",
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    "127.0.0.1:3001",
+		ChannelProtocol:      "udp",
+		ChannelRevealTimeout: "250",
+		ChannelDBPath:        "./DB/channel",
+		AutoSetupDNSEnable:   true,
+		DnsNodeMaxNum:        1,
+		DnsChannelDeposit:    1000000000,
+		SeedInterval:         3600,
+	}
 	return config
 }
