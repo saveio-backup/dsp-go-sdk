@@ -82,6 +82,16 @@ func (this *Channel) GetChannelPid() *actor.PID {
 }
 
 // SetHostAddr. set host address for wallet
+func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
+	addr, err := chaincomm.AddressFromBase58(walletAddr)
+	if err != nil {
+		return "", err
+	}
+	log.Debugf("GetHostAddr %v", walletAddr)
+	return ch_actor.GetHostAddr(common.Address(addr))
+}
+
+// SetHostAddr. set host address for wallet
 func (this *Channel) SetHostAddr(walletAddr, host string) error {
 	addr, err := chaincomm.AddressFromBase58(walletAddr)
 	if err != nil {
