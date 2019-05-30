@@ -103,15 +103,6 @@ func (this *Channel) SetHostAddr(walletAddr, host string) error {
 	return nil
 }
 
-// GetHostAddr. get host address for wallet
-func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
-	addr, err := chaincomm.AddressFromBase58(walletAddr)
-	if err != nil {
-		return "", err
-	}
-	return ch_actor.GetHostAddr(common.Address(addr))
-}
-
 // StartService. start channel service
 func (this *Channel) StartService() error {
 	//start connnect target
