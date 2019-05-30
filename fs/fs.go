@@ -7,16 +7,18 @@ import (
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
-	"gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
+	blocks "gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
 	sdk "github.com/saveio/themis-go-sdk"
 	chainCom "github.com/saveio/themis/common"
+	"github.com/saveio/themis/common/log"
 
 	"github.com/saveio/max/importer/helpers"
 	max "github.com/saveio/max/max"
@@ -33,10 +35,16 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 	if cfg == nil {
 		cfg = config.DefaultDspConfig()
 	}
-
-	root, err := filepath.Abs("/")
-	if err != nil {
-		return nil, err
+	log.Debugf("runtime.GOOS: %s", runtime.GOOS)
+	root := ""
+	if runtime.GOOS == "windows" {
+		root = "C:\\"
+	} else {
+		rootAbs, err := filepath.Abs("/")
+		if err != nil {
+			return nil, err
+		}
+		root = rootAbs
 	}
 	fsConfig := &max.FSConfig{
 		RepoRoot:   cfg.FsRepoRoot,

@@ -43,14 +43,7 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 // handleFileMsg handle all file msg
 func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	log.Debugf("handleFileMsg %s from peer:%s, length:%d", map[int32]string{
-		netcom.FILE_OP_FETCH_ASK:    "fetch_ask",
-		netcom.FILE_OP_FETCH_ACK:    "fetch_ack",
-		netcom.FILE_OP_FETCH_RDY:    "fetch_rdy",
-		netcom.FILE_OP_DOWNLOAD_ASK: "download_ask",
-		netcom.FILE_OP_DOWNLOAD_ACK: "download_ack",
-		netcom.FILE_OP_DOWNLOAD:     "download",
-	}[fileMsg.Operation], peer.Address, msg.Header.MsgLength)
+	log.Debugf("handleFileMsg %d from peer:%s, length:%d", fileMsg.Operation, peer.Address, msg.Header.MsgLength)
 	switch fileMsg.Operation {
 	case netcom.FILE_OP_FETCH_ASK:
 		//TODO: verify & save info
@@ -107,6 +100,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			log.Debugf("task is exist")
 			return
 		}
+		log.Debugf("start fetching blocks")
 		err := this.startFetchBlocks(fileMsg.Hash, peer.Address)
 		if err != nil {
 			log.Errorf("start fetch blocks for file %s failed, err:%s", fileMsg.Hash, err)
@@ -122,6 +116,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if err != nil {
 			log.Errorf("reply delete ok msg failed", err)
 		}
+		log.Debugf("reply delete ack msg success")
 		// TODO: check file owner
 		this.deleteFile(fileMsg.Hash)
 	case netcom.FILE_OP_DOWNLOAD_ASK:
@@ -150,6 +145,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if err != nil {
 			replyMsg := message.NewFileDownloadAck(fileMsg.Hash, nil, "", "", 0, netcom.MSG_ERROR_CODE_FILE_UNITPRICE_ERROR)
 			err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+			log.Debugf("reply download_ack when not price, err %s", err)
 			if err != nil {
 				log.Errorf("reply download ack err msg failed", err)
 			}
@@ -162,6 +158,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if err != nil {
 			log.Errorf("reply download ack  msg failed", err)
 		}
+		log.Debugf("reply download ack success")
 	case netcom.FILE_OP_DOWNLOAD:
 		if !this.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
 			log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
@@ -191,6 +188,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if err != nil {
 			log.Errorf("reply download msg failed, err %s", err)
 		}
+		log.Debugf("reply download msg success")
 		this.taskMgr.EmitNotification(taskKey, task.ShareStateBegin, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
 	case netcom.FILE_OP_DOWNLOAD_OK:
 		taskKey := this.taskMgr.TaskKey(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
@@ -204,6 +202,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		if err != nil {
 			log.Errorf("reply download msg failed, err %s", err)
 		}
+		log.Debugf("reply download ack msg success")
 		this.taskMgr.EmitNotification(taskKey, task.ShareStateEnd, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
 	default:
 	}
@@ -212,11 +211,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 // handleBlockMsg handle all file msg
 func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	blockMsg := msg.Payload.(*block.Block)
-	log.Debugf("handleBlockMsg %s from peer:%s, length:%d",
-		map[int32]string{
-			netcom.BLOCK_OP_NONE: "block_none",
-			netcom.BLOCK_OP_GET:  "block_get",
-		}[blockMsg.Operation], peer.Address, msg.Header.MsgLength)
+	log.Debugf("handleBlockMsg %d from peer:%s, length:%d", blockMsg.Operation, peer.Address, msg.Header.MsgLength)
 
 	switch blockMsg.Operation {
 	case netcom.BLOCK_OP_NONE:
@@ -315,5 +310,6 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.P
 	if err != nil {
 		log.Errorf("reply delete ok msg failed", err)
 	}
+	log.Debugf("reply handle payment msg")
 	this.taskMgr.EmitNotification(taskKey, task.ShareStateReceivedPaying, paymentMsg.FileHash, paymentMsg.Sender, uint64(paymentMsg.PaymentId), uint64(paymentMsg.Amount))
 }

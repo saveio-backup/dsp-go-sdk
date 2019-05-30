@@ -19,6 +19,7 @@ import (
 )
 
 type Dsp struct {
+	Account     *account.Account
 	Config      *config.DspConfig
 	Chain       *chain.Chain
 	Fs          *fs.Fs
@@ -40,6 +41,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	d.Chain.NewRpcClient().SetAddress(c.ChainRpcAddr)
 	if acc != nil {
 		d.Chain.SetDefaultAccount(acc)
+		d.Account = acc
 	}
 	var dbstore *store.LevelDBStore
 	if len(c.DBPath) > 0 {
@@ -119,7 +121,7 @@ func (this *Dsp) StartChannelService() error {
 		return err
 	}
 	this.SetupPartnerHost(this.Channel.GetAllPartners())
-	err = this.Channel.StartService()
+	err = this.Channel.StartServiceAsync()
 	if err != nil {
 		return err
 	}
@@ -146,13 +148,18 @@ func (this *Dsp) Stop() error {
 			return err
 		}
 	}
-	// if this.Network != nil {
-	// 	err := this.Network.Halt()
-	// 	if err != nil {
-	// 		log.Errorf("close dsp p2p err %s", err)
-	// 		return err
-	// 	}
-	// }
+	return nil
+}
 
+func (this *Dsp) UpdateConfig(field string, value interface{}) error {
+	switch field {
+	case "FsFileRoot":
+		str, ok := value.(string)
+		if !ok {
+			return errors.New("invalid value type")
+		}
+		this.Config.FsFileRoot = str
+	}
+	log.Debugf("update config %s", this.Config.FsFileRoot)
 	return nil
 }

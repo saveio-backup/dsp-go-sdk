@@ -26,7 +26,7 @@ type DspConfig struct {
 
 	AutoSetupDNSEnable bool   // enable auto setup DNS node or not
 	DnsNodeMaxNum      int    // dns node max count
-	DnsChannelDeposit  uint64 //  deposit amount of channel between self and dns node
+	DnsChannelDeposit  uint64 // deposit amount of channel between self and dns node
 	SeedInterval       int    // push file to tracker interval in second, if it's 0, no push
 }
 

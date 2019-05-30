@@ -127,25 +127,24 @@ func (this *Dsp) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
 	return this.Chain.Native.Fs.GetUserSpace(address)
 }
 
-func (this *Dsp) AddUserSpace(walletAddr string, size, blockCount uint64) (string, error) {
+func (this *Dsp) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
 		return "", err
 	}
-	txHash, err := this.Chain.Native.Fs.AddUserSpace(address, size, blockCount)
-	if err != nil {
-		return "", err
+	if size == 0 {
+		sizeOpType = uint64(fs.UserSpaceNone)
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
-	return tx, nil
-}
-
-func (this *Dsp) RevokeUserSpace(walletAddr string, size, blockCount uint64) (string, error) {
-	address, err := chainCom.AddressFromBase58(walletAddr)
-	if err != nil {
-		return "", err
+	if blockCount == 0 {
+		countOpType = uint64(fs.UserSpaceNone)
 	}
-	txHash, err := this.Chain.Native.Fs.RevokeUserSpace(address, size, blockCount)
+	txHash, err := this.Chain.Native.Fs.UpdateUserSpace(address, &fs.UserSpaceOperation{
+		Type:  sizeOpType,
+		Value: size,
+	}, &fs.UserSpaceOperation{
+		Type:  countOpType,
+		Value: blockCount,
+	})
 	if err != nil {
 		return "", err
 	}

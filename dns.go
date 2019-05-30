@@ -43,12 +43,20 @@ func (this *Dsp) SetupDNSTrackers() error {
 	if this.TrackerUrls == nil {
 		this.TrackerUrls = make([]string, 0)
 	}
+	existDNSMap := make(map[string]struct{}, 0)
+	for _, trackerUrl := range this.TrackerUrls {
+		existDNSMap[trackerUrl] = struct{}{}
+	}
 	for _, v := range ns {
 		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
 		if len(this.TrackerUrls) >= maxTrackerNum {
 			break
 		}
 		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
+		_, ok := existDNSMap[trackerUrl]
+		if ok {
+			continue
+		}
 		this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
 	}
 	log.Debugf("this.TrackerUrls %v", this.TrackerUrls)

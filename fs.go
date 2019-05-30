@@ -314,11 +314,16 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 		// find breakpoint keep nodelist
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(taskKey, fileHashStr, 0)...)
 	}
-	msg := message.NewFileDelete(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
-	err = client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
-	if err != nil {
-		return "", err
+	log.Debugf("will broadcast delete msg to %v", storingNode)
+	if len(storingNode) > 0 {
+		msg := message.NewFileDelete(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+		err = client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
+		if err != nil {
+			return "", err
+		}
+		log.Debugf("broadcast to delete file msg success")
 	}
+
 	err = this.taskMgr.DeleteFileUploadInfo(taskKey)
 	if err != nil {
 		log.Errorf("delete upload info from db err: %s", err)

@@ -103,6 +103,15 @@ func (this *Channel) SetHostAddr(walletAddr, host string) error {
 	return nil
 }
 
+// GetHostAddr. get host address for wallet
+func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
+	addr, err := chaincomm.AddressFromBase58(walletAddr)
+	if err != nil {
+		return "", err
+	}
+	return ch_actor.GetHostAddr(common.Address(addr))
+}
+
 // StartService. start channel service
 func (this *Channel) StartService() error {
 	//start connnect target
@@ -114,9 +123,31 @@ func (this *Channel) StartService() error {
 	return nil
 }
 
+// StartServiceAsync. start channel service Async
+func (this *Channel) StartServiceAsync() error {
+	//start connnect target
+	go func() {
+		err := this.chActor.Start()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	go this.registerReceiveNotification()
+	return nil
+}
+
+func (this *Channel) GetCurrentFilterBlockHeight() uint32 {
+	height, err := ch_actor.GetLastFilterBlockHeight()
+	if err != nil {
+		log.Errorf("request err %s", err)
+	}
+	return height
+}
+
 func (this *Channel) StopService() {
 	this.chActor.Stop()
 	this.channelDB.Close()
+	this.chActorId.Stop()
 	close(this.closeCh)
 }
 
