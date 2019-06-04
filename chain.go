@@ -8,6 +8,7 @@ import (
 	"github.com/saveio/themis/account"
 	chainCom "github.com/saveio/themis/common"
 	fs "github.com/saveio/themis/smartcontract/service/native/onifs"
+	"github.com/saveio/themis/smartcontract/service/native/usdt"
 )
 
 func (this *Dsp) CurrentAccount() *account.Account {
@@ -150,4 +151,24 @@ func (this *Dsp) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
+}
+
+func (this *Dsp) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
+	address, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return nil, err
+	}
+	if size == 0 {
+		sizeOpType = uint64(fs.UserSpaceNone)
+	}
+	if blockCount == 0 {
+		countOpType = uint64(fs.UserSpaceNone)
+	}
+	return this.Chain.Native.Fs.GetUpdateSpaceCost(address, &fs.UserSpaceOperation{
+		Type:  sizeOpType,
+		Value: size,
+	}, &fs.UserSpaceOperation{
+		Type:  countOpType,
+		Value: blockCount,
+	})
 }
