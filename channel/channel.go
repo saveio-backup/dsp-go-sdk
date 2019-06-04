@@ -28,6 +28,7 @@ type Channel struct {
 	unitPrices map[int32]uint64
 	channelDB  *store.ChannelDB
 	walletAddr string
+	isStart    bool
 }
 
 type channelInfo struct {
@@ -110,6 +111,8 @@ func (this *Channel) StartService() error {
 	if err != nil {
 		return err
 	}
+	this.isStart = true
+	this.OverridePartners()
 	go this.registerReceiveNotification()
 	return nil
 }
@@ -122,6 +125,8 @@ func (this *Channel) StartServiceAsync() error {
 		if err != nil {
 			panic(err)
 		}
+		this.isStart = true
+		this.OverridePartners()
 	}()
 	go this.registerReceiveNotification()
 	return nil
@@ -136,10 +141,15 @@ func (this *Channel) GetCurrentFilterBlockHeight() uint32 {
 }
 
 func (this *Channel) StopService() {
-	this.chActor.Stop()
+	if this.isStart {
+		this.chActor.Stop()
+	} else {
+		this.chActor.GetChannelService().Service.Wal.Storage.Close()
+	}
 	this.channelDB.Close()
 	this.chActorId.Stop()
 	close(this.closeCh)
+	this.isStart = false
 }
 
 func (this *Channel) SetChannelDB(db *store.ChannelDB) {

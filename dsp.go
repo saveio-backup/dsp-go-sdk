@@ -126,7 +126,6 @@ func (this *Dsp) StartChannelService() error {
 		return err
 	}
 	time.Sleep(time.Second)
-	this.Channel.OverridePartners()
 	return nil
 }
 
