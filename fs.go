@@ -212,6 +212,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 				}
 				dataLen = int64(len(blockDecodedData))
 			}
+			log.Debugf("receive fetch block msg of %s-%s from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.PeerAddr)
 			offset += dataLen
 			if len(blockData) == 0 {
 				log.Errorf("block is nil hash %s, peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
@@ -239,12 +240,15 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 			this.taskMgr.AddUploadedBlock(taskKey, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 			// update progress
 			go this.taskMgr.EmitProgress(taskKey)
+			log.Debugf("upload node list len %d, taskkey %s, hash %s, index %d, copynum %d", len(this.taskMgr.GetUploadedBlockNodeList(taskKey, reqInfo.Hash, uint32(reqInfo.Index))), taskKey, reqInfo.Hash, reqInfo.Index, opt.CopyNum)
+			// check all copynum node has received the block
 			if len(this.taskMgr.GetUploadedBlockNodeList(taskKey, reqInfo.Hash, uint32(reqInfo.Index))) < int(opt.CopyNum)+1 {
 				break
 			}
-			sent := uint64(this.taskMgr.UploadedBlockCount(taskKey))
+			// check all blocks has sent
+			sent := uint64(this.taskMgr.UploadedBlockCount(taskKey) / (uint64(opt.CopyNum) + 1))
 			if totalCount == sent {
-				log.Infof("all block has sent")
+				log.Infof("all block has sent %s", taskKey)
 				finish = true
 				break
 			}
@@ -949,7 +953,7 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 			return nil, fmt.Errorf("file:%s has expired, please delete it first", fileHashStr)
 		}
 		log.Debugf("has paid but not store")
-		if uint64(this.taskMgr.UploadedBlockCount(taskKey)) == blockNum {
+		if uint64(this.taskMgr.UploadedBlockCount(taskKey)) == blockNum*(fileInfo.CopyNum+1) {
 			return nil, fmt.Errorf("has sent all blocks, waiting for ont-ipfs node commit proves")
 		}
 		paramsBuf = fileInfo.FileProveParam
@@ -1170,6 +1174,7 @@ func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr inter
 		walletAddress = this.Chain.Native.Channel.DefAcc.Address.ToBase58()
 	}
 	msg := message.NewBlockReqMsg(fileHashStr, hash, index, walletAddress, common.ASSET_USDT)
+	log.Debugf("send download block msg of %s to %s", fileHashStr, addr)
 	err := client.P2pSend(addr, msg.ToProtoMsg())
 	if err != nil {
 		return nil, err

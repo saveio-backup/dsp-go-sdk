@@ -58,6 +58,7 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 		RevealTimeout: cfg.ChannelRevealTimeout,
 		DBPath:        cfg.ChannelDBPath,
 	}
+	log.Debugf("channel cfg %v", channelConfig)
 	if _, err := os.Stat(channelConfig.DBPath); os.IsNotExist(err) {
 		err = os.MkdirAll(channelConfig.DBPath, 0755)
 		if err != nil {
@@ -210,6 +211,9 @@ func (this *Channel) HealthyCheckNodeState(walletAddr string) error {
 
 // OpenChannel. open channel for target of token.
 func (this *Channel) OpenChannel(targetAddress string) (common.ChannelID, error) {
+	if !this.isStart {
+		return 0, errors.New("channel service is not start")
+	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
@@ -226,6 +230,9 @@ func (this *Channel) OpenChannel(targetAddress string) (common.ChannelID, error)
 }
 
 func (this *Channel) ChannelClose(targetAddress string) error {
+	if !this.isStart {
+		return errors.New("channel service is not start")
+	}
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
 		return err
@@ -242,6 +249,9 @@ func (this *Channel) SetDeposit(targetAddress string, amount uint64) error {
 	if amount == 0 {
 		return nil
 	}
+	if !this.isStart {
+		return errors.New("channel service is not start")
+	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
@@ -256,6 +266,9 @@ func (this *Channel) SetDeposit(targetAddress string, amount uint64) error {
 }
 
 func (this *Channel) CanTransfer(to string, amount uint64) error {
+	if !this.isStart {
+		return errors.New("channel service is not start")
+	}
 	target, err := chaincomm.AddressFromBase58(to)
 	if err != nil {
 		return err
@@ -299,8 +312,8 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) error {
 	err := this.CanTransfer(to, amount)
-	log.Debugf("can transter err %s", err)
 	if err != nil {
+		log.Errorf("can't transter id %d, err %s", paymentId, err)
 		return err
 	}
 	registryAddress := common.PaymentNetworkID(utils.MicroPayContractAddress)
@@ -309,26 +322,30 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) er
 	if err != nil {
 		return err
 	}
-	log.Debugf("start media transfer")
-	success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
-	log.Debugf("media transfer result %v, err %s", success, err)
-	// if err != nil {
-	// 	return err
-	// }
-	// for {
-	// 	select {
-	// 	case ret := <-success:
-	// 		log.Debugf("media transfer success: %t", ret)
-	// 		return nil
-	// 	case <-time.After(time.Minute):
-	// 		return errors.New("media transfer timeout")
-	// 	}
-	// }
-	log.Debugf("media transfer success: %t", success)
-	if success {
-		return nil
+	type mediaTransferResp struct {
+		success bool
+		err     error
 	}
-	return errors.New(fmt.Sprintf("media transfer failed: %t", success))
+	mediaTransferCh := make(chan *mediaTransferResp, 0)
+	go func() {
+		success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
+		mediaTransferCh <- &mediaTransferResp{
+			success: success,
+			err:     err,
+		}
+	}()
+	for {
+		select {
+		case ret := <-mediaTransferCh:
+			if ret.err != nil {
+				return ret.err
+			}
+			log.Debugf("media transfer success: %t", ret.success)
+			return nil
+		case <-time.After(time.Minute):
+			return errors.New("media transfer timeout")
+		}
+	}
 }
 
 // GetTargetBalance. check total deposit balance
@@ -367,6 +384,9 @@ func (this *Channel) GetCurrentBalance(partnerAddress string) (uint64, error) {
 
 // Withdraw. withdraw balance with target address
 func (this *Channel) Withdraw(targetAddress string, amount uint64) (bool, error) {
+	if !this.isStart {
+		return false, errors.New("channel service is not start")
+	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
@@ -378,6 +398,9 @@ func (this *Channel) Withdraw(targetAddress string, amount uint64) (bool, error)
 
 // CooperativeSettle. settle channel cooperatively
 func (this *Channel) CooperativeSettle(targetAddress string) error {
+	if !this.isStart {
+		return errors.New("channel service is not start")
+	}
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
 		return err

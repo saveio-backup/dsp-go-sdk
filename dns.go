@@ -324,6 +324,7 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 			return err
 		}
 	}
+	hasRegister := false
 	for _, trackerUrl := range this.TrackerUrls {
 		log.Debugf("trackerurl %s walletAddr: %v netIp:%v netPort:%v", trackerUrl, wallet, netIp, netPort)
 		params := dnscom.ApiParams{
@@ -334,17 +335,23 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 		}
 		rawData, err := json.Marshal(params)
 		if err != nil {
-			return err
+			continue
 		}
 
 		sigData, err := chainsdk.Sign(this.CurrentAccount(), rawData)
 		if err != nil {
-			return err
+			continue
 		}
 		err = tracker.RegEndPoint(trackerUrl, sigData, this.CurrentAccount().PublicKey, wallet, netIp, uint16(netPort))
 		if err != nil {
-			return err
+			continue
 		}
+		if !hasRegister {
+			hasRegister = true
+		}
+	}
+	if !hasRegister {
+		return errors.New("register endpoint failed for all dns nodes")
 	}
 	return nil
 }
@@ -362,8 +369,8 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 			log.Errorf("address from req failed %s", err)
 			continue
 		}
-		log.Debugf("GetExternalIP %s :%v", walletAddr, string(hostAddr))
-		if len(string(hostAddr)) == 0 {
+		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddr), url)
+		if len(string(hostAddr)) == 0 || !utils.IsHostAddrValid(string(hostAddr)) {
 			continue
 		}
 		hostAddrStr := utils.FullHostAddr(string(hostAddr), this.Config.ChannelProtocol)

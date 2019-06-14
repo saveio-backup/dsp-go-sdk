@@ -61,6 +61,7 @@ type FileInfo struct {
 	Prefix       string                `json:"prefix"`
 	UnitPrice    map[int32]uint64      `json:"uint_price"`
 	Unpaid       map[string]*Payment   `json:"unpaid"`
+	Sent         uint64                `json:"sent"`
 	ShareTo      map[string]struct{}   `json:"shareto"`
 	CreatedAt    uint64                `json:"createdAt"`
 }
@@ -125,6 +126,7 @@ func (this *FileDB) AddUploadedBlock(fileInfoKey, blockHashStr, nodeAddr string,
 		fi.Progress = make(map[string]uint64, 0)
 	}
 	fi.Progress[nodeAddr]++
+	fi.Sent++
 	return this.putFileInfo([]byte(fileInfoKey), fi)
 }
 
@@ -180,12 +182,12 @@ func (this *FileDB) GetStoreFileTx(fileInfoKey string) string {
 }
 
 // UploadedBlockCount
-func (this *FileDB) UploadedBlockCount(fileInfoKey string) int {
+func (this *FileDB) UploadedBlockCount(fileInfoKey string) uint64 {
 	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return 0
 	}
-	return len(fi.Blocks)
+	return fi.Sent
 }
 
 // AddFileBlockHashes add all blocks' hash, using for detect whether the node has stored the file

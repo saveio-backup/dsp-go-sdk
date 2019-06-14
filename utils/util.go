@@ -2,11 +2,13 @@ package utils
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
+	"github.com/saveio/themis/common/log"
 )
 
 // SortPeersByPrice. sort peer paymentInfo by its unitprice with max peer count
@@ -54,4 +56,22 @@ func FullHostAddr(hostAddr, protocol string) string {
 		return hostAddr
 	}
 	return fmt.Sprintf("%s://%s", protocol, hostAddr)
+}
+
+func IsHostAddrValid(hostAddr string) bool {
+	host := hostAddr
+	protocolIdx := strings.Index(hostAddr, "://")
+	if protocolIdx != -1 {
+		host = hostAddr[protocolIdx+3:]
+	}
+	portIndex := strings.Index(host, ":")
+	if portIndex != -1 {
+		host = host[:portIndex]
+	}
+	ip := net.ParseIP(host)
+	log.Debugf("hostAddr %s, host %s, ip %v", hostAddr, host, ip)
+	if ip != nil {
+		return true
+	}
+	return false
 }
