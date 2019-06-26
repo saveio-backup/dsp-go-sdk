@@ -98,7 +98,7 @@ func P2pSend(address interface{}, data proto.Message) error {
 
 func P2pBroadcast(addresses []string, data proto.Message, needReply bool, stop func() bool, action func(proto.Message, string)) error {
 	chReq := &BroadcastReq{addresses, data, needReply, stop, action}
-	future := P2pServerPid.RequestFuture(chReq, time.Duration(common.P2P_REQ_TIMEOUT*len(addresses))*time.Second)
+	future := P2pServerPid.RequestFuture(chReq, time.Duration(common.P2P_BROADCAST_TIMEOUT*len(addresses))*time.Second)
 	if _, err := future.Result(); err != nil {
 		log.Error("[P2pBroadcast] error: ", err)
 		return err

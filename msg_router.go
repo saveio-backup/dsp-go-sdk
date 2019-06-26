@@ -20,6 +20,7 @@ import (
 func (this *Dsp) Receive(ctx *network.ComponentContext) {
 	msg := message.ReadMessage(ctx.Message())
 	peer := ctx.Client()
+	log.Debugf("received msg %s from peer %s", ctx.Message().String(), peer.Address)
 	if msg == nil || msg.Header == nil {
 		log.Debugf("receive nil msg from %s", peer.Address)
 		return
@@ -43,7 +44,7 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 // handleFileMsg handle all file msg
 func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	log.Debugf("handleFileMsg %d from peer:%s, length:%d", fileMsg.Operation, peer.Address, msg.Header.MsgLength)
+	log.Debugf("handleFileMsg %d of file %s from peer:%s, length:%d", fileMsg.Operation, fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 	switch fileMsg.Operation {
 	case netcom.FILE_OP_FETCH_ASK:
 		//TODO: verify & save info
@@ -211,7 +212,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 // handleBlockMsg handle all file msg
 func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	blockMsg := msg.Payload.(*block.Block)
-	log.Debugf("handleBlockMsg %d from peer:%s, length:%d", blockMsg.Operation, peer.Address, msg.Header.MsgLength)
+	log.Debugf("handleBlockMsg %d %s-%s-%d from peer:%s, length:%d", blockMsg.Operation, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address, msg.Header.MsgLength)
 
 	switch blockMsg.Operation {
 	case netcom.BLOCK_OP_NONE:

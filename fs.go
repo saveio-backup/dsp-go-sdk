@@ -149,6 +149,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		return nil, err
 	}
 	g0, fileID := p.G0, p.FileId
+	// log.Debugf("g0:%v, fileID:%v, privateKey:%v", sha1.Sum(g0), sha1.Sum(fileID), sha1.Sum(payRet.PrivateKey))
 	hashes, err := this.Fs.AllBlockHashes(root, list)
 	if err != nil {
 		return nil, err
@@ -184,7 +185,6 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	finish := false
 	timeout := time.NewTimer(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
 	// TODO: replace offset calculate by fs api
-	offset := int64(0)
 	for {
 		select {
 		case reqInfo := <-req:
@@ -213,7 +213,6 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 				dataLen = int64(len(blockDecodedData))
 			}
 			log.Debugf("receive fetch block msg of %s-%s from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.PeerAddr)
-			offset += dataLen
 			if len(blockData) == 0 {
 				log.Errorf("block is nil hash %s, peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 				break
@@ -228,16 +227,18 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 				log.Errorf("generate tag hash %s, peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 				return nil, err
 			}
-			msg := message.NewBlockMsg(int32(reqInfo.Index), fileHashStr, reqInfo.Hash, blockData, tag, offset-dataLen)
+			offset := this.taskMgr.GetBlockOffset(taskKey, uint32(reqInfo.Index))
+			msg := message.NewBlockMsg(int32(reqInfo.Index), fileHashStr, reqInfo.Hash, blockData, tag, offset)
 			log.Debugf("send fetched block msg len:%d, block len:%d, tag len:%d", msg.Header.MsgLength, dataLen, len(tag))
+			// log.Debugf("index%d tag data %v", reqInfo.Index, sha1.Sum(tag))
 			err = client.P2pSend(reqInfo.PeerAddr, msg.ToProtoMsg())
 			if err != nil {
 				log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 				return nil, err
 			}
-			log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d add uploaded block to db", reqInfo.Hash, reqInfo.Index, len(tag), offset-dataLen)
+			log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d ", reqInfo.Hash, reqInfo.Index, len(tag), offset)
 			// stored
-			this.taskMgr.AddUploadedBlock(taskKey, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
+			this.taskMgr.AddUploadedBlock(taskKey, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index), offset+dataLen)
 			// update progress
 			go this.taskMgr.EmitProgress(taskKey)
 			log.Debugf("upload node list len %d, taskkey %s, hash %s, index %d, copynum %d", len(this.taskMgr.GetUploadedBlockNodeList(taskKey, reqInfo.Hash, uint32(reqInfo.Index))), taskKey, reqInfo.Hash, reqInfo.Index, opt.CopyNum)
@@ -271,7 +272,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	var dnsRegTx, dnsBindTx string
 	if opt.RegisterDns && len(opt.DnsUrl) > 0 {
 		dnsRegTx, err = this.RegisterFileUrl(opt.DnsUrl, oniLink)
-		log.Debugf("reg dns %s, err %s", dnsRegTx, err)
+		log.Debugf("acc %s, reg dns %s, err %s", this.Chain.Native.Dns.DefAcc.Address.ToBase58(), dnsRegTx, err)
 	}
 	if opt.BindDns && len(opt.DnsUrl) > 0 {
 		dnsBindTx, err = this.BindFileUrl(opt.DnsUrl, oniLink)
@@ -410,6 +411,7 @@ func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder
 	go this.taskMgr.EmitProgress(taskKey)
 	this.taskMgr.SetFileName(taskKey, fileName)
 	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
+	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.TrackerUrls)
 	if len(addrs) == 0 {
 		log.Debugf("get 0 peer of %s from trackers %v", fileHashStr, this.TrackerUrls)
 	}
@@ -433,6 +435,7 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 	fileHashStr := this.GetFileHashFromUrl(url)
 	linkvalues := this.GetLinkValues(this.GetLinkFromUrl(url))
 	fileName := linkvalues[common.FILE_LINK_NAME_KEY]
+	log.Debugf("DownloadFileByUrl %s, hash %s, max %d", url, fileHashStr, maxPeerCnt)
 	return this.DownloadFile(fileHashStr, fileName, asset, inOrder, decryptPwd, free, maxPeerCnt)
 }
 
@@ -507,8 +510,6 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 	if totalAmount/common.FILE_DOWNLOAD_UNIT_PRICE != uint64(len(blockHashes))*uint64(common.CHUNK_SIZE) {
 		return errors.New("deposit amount overflow")
 	}
-	log.Debugf("this %v", this)
-	log.Debugf("this.ch %v", this.Channel)
 	curBal, _ := this.Channel.GetAvaliableBalance(this.DNSNode.WalletAddr)
 	if curBal < totalAmount {
 		log.Debugf("depositing...")
@@ -518,9 +519,10 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 			return err
 		}
 	}
+	log.Debugf("GetExternalIP for downloaded nodes %v", peerPrices)
 	for _, payInfo := range peerPrices {
 		hostAddr, err := this.GetExternalIP(payInfo.WalletAddress)
-		log.Debugf("Set host addr after deposit channel %s - %s", payInfo.WalletAddress, hostAddr)
+		log.Debugf("Set host addr after deposit channel %s - %s, err %s", payInfo.WalletAddress, hostAddr, err)
 		if len(hostAddr) == 0 || err != nil {
 			continue
 		}
@@ -532,6 +534,7 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 // PayForData. pay for block
 func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, blockSize uint64) (int32, error) {
 	if payInfo == nil {
+		log.Warn("payinfo is nil")
 		return 0, nil
 	}
 	amount := blockSize * payInfo.UnitPrice
@@ -539,6 +542,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		return 0, errors.New("total price overflow")
 	}
 	if amount == 0 {
+		log.Warn("pay amount is 0")
 		return 0, nil
 	}
 	taskKey := this.taskMgr.TaskKey(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
@@ -607,7 +611,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	for addr, _ := range quotation {
 		addrs = append(addrs, addr)
 	}
-	log.Debugf("broad cast msg to %v", addrs)
+	log.Debugf("broadcast file_download msg to %v", addrs)
 	err = client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, nil)
 	log.Debugf("brocast file download msg err %v", err)
 	if err != nil {
@@ -656,6 +660,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			if !ok {
 				return errors.New("download internal error")
 			}
+			log.Debugf("received block %s-%s-%d", fileHashStr, value.Hash, value.Index)
 			if this.taskMgr.IsBlockDownloaded(taskKey, value.Hash, uint32(value.Index)) {
 				log.Debugf("%s-%s-%d is downloaded", fileHashStr, value.Hash, value.Index)
 				continue
@@ -677,7 +682,8 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 					return err
 				}
 				// cut prefix
-				if fileStat.Size() == 0 && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
+				// TEST: why not use filesize == 0
+				if value.Index == 1 && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
 					data = data[len(prefix):]
 				}
 				// TEST: offset
@@ -685,14 +691,17 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 				if value.Offset > 0 {
 					writeAtPos = value.Offset - int64(len(prefix))
 				}
+				log.Debugf("block %s filesize %d, block-len %d, offset %v prefix %v pos %d", block.Cid().String(), fileStat.Size(), len(data), value.Offset, len(prefix), writeAtPos)
 				_, err = file.WriteAt(data, writeAtPos)
 				if err != nil {
 					return err
 				}
 			}
 			payInfo := quotation[value.PeerAddr]
+			log.Debugf("start paying for block %s, payInfo %v", value.Hash, payInfo)
 			_, err = this.PayForBlock(payInfo, value.PeerAddr, fileHashStr, uint64(len(value.Block)))
 			if err != nil {
+				log.Errorf("pay for block %s err %s", value.Hash, err)
 				return err
 			}
 			if this.Config.FsType == config.FS_FILESTORE {
@@ -892,6 +901,7 @@ func (this *Dsp) downloadFileFromPeers(fileHashStr string, asset int32, inOrder 
 		return errors.New("no quotation from peers")
 	}
 	if !free && len(addrs) > maxPeerCnt {
+		log.Debugf("filter peers free %t len %d max %d", free, len(addrs), maxPeerCnt)
 		// filter peers
 		quotation = utils.SortPeersByPrice(quotation, maxPeerCnt)
 	}
@@ -1174,8 +1184,8 @@ func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr inter
 		walletAddress = this.Chain.Native.Channel.DefAcc.Address.ToBase58()
 	}
 	msg := message.NewBlockReqMsg(fileHashStr, hash, index, walletAddress, common.ASSET_USDT)
-	log.Debugf("send download block msg of %s to %s", fileHashStr, addr)
 	err := client.P2pSend(addr, msg.ToProtoMsg())
+	log.Debugf("send download block msg of %s-%s-%d to %s, err %s", fileHashStr, hash, index, addr, err)
 	if err != nil {
 		return nil, err
 	}

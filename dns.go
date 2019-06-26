@@ -183,7 +183,7 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	copy(hashBytes[:], []byte(hash)[:])
 	for _, trackerUrl := range trackerUrls {
 		log.Debugf("trackerurl %s hashBytes: %v netIp:%v netPort:%v", trackerUrl, hashBytes, netIp, netPort)
-		tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
+		go tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
 	}
 	return nil
 }
@@ -195,7 +195,18 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 	selfAddr := client.P2pGetPublicAddr()
 	protocol := selfAddr[:strings.Index(selfAddr, "://")]
 	for _, trackerUrl := range trackerUrls {
-		peers := tracker.GetTorrentPeers(hashBytes, trackerUrl, -1, 1)
+		request := func(resp chan *trackerResp) {
+			peers := tracker.GetTorrentPeers(hashBytes, trackerUrl, -1, 1)
+			resp <- &trackerResp{
+				ret: peers,
+				err: nil,
+			}
+		}
+		ret, err := trackerReq(request)
+		if err != nil {
+			continue
+		}
+		peers := ret.([]tracker.Peer)
 		if len(peers) == 0 {
 			continue
 		}
@@ -215,32 +226,36 @@ func (this *Dsp) StartSeedService() {
 	tick := time.NewTicker(time.Duration(this.Config.SeedInterval) * time.Second)
 	for {
 		<-tick.C
-		if len(this.TrackerUrls) == 0 {
-			continue
+		this.PushLocalFilesToTrackers()
+	}
+}
+
+func (this *Dsp) PushLocalFilesToTrackers() {
+	if len(this.TrackerUrls) == 0 {
+		return
+	}
+	files := make([]string, 0)
+	switch this.Config.FsType {
+	case config.FS_FILESTORE:
+		fileInfos, err := ioutil.ReadDir(this.Config.FsFileRoot)
+		if err != nil || len(fileInfos) == 0 {
+			return
 		}
-		files := make([]string, 0)
-		switch this.Config.FsType {
-		case config.FS_FILESTORE:
-			fileInfos, err := ioutil.ReadDir(this.Config.FsFileRoot)
-			if err != nil || len(fileInfos) == 0 {
-				continue
+		for _, info := range fileInfos {
+			if info.IsDir() ||
+				(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
+				return
 			}
-			for _, info := range fileInfos {
-				if info.IsDir() ||
-					(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
-					continue
-				}
-				files = append(files, info.Name())
-			}
-		case config.FS_BLOCKSTORE:
-			files, _ = this.taskMgr.AllDownloadFiles()
+			files = append(files, info.Name())
 		}
-		if len(files) == 0 {
-			continue
-		}
-		for _, fileHashStr := range files {
-			this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
-		}
+	case config.FS_BLOCKSTORE:
+		files, _ = this.taskMgr.AllDownloadFiles()
+	}
+	if len(files) == 0 {
+		return
+	}
+	for _, fileHashStr := range files {
+		this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
 	}
 }
 
@@ -277,6 +292,7 @@ func (this *Dsp) BindFileUrl(url, link string) (string, error) {
 
 func (this *Dsp) GetLinkFromUrl(url string) string {
 	info, err := this.Chain.Native.Dns.QueryUrl(url, this.Chain.Native.Dns.DefAcc.Address)
+	log.Debugf("query url %s %s info %s err %s", url, this.Chain.Native.Dns.DefAcc.Address.ToBase58(), info, err)
 	if err != nil || info == nil {
 		return ""
 	}
@@ -285,7 +301,9 @@ func (this *Dsp) GetLinkFromUrl(url string) string {
 
 func (this *Dsp) GetFileHashFromUrl(url string) string {
 	link := this.GetLinkFromUrl(url)
+	log.Debugf("get link from url %s %s", url, link)
 	if len(link) == 0 {
+		panic("no url to download")
 		return ""
 	}
 	return utils.GetFileHashFromLink(link)
@@ -342,7 +360,17 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 		if err != nil {
 			continue
 		}
-		err = tracker.RegEndPoint(trackerUrl, sigData, this.CurrentAccount().PublicKey, wallet, netIp, uint16(netPort))
+		request := func(resp chan *trackerResp) {
+			err := tracker.RegEndPoint(trackerUrl, sigData, this.CurrentAccount().PublicKey, wallet, netIp, uint16(netPort))
+			resp <- &trackerResp{
+				ret: nil,
+				err: err,
+			}
+		}
+		_, err = trackerReq(request)
+		if err != nil {
+			continue
+		}
 		if err != nil {
 			continue
 		}
@@ -364,11 +392,21 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 		return "", err
 	}
 	for _, url := range this.TrackerUrls {
-		hostAddr, err := tracker.ReqEndPoint(url, address)
+		request := func(resp chan *trackerResp) {
+			hostAddr, err := tracker.ReqEndPoint(url, address)
+			log.Debugf("hostAddr :%v %s", hostAddr, string(hostAddr))
+			resp <- &trackerResp{
+				ret: hostAddr,
+				err: err,
+			}
+		}
+		ret, err := trackerReq(request)
 		if err != nil {
 			log.Errorf("address from req failed %s", err)
 			continue
 		}
+		log.Debugf("ret %v. rettype %T, retstr %s", ret, ret, string(ret.([]byte)))
+		hostAddr := ret.([]byte)
 		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddr), url)
 		if len(string(hostAddr)) == 0 || !utils.IsHostAddrValid(string(hostAddr)) {
 			continue
@@ -392,5 +430,24 @@ func (this *Dsp) SetupPartnerHost(partners []string) {
 			continue
 		}
 		this.Channel.SetHostAddr(addr, host)
+	}
+}
+
+type trackerResp struct {
+	ret interface{}
+	err error
+}
+
+func trackerReq(request func(chan *trackerResp)) (interface{}, error) {
+	done := make(chan *trackerResp, 1)
+	go request(done)
+	for {
+		select {
+		case ret := <-done:
+			return ret.ret, ret.err
+		case <-time.After(time.Duration(common.TRACKER_SERVICE_TIMEOUT) * time.Second):
+			log.Errorf("tracker request timeout")
+			return nil, errors.New("tracker request timeout")
+		}
 	}
 }

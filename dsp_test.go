@@ -942,8 +942,8 @@ func TestGetPublicIPFromDNS(t *testing.T) {
 	}
 	d.Config = dspCfg
 	d.TrackerUrls = make([]string, 0)
-	d.TrackerUrls = append(d.TrackerUrls, "udp://10.0.1.224:6369")
-	publicIP, err := d.GetExternalIP("ALs5JNZXLgrDjqKwwZGAaAcA1KLpjPqVFX")
+	d.TrackerUrls = append(d.TrackerUrls, "udp://40.73.96.40:6369")
+	publicIP, err := d.GetExternalIP("AZj9LDEP1nhB1PYVtgAaabVKvN1uAKhmHn")
 	if err != nil {
 		t.Fatal(err)
 	}

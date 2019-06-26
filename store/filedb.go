@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/saveio/themis/common/log"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -64,6 +65,7 @@ type FileInfo struct {
 	Sent         uint64                `json:"sent"`
 	ShareTo      map[string]struct{}   `json:"shareto"`
 	CreatedAt    uint64                `json:"createdAt"`
+	BlockOffset  map[uint32]int64      `json:"block_offset"`
 }
 
 func NewFileDB(db *LevelDBStore) *FileDB {
@@ -91,6 +93,7 @@ func (this *FileDB) PutFileUploadInfo(tx, fileInfoKey string, provePrivKey []byt
 	fi.Tx = tx
 	fi.ProvePrivKey = provePrivKey
 	fi.Blocks = make(map[string]*blockInfo, 0)
+	fi.BlockOffset = make(map[uint32]int64, 0)
 	return this.putFileInfo(key, fi)
 }
 
@@ -100,7 +103,7 @@ func (this *FileDB) DeleteFileUploadInfo(fileInfoKey string) error {
 }
 
 // AddUploadedBlock. add a uploaded block into db
-func (this *FileDB) AddUploadedBlock(fileInfoKey, blockHashStr, nodeAddr string, index uint32) error {
+func (this *FileDB) AddUploadedBlock(fileInfoKey, blockHashStr, nodeAddr string, index uint32, offset int64) error {
 	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil {
 		return err
@@ -127,7 +130,26 @@ func (this *FileDB) AddUploadedBlock(fileInfoKey, blockHashStr, nodeAddr string,
 	}
 	fi.Progress[nodeAddr]++
 	fi.Sent++
+	oldOffset, ok := fi.BlockOffset[uint32(index)]
+	if !ok || oldOffset < offset {
+		fi.BlockOffset[uint32(index)] = offset
+		log.Debugf("set offset for %d %d, ok: %t, old %v", index, offset, ok, oldOffset)
+	}
 	return this.putFileInfo([]byte(fileInfoKey), fi)
+}
+
+func (this *FileDB) GetBlockOffset(fileInfoKey string, index uint32) int64 {
+	fi, err := this.GetFileInfo([]byte(fileInfoKey))
+	if err != nil {
+		return 0
+	}
+	if fi == nil {
+		return 0
+	}
+	if index == 0 {
+		return 0
+	}
+	return fi.BlockOffset[index-1]
 }
 
 // IsBlockUploaded. check if a block is uploaded

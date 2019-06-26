@@ -27,7 +27,7 @@ const (
 const (
 	TX_CONFIRM_TIMEOUT                  = 60      // wait for tx confirmed timeout
 	FILE_FETCH_ACK_TIMEOUT              = 60      // wait for file fetch ack timeout
-	BLOCK_FETCH_TIMEOUT                 = 10      // fetch block and get block response timeout
+	BLOCK_FETCH_TIMEOUT                 = 60      // fetch block and get block response timeout
 	CHECK_PROVE_TIMEOUT                 = 60      // client upload file and check prove timeout
 	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval
 	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1       // check channel can transfer interval
@@ -37,7 +37,9 @@ const (
 	// CHANNEL_TRANSFER_TIMEOUT     = 60      // 60s
 	CHANNEL_TRANSFER_TIMEOUT = 20 // 60s
 	CHANNEL_WITHDRAW_TIMEOUT = 60 // 60s
-	P2P_REQ_TIMEOUT          = 5  // 5s
+	P2P_REQ_TIMEOUT          = 10 // 10s
+	P2P_BROADCAST_TIMEOUT    = 30 // 30s
+	TRACKER_SERVICE_TIMEOUT  = 10 // 5s
 )
 
 const (
