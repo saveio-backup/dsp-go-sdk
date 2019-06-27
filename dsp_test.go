@@ -949,3 +949,27 @@ func TestGetPublicIPFromDNS(t *testing.T) {
 	}
 	t.Logf("public ip %s", publicIP)
 }
+
+func TestCloseChannel(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddr:         "http://10.0.1.201:10336",
+		ChannelClientType:    "rpc",
+		ChannelListenAddr:    "127.0.0.1:3006",
+		ChannelProtocol:      "tcp",
+		ChannelRevealTimeout: "1000",
+	}
+	w, err := wallet.OpenWallet("./dns_wallet.dat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc, nil)
+	err = d.Channel.ChannelClose("AdpPG7rjumCogd5cTvpfgZdS2c19cPK335")
+	if err != nil {
+		t.Fatal(err)
+	}
+}

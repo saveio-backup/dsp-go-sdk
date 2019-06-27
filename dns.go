@@ -231,6 +231,7 @@ func (this *Dsp) StartSeedService() {
 }
 
 func (this *Dsp) PushLocalFilesToTrackers() {
+	log.Debugf("PushLocalFilesToTrackers %v", this.TrackerUrls)
 	if len(this.TrackerUrls) == 0 {
 		return
 	}

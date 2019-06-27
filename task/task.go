@@ -42,7 +42,7 @@ type ProgressInfo struct {
 	Total    uint64            // total file's blocks count
 	Count    map[string]uint64 // address <=> count
 	Result   interface{}       // finish result
-	Error    error             // interrupt error
+	ErrorMsg string            // interrupt error
 }
 type ShareState int
 
@@ -101,6 +101,12 @@ type Task struct {
 	backupOpt     *BackupFileOpt     // backup file options
 	lock          sync.RWMutex       // lock
 	lastWorkerIdx int                // last worker index
+}
+
+func (this *Task) SetTaskType(ty TaskType) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	this.taskType = ty
 }
 
 func (this *Task) GetTaskType() TaskType {

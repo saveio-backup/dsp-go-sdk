@@ -53,6 +53,7 @@ type Payment struct {
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type FileInfo struct {
+	Id           string                `json:"id"`
 	Tx           string                `json:"tx,omitempty"`
 	FileName     string                `json:"name"`
 	Blocks       map[string]*blockInfo `json:"blocks"`
@@ -76,6 +77,26 @@ func NewFileDB(db *LevelDBStore) *FileDB {
 
 func (this *FileDB) Close() error {
 	return this.db.Close()
+}
+
+func (this *FileDB) NewFileUploadInfo(id string) error {
+	fi := &FileInfo{
+		Id:        id,
+		CreatedAt: uint64(time.Now().Unix()),
+	}
+	return this.putFileInfo([]byte(id), fi)
+}
+
+func (this *FileDB) SetIdIndex(id, key string) error {
+	return this.db.Put([]byte(key), []byte(id))
+}
+
+func (this *FileDB) GetId(key string) (string, error) {
+	id, err := this.db.Get([]byte(key))
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
 }
 
 // PutFileUploadInfo. put info when upload file

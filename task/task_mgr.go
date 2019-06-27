@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/themis/common/log"
@@ -33,25 +34,51 @@ func NewTaskMgr() *TaskMgr {
 }
 
 // NewTask. start a task for a file
-func (this *TaskMgr) NewTask(fileHash, walletAddress string, tp TaskType) string {
+func (this *TaskMgr) NewTask() string {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	t := &Task{
-		fileHash:      fileHash,
-		taskType:      tp,
 		ack:           make(chan struct{}, 1),
 		blockReq:      make(chan *GetBlockReq, 1),
 		blockResp:     make(chan *BlockResp, 1),
 		notify:        make(chan *BlockResp, 100),
 		lastWorkerIdx: -1,
 	}
-	taskKey := this.TaskKey(fileHash, walletAddress, tp)
-	this.tasks[taskKey] = t
-	return taskKey
+	id, _ := uuid.NewUUID()
+	t.id = id.String()
+	this.tasks[t.id] = t
+	return t.id
 }
 
-func (this *TaskMgr) TaskKey(fileHash, walletAddress string, tp TaskType) string {
-	return fmt.Sprintf("%s-%s-%d", fileHash, walletAddress, tp)
+func (this *TaskMgr) SetNewTaskInfo(id, fileHash, fileName, walletAddress string, tp TaskType) error {
+	this.lock.Lock()
+	t := this.tasks[id]
+	this.lock.Unlock()
+	t.SetTaskType(tp)
+	t.SetStringValue(FIELD_NAME_FILENAME, fileName)
+	if len(fileHash) == 0 {
+		return nil
+	}
+	t.SetStringValue(FIELD_NAME_FILEHASH, fileHash)
+	key := fmt.Sprintf("%s-%s-%d", fileHash, walletAddress, tp)
+	oldId, _ := this.GetId(key)
+	if len(oldId) != 0 {
+		return errors.New("task exists")
+	}
+	log.Debugf("SetNewTaskInfo id %s, key %s", id, key)
+	switch tp {
+	case TaskTypeUpload:
+		this.NewFileUploadInfo(id)
+	}
+	this.SetIdIndex(id, key)
+	return nil
+}
+
+func (this *TaskMgr) TaskId(fileHash, walletAddress string, tp TaskType) string {
+	key := fmt.Sprintf("%s-%s-%d", fileHash, walletAddress, tp)
+	id, _ := this.GetId(key)
+	log.Debugf("TaskId key %s id %s", key, id)
+	return id
 }
 
 func (this *TaskMgr) TaskNum() int {
@@ -63,12 +90,12 @@ func (this *TaskMgr) BlockReqCh() chan *GetBlockReq {
 }
 
 func (this *TaskMgr) TryGetTaskKey(fileHashStr, currentAddress, senderAddress string) (string, error) {
-	myUploadTaskKey := this.TaskKey(fileHashStr, currentAddress, TaskTypeUpload)
+	myUploadTaskKey := this.TaskId(fileHashStr, currentAddress, TaskTypeUpload)
 	v, ok := this.tasks[myUploadTaskKey]
 	if ok && v != nil {
 		return myUploadTaskKey, nil
 	}
-	myShareTaskKey := this.TaskKey(fileHashStr, senderAddress, TaskTypeShare)
+	myShareTaskKey := this.TaskId(fileHashStr, senderAddress, TaskTypeShare)
 	v, ok = this.tasks[myShareTaskKey]
 	if ok && v != nil {
 		return myShareTaskKey, nil
@@ -76,71 +103,71 @@ func (this *TaskMgr) TryGetTaskKey(fileHashStr, currentAddress, senderAddress st
 	return "", errors.New("task key not found")
 }
 
-func (this *TaskMgr) GetTaskByKey(taskKey string) (*Task, bool) {
+func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 	this.lock.RLock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.RUnlock()
 	if !ok {
-		log.Debugf("[dsp-go-sdk-taskmgr]: GetTaskByKey failed %s", taskKey)
+		log.Debugf("[dsp-go-sdk-taskmgr]: GetTaskByKey failed %s", taskId)
 	}
 	return v, ok
 }
 
 // TaskType.
-func (this *TaskMgr) TaskType(taskKey string) TaskType {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) TaskType(taskId string) TaskType {
+	v, ok := this.GetTaskById(taskId)
 	if ok {
 		return v.GetTaskType()
 	}
 	return TaskTypeNone
 }
 
-func (this *TaskMgr) TaskExist(taskKey string) bool {
-	_, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) TaskExist(taskId string) bool {
+	_, ok := this.GetTaskById(taskId)
 	return ok
 }
 
 // DeleteTask. delete task with task id
-func (this *TaskMgr) DeleteTask(taskKey string) {
+func (this *TaskMgr) DeleteTask(taskId string) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	delete(this.tasks, taskKey)
+	delete(this.tasks, taskId)
 }
 
-func (this *TaskMgr) TaskTimeout(taskKey string) (bool, error) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) TaskTimeout(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, errors.New("task not found")
 	}
 	return v.GetBoolValue(FIELD_NAME_ASKTIMEOUT), nil
 }
 
-func (this *TaskMgr) TaskAck(taskKey string) (chan struct{}, error) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) TaskAck(taskId string) (chan struct{}, error) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return nil, errors.New("task not found")
 	}
 	return v.GetAckCh(), nil
 }
 
-func (this *TaskMgr) TaskReady(taskKey string) (bool, error) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) TaskReady(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, errors.New("task not found")
 	}
 	return v.GetBoolValue(FIELD_NAME_READY), nil
 }
 
-func (this *TaskMgr) TaskBlockReq(taskKey string) (chan *GetBlockReq, error) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) TaskBlockReq(taskId string) (chan *GetBlockReq, error) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return nil, errors.New("task not found")
 	}
 	return v.GetBlockReq(), nil
 }
 
-func (this *TaskMgr) TaskBlockResp(taskKey string) (chan *BlockResp, error) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) TaskBlockResp(taskId string) (chan *BlockResp, error) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return nil, errors.New("task not found")
 	}
@@ -148,8 +175,8 @@ func (this *TaskMgr) TaskBlockResp(taskKey string) (chan *BlockResp, error) {
 }
 
 // SetTaskTimeout. set task timeout with taskid
-func (this *TaskMgr) SetTaskTimeout(taskKey string, timeout bool) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) SetTaskTimeout(taskId string, timeout bool) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
@@ -157,8 +184,8 @@ func (this *TaskMgr) SetTaskTimeout(taskKey string, timeout bool) {
 }
 
 // SetTaskReady. set task is ready with taskid
-func (this *TaskMgr) SetTaskReady(taskKey string, ready bool) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) SetTaskReady(taskId string, ready bool) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
@@ -166,8 +193,8 @@ func (this *TaskMgr) SetTaskReady(taskKey string, ready bool) {
 }
 
 // SetFileName. set file name of task
-func (this *TaskMgr) SetFileName(taskKey, fileName string) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) SetFileName(taskId, fileName string) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
@@ -189,57 +216,58 @@ func (this *TaskMgr) CloseProgressCh() {
 	this.progress = nil
 }
 
-func (this *TaskMgr) FileNameFromTask(taskKey string) string {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) FileNameFromTask(taskId string) string {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return ""
 	}
 	return v.GetStringValue(FIELD_NAME_FILENAME)
 }
 
-func (this *TaskMgr) SetFileBlocksTotalCount(taskKey string, count uint64) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) SetFileBlocksTotalCount(taskId string, count uint64) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
 	v.SetTotalBlockCnt(count)
 }
 
-func (this *TaskMgr) SetOnlyBlock(taskKey string, only bool) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) SetOnlyBlock(taskId string, only bool) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
 	v.SetBoolValue(FIELD_NAME_ONLYBLOCK, only)
 }
 
-func (this *TaskMgr) SetBackupOpt(taskKey string, opt *BackupFileOpt) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) SetBackupOpt(taskId string, opt *BackupFileOpt) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
 	v.SetBackupOpt(opt)
 }
 
-func (this *TaskMgr) OnTaskAck(taskKey string) {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) OnTaskAck(taskId string) {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
 	v.OnTaskAck()
 }
 
-func (this *TaskMgr) OnlyBlock(taskKey string) bool {
-	v, ok := this.GetTaskByKey(taskKey)
+func (this *TaskMgr) OnlyBlock(taskId string) bool {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false
 	}
 	return v.GetBoolValue(FIELD_NAME_ONLYBLOCK)
 }
 
-// EmitProgress. emit progress to channel with taskKey
-func (this *TaskMgr) EmitProgress(taskKey string) {
-	v, ok := this.GetTaskByKey(taskKey)
+// EmitProgress. emit progress to channel with taskId
+func (this *TaskMgr) EmitProgress(taskId string) {
+	v, ok := this.GetTaskById(taskId)
+	log.Debugf("EmitProgress ok %t, this.progress %v", ok, this.progress)
 	if !ok {
 		return
 	}
@@ -247,30 +275,31 @@ func (this *TaskMgr) EmitProgress(taskKey string) {
 		return
 	}
 	pInfo := &ProgressInfo{
-		TaskKey:  taskKey,
+		TaskKey:  taskId,
 		Type:     v.GetTaskType(),
 		FileName: v.GetStringValue(FIELD_NAME_FILENAME),
 		FileHash: v.GetStringValue(FIELD_NAME_FILEHASH),
 		Total:    v.GetTotalBlockCnt(),
-		Count:    this.FileProgress(taskKey),
+		Count:    this.FileProgress(taskId),
 	}
+	log.Debugf("pInfo %v", pInfo)
 	this.progress <- pInfo
 }
 
-func (this *TaskMgr) GetTask(taskKey string) *Task {
+func (this *TaskMgr) GetTask(taskId string) *Task {
 	this.lock.RLock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.RUnlock()
 	if !ok {
 		return nil
 	}
-	v.SetStringValue(FIELD_NAME_ID, taskKey)
+	v.SetStringValue(FIELD_NAME_ID, taskId)
 	return v
 }
 
 // EmitResult. emit result or error async
-func (this *TaskMgr) EmitResult(taskKey string, ret interface{}, err error) {
-	v := this.GetTask(taskKey)
+func (this *TaskMgr) EmitResult(taskId string, ret interface{}, err error) {
+	v := this.GetTask(taskId)
 	if v == nil {
 		return
 	}
@@ -286,7 +315,7 @@ func (this *TaskMgr) EmitResult(taskKey string, ret interface{}, err error) {
 		Count:    this.FileProgress(v.GetStringValue(FIELD_NAME_ID)),
 	}
 	if err != nil {
-		pInfo.Error = err
+		pInfo.ErrorMsg = err.Error()
 	} else if ret != nil {
 		pInfo.Result = ret
 	}
@@ -314,9 +343,9 @@ func (this *TaskMgr) CloseShareNotification() {
 }
 
 // EmitNotification. emit notification
-func (this *TaskMgr) EmitNotification(taskKey string, state ShareState, fileHashStr, toWalletAddr string, paymentId, paymentAmount uint64) {
+func (this *TaskMgr) EmitNotification(taskId string, state ShareState, fileHashStr, toWalletAddr string, paymentId, paymentAmount uint64) {
 	n := &ShareNotification{
-		TaskKey:       taskKey,
+		TaskKey:       taskId,
 		State:         state,
 		FileHash:      fileHashStr,
 		ToWalletAddr:  toWalletAddr,
@@ -328,9 +357,9 @@ func (this *TaskMgr) EmitNotification(taskKey string, state ShareState, fileHash
 	}()
 }
 
-func (this *TaskMgr) NewWorkers(taskKey string, addrs []string, inOrder bool, job jobFunc) {
+func (this *TaskMgr) NewWorkers(taskId string, addrs []string, inOrder bool, job jobFunc) {
 	this.lock.Lock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.Unlock()
 	if !ok {
 		return
@@ -341,9 +370,9 @@ func (this *TaskMgr) NewWorkers(taskKey string, addrs []string, inOrder bool, jo
 
 // WorkBackground. Run n goroutines to check request pool one second a time.
 // If there exist a idle request, find the idle worker to do the job
-func (this *TaskMgr) WorkBackground(taskKey string) {
+func (this *TaskMgr) WorkBackground(taskId string) {
 	this.lock.RLock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.RUnlock()
 	if !ok {
 		return
@@ -447,7 +476,7 @@ func (this *TaskMgr) WorkBackground(taskKey string) {
 					v.NotifyBlock(blk)
 					log.Debugf("delete flightkty from cache %s", blkKey)
 					blockCache.Delete(blkKey)
-					this.DelBlockReq(taskKey, r.Hash, r.Index)
+					this.DelBlockReq(taskId, r.Hash, r.Index)
 				}
 				log.Debugf("remain block cache len %d", getBlockCacheLen())
 			}
@@ -456,9 +485,9 @@ func (this *TaskMgr) WorkBackground(taskKey string) {
 	}
 }
 
-func (this *TaskMgr) SetWorkerPaid(taskKey, addr string) {
+func (this *TaskMgr) SetWorkerPaid(taskId, addr string) {
 	this.lock.Lock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.Unlock()
 	if !ok {
 		return
@@ -466,9 +495,9 @@ func (this *TaskMgr) SetWorkerPaid(taskKey, addr string) {
 	v.SetWorkerUnPaid(addr, false)
 }
 
-func (this *TaskMgr) TaskNotify(taskKey string) chan *BlockResp {
+func (this *TaskMgr) TaskNotify(taskId string) chan *BlockResp {
 	this.lock.RLock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.RUnlock()
 	if !ok {
 		return nil
@@ -476,9 +505,9 @@ func (this *TaskMgr) TaskNotify(taskKey string) chan *BlockResp {
 	return v.GetTaskNotify()
 }
 
-func (this *TaskMgr) AddBlockReq(taskKey, blockHash string, index int32) error {
+func (this *TaskMgr) AddBlockReq(taskId, blockHash string, index int32) error {
 	this.lock.Lock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.Unlock()
 	if !ok {
 		return errors.New("task not found")
@@ -487,9 +516,9 @@ func (this *TaskMgr) AddBlockReq(taskKey, blockHash string, index int32) error {
 	return nil
 }
 
-func (this *TaskMgr) DelBlockReq(taskKey, blockHash string, index int32) {
+func (this *TaskMgr) DelBlockReq(taskId, blockHash string, index int32) {
 	this.lock.Lock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.Unlock()
 	if !ok {
 		return
@@ -497,9 +526,9 @@ func (this *TaskMgr) DelBlockReq(taskKey, blockHash string, index int32) {
 	v.DelBlockReqFromPool(blockHash, index)
 }
 
-func (this *TaskMgr) SetTaskDone(taskKey string, done bool) {
+func (this *TaskMgr) SetTaskDone(taskId string, done bool) {
 	this.lock.Lock()
-	v, ok := this.tasks[taskKey]
+	v, ok := this.tasks[taskId]
 	this.lock.Unlock()
 	if !ok {
 		return
