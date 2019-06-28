@@ -420,7 +420,8 @@ func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder
 		if err != nil {
 			log.Errorf("download file %s err %s", fileHashStr, err)
 		}
-		go this.taskMgr.EmitResult(taskId, nil, err)
+		log.Debugf("empit ret %s %s", taskId, err)
+		this.taskMgr.EmitResult(taskId, nil, err)
 		// delete task from cache in the end
 		this.taskMgr.DeleteTask(taskId)
 	}()
@@ -574,7 +575,8 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	paymentId := r.Int31()
 	log.Debugf("paying to %s, id %v, err:%s", payInfo.WalletAddress, paymentId, err)
-	err = this.Channel.MediaTransfer(paymentId, amount, payInfo.WalletAddress)
+	// err = this.Channel.MediaTransfer(paymentId, amount, payInfo.WalletAddress)
+	err = this.Channel.DirectTransfer(paymentId, amount, payInfo.WalletAddress)
 	if err != nil {
 		log.Debugf("payingmentid %d, failed err %s", paymentId, err)
 		return 0, err

@@ -362,7 +362,9 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 			continue
 		}
 		request := func(resp chan *trackerResp) {
+			log.Debugf("start RegEndPoint %s ipport %v:%v", trackerUrl, netIp, netPort)
 			err := tracker.RegEndPoint(trackerUrl, sigData, this.CurrentAccount().PublicKey, wallet, netIp, uint16(netPort))
+			log.Debugf("start RegEndPoint err %s end", err)
 			resp <- &trackerResp{
 				ret: nil,
 				err: err,
@@ -440,11 +442,13 @@ type trackerResp struct {
 }
 
 func trackerReq(request func(chan *trackerResp)) (interface{}, error) {
+	log.Debugf("start tracker request")
 	done := make(chan *trackerResp, 1)
 	go request(done)
 	for {
 		select {
 		case ret := <-done:
+			log.Debugf("tracker request finished ret %v", ret)
 			return ret.ret, ret.err
 		case <-time.After(time.Duration(common.TRACKER_SERVICE_TIMEOUT) * time.Second):
 			log.Errorf("tracker request timeout")

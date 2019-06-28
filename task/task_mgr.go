@@ -319,9 +319,9 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, err error) {
 	} else if ret != nil {
 		pInfo.Result = ret
 	}
-	go func() {
-		this.progress <- pInfo
-	}()
+	go func(pi *ProgressInfo) {
+		this.progress <- pi
+	}(pInfo)
 }
 
 // RegShareNotification. register share notification

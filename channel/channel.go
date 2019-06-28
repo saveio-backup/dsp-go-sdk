@@ -2,7 +2,6 @@ package channel
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"time"
 
@@ -304,15 +303,31 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 	if err != nil {
 		return err
 	}
-	success, err := ch_actor.DirectTransferAsync(common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
-	if err != nil {
-		return err
+	type transferResp struct {
+		success bool
+		err     error
 	}
-	log.Debugf("direct transfer success: %t", success)
-	if success {
-		return nil
+	transferRespCh := make(chan *transferResp, 0)
+	go func() {
+		success, err := ch_actor.DirectTransferAsync(common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
+		transferRespCh <- &transferResp{
+			success: success,
+			err:     err,
+		}
+		log.Debugf("direct transfer success: %t", success)
+	}()
+	for {
+		select {
+		case ret := <-transferRespCh:
+			if ret.err != nil {
+				return ret.err
+			}
+			log.Debugf("direct transfer success: %t", ret.success)
+			return nil
+		case <-time.After(time.Minute):
+			return errors.New("direct transfer timeout")
+		}
 	}
-	return errors.New(fmt.Sprintf("direct transfer failed: %t", success))
 }
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) error {
