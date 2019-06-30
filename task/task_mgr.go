@@ -380,13 +380,30 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	fileHash := v.GetStringValue(FIELD_NAME_FILEHASH)
 	addrs := v.GetWorkerAddrs()
 	// lock for local go routines variables
-	var workLock sync.Mutex
 	max := len(addrs)
 	if max > common.MAX_GOROUTINES_FOR_WORK_TASK {
 		max = common.MAX_GOROUTINES_FOR_WORK_TASK
 	}
 	// block request flights
+	var workLock sync.Mutex
 	flight := make([]string, 0)
+	addFlight := func(f string) {
+		workLock.Lock()
+		flight = append(flight, f)
+		log.Debugf("append flightkey %v workLock:%p", flight, &workLock)
+		workLock.Unlock()
+	}
+	removeFilght := func(f string) {
+		workLock.Lock()
+		for j, key := range flight {
+			if key == f {
+				flight = append(flight[:j], flight[j+1:]...)
+				break
+			}
+		}
+		log.Debugf("delete flight key %s %v", f, flight)
+		workLock.Unlock()
+	}
 	// flightMap := make(map[string]struct{}, 0)
 	// blockCache := make(map[string]*BlockResp, 0)
 	flightMap := sync.Map{}
@@ -399,6 +416,134 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 		})
 		return len
 	}
+
+	type job struct {
+		req       *GetBlockReq
+		worker    *Worker
+		flightKey string
+	}
+	jobCh := make(chan *job, max)
+
+	type getBlockResp struct {
+		worker    *Worker
+		flightKey string
+		ret       *BlockResp
+		err       error
+	}
+
+	done := make(chan *getBlockResp, 1)
+	go func() {
+		for {
+			if v.GetBoolValue(FIELD_NAME_DONE) {
+				log.Debugf("distribute job task is done break")
+				close(jobCh)
+				close(done)
+				break
+			}
+			// check pool has item or not
+			// check all pool items are in request flights
+			if v.GetBlockReqPoolLen() == 0 || len(flight)+getBlockCacheLen() >= v.GetBlockReqPoolLen() {
+				// time.Sleep(time.Second)
+				time.Sleep(time.Duration(3) * time.Second)
+				continue
+			}
+			// get the idle request
+			var req *GetBlockReq
+			var flightKey string
+			pool := v.GetBlockReqPool()
+			for _, r := range pool {
+				flightKey = fmt.Sprintf("%s-%d", r.Hash, r.Index)
+				if _, ok := flightMap.Load(flightKey); ok {
+					continue
+				}
+				if _, ok := blockCache.Load(flightKey); ok {
+					continue
+				}
+				req = r
+				break
+			}
+			if req == nil {
+				continue
+			}
+			// get next index idle worker
+			worker := v.GetIdleWorker(addrs, req.Hash)
+			if worker == nil {
+				// can't find a valid worker
+				log.Debugf("no worker...")
+				time.Sleep(time.Duration(3) * time.Second)
+				continue
+			}
+			addFlight(flightKey)
+			flightMap.Store(flightKey, struct{}{})
+			v.SetWorkerUnPaid(worker.remoteAddr, true)
+			jobCh <- &job{
+				req:       req,
+				flightKey: flightKey,
+				worker:    worker,
+			}
+		}
+		log.Debugf("outside for loop")
+	}()
+
+	go func() {
+		for {
+			if v.GetBoolValue(FIELD_NAME_DONE) {
+				log.Debugf("receive job task is done break")
+				break
+			}
+			select {
+			case resp, ok := <-done:
+				if !ok {
+					log.Debugf("done channel has close")
+					break
+				}
+				log.Debugf("receive resp++++ %s", resp.flightKey)
+				// remove the request from flight
+				removeFilght(resp.flightKey)
+				flightMap.Delete(resp.flightKey)
+				if resp.err != nil {
+					v.SetWorkerUnPaid(resp.worker.remoteAddr, false)
+					log.Errorf("worker %s do job err continue %s", resp.worker.remoteAddr, resp.err)
+					continue
+				}
+				log.Debugf("add flightkey to cache %s", resp.flightKey)
+				blockCache.Store(resp.flightKey, resp.ret)
+				// notify outside
+				pool := v.GetBlockReqPool()
+				type toDeleteInfo struct {
+					hash  string
+					index int32
+				}
+				toDelete := make([]*toDeleteInfo, 0)
+				for _, r := range pool {
+					blkKey := fmt.Sprintf("%s-%d", r.Hash, r.Index)
+					blktemp, ok := blockCache.Load(blkKey)
+					log.Debugf("loop req  pool %v", blkKey)
+					if !ok {
+						log.Debugf("break because block cache not has %v", blkKey)
+						break
+					}
+					blk := blktemp.(*BlockResp)
+					log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
+					v.NotifyBlock(blk)
+					blockCache.Delete(blkKey)
+					toDelete = append(toDelete, &toDeleteInfo{
+						hash:  r.Hash,
+						index: r.Index,
+					})
+				}
+				log.Debugf("to delete len %d", len(toDelete))
+				for _, toD := range toDelete {
+					this.DelBlockReq(taskId, toD.hash, toD.index)
+				}
+				log.Debugf("remain block cache len %d", getBlockCacheLen())
+				log.Debugf("receive resp++++ done")
+			}
+		}
+		log.Debugf("outside receive job task")
+	}()
+
+	// open max routinue to do jobs
 	log.Debugf("open %d routines to work background", max)
 	for i := 0; i < max; i++ {
 		go func() {
@@ -407,80 +552,23 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("task is done break")
 					break
 				}
-				// check pool has item or not
-				// check all pool items are in request flights
-				if v.GetBlockReqPoolLen() == 0 || len(flight)+getBlockCacheLen() >= v.GetBlockReqPoolLen() {
-					time.Sleep(time.Second)
-					continue
-				}
-				// get the idle request
-				var req *GetBlockReq
-				var flightKey string
-				for _, r := range v.GetBlockReqPool() {
-					flightKey = fmt.Sprintf("%s%d", r.Hash, r.Index)
-					if _, ok := flightMap.Load(flightKey); ok {
-						continue
-					}
-					if _, ok := blockCache.Load(flightKey); ok {
-						continue
-					}
-					req = r
+				job, ok := <-jobCh
+				if !ok {
+					log.Debugf("job channel has close")
 					break
 				}
-				if req == nil {
-					continue
+
+				log.Debugf("start request block %s from %s", job.req.Hash, job.worker.RemoteAddress())
+				ret, err := job.worker.Do(fileHash, job.req.Hash, job.worker.RemoteAddress(), job.req.Index, v.GetBlockResp())
+				log.Debugf("request block %s, err %s", job.req.Hash, err)
+				done <- &getBlockResp{
+					worker:    job.worker,
+					flightKey: job.flightKey,
+					ret:       ret,
+					err:       err,
 				}
-				// get next index idle worker
-				worker := v.GetIdleWorker(addrs, req.Hash)
-				if worker == nil {
-					// can't find a valid worker
-					log.Debugf("no worker...")
-					time.Sleep(time.Duration(1) * time.Second)
-					continue
-				}
-				workLock.Lock()
-				flight = append(flight, flightKey)
-				log.Debugf("append flightkey %v workLock:%p", flight, &workLock)
-				workLock.Unlock()
-				flightMap.Store(flightKey, struct{}{})
-				log.Debugf("start request block %s from %s", req.Hash, worker.RemoteAddress())
-				ret, err := worker.Do(fileHash, req.Hash, worker.RemoteAddress(), req.Index, v.GetBlockResp())
-				log.Debugf("request block %s, err %s", req.Hash, err)
-				workLock.Lock()
-				// remove the request from flight
-				for j, key := range flight {
-					if key == flightKey {
-						flight = append(flight[:j], flight[j+1:]...)
-						break
-					}
-				}
-				workLock.Unlock()
-				log.Debugf("delete flight key %s %v", flightKey, flight)
-				flightMap.Delete(flightKey)
-				if err != nil {
-					continue
-				}
-				v.SetWorkerUnPaid(worker.remoteAddr, true)
-				log.Debugf("add flightkey to cache %s", flightKey)
-				blockCache.Store(flightKey, ret)
-				// notify outside
-				for _, r := range v.GetBlockReqPool() {
-					blkKey := fmt.Sprintf("%s%d", r.Hash, r.Index)
-					blktemp, ok := blockCache.Load(blkKey)
-					log.Debugf("loop req pool len %d, first %v", v.GetBlockReqPoolLen(), v.GetBlockReqPool()[0].Hash)
-					if !ok {
-						log.Debugf("break because block cache not has %v", blkKey)
-						break
-					}
-					blk := blktemp.(*BlockResp)
-					v.NotifyBlock(blk)
-					log.Debugf("delete flightkty from cache %s", blkKey)
-					blockCache.Delete(blkKey)
-					this.DelBlockReq(taskId, r.Hash, r.Index)
-				}
-				log.Debugf("remain block cache len %d", getBlockCacheLen())
 			}
-			log.Debugf("outside for loop")
+			log.Debugf("workers outside for loop")
 		}()
 	}
 }

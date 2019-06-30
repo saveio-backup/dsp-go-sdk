@@ -431,7 +431,6 @@ func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder
 			return err
 		}
 	}
-
 	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
 	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.TrackerUrls)
 	if len(addrs) == 0 {
@@ -492,10 +491,10 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	if err != nil {
 		log.Errorf("file download err %s", err)
 	}
+	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {
 		return nil, errors.New("no peerPayInfos for download")
 	}
-	log.Debugf("peer prices:%v", peerPayInfos)
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	if this.taskMgr.IsDownloadInfoExist(taskId) {
 		return peerPayInfos, nil
@@ -683,7 +682,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			if !ok {
 				return errors.New("download internal error")
 			}
-			log.Debugf("received block %s-%s-%d", fileHashStr, value.Hash, value.Index)
+			log.Debugf("received block %s-%s-%d from %s", fileHashStr, value.Hash, value.Index, value.PeerAddr)
 			if this.taskMgr.IsBlockDownloaded(taskId, value.Hash, uint32(value.Index)) {
 				log.Debugf("%s-%s-%d is downloaded", fileHashStr, value.Hash, value.Index)
 				continue
@@ -760,9 +759,11 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 				continue
 			}
 			// find a more accurate way
-			if value.Index != blockIndex {
+			if value.Index != blockIndex || !this.taskMgr.IsFileDownloaded(taskId) {
+				log.Debugf("continune value.Index %d, is %t", value.Index, this.taskMgr.IsFileDownloaded(taskId))
 				continue
 			}
+			log.Debugf("IsFileDownloaded last block %t", this.taskMgr.IsFileDownloaded(taskId))
 			// last block
 			this.taskMgr.SetTaskDone(taskId, true)
 			break
@@ -832,6 +833,7 @@ func (this *Dsp) CloseShareNotificationChannel() {
 func (this *Dsp) StartBackupFileService() {
 	backupingCnt := 0
 	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
+	backupFailedMap := make(map[string]int)
 	for {
 		select {
 		case <-ticker.C:
@@ -860,11 +862,16 @@ func (this *Dsp) StartBackupFileService() {
 					log.Debugf("get expired prove list params invalid:%v", t)
 					continue
 				}
+				if v, ok := backupFailedMap[string(t.FileHash)]; ok && v >= common.MAX_BACKUP_FILE_FAILED {
+					log.Debugf("skip backup this file, because has failed")
+					continue
+				}
 				backupingCnt++
 				log.Debugf("go backup file:%s, from:%s %s", t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58())
 				err := this.downloadFileFromPeers(string(t.FileHash), common.ASSET_USDT, true, "", false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
 				if err != nil {
 					log.Errorf("download file err %s", err)
+					backupFailedMap[string(t.FileHash)] = backupFailedMap[string(t.FileHash)] + 1
 					continue
 				}
 				err = this.Fs.PinRoot(context.TODO(), string(t.FileHash))
