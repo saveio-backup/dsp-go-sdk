@@ -6,8 +6,6 @@ import (
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 
 	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
@@ -18,7 +16,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/config"
 	sdk "github.com/saveio/themis-go-sdk"
 	chainCom "github.com/saveio/themis/common"
-	"github.com/saveio/themis/common/log"
 
 	"github.com/saveio/max/importer/helpers"
 	max "github.com/saveio/max/max"
@@ -35,20 +32,9 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 	if cfg == nil {
 		cfg = config.DefaultDspConfig()
 	}
-	log.Debugf("runtime.GOOS: %s", runtime.GOOS)
-	root := ""
-	if runtime.GOOS == "windows" {
-		root = "C:\\"
-	} else {
-		rootAbs, err := filepath.Abs("/")
-		if err != nil {
-			return nil, err
-		}
-		root = rootAbs
-	}
+
 	fsConfig := &max.FSConfig{
 		RepoRoot:   cfg.FsRepoRoot,
-		FsRoot:     root,
 		FsType:     max.FSType(cfg.FsType),
 		ChunkSize:  common.CHUNK_SIZE,
 		GcPeriod:   cfg.FsGcPeriod,
