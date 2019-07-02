@@ -431,10 +431,19 @@ func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder
 			return err
 		}
 	}
+	if len(fileHashStr) == 0 {
+		log.Errorf("taskId %s no filehash for download", taskId)
+		err = errors.New("no filehash for download")
+		return err
+	}
 	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
 	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.TrackerUrls)
 	if len(addrs) == 0 {
-		log.Debugf("get 0 peer of %s from trackers %v", fileHashStr, this.TrackerUrls)
+		err = fmt.Errorf("get 0 peer of %s from %d trackers", fileHashStr, len(this.TrackerUrls))
+		return err
+	}
+	if maxPeerCnt > common.MAX_DOWNLOAD_PEERS_NUM {
+		maxPeerCnt = common.MAX_DOWNLOAD_PEERS_NUM
 	}
 	err = this.downloadFileFromPeers(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt, addrs)
 	return err

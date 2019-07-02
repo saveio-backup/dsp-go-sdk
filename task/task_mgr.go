@@ -301,9 +301,11 @@ func (this *TaskMgr) GetTask(taskId string) *Task {
 func (this *TaskMgr) EmitResult(taskId string, ret interface{}, err error) {
 	v := this.GetTask(taskId)
 	if v == nil {
+		log.Errorf("emit result get no task")
 		return
 	}
 	if this.progress == nil {
+		log.Errorf("progress is nil")
 		return
 	}
 	pInfo := &ProgressInfo{

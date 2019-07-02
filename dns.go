@@ -304,7 +304,6 @@ func (this *Dsp) GetFileHashFromUrl(url string) string {
 	link := this.GetLinkFromUrl(url)
 	log.Debugf("get link from url %s %s", url, link)
 	if len(link) == 0 {
-		panic("no url to download")
 		return ""
 	}
 	return utils.GetFileHashFromLink(link)
