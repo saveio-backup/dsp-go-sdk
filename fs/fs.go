@@ -32,7 +32,6 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 	if cfg == nil {
 		cfg = config.DefaultDspConfig()
 	}
-
 	fsConfig := &max.FSConfig{
 		RepoRoot:   cfg.FsRepoRoot,
 		FsType:     max.FSType(cfg.FsType),
