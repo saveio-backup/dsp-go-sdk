@@ -3,6 +3,7 @@ package channel
 import (
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ontio/ontology-eventbus/actor"
@@ -28,15 +29,19 @@ type Channel struct {
 	channelDB  *store.ChannelDB
 	walletAddr string
 	isStart    bool
+	chain      *sdk.Chain
+	cfg        *config.DspConfig
 }
 
 type channelInfo struct {
-	ChannelId     uint32
-	Balance       uint64
-	BalanceFormat string
-	Address       string
-	HostAddr      string
-	TokenAddr     string
+	ChannelId         uint32
+	Balance           uint64
+	BalanceFormat     string
+	Address           string
+	HostAddr          string
+	TokenAddr         string
+	Participant1State int
+	ParticiPant2State int
 }
 
 type ChannelInfosResp struct {
@@ -75,6 +80,8 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 		chActor:    channelActor,
 		closeCh:    make(chan struct{}, 1),
 		walletAddr: chain.Native.Channel.DefAcc.Address.ToBase58(),
+		chain:      chain,
+		cfg:        cfg,
 	}, nil
 }
 
@@ -90,18 +97,31 @@ func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
 		return "", err
 	}
 	log.Debugf("GetHostAddr %v", walletAddr)
-	return ch_actor.GetHostAddr(common.Address(addr))
+	host, err := ch_actor.GetHostAddr(common.Address(addr))
+	if err != nil {
+		return "", err
+	}
+	prefix := this.cfg.ChannelProtocol + "://"
+	if strings.Contains(host, prefix) {
+		return host, nil
+	}
+	return prefix + host, nil
 }
 
 // SetHostAddr. set host address for wallet
 func (this *Channel) SetHostAddr(walletAddr, host string) error {
-	log.Debugf("[dsp-go-sdk-channel] SetHostAddr %s %s", walletAddr, host)
+	index := strings.Index(host, this.cfg.ChannelProtocol)
+	realHost := host
+	if index != -1 {
+		prefix := this.cfg.ChannelProtocol + "://"
+		realHost = host[index+len(prefix):]
+	}
+	log.Debugf("[dsp-go-sdk-channel] SetHostAddr %s %s", walletAddr, realHost)
 	addr, err := chaincomm.AddressFromBase58(walletAddr)
 	if err != nil {
 		return err
 	}
-	log.Debugf("SetHostAddr %v %v", walletAddr, host)
-	ch_actor.SetHostAddr(common.Address(addr), host)
+	ch_actor.SetHostAddr(common.Address(addr), realHost)
 	this.channelDB.AddPartner(this.walletAddr, walletAddr)
 	return nil
 }
@@ -490,13 +510,29 @@ func (this *Channel) AllChannels() *ChannelInfosResp {
 	resp.Balance = all.Balance
 	resp.BalanceFormat = all.BalanceFormat
 	for _, ch := range all.Channels {
+		info, err := this.chain.Native.Channel.GetChannelInfo(uint64(ch.ChannelId), chaincomm.ADDRESS_EMPTY, chaincomm.ADDRESS_EMPTY)
+		if err != nil {
+			log.Errorf("get channel info err %s", err)
+		}
+		state1 := 1
+		if info.Participant1.IsCloser {
+			state1 = 0
+		}
+
+		state2 := 1
+		if info.Participant2.IsCloser {
+			state2 = 0
+		}
+
 		resp.Channels = append(resp.Channels, &channelInfo{
-			ChannelId:     ch.ChannelId,
-			Address:       ch.Address,
-			Balance:       ch.Balance,
-			BalanceFormat: ch.BalanceFormat,
-			HostAddr:      ch.HostAddr,
-			TokenAddr:     ch.TokenAddr,
+			ChannelId:         ch.ChannelId,
+			Address:           ch.Address,
+			Balance:           ch.Balance,
+			BalanceFormat:     ch.BalanceFormat,
+			HostAddr:          ch.HostAddr,
+			TokenAddr:         ch.TokenAddr,
+			Participant1State: state1,
+			ParticiPant2State: state2,
 		})
 	}
 	return resp
