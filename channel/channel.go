@@ -492,6 +492,23 @@ func (this *Channel) DeletePayment(paymentId int32) error {
 	return this.channelDB.RemovePayment(paymentId)
 }
 
+func (this *Channel) CanOpenChannel(walletAddr string) bool {
+	if !this.isStart {
+		return false
+	}
+	all := ch_actor.GetAllChannels()
+	if all == nil {
+		return true
+	}
+	for _, ch := range all.Channels {
+		if ch.Address != walletAddr {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 func (this *Channel) AllChannels() *ChannelInfosResp {
 	log.Debugf("[dsp-go-sdk-channel] AllChannels")
 	if !this.isStart {
