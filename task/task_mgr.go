@@ -39,7 +39,7 @@ func (this *TaskMgr) NewTask() string {
 	defer this.lock.Unlock()
 	t := &Task{
 		ack:           make(chan struct{}, 1),
-		blockReq:      make(chan *GetBlockReq, 1),
+		blockReq:      make(chan *GetBlockReq, 100),
 		blockResp:     make(chan *BlockResp, 1),
 		notify:        make(chan *BlockResp, 100),
 		lastWorkerIdx: -1,

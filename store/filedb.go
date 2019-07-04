@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/saveio/themis/common/log"
@@ -12,7 +13,8 @@ import (
 
 // FileDB. implement a db storage for save information of sending/downloading/downloaded files
 type FileDB struct {
-	db *LevelDBStore
+	db   *LevelDBStore
+	lock sync.RWMutex
 }
 
 type FileInfoType int
@@ -125,11 +127,15 @@ func (this *FileDB) DeleteFileUploadInfo(fileInfoKey string) error {
 
 // AddUploadedBlock. add a uploaded block into db
 func (this *FileDB) AddUploadedBlock(fileInfoKey, blockHashStr, nodeAddr string, index uint32, offset int64) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil {
+		log.Errorf("get info err %s", err)
 		return err
 	}
 	if fi == nil {
+		log.Errorf("file info not found %d", index)
 		return errors.New("file info not found")
 	}
 	blockKey := uploadFileBlockKey(fileInfoKey, blockHashStr, index)
@@ -156,6 +162,7 @@ func (this *FileDB) AddUploadedBlock(fileInfoKey, blockHashStr, nodeAddr string,
 		fi.BlockOffset[uint32(index)] = offset
 		log.Debugf("set offset for %d %d, ok: %t, old %v", index, offset, ok, oldOffset)
 	}
+	log.Debugf("nodeAddr %s incre sent %d", nodeAddr, fi.Sent)
 	return this.putFileInfo([]byte(fileInfoKey), fi)
 }
 
@@ -226,10 +233,13 @@ func (this *FileDB) GetStoreFileTx(fileInfoKey string) string {
 
 // UploadedBlockCount
 func (this *FileDB) UploadedBlockCount(fileInfoKey string) uint64 {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
 	fi, err := this.GetFileInfo([]byte(fileInfoKey))
 	if err != nil || fi == nil {
 		return 0
 	}
+	log.Debugf("get sent %d", fi.Sent)
 	return fi.Sent
 }
 

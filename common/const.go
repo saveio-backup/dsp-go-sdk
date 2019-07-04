@@ -58,6 +58,11 @@ const (
 	MAX_BACKUP_FILE_FAILED       = 3  // max backup file failed times
 )
 
+// go routine
+const (
+	MAX_UPLOAD_ROUTINES = 15 // max upload go routines
+)
+
 const (
 	FILE_UNIT_PRICE_TYPE_BYTE  = 1
 	FILE_UNIT_PRICE_TYPE_KBYTE = 2
