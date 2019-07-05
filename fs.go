@@ -501,10 +501,8 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 		peerPayInfos[addr] = fileMsg.PayInfo
 		prefix = fileMsg.Prefix
 	}
-	err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)
-	if err != nil {
-		log.Errorf("file download err %s", err)
-	}
+	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)
+	log.Debugf("broadcast file download msg result %v err %s", ret, err)
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {
 		return nil, errors.New("no peerPayInfos for download")
@@ -648,11 +646,12 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		addrs = append(addrs, addr)
 	}
 	log.Debugf("broadcast file_download msg to %v", addrs)
-	err = client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, nil)
-	log.Debugf("brocast file download msg err %v", err)
+	broadcastRet, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, nil)
+	log.Debugf("brocast file download msg %v err %v", broadcastRet, err)
 	if err != nil {
 		return err
 	}
+
 	blockHashes := this.taskMgr.FileBlockHashes(taskId)
 	prefix := this.taskMgr.FilePrefix(taskId)
 	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v", fileHashStr, len(blockHashes), prefix)
@@ -1132,7 +1131,7 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 	stop := func() bool {
 		return len(receivers) >= receiverCount
 	}
-	err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), false, stop, action)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), false, stop, action)
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err")
 		return nil, err
@@ -1140,7 +1139,7 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 	if len(receivers) >= receiverCount {
 		receivers = receivers[:receiverCount]
 	}
-	log.Debugf("receives :%v", receivers)
+	log.Debugf("receives :%v, ret %v", receivers, ret)
 	return receivers, nil
 }
 
@@ -1148,12 +1147,20 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 func (this *Dsp) notifyFetchReady(taskKey, fileHashStr string, receivers []string) error {
 	msg := message.NewFileFetchRdy(fileHashStr)
 	this.taskMgr.SetTaskReady(taskKey, true)
-	err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil, nil)
+	ret, err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil, nil)
 	if err != nil {
 		log.Errorf("notify err %s", err)
 		this.taskMgr.SetTaskReady(taskKey, false)
+		return err
 	}
-	return err
+	for _, e := range ret {
+		if e != nil {
+			log.Errorf("notify err %s", err)
+			this.taskMgr.SetTaskReady(taskKey, false)
+			return e
+		}
+	}
+	return nil
 }
 
 func (this *Dsp) handleFetchBlockRequest(taskId, fileHashStr string,
