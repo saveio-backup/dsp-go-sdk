@@ -287,27 +287,27 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 }
 
 // DeleteUploadedFile. Delete uploaded file from remote nodes. it is called by the owner
-func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
+func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFileResp, error) {
 	if len(fileHashStr) == 0 {
-		return "", errors.New("delete file hash string is empty")
+		return nil, errors.New("delete file hash string is empty")
 	}
 	info, err := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	if err != nil || info == nil {
 		log.Debugf("info:%v, err:%s", info, err)
-		return "", fmt.Errorf("file info not found, %s has deleted", fileHashStr)
+		return nil, fmt.Errorf("file info not found, %s has deleted", fileHashStr)
 	}
 	if info.FileOwner.ToBase58() != this.Chain.Native.Fs.DefAcc.Address.ToBase58() {
-		return "", fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
+		return nil, fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
 	}
 	storingNode, _ := this.getFileProveNode(fileHashStr, info.ChallengeTimes)
 	txHash, err := this.Chain.Native.Fs.DeleteFile(fileHashStr)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	log.Debugf("delete file txHash %s", hex.EncodeToString(chainCom.ToArrayReverse(txHash)))
 	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
 	if err != nil || !confirmed {
-		return "", errors.New("wait for tx confirmed failed")
+		return nil, errors.New("wait for tx confirmed failed")
 	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
 	if len(storingNode) == 0 {
@@ -315,20 +315,30 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (string, error) {
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)...)
 	}
 	log.Debugf("will broadcast delete msg to %v", storingNode)
+	resp := &common.DeleteUploadFileResp{}
 	if len(storingNode) > 0 {
 		msg := message.NewFileDelete(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58())
-		err = client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
+		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
+		nodeStatus := make([]common.DeleteFileStatus, 0, len(m))
+		for addr, deleteErr := range m {
+			nodeStatus = append(nodeStatus, common.DeleteFileStatus{
+				HostAddr: addr,
+				Status:   "",
+				ErrorMsg: deleteErr.Error(),
+			})
+		}
+		resp.Status = nodeStatus
 		log.Debugf("broadcast to delete file msg success")
 	}
-
 	err = this.taskMgr.DeleteFileUploadInfo(taskId)
 	if err != nil {
 		log.Errorf("delete upload info from db err: %s", err)
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
+	resp.Tx = hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return resp, nil
 }
 
 func (this *Dsp) Progress() {

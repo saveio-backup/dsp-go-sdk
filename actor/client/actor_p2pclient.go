@@ -45,6 +45,11 @@ type BroadcastReq struct {
 	Action    func(proto.Message, string)
 }
 
+type BroadcastResp struct {
+	Result map[string]error
+	Error  error
+}
+
 type PeerListeningReq struct {
 	Address string
 }
@@ -96,14 +101,19 @@ func P2pSend(address interface{}, data proto.Message) error {
 	return nil
 }
 
-func P2pBroadcast(addresses []string, data proto.Message, needReply bool, stop func() bool, action func(proto.Message, string)) error {
+func P2pBroadcast(addresses []string, data proto.Message, needReply bool, stop func() bool, action func(proto.Message, string)) (map[string]error, error) {
 	chReq := &BroadcastReq{addresses, data, needReply, stop, action}
 	future := P2pServerPid.RequestFuture(chReq, time.Duration(common.P2P_BROADCAST_TIMEOUT*len(addresses))*time.Second)
-	if _, err := future.Result(); err != nil {
+	in, err := future.Result()
+	if err != nil {
 		log.Error("[P2pBroadcast] error: ", err)
-		return err
+		return nil, err
 	}
-	return nil
+	resp, ok := in.(*BroadcastResp)
+	if !ok {
+		return nil, errors.New("[P2pBroadcast] BroadcastResp type assert failed")
+	}
+	return resp.Result, resp.Error
 }
 
 func P2pIsPeerListening(address string) error {

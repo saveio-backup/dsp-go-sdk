@@ -36,3 +36,14 @@ type PayInfo struct {
 	Asset         int32
 	UnitPrice     uint64
 }
+
+type DeleteFileStatus struct {
+	HostAddr string
+	Status   string
+	ErrorMsg string
+}
+
+type DeleteUploadFileResp struct {
+	Tx     string
+	Status []DeleteFileStatus
+}
