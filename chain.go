@@ -94,13 +94,13 @@ func (this *Dsp) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
 	if err != nil || info == nil {
 		return false
 	}
+	if info.FileOwner.ToBase58() == walletAddr {
+		return true
+	}
 	if info.Privilege == fs.PUBLIC {
 		return true
 	}
 	if info.Privilege == fs.PRIVATE {
-		if info.FileOwner.ToBase58() == walletAddr {
-			return true
-		}
 		return false
 	}
 	whitelist, err := this.Chain.Native.Fs.GetWhiteList(fileHashStr)

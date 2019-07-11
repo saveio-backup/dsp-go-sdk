@@ -532,12 +532,12 @@ func (this *Channel) AllChannels() *ChannelInfosResp {
 			log.Errorf("get channel info err %s", err)
 		}
 		state1 := 1
-		if info.Participant1.IsCloser {
+		if info != nil && info.Participant1.IsCloser {
 			state1 = 0
 		}
 
 		state2 := 1
-		if info.Participant2.IsCloser {
+		if info != nil && info.Participant2.IsCloser {
 			state2 = 0
 		}
 

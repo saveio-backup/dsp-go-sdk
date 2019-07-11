@@ -441,6 +441,10 @@ func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder
 		err = errors.New("no filehash for download")
 		return err
 	}
+	if this.DNSNode == nil {
+		err = errors.New("no dns node for download")
+		return err
+	}
 	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
 	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.TrackerUrls)
 	if len(addrs) == 0 {
@@ -868,7 +872,7 @@ func (this *Dsp) StartBackupFileService() {
 					(t.BrokenAddr.ToBase58() == this.Chain.Native.Fs.DefAcc.Address.ToBase58()) ||
 					(t.BrokenAddr.ToBase58() == t.BackUpAddr.ToBase58())
 				if addrCheckFailed {
-					log.Debugf("address check faield file %s, lucky: %s, backup: %s, broken: %s", string(t.FileHash), t.LuckyAddr.ToBase58(), t.BackUpAddr.ToBase58(), t.BrokenAddr.ToBase58())
+					// log.Debugf("address check faield file %s, lucky: %s, backup: %s, broken: %s", string(t.FileHash), t.LuckyAddr.ToBase58(), t.BackUpAddr.ToBase58(), t.BrokenAddr.ToBase58())
 					continue
 				}
 				if len(t.FileHash) == 0 || len(t.BakSrvAddr) == 0 || len(t.BackUpAddr.ToBase58()) == 0 {

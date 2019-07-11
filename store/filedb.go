@@ -388,7 +388,12 @@ func (this *FileDB) IsFileDownloaded(fileInfoKey string) bool {
 	if err != nil || fi == nil {
 		return false
 	}
-	return len(fi.BlockHashes) == len(fi.Blocks)
+	ok := (len(fi.BlockHashes) == len(fi.Blocks))
+	if ok {
+		key := fmt.Sprintf("alldownloaded-type=%d&hash=%s", FileInfoTypeDownload, fi.BlockHashes[0])
+		this.db.Put([]byte(key), []byte("true"))
+	}
+	return ok
 }
 
 // GetUndownloadedBlockInfo. check undownloaded block in-order
@@ -442,7 +447,7 @@ func (this *FileDB) DeleteFileDownloadInfo(fileInfoKey string) error {
 
 // AllDownloadFiles. get all download files from db
 func (this *FileDB) AllDownloadFiles() ([]string, error) {
-	prefix := fmt.Sprintf("type=%d&hash=", FileInfoTypeDownload)
+	prefix := fmt.Sprintf("alldownloaded-type=%d&hash=", FileInfoTypeDownload)
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
 		return nil, err
