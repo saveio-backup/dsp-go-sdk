@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
@@ -175,6 +176,10 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	if len(receivers) < int(opt.CopyNum)+1 {
 		err = errors.New("file receivers is not enough")
 		return nil, err
+	}
+	if len(receivers) > int(opt.CopyNum)+1 {
+		log.Warnf("receivers too much")
+		receivers = receivers[:int(opt.CopyNum)+1]
 	}
 	// notify fetch ready to all receivers
 	err = this.notifyFetchReady(taskId, fileHashStr, receivers)
@@ -1109,6 +1114,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint3
 // return receivers
 func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	receivers := make([]string, 0)
+	receiverLen := int32(0)
 	msg := message.NewFileFetchAsk(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), this.Chain.Native.Fs.DefAcc.Address.ToBase58())
 	action := func(res proto.Message, addr string) {
 		log.Debugf("send file ask msg success %s", addr)
@@ -1123,6 +1129,7 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 			isAck = true
 			log.Debugf("received ack from %s", addr)
 			receivers = append(receivers, addr)
+			atomic.AddInt32(&receiverLen, 1)
 		case <-time.After(time.Duration(common.FILE_FETCH_ACK_TIMEOUT) * time.Second):
 			if isAck {
 				return
@@ -1133,7 +1140,7 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 	}
 	// TODO: make stop func sense in parallel mode
 	stop := func() bool {
-		return len(receivers) >= receiverCount
+		return atomic.LoadInt32(&receiverLen) >= int32(receiverCount)
 	}
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), false, stop, action)
 	if err != nil {
