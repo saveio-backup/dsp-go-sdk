@@ -15,6 +15,7 @@ import (
 	chActorClient "github.com/saveio/pylons/actor/client"
 	chain "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis/account"
+	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -64,7 +65,10 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	dspActorClient.SetP2pPid(p2pActor)
 	if len(c.ChannelListenAddr) > 0 && acc != nil {
 		var err error
-		d.Channel, err = channel.NewChannelService(c, d.Chain)
+		getHostCallBack := func(addr chainCom.Address) (string, error) {
+			return d.GetExternalIP(addr.ToBase58())
+		}
+		d.Channel, err = channel.NewChannelService(c, d.Chain, getHostCallBack)
 		if err != nil {
 			log.Errorf("init channel err %s", err)
 			return nil

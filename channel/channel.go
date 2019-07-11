@@ -50,7 +50,7 @@ type ChannelInfosResp struct {
 	Channels      []*channelInfo
 }
 
-func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error) {
+func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallBack func(chaincomm.Address) (string, error)) (*Channel, error) {
 	if cfg == nil {
 		cfg = config.DefaultDspConfig()
 	}
@@ -71,6 +71,13 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 	}
 	//start channel and actor
 	channelActor, err := ch_actor.NewChannelActor(channelConfig, chain.Native.Channel.DefAcc)
+	if err != nil {
+		return nil, err
+	}
+	hostAddrCallBack := func(addr common.Address) (string, error) {
+		return getHostAddrCallBack(chaincomm.Address(addr))
+	}
+	err = ch_actor.SetGetHostAddrCallback(hostAddrCallBack)
 	if err != nil {
 		return nil, err
 	}
