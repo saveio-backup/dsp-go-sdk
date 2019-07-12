@@ -35,14 +35,16 @@ type BlockResp struct {
 }
 
 type ProgressInfo struct {
-	TaskKey  string
-	Type     TaskType          //task type
-	FileName string            // file name
-	FileHash string            // file hash
-	Total    uint64            // total file's blocks count
-	Count    map[string]uint64 // address <=> count
-	Result   interface{}       // finish result
-	ErrorMsg string            // interrupt error
+	TaskKey   string
+	Type      TaskType          //task type
+	FileName  string            // file name
+	FileHash  string            // file hash
+	Total     uint64            // total file's blocks count
+	Count     map[string]uint64 // address <=> count
+	CreatedAt uint64
+	UpdatedAt uint64
+	Result    interface{} // finish result
+	ErrorMsg  string      // interrupt error
 }
 type ShareState int
 
@@ -101,6 +103,7 @@ type Task struct {
 	backupOpt     *BackupFileOpt     // backup file options
 	lock          sync.RWMutex       // lock
 	lastWorkerIdx int                // last worker index
+	createdAt     int64              // createdAt
 }
 
 func (this *Task) SetTaskType(ty TaskType) {
@@ -205,6 +208,12 @@ func (this *Task) GetTotalBlockCnt() uint64 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.total
+}
+
+func (this *Task) GetCreatedAt() int64 {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.createdAt
 }
 
 func (this *Task) SetBackupOpt(opt *BackupFileOpt) {

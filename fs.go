@@ -520,7 +520,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	if this.taskMgr.IsDownloadInfoExist(taskId) {
 		return peerPayInfos, nil
 	}
-	log.Debugf("AddFileBlockHashes id %v hashes %v", taskId, blockHashes)
+	log.Debugf("AddFileBlockHashes id %v hashes %v, prefix %s", taskId, blockHashes, prefix)
 	err = this.taskMgr.AddFileBlockHashes(taskId, blockHashes)
 	if err != nil {
 		return nil, err
@@ -727,7 +727,8 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 				}
 				// cut prefix
 				// TEST: why not use filesize == 0
-				if value.Index == 1 && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
+				if (value.Index == 0 || value.Index == 1) && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
+					log.Debugf("cut prefix data-len %d, prefix %s, prefix-len: %d, str %s", len(data), prefix, len(prefix), string(data[:len(prefix)]))
 					data = data[len(prefix):]
 				}
 				// TEST: offset

@@ -43,6 +43,7 @@ func (this *TaskMgr) NewTask() string {
 		blockResp:     make(chan *BlockResp, 1),
 		notify:        make(chan *BlockResp, 100),
 		lastWorkerIdx: -1,
+		createdAt:     time.Now().Unix(),
 	}
 	id, _ := uuid.NewUUID()
 	t.id = id.String()
@@ -275,12 +276,14 @@ func (this *TaskMgr) EmitProgress(taskId string) {
 		return
 	}
 	pInfo := &ProgressInfo{
-		TaskKey:  taskId,
-		Type:     v.GetTaskType(),
-		FileName: v.GetStringValue(FIELD_NAME_FILENAME),
-		FileHash: v.GetStringValue(FIELD_NAME_FILEHASH),
-		Total:    v.GetTotalBlockCnt(),
-		Count:    this.FileProgress(taskId),
+		TaskKey:   taskId,
+		Type:      v.GetTaskType(),
+		FileName:  v.GetStringValue(FIELD_NAME_FILENAME),
+		FileHash:  v.GetStringValue(FIELD_NAME_FILEHASH),
+		Total:     v.GetTotalBlockCnt(),
+		Count:     this.FileProgress(taskId),
+		CreatedAt: uint64(v.GetCreatedAt()),
+		UpdatedAt: uint64(time.Now().Unix()),
 	}
 	log.Debugf("pInfo %v", pInfo)
 	this.progress <- pInfo
@@ -309,12 +312,14 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, err error) {
 		return
 	}
 	pInfo := &ProgressInfo{
-		TaskKey:  v.GetStringValue(FIELD_NAME_ID),
-		Type:     v.GetTaskType(),
-		FileName: v.GetStringValue(FIELD_NAME_FILENAME),
-		FileHash: v.GetStringValue(FIELD_NAME_FILEHASH),
-		Total:    v.GetTotalBlockCnt(),
-		Count:    this.FileProgress(v.GetStringValue(FIELD_NAME_ID)),
+		TaskKey:   v.GetStringValue(FIELD_NAME_ID),
+		Type:      v.GetTaskType(),
+		FileName:  v.GetStringValue(FIELD_NAME_FILENAME),
+		FileHash:  v.GetStringValue(FIELD_NAME_FILEHASH),
+		Total:     v.GetTotalBlockCnt(),
+		Count:     this.FileProgress(v.GetStringValue(FIELD_NAME_ID)),
+		CreatedAt: uint64(v.GetCreatedAt()),
+		UpdatedAt: uint64(time.Now().Unix()),
 	}
 	if err != nil {
 		pInfo.ErrorMsg = err.Error()
