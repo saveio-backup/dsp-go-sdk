@@ -1,6 +1,7 @@
 package task
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/saveio/themis/common/log"
@@ -91,19 +92,19 @@ type Task struct {
 	askTimeout bool          // fetch ask timeout flag
 	ack        chan struct{} // fetch ack channel
 	ready      bool          // fetch ready flag
-	// TODO: refactor, delete below two channels
-	blockReq      chan *GetBlockReq  // fetch block request channel
-	blockResp     chan *BlockResp    // fetch block response channel from msg router
-	blockReqPool  []*GetBlockReq     // get block request pool
-	workers       map[string]*Worker // workers to request block
-	inOrder       bool               // keep work in order
-	onlyBlock     bool               // only send block data, without tag data
-	notify        chan *BlockResp    // notify download block
-	done          bool               // task done
-	backupOpt     *BackupFileOpt     // backup file options
-	lock          sync.RWMutex       // lock
-	lastWorkerIdx int                // last worker index
-	createdAt     int64              // createdAt
+	// TODO: refactor, delete below two channels, use request and reply
+	blockReq      chan *GetBlockReq          // fetch block request channel
+	blockRespsMap map[string]chan *BlockResp // map key <=> *BlockResp
+	blockReqPool  []*GetBlockReq             // get block request pool
+	workers       map[string]*Worker         // workers to request block
+	inOrder       bool                       // keep work in order
+	onlyBlock     bool                       // only send block data, without tag data
+	notify        chan *BlockResp            // notify download block
+	done          bool                       // task done
+	backupOpt     *BackupFileOpt             // backup file options
+	lock          sync.RWMutex               // lock
+	lastWorkerIdx int                        // last worker index
+	createdAt     int64                      // createdAt
 }
 
 func (this *Task) SetTaskType(ty TaskType) {
@@ -130,11 +131,11 @@ func (this *Task) GetBlockReq() chan *GetBlockReq {
 	return this.blockReq
 }
 
-func (this *Task) GetBlockResp() chan *BlockResp {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
-	return this.blockResp
-}
+// func (this *Task) GetBlockResp(key string) chan *BlockResp {
+// 	this.lock.RLock()
+// 	defer this.lock.RUnlock()
+// 	return this.blockResp
+// }
 
 func (this *Task) SetBoolValue(name string, value bool) {
 	this.lock.Lock()
@@ -196,6 +197,47 @@ func (this *Task) GetStringValue(name string) string {
 		return this.id
 	}
 	return ""
+}
+
+func (this *Task) PushGetBlock(blockHash string, index int32, block *BlockResp) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.id, this.fileHash, blockHash, index)
+	log.Debugf("push block %s", key)
+	ch, ok := this.blockRespsMap[key]
+	if !ok {
+		log.Errorf("get block resp channel is nil with key %s", key)
+		return
+	}
+	go func() {
+		ch <- block
+	}()
+}
+
+func (this *Task) GetBlockRespCh(blockHash string, index int32) chan *BlockResp {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.id, this.fileHash, blockHash, index)
+	if this.blockRespsMap == nil {
+		this.blockRespsMap = make(map[string]chan *BlockResp)
+	}
+	ch, ok := this.blockRespsMap[key]
+	if !ok {
+		ch = make(chan *BlockResp, 1)
+		this.blockRespsMap[key] = ch
+	}
+	return ch
+}
+
+func (this *Task) DropBlockRespCh(blockHash string, index int32) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.id, this.fileHash, blockHash, index)
+	ch := this.blockRespsMap[key]
+	delete(this.blockRespsMap, key)
+	if ch != nil {
+		close(ch)
+	}
 }
 
 func (this *Task) SetTotalBlockCnt(cnt uint64) {

@@ -238,25 +238,33 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 
 	switch blockMsg.Operation {
 	case netcom.BLOCK_OP_NONE:
-		taskKey := this.taskMgr.TaskId(blockMsg.FileHash, this.WalletAddress(), task.TaskTypeDownload)
-		exist := this.taskMgr.TaskExist(taskKey)
+		taskId := this.taskMgr.TaskId(blockMsg.FileHash, this.WalletAddress(), task.TaskTypeDownload)
+		exist := this.taskMgr.TaskExist(taskId)
 		if !exist {
 			log.Debugf("task %s not exist", blockMsg.FileHash)
 			return
 		}
-		respCh, err := this.taskMgr.TaskBlockResp(taskKey)
-		if err != nil {
-			log.Errorf("get task block respch err: %s", err)
-			return
-		}
-		respCh <- &task.BlockResp{
+		this.taskMgr.PushGetBlock(taskId, &task.BlockResp{
 			Hash:     blockMsg.Hash,
 			Index:    blockMsg.Index,
 			PeerAddr: peer.Address,
 			Block:    blockMsg.Data,
 			Tag:      blockMsg.Tag,
 			Offset:   blockMsg.Offset,
-		}
+		})
+		// respCh, err := this.taskMgr.TaskBlockResp(taskKey)
+		// if err != nil {
+		// 	log.Errorf("get task block respch err: %s", err)
+		// 	return
+		// }
+		// respCh <- &task.BlockResp{
+		// 	Hash:     blockMsg.Hash,
+		// 	Index:    blockMsg.Index,
+		// 	PeerAddr: peer.Address,
+		// 	Block:    blockMsg.Data,
+		// 	Tag:      blockMsg.Tag,
+		// 	Offset:   blockMsg.Offset,
+		// }
 	case netcom.BLOCK_OP_GET:
 		log.Debugf("handle get block %s-%s-%d", blockMsg.FileHash, blockMsg.Hash, blockMsg.Index)
 		taskKey, err := this.taskMgr.TryGetTaskKey(blockMsg.FileHash, this.WalletAddress(), blockMsg.Payment.Sender)

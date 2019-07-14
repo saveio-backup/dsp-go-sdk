@@ -40,7 +40,6 @@ func (this *TaskMgr) NewTask() string {
 	t := &Task{
 		ack:           make(chan struct{}, 1),
 		blockReq:      make(chan *GetBlockReq, 100),
-		blockResp:     make(chan *BlockResp, 1),
 		notify:        make(chan *BlockResp, 100),
 		lastWorkerIdx: -1,
 		createdAt:     time.Now().Unix(),
@@ -167,12 +166,28 @@ func (this *TaskMgr) TaskBlockReq(taskId string) (chan *GetBlockReq, error) {
 	return v.GetBlockReq(), nil
 }
 
-func (this *TaskMgr) TaskBlockResp(taskId string) (chan *BlockResp, error) {
+func (this *TaskMgr) PushGetBlock(taskId string, block *BlockResp) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return nil, errors.New("task not found")
+		return
 	}
-	return v.GetBlockResp(), nil
+	v.PushGetBlock(block.Hash, block.Index, block)
+}
+
+func (this *TaskMgr) GetBlockRespCh(taskId, blockHash string, index int32) chan *BlockResp {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return nil
+	}
+	return v.GetBlockRespCh(blockHash, index)
+}
+
+func (this *TaskMgr) DropBlockRespCh(taskId, blockHash string, index int32) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return
+	}
+	v.DropBlockRespCh(blockHash, index)
 }
 
 // SetTaskTimeout. set task timeout with taskid
@@ -566,7 +581,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 
 				log.Debugf("start request block %s from %s", job.req.Hash, job.worker.RemoteAddress())
-				ret, err := job.worker.Do(fileHash, job.req.Hash, job.worker.RemoteAddress(), job.req.Index, v.GetBlockResp())
+				ret, err := job.worker.Do(taskId, fileHash, job.req.Hash, job.worker.RemoteAddress(), job.req.Index)
 				log.Debugf("request block %s, err %s", job.req.Hash, err)
 				done <- &getBlockResp{
 					worker:    job.worker,

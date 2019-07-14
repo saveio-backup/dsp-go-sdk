@@ -678,9 +678,14 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	this.taskMgr.SetFileBlocksTotalCount(taskId, uint64(len(blockHashes)))
 	go this.taskMgr.EmitProgress(taskId)
 	// declare job for workers
-	job := func(fHash, bHash, pAddr string, index int32, respCh chan *task.BlockResp) (*task.BlockResp, error) {
-		log.Debugf("download %s-%s-%d from %s", fHash, bHash, index, pAddr)
-		return this.downloadBlock(fHash, bHash, index, pAddr, respCh)
+	job := func(tId, fHash, bHash, pAddr string, index int32) (*task.BlockResp, error) {
+		resp, err := this.downloadBlock(tId, fHash, bHash, index, pAddr)
+		if resp != nil {
+			log.Debugf("job done: download tId  %s-%s-%d %s-%d from %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr)
+		} else {
+			log.Errorf("download block %s-%s-%d err %s", fHash, bHash, index, err)
+		}
+		return resp, err
 	}
 	this.taskMgr.NewWorkers(taskId, addrs, inOrder, job)
 	go this.taskMgr.WorkBackground(taskId)
@@ -1277,15 +1282,11 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		return err
 	}
 	defer this.taskMgr.DeleteTask(taskId)
-	resp, err := this.taskMgr.TaskBlockResp(taskId)
-	if err != nil {
-		return err
-	}
 	for index, hash := range blockHashes {
 		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {
 			continue
 		}
-		value, err := this.downloadBlock(fileHashStr, hash, int32(index), addr, resp)
+		value, err := this.downloadBlock(taskId, fileHashStr, hash, int32(index), addr)
 		if err != nil {
 			return err
 		}
@@ -1322,7 +1323,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 }
 
 // downloadBlock. download block helper function.
-func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr interface{}, resp chan *task.BlockResp) (*task.BlockResp, error) {
+func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, addr interface{}) (*task.BlockResp, error) {
 	var walletAddress string
 	if this.Chain.Native.Fs.DefAcc != nil {
 		walletAddress = this.Chain.Native.Fs.DefAcc.Address.ToBase58()
@@ -1330,6 +1331,8 @@ func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr inter
 		walletAddress = this.Chain.Native.Channel.DefAcc.Address.ToBase58()
 	}
 	log.Debugf("download block  of %s-%s-%d to %s", fileHashStr, hash, index, addr)
+	ch := this.taskMgr.GetBlockRespCh(taskId, hash, index)
+	defer this.taskMgr.DropBlockRespCh(taskId, hash, index)
 	msg := message.NewBlockReqMsg(fileHashStr, hash, index, walletAddress, common.ASSET_USDT)
 	err := client.P2pSend(addr, msg.ToProtoMsg())
 	log.Debugf("send download block msg of %s-%s-%d to %s, err %s", fileHashStr, hash, index, addr, err)
@@ -1339,13 +1342,13 @@ func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr inter
 	received := false
 	timeout := false
 	select {
-	case value, ok := <-resp:
+	case value, ok := <-ch:
 		received = true
+		if !ok {
+			return nil, fmt.Errorf("receiving block none from channel")
+		}
 		if timeout {
 			return nil, fmt.Errorf("receiving block %s timeout", hash)
-		}
-		if !ok {
-			return nil, fmt.Errorf("receiving block channel %s error", hash)
 		}
 		return value, nil
 	case <-time.After(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second):
@@ -1355,6 +1358,7 @@ func (this *Dsp) downloadBlock(fileHashStr, hash string, index int32, addr inter
 		timeout = true
 		return nil, fmt.Errorf("receiving block %s timeout", hash)
 	}
+
 	return nil, errors.New("no receive channel")
 }
 

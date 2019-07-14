@@ -2,7 +2,7 @@ package task
 
 import "github.com/saveio/dsp-go-sdk/common"
 
-type jobFunc func(string, string, string, int32, chan *BlockResp) (*BlockResp, error)
+type jobFunc func(string, string, string, string, int32) (*BlockResp, error)
 
 type Worker struct {
 	remoteAddr string
@@ -20,9 +20,9 @@ func NewWorker(addr string, j jobFunc) *Worker {
 	return w
 }
 
-func (w *Worker) Do(fileHash, blockHash, peerAddr string, index int32, respCh chan *BlockResp) (*BlockResp, error) {
+func (w *Worker) Do(taskId, fileHash, blockHash, peerAddr string, index int32) (*BlockResp, error) {
 	w.working = true
-	resp, err := w.job(fileHash, blockHash, peerAddr, index, respCh)
+	resp, err := w.job(taskId, fileHash, blockHash, peerAddr, index)
 	if err != nil {
 		cnt := w.failed[blockHash]
 		w.failed[blockHash] = cnt + 1
