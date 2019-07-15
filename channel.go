@@ -22,10 +22,10 @@ func (this *Dsp) GetFileUnitPrice(asset int32) (uint64, error) {
 }
 
 func (this *Dsp) setupDNSNodeHost() error {
-	if this.DNSNode == nil {
+	if this.DNS.DNSNode == nil {
 		return errors.New("no dns node to setup")
 	}
-	err := this.Channel.SetHostAddr(this.DNSNode.WalletAddr, this.DNSNode.ChannelAddr)
+	err := this.Channel.SetHostAddr(this.DNS.DNSNode.WalletAddr, this.DNS.DNSNode.ChannelAddr)
 	if err != nil {
 		return err
 	}

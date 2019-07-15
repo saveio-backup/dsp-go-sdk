@@ -61,10 +61,10 @@ func (this *TaskMgr) SetNewTaskInfo(id, fileHash, fileName, walletAddress string
 	}
 	t.SetStringValue(FIELD_NAME_FILEHASH, fileHash)
 	key := fmt.Sprintf("%s-%s-%d", fileHash, walletAddress, tp)
-	oldId, _ := this.GetId(key)
-	if len(oldId) != 0 {
-		return errors.New("task exists")
-	}
+	// oldId, _ := this.GetId(key)
+	// if len(oldId) != 0 {
+	// 	return errors.New("task exists")
+	// }
 	log.Debugf("SetNewTaskInfo id %s, key %s", id, key)
 	switch tp {
 	case TaskTypeUpload:
@@ -132,6 +132,7 @@ func (this *TaskMgr) DeleteTask(taskId string) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	delete(this.tasks, taskId)
+	this.DeleteId(taskId)
 }
 
 func (this *TaskMgr) TaskTimeout(taskId string) (bool, error) {
@@ -528,7 +529,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Errorf("worker %s do job err continue %s", resp.worker.remoteAddr, resp.err)
 					continue
 				}
-				log.Debugf("add flightkey to cache %s", resp.flightKey)
+				log.Debugf("add flightkey to cache %s, blockhash %s", resp.flightKey, resp.ret.Hash)
 				blockCache.Store(resp.flightKey, resp.ret)
 				// notify outside
 				pool := v.GetBlockReqPool()
@@ -537,10 +538,10 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					index int32
 				}
 				toDelete := make([]*toDeleteInfo, 0)
-				for _, r := range pool {
+				for poolIdx, r := range pool {
 					blkKey := fmt.Sprintf("%s-%d", r.Hash, r.Index)
 					blktemp, ok := blockCache.Load(blkKey)
-					log.Debugf("loop req  pool %v", blkKey)
+					log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
 					if !ok {
 						log.Debugf("break because block cache not has %v", blkKey)
 						break

@@ -101,6 +101,10 @@ func (this *FileDB) GetId(key string) (string, error) {
 	return string(id), nil
 }
 
+func (this *FileDB) DeleteId(key string) error {
+	return this.db.Delete([]byte(key))
+}
+
 // PutFileUploadInfo. put info when upload file
 func (this *FileDB) PutFileUploadInfo(tx, fileInfoKey string, provePrivKey []byte) error {
 	key := []byte(fileInfoKey)

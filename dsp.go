@@ -20,14 +20,13 @@ import (
 )
 
 type Dsp struct {
-	Account     *account.Account
-	Config      *config.DspConfig
-	Chain       *chain.Chain
-	Fs          *fs.Fs
-	Channel     *channel.Channel
-	TrackerUrls []string
-	DNSNode     *DNSNodeInfo
-	taskMgr     *task.TaskMgr
+	Account *account.Account
+	Config  *config.DspConfig
+	Chain   *chain.Chain
+	Fs      *fs.Fs
+	Channel *channel.Channel
+	DNS     *DNS
+	taskMgr *task.TaskMgr
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
@@ -79,6 +78,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 			d.Channel.SetChannelDB(channelDB)
 		}
 	}
+	d.DNS = NewDNS()
 	return d
 }
 

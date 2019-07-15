@@ -48,14 +48,16 @@ const (
 )
 
 const (
-	MAX_TASKS_NUM                = 50 // max task number
-	MAX_GOROUTINES_FOR_WORK_TASK = 8  // max goroutines for choose worker to do job
-	BACKUP_FILE_DURATION         = 10 // 10s check
-	MAX_EXPIRED_PROVE_TASK_NUM   = 10 // max backup tasks one time
-	MAX_WORKER_FAILED_NUM        = 10 // max failed count from a worker
-	MAX_DOWNLOAD_PEERS_NUM       = 50 // max peers for download file
-	MAX_NETWORK_REQUEST_RETRY    = 5  // max network request retry
-	MAX_BACKUP_FILE_FAILED       = 3  // max backup file failed times
+	MAX_TASKS_NUM                = 50  // max task number
+	MAX_GOROUTINES_FOR_WORK_TASK = 8   // max goroutines for choose worker to do job
+	BACKUP_FILE_DURATION         = 10  // 10s check
+	MAX_EXPIRED_PROVE_TASK_NUM   = 10  // max backup tasks one time
+	MAX_WORKER_FAILED_NUM        = 10  // max failed count from a worker
+	MAX_DOWNLOAD_PEERS_NUM       = 50  // max peers for download file
+	MAX_NETWORK_REQUEST_RETRY    = 5   // max network request retry
+	MAX_BACKUP_FILE_FAILED       = 3   // max backup file failed times
+	MAX_TRACKERS_NUM             = 100 // max tracker num
+	MAX_PUBLICADDR_CACHE_LEN     = 100 // cache len
 )
 
 // go routine

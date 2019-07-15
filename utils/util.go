@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
+	"github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -74,4 +75,32 @@ func IsHostAddrValid(hostAddr string) bool {
 		return true
 	}
 	return false
+}
+
+func GetFileNameAtPath(dirPath, fileHash, fileName string) string {
+	if len(fileName) == 0 {
+		return dirPath + fileHash
+	}
+	i := strings.LastIndex(fileName, ".")
+	name := fileName
+	ext := ""
+	if i > 0 {
+		name = fileName[:i]
+		ext = fileName[i:]
+	}
+
+	for count := 0; count < 1000; count++ {
+		fullPath := dirPath + name
+		if count > 0 {
+			fullPath += fmt.Sprintf(" (%d)", count)
+		}
+		if len(ext) > 0 {
+			fullPath += ext
+		}
+		exist := common.FileExisted(fullPath)
+		if !exist {
+			return fullPath
+		}
+	}
+	return dirPath + fileHash
 }

@@ -310,7 +310,6 @@ func (this *Task) AddBlockReqToPool(blockHash string, index int32) {
 		Hash:     blockHash,
 		Index:    index,
 	})
-	log.Debugf("add blockReqPool %v", this.blockReqPool)
 }
 
 func (this *Task) DelBlockReqFromPool(blockHash string, index int32) {
@@ -327,13 +326,11 @@ func (this *Task) DelBlockReqFromPool(blockHash string, index int32) {
 		}
 	}
 	log.Debugf("block req pool len: %d", len(this.blockReqPool))
-	log.Debugf("delete blockReqPool %v", this.blockReqPool)
 }
 
 func (this *Task) GetBlockReqPool() []*GetBlockReq {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	log.Debugf("get blockReqPool %v", this.blockReqPool)
 	return this.blockReqPool
 }
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
@@ -28,6 +29,25 @@ type DNSNodeInfo struct {
 	ChannelAddr string
 }
 
+type PublicAddrInfo struct {
+	HostAddr  string
+	UpdatedAt int64
+}
+
+type DNS struct {
+	TrackerUrls     []string
+	DNSNode         *DNSNodeInfo
+	PublicAddrCache *lru.ARCCache
+}
+
+func NewDNS() *DNS {
+	cache, _ := lru.NewARC(common.MAX_PUBLICADDR_CACHE_LEN)
+	return &DNS{
+		TrackerUrls:     make([]string, 0, common.MAX_TRACKERS_NUM),
+		PublicAddrCache: cache,
+	}
+}
+
 func (this *Dsp) SetupDNSTrackers() error {
 	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
 	if err != nil {
@@ -40,16 +60,16 @@ func (this *Dsp) SetupDNSTrackers() error {
 	if this.Config.DnsNodeMaxNum > 1 {
 		maxTrackerNum = this.Config.DnsNodeMaxNum
 	}
-	if this.TrackerUrls == nil {
-		this.TrackerUrls = make([]string, 0)
+	if this.DNS.TrackerUrls == nil {
+		this.DNS.TrackerUrls = make([]string, 0)
 	}
 	existDNSMap := make(map[string]struct{}, 0)
-	for _, trackerUrl := range this.TrackerUrls {
+	for _, trackerUrl := range this.DNS.TrackerUrls {
 		existDNSMap[trackerUrl] = struct{}{}
 	}
 	for _, v := range ns {
 		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
-		if len(this.TrackerUrls) >= maxTrackerNum {
+		if len(this.DNS.TrackerUrls) >= maxTrackerNum {
 			break
 		}
 		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
@@ -57,9 +77,9 @@ func (this *Dsp) SetupDNSTrackers() error {
 		if ok {
 			continue
 		}
-		this.TrackerUrls = append(this.TrackerUrls, trackerUrl)
+		this.DNS.TrackerUrls = append(this.DNS.TrackerUrls, trackerUrl)
 	}
-	log.Debugf("this.TrackerUrls %v", this.TrackerUrls)
+	log.Debugf("this.DNS.TrackerUrls %v", this.DNS.TrackerUrls)
 	return nil
 }
 
@@ -107,11 +127,11 @@ func (this *Dsp) SetupDNSChannels() error {
 				}
 			}
 		}
-		this.DNSNode = &DNSNodeInfo{
+		this.DNS.DNSNode = &DNSNodeInfo{
 			WalletAddr:  walletAddr,
 			ChannelAddr: dnsUrl,
 		}
-		log.Debugf("DNSNode wallet: %v, addr: %v", this.DNSNode.WalletAddr, this.DNSNode.ChannelAddr)
+		log.Debugf("DNSNode wallet: %v, addr: %v", this.DNS.DNSNode.WalletAddr, this.DNS.DNSNode.ChannelAddr)
 		return nil
 	}
 
@@ -231,8 +251,8 @@ func (this *Dsp) StartSeedService() {
 }
 
 func (this *Dsp) PushLocalFilesToTrackers() {
-	log.Debugf("PushLocalFilesToTrackers %v", this.TrackerUrls)
-	if len(this.TrackerUrls) == 0 {
+	log.Debugf("PushLocalFilesToTrackers %v", this.DNS.TrackerUrls)
+	if len(this.DNS.TrackerUrls) == 0 {
 		return
 	}
 	files := make([]string, 0)
@@ -256,7 +276,7 @@ func (this *Dsp) PushLocalFilesToTrackers() {
 		return
 	}
 	for _, fileHashStr := range files {
-		this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
+		this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	}
 }
 
@@ -335,7 +355,7 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 
 	var wallet [20]byte
 	copy(wallet[:], walletAddr[:])
-	if len(this.TrackerUrls) == 0 {
+	if len(this.DNS.TrackerUrls) == 0 {
 		log.Debugf("set up dns trackers before register channel endpoint")
 		err = this.SetupDNSTrackers()
 		if err != nil {
@@ -343,7 +363,7 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 		}
 	}
 	hasRegister := false
-	for _, trackerUrl := range this.TrackerUrls {
+	for _, trackerUrl := range this.DNS.TrackerUrls {
 		log.Debugf("trackerurl %s walletAddr: %v netIp:%v netPort:%v", trackerUrl, wallet, netIp, netPort)
 		params := dnscom.ApiParams{
 			TrackerUrl: trackerUrl,
@@ -388,15 +408,26 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 
 // GetExternalIP. get external ip of wallet from dns nodes
 func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
+	info, ok := this.DNS.PublicAddrCache.Get(walletAddr)
+	if ok && info != nil {
+		addrInfo, ok := info.(*PublicAddrInfo)
+		if ok && addrInfo != nil && (addrInfo.UpdatedAt+60) > time.Now().Unix() {
+			log.Debugf("GetExternalIP %s addr %s from cache", walletAddr, addrInfo.HostAddr)
+			return addrInfo.HostAddr, nil
+		}
+	}
 	address, err := chaincom.AddressFromBase58(walletAddr)
 	if err != nil {
 		log.Errorf("address from b58 failed %s", err)
 		return "", err
 	}
-	for _, url := range this.TrackerUrls {
+	if len(this.DNS.TrackerUrls) == 0 {
+		log.Warn("GetExternalIP no trackers")
+	}
+	for _, url := range this.DNS.TrackerUrls {
 		request := func(resp chan *trackerResp) {
 			hostAddr, err := tracker.ReqEndPoint(url, address)
-			log.Debugf("hostAddr :%v %s", hostAddr, string(hostAddr))
+			log.Debugf("ReqEndPoint hostAddr url%s, address %s, hostaddr:%s", url, address, string(hostAddr))
 			resp <- &trackerResp{
 				ret: hostAddr,
 				err: err,
@@ -407,7 +438,6 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 			log.Errorf("address from req failed %s", err)
 			continue
 		}
-		log.Debugf("ret %v. rettype %T, retstr %s", ret, ret, string(ret.([]byte)))
 		hostAddr := ret.([]byte)
 		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddr), url)
 		if len(string(hostAddr)) == 0 || !utils.IsHostAddrValid(string(hostAddr)) {
@@ -417,9 +447,12 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 		if strings.Index(hostAddrStr, "0.0.0.0:0") != -1 {
 			continue
 		}
+		this.DNS.PublicAddrCache.Add(walletAddr, &PublicAddrInfo{
+			HostAddr:  hostAddrStr,
+			UpdatedAt: time.Now().Unix(),
+		})
 		return hostAddrStr, nil
 	}
-	log.Debugf("no request %v", this.TrackerUrls)
 	return "", errors.New("host addr not found")
 }
 
@@ -441,13 +474,11 @@ type trackerResp struct {
 }
 
 func trackerReq(request func(chan *trackerResp)) (interface{}, error) {
-	log.Debugf("start tracker request")
 	done := make(chan *trackerResp, 1)
 	go request(done)
 	for {
 		select {
 		case ret := <-done:
-			log.Debugf("tracker request finished ret %v", ret)
 			return ret.ret, ret.err
 		case <-time.After(time.Duration(common.TRACKER_SERVICE_TIMEOUT) * time.Second):
 			log.Errorf("tracker request timeout")

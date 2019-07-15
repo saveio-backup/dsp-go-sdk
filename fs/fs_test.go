@@ -215,3 +215,45 @@ func Test2GetBlockFromFileStore(t *testing.T) {
 	fmt.Printf("blk2 :%v from:%s\n", blk2, l0Blk.Cid().String())
 
 }
+
+func TestDownloadFile(t *testing.T) {
+	cfg := &config.DspConfig{
+		FsRepoRoot: "test",
+		FsFileRoot: "download",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefix := "AXjQn2mds5Saqka9ZiZke6fpJC4gM1QVm6"
+	root, list, err := fs.NodesFromFile("./win-scatter-10.1.2.exe", prefix, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("root %s\n", root.Cid().String())
+	file, err := os.OpenFile("./result", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for idx, item := range list {
+		data, err := item.GetDagNode()
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootdata := fs.BlockData(data)
+		if len(rootdata) == 0 {
+			fmt.Printf("idx is 0 %d", idx)
+			continue
+		}
+		if len(data.Links()) > 0 {
+			continue
+		}
+		if string(rootdata[:len(prefix)]) == prefix {
+			fmt.Printf("cut header %v %v %v, len %d\n", rootdata[:len(prefix)], []byte(prefix), rootdata[len(prefix)-2:len(prefix)+20], len(rootdata[len(prefix):]))
+			file.Write(rootdata[len(prefix):])
+			continue
+		}
+		fmt.Printf("write block %s-%d, len %d\n", data.Cid(), idx, len(rootdata))
+		file.Write(rootdata[:])
+	}
+}

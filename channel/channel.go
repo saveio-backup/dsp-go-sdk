@@ -244,6 +244,7 @@ func (this *Channel) OpenChannel(targetAddress string) (common.ChannelID, error)
 		return 0, err
 	}
 	channelID, err := ch_actor.OpenChannel(token, common.Address(target))
+	log.Debugf("actor open channel id :%v, %s", channelID, err)
 	if err != nil {
 		return 0, err
 	}

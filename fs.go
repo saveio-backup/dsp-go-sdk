@@ -268,7 +268,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		return nil, err
 	}
 
-	oniLink := utils.GenOniLink(fileHashStr, opt.FileDesc, 0, totalCount, this.TrackerUrls)
+	oniLink := utils.GenOniLink(fileHashStr, opt.FileDesc, 0, totalCount, this.DNS.TrackerUrls)
 	var dnsRegTx, dnsBindTx string
 	if opt.RegisterDns && len(opt.DnsUrl) > 0 {
 		dnsRegTx, err = this.RegisterFileUrl(opt.DnsUrl, oniLink)
@@ -329,10 +329,14 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 		}
 		nodeStatus := make([]common.DeleteFileStatus, 0, len(m))
 		for addr, deleteErr := range m {
+			errMsg := ""
+			if deleteErr != nil {
+				errMsg = deleteErr.Error()
+			}
 			nodeStatus = append(nodeStatus, common.DeleteFileStatus{
 				HostAddr: addr,
 				Status:   "",
-				ErrorMsg: deleteErr.Error(),
+				ErrorMsg: errMsg,
 			})
 		}
 		resp.Status = nodeStatus
@@ -416,14 +420,14 @@ func (this *Dsp) StartShareServices() {
 // inOrder: if true, the file will be downloaded block by block in order
 // free: if true, query nodes who can share file free
 // maxPeeCnt: download with max number peers with min price
-func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
+func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder bool, decryptPwd string, free, setFileName bool, maxPeerCnt int) error {
 	// start a task
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	var newTask bool
-	if len(taskId) == 0 {
-		taskId = this.taskMgr.NewTask()
-		newTask = true
-	}
+	// if len(taskId) == 0 {
+	taskId = this.taskMgr.NewTask()
+	newTask = true
+	// }
 	go this.taskMgr.EmitProgress(taskId)
 	var err error
 	defer func() {
@@ -446,38 +450,38 @@ func (this *Dsp) DownloadFile(fileHashStr, fileName string, asset int32, inOrder
 		err = errors.New("no filehash for download")
 		return err
 	}
-	if this.DNSNode == nil {
+	if this.DNS.DNSNode == nil {
 		err = errors.New("no dns node for download")
 		return err
 	}
-	addrs := this.GetPeerFromTracker(fileHashStr, this.TrackerUrls)
-	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.TrackerUrls)
+	addrs := this.GetPeerFromTracker(fileHashStr, this.DNS.TrackerUrls)
+	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.DNS.TrackerUrls)
 	if len(addrs) == 0 {
-		err = fmt.Errorf("get 0 peer of %s from %d trackers", fileHashStr, len(this.TrackerUrls))
+		err = fmt.Errorf("get 0 peer of %s from %d trackers", fileHashStr, len(this.DNS.TrackerUrls))
 		return err
 	}
 	if maxPeerCnt > common.MAX_DOWNLOAD_PEERS_NUM {
 		maxPeerCnt = common.MAX_DOWNLOAD_PEERS_NUM
 	}
-	err = this.downloadFileFromPeers(fileHashStr, asset, inOrder, decryptPwd, free, maxPeerCnt, addrs)
+	err = this.downloadFileFromPeers(fileHashStr, asset, inOrder, decryptPwd, free, setFileName, maxPeerCnt, addrs)
 	return err
 }
 
 // DownloadFileByLink. download file by link, e.g oni://Qm...&name=xxx&tr=xxx
-func (this *Dsp) DownloadFileByLink(link string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
+func (this *Dsp) DownloadFileByLink(link string, asset int32, inOrder bool, decryptPwd string, free, setFileName bool, maxPeerCnt int) error {
 	fileHashStr := utils.GetFileHashFromLink(link)
 	linkvalues := this.GetLinkValues(link)
 	fileName := linkvalues[common.FILE_LINK_NAME_KEY]
-	return this.DownloadFile(fileHashStr, fileName, asset, inOrder, decryptPwd, free, maxPeerCnt)
+	return this.DownloadFile(fileHashStr, fileName, asset, inOrder, decryptPwd, free, setFileName, maxPeerCnt)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
-func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int) error {
+func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryptPwd string, free, setFileName bool, maxPeerCnt int) error {
 	fileHashStr := this.GetFileHashFromUrl(url)
 	linkvalues := this.GetLinkValues(this.GetLinkFromUrl(url))
 	fileName := linkvalues[common.FILE_LINK_NAME_KEY]
 	log.Debugf("DownloadFileByUrl %s, hash %s, max %d", url, fileHashStr, maxPeerCnt)
-	return this.DownloadFile(fileHashStr, fileName, asset, inOrder, decryptPwd, free, maxPeerCnt)
+	return this.DownloadFile(fileHashStr, fileName, asset, inOrder, decryptPwd, free, setFileName, maxPeerCnt)
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
@@ -552,10 +556,10 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 	if totalAmount/common.FILE_DOWNLOAD_UNIT_PRICE != uint64(len(blockHashes))*uint64(common.CHUNK_SIZE) {
 		return errors.New("deposit amount overflow")
 	}
-	curBal, _ := this.Channel.GetAvaliableBalance(this.DNSNode.WalletAddr)
+	curBal, _ := this.Channel.GetAvaliableBalance(this.DNS.DNSNode.WalletAddr)
 	if curBal < totalAmount {
 		log.Debugf("depositing...")
-		err := this.Channel.SetDeposit(this.DNSNode.WalletAddr, totalAmount)
+		err := this.Channel.SetDeposit(this.DNS.DNSNode.WalletAddr, totalAmount)
 		log.Debugf("deposit result %s", err)
 		if err != nil {
 			return err
@@ -630,7 +634,7 @@ func (this *Dsp) PayUnpaidFile(fileHashStr string) error {
 
 // DownloadFileWithQuotation. download file, peice by peice from addrs.
 // inOrder: if true, the file will be downloaded block by block in order
-func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOrder bool, quotation map[string]*file.Payment, decryptPwd string) error {
+func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOrder, setFileName bool, quotation map[string]*file.Payment, decryptPwd string) error {
 	// task exist at runtime
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	// if this.taskMgr.TaskExist(taskKey) {
@@ -664,9 +668,15 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	blockHashes := this.taskMgr.FileBlockHashes(taskId)
 	prefix := this.taskMgr.FilePrefix(taskId)
 	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v", fileHashStr, len(blockHashes), prefix)
+	fileName := this.taskMgr.FileName(taskId)
+	fullFilePath := this.Config.FsFileRoot + "/" + fileHashStr
+	if setFileName {
+		fullFilePath = utils.GetFileNameAtPath(this.Config.FsFileRoot+"/", fileHashStr, fileName)
+	}
+	log.Debugf("get fullFilePath of filehashstr %s, filename %s, path %s", fileHashStr, fileName, fullFilePath)
 	var file *os.File
 	if this.Config.FsType == config.FS_FILESTORE {
-		file, err = createDownloadFile(this.Config.FsFileRoot, fileHashStr)
+		file, err = createDownloadFile(this.Config.FsFileRoot, fullFilePath)
 		if err != nil {
 			return err
 		}
@@ -689,31 +699,34 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	}
 	this.taskMgr.NewWorkers(taskId, addrs, inOrder, job)
 	go this.taskMgr.WorkBackground(taskId)
+	hasCutPrefix := false
 	if inOrder {
-		hash, index, err := this.taskMgr.GetUndownloadedBlockInfo(taskId, fileHashStr)
-		if err != nil {
-			return err
-		}
-		if len(hash) == 0 {
-			// removeTempFile(fileHashStr)
-			return errors.New("no undownloaded block")
-		}
+		// hash, index, err := this.taskMgr.GetUndownloadedBlockInfo(taskId, fileHashStr)
+		// if err != nil {
+		// 	return err
+		// }
+		// if len(hash) == 0 {
+		// 	return fmt.Errorf("no undownloaded block %s %d", hash, index)
+		// }
+		hash := fileHashStr
+		index := 0
 		blockIndex := int32(index)
 		err = this.taskMgr.AddBlockReq(taskId, hash, blockIndex)
 		if err != nil {
 			return err
 		}
-		fullFilePath := this.Config.FsFileRoot + "/" + fileHashStr
+
+		// fullFilePath := this.Config.FsFileRoot + "/" + fileHashStr
 		for {
 			value, ok := <-this.taskMgr.TaskNotify(taskId)
 			if !ok {
 				return errors.New("download internal error")
 			}
 			log.Debugf("received block %s-%s-%d from %s", fileHashStr, value.Hash, value.Index, value.PeerAddr)
-			if this.taskMgr.IsBlockDownloaded(taskId, value.Hash, uint32(value.Index)) {
-				log.Debugf("%s-%s-%d is downloaded", fileHashStr, value.Hash, value.Index)
-				continue
-			}
+			// if this.taskMgr.IsBlockDownloaded(taskId, value.Hash, uint32(value.Index)) {
+			// 	log.Debugf("%s-%s-%d is downloaded", fileHashStr, value.Hash, value.Index)
+			// 	continue
+			// }
 			block := this.Fs.EncodedToBlockWithCid(value.Block, value.Hash)
 			links, err := this.Fs.BlockLinks(block)
 			if err != nil {
@@ -732,9 +745,10 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 				}
 				// cut prefix
 				// TEST: why not use filesize == 0
-				if (value.Index == 0 || value.Index == 1) && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
+				if !hasCutPrefix && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
 					log.Debugf("cut prefix data-len %d, prefix %s, prefix-len: %d, str %s", len(data), prefix, len(prefix), string(data[:len(prefix)]))
 					data = data[len(prefix):]
+					hasCutPrefix = true
 				}
 				// TEST: offset
 				writeAtPos := int64(0)
@@ -796,7 +810,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			this.taskMgr.SetTaskDone(taskId, true)
 			break
 		}
-		go this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
+		go this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 		fileDonwloadOkMsg := message.NewFileDownloadOk(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), asset)
 		log.Debugf("broad file donwload ok cast msg to %v", addrs)
 		client.P2pBroadcast(addrs, fileDonwloadOkMsg.ToProtoMsg(), true, nil, nil)
@@ -896,7 +910,7 @@ func (this *Dsp) StartBackupFileService() {
 				}
 				backupingCnt++
 				log.Debugf("go backup file:%s, from:%s %s", t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58())
-				err := this.downloadFileFromPeers(string(t.FileHash), common.ASSET_USDT, true, "", false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
+				err := this.downloadFileFromPeers(string(t.FileHash), common.ASSET_USDT, true, "", false, false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
 				if err != nil {
 					log.Errorf("download file err %s", err)
 					backupFailedMap[string(t.FileHash)] = backupFailedMap[string(t.FileHash)] + 1
@@ -950,7 +964,7 @@ func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.FileInfo, error)
 }
 
 // downloadFileFromPeers. downloadfile base methods. download file from peers.
-func (this *Dsp) downloadFileFromPeers(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free bool, maxPeerCnt int, addrs []string) error {
+func (this *Dsp) downloadFileFromPeers(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free, setFileName bool, maxPeerCnt int, addrs []string) error {
 	quotation, err := this.GetDownloadQuotation(fileHashStr, asset, free, addrs)
 	if err != nil {
 		return err
@@ -968,7 +982,7 @@ func (this *Dsp) downloadFileFromPeers(fileHashStr string, asset int32, inOrder 
 		return err
 	}
 	log.Debugf("set up channel success: %v", quotation)
-	return this.DownloadFileWithQuotation(fileHashStr, asset, inOrder, quotation, decryptPwd)
+	return this.DownloadFileWithQuotation(fileHashStr, asset, inOrder, setFileName, quotation, decryptPwd)
 }
 
 // payForSendFile pay before send a file
@@ -1309,7 +1323,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 		log.Errorf("pin root file err %s", err)
 		return err
 	}
-	this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
+	this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	log.Infof("received all block, start pdp verify")
 
 	// all block is saved, prove it
@@ -1468,7 +1482,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, blockHashe
 		log.Debugf("%s-%s-%d set downloaded", fileHashStr, blockHash, blockIndex)
 		blockOffset += dataLen
 	}
-	go this.PushToTrackers(fileHashStr, this.TrackerUrls, client.P2pGetPublicAddr())
+	go this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	return nil
 }
 
@@ -1484,21 +1498,14 @@ func uploadOptValid(filePath string, opt *common.UploadOption) error {
 }
 
 // createDownloadFile. create file handler for write downloading file
-func createDownloadFile(dir, fileName string) (*os.File, error) {
-	// if _, err := os.Stat(common.DOWNLOAD_FILE_TEMP_DIR_PATH); os.IsNotExist(err) {
-	// 	err = os.MkdirAll(common.DOWNLOAD_FILE_TEMP_DIR_PATH, 0755)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// }
+func createDownloadFile(dir, filePath string) (*os.File, error) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		err = os.MkdirAll(dir, 0755)
 		if err != nil {
 			return nil, err
 		}
 	}
-	// file, err := os.OpenFile(common.DOWNLOAD_FILE_TEMP_DIR_PATH+"/"+fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	file, err := os.OpenFile(dir+"/"+fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		return nil, err
 	}
