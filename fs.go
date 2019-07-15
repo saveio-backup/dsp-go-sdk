@@ -343,6 +343,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 		log.Debugf("broadcast to delete file msg success")
 	}
 	err = this.taskMgr.DeleteFileUploadInfo(taskId)
+	this.taskMgr.DeleteId(fmt.Sprintf("%s-%s-%d", fileHashStr, this.WalletAddress(), task.TaskTypeUpload))
 	if err != nil {
 		log.Errorf("delete upload info from db err: %s", err)
 	}

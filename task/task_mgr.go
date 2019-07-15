@@ -132,7 +132,6 @@ func (this *TaskMgr) DeleteTask(taskId string) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	delete(this.tasks, taskId)
-	this.DeleteId(taskId)
 }
 
 func (this *TaskMgr) TaskTimeout(taskId string) (bool, error) {
