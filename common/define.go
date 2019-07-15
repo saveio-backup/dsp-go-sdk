@@ -1,5 +1,12 @@
 package common
 
+type FileStoreType int
+
+const (
+	FileStoreTypeNormal FileStoreType = iota
+	FileStoreTypeProfessional
+)
+
 type UploadOption struct {
 	FileDesc        string
 	ProveInterval   uint64
@@ -13,6 +20,7 @@ type UploadOption struct {
 	DnsUrl          string
 	WhiteList       []string
 	Share           bool
+	StorageType     FileStoreType
 }
 
 type UploadResult struct {

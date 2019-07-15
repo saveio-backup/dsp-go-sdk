@@ -51,12 +51,12 @@ func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, w
 	if err != nil {
 		return 0, err
 	}
-	userSpace, _ := this.Chain.Native.Fs.GetUserSpace(this.CurrentAccount().Address)
-	currentHeight, err := this.Chain.GetCurrentBlockHeight()
-	if err != nil {
-		return 0, err
-	}
-	estimatedTimes := uint64(math.Ceil((float64(userSpace.ExpireHeight) - float64(currentHeight)) / float64(fsSetting.DefaultProvePeriod)))
+	// userSpace, _ := this.Chain.Native.Fs.GetUserSpace(this.CurrentAccount().Address)
+	// currentHeight, err := this.Chain.GetCurrentBlockHeight()
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// estimatedTimes := uint64(math.Ceil((float64(userSpace.ExpireHeight) - float64(currentHeight)) / float64(fsSetting.DefaultProvePeriod)))
 	defer func() {
 		err = fi.Close()
 		if err != nil {
@@ -64,12 +64,9 @@ func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, w
 		}
 	}()
 	txGas := uint64(10000000)
-	log.Debugf("opt.interval:%d", opt.ProveInterval)
-	log.Debugf("opt.ProveTimes:%d", opt.ProveTimes)
-	log.Debugf("opt.CopyNum:%d", opt.CopyNum)
-	useDefalut := (opt.ProveInterval == 0 && opt.ProveTimes == 0 && opt.CopyNum == 0) ||
-		(userSpace != nil && opt.ProveInterval == fsSetting.DefaultProvePeriod && uint64(opt.ProveTimes) == estimatedTimes && uint64(opt.CopyNum) == fsSetting.DefaultCopyNum)
-	log.Debugf("estimatedTimes: %d, userspace.expired %d, current %d, usedDefault:%t", estimatedTimes, userSpace.ExpireHeight, currentHeight, useDefalut)
+	log.Debugf("opt.interval:%d, opt.ProveTimes:%d, opt.CopyNum:%d, ", opt.ProveInterval, opt.ProveTimes, opt.CopyNum)
+	useDefalut := opt.StorageType == common.FileStoreTypeNormal
+	// log.Debugf("estimatedTimes: %d, userspace.expired %d, current %d, usedDefault:%t", estimatedTimes, userSpace.ExpireHeight, currentHeight, useDefalut)
 	if whitelistCnt > 0 {
 		fee = txGas * 4
 	} else {
@@ -557,7 +554,7 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 	if totalAmount/common.FILE_DOWNLOAD_UNIT_PRICE != uint64(len(blockHashes))*uint64(common.CHUNK_SIZE) {
 		return errors.New("deposit amount overflow")
 	}
-	curBal, _ := this.Channel.GetAvaliableBalance(this.DNS.DNSNode.WalletAddr)
+	curBal, _ := this.Channel.GetAvailableBalance(this.DNS.DNSNode.WalletAddr)
 	if curBal < totalAmount {
 		log.Debugf("depositing...")
 		err := this.Channel.SetDeposit(this.DNS.DNSNode.WalletAddr, totalAmount)
@@ -1012,7 +1009,7 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 			return nil, err
 		}
 		txHash, err := this.Chain.Native.Fs.StoreFile(fileHashStr, blockNum, blockSizeInKB, opt.ProveInterval,
-			uint64(opt.ProveTimes), uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege), paramsBuf)
+			uint64(opt.ProveTimes), uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege), paramsBuf, uint64(opt.StorageType))
 		if err != nil {
 			log.Errorf("pay store file order failed:%s", err)
 			return nil, err

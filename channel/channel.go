@@ -411,13 +411,13 @@ func (this *Channel) GetTotalDepositBalance(targetAddress string) (uint64, error
 }
 
 // GetAvaliableBalance. get avaliable balance
-func (this *Channel) GetAvaliableBalance(partnerAddress string) (uint64, error) {
-	log.Debugf("[dsp-go-sdk-channel] GetAvaliableBalance %s", partnerAddress)
+func (this *Channel) GetAvailableBalance(partnerAddress string) (uint64, error) {
+	log.Debugf("[dsp-go-sdk-channel] GetAvailableBalance %s", partnerAddress)
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)
 	if err != nil {
 		return 0, err
 	}
-	return ch_actor.GetAvaliableBalance(common.Address(partner))
+	return ch_actor.GetAvailableBalance(common.Address(partner))
 }
 
 func (this *Channel) GetTotalWithdraw(partnerAddress string) (uint64, error) {

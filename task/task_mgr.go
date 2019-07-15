@@ -61,13 +61,13 @@ func (this *TaskMgr) SetNewTaskInfo(id, fileHash, fileName, walletAddress string
 	}
 	t.SetStringValue(FIELD_NAME_FILEHASH, fileHash)
 	key := fmt.Sprintf("%s-%s-%d", fileHash, walletAddress, tp)
-	// oldId, _ := this.GetId(key)
-	// if len(oldId) != 0 {
-	// 	return errors.New("task exists")
-	// }
 	log.Debugf("SetNewTaskInfo id %s, key %s", id, key)
 	switch tp {
 	case TaskTypeUpload:
+		oldId, _ := this.GetId(key)
+		if len(oldId) != 0 {
+			return nil
+		}
 		this.NewFileUploadInfo(id)
 	}
 	this.SetIdIndex(id, key)

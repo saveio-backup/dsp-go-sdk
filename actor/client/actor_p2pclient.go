@@ -1,7 +1,7 @@
 package client
 
 import (
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -16,20 +16,24 @@ func SetP2pPid(p2pPid *actor.PID) {
 	P2pServerPid = p2pPid
 }
 
+type P2pResp struct {
+	Error error
+}
+
 type ConnectReq struct {
-	Address string
+	Address  string
+	Response chan *P2pResp
 }
 
 type CloseReq struct {
-	Address string
+	Address  string
+	Response chan *P2pResp
 }
 
 type SendReq struct {
-	Address interface{}
-	Data    proto.Message
-}
-type P2pResp struct {
-	Error error
+	Address  interface{}
+	Data     proto.Message
+	Response chan *P2pResp
 }
 
 type RecvMsg struct {
@@ -43,6 +47,7 @@ type BroadcastReq struct {
 	NeedReply bool
 	Stop      func() bool
 	Action    func(proto.Message, string)
+	Response  chan *BroadcastResp
 }
 
 type BroadcastResp struct {
@@ -51,107 +56,155 @@ type BroadcastResp struct {
 }
 
 type PeerListeningReq struct {
-	Address string
+	Address  string
+	Response chan *P2pResp
 }
 
-type PublicAddrReq struct{}
+type PublicAddrReq struct {
+	Response chan *PublicAddrResp
+}
 type PublicAddrResp struct {
-	Addr string
+	Addr  string
+	Error error
 }
 
 type RequestWithRetryReq struct {
-	Address interface{}
-	Data    proto.Message
-	Retry   int
+	Address  interface{}
+	Data     proto.Message
+	Retry    int
+	Response chan *RequestWithRetryResp
 }
+
 type RequestWithRetryResp struct {
 	Data  proto.Message
 	Error error
 }
 
 func P2pConnect(address string) error {
-	chReq := &ConnectReq{address}
-	future := P2pServerPid.RequestFuture(chReq, common.P2P_REQ_TIMEOUT*time.Second)
-	if _, err := future.Result(); err != nil {
-		log.Error("[P2pConnect] error: ", err)
-		return err
+	chReq := &ConnectReq{
+		Address:  address,
+		Response: make(chan *P2pResp, 1),
 	}
-	return nil
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return resp.Error
+		}
+		return nil
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		return fmt.Errorf("[P2pConnect] timeout")
+	}
 }
 
 func P2pClose(address string) error {
-	chReq := &CloseReq{address}
-	future := P2pServerPid.RequestFuture(chReq, common.P2P_REQ_TIMEOUT*time.Second)
-	if _, err := future.Result(); err != nil {
-		log.Error("[P2pClose] error: ", err)
-		return err
+	chReq := &CloseReq{
+		Address:  address,
+		Response: make(chan *P2pResp, 1),
 	}
-	return nil
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return resp.Error
+		}
+		return nil
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		return fmt.Errorf("[P2pClose] timeout")
+	}
 }
 
 func P2pSend(address interface{}, data proto.Message) error {
-	chReq := &SendReq{address, data}
-	future := P2pServerPid.RequestFuture(chReq, common.P2P_REQ_TIMEOUT*time.Second)
-	in, err := future.Result()
-	log.Debugf("send msg to %v in %v err %v", address, in, err)
-	if err != nil {
-		log.Error("[P2pSend] error: ", err)
-		return err
+	chReq := &SendReq{
+		Address:  address,
+		Data:     data,
+		Response: make(chan *P2pResp, 1),
 	}
-	return nil
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return resp.Error
+		}
+		return nil
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		return fmt.Errorf("[P2pSend] timeout")
+	}
 }
 
 func P2pBroadcast(addresses []string, data proto.Message, needReply bool, stop func() bool, action func(proto.Message, string)) (map[string]error, error) {
-	chReq := &BroadcastReq{addresses, data, needReply, stop, action}
-	future := P2pServerPid.RequestFuture(chReq, time.Duration(common.P2P_BROADCAST_TIMEOUT*len(addresses))*time.Second)
-	in, err := future.Result()
-	if err != nil {
-		log.Error("[P2pBroadcast] error: ", err)
-		return nil, err
+	chReq := &BroadcastReq{
+		Addresses: addresses,
+		Data:      data,
+		NeedReply: needReply,
+		Stop:      stop,
+		Action:    action,
+		Response:  make(chan *BroadcastResp, 1),
 	}
-	resp, ok := in.(*BroadcastResp)
-	if !ok {
-		return nil, errors.New("[P2pBroadcast] BroadcastResp type assert failed")
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return nil, resp.Error
+		}
+		return resp.Result, nil
+	case <-time.After(time.Duration(common.P2P_BROADCAST_TIMEOUT*len(addresses)) * time.Second):
+		return nil, fmt.Errorf("[P2pBroadcast] timeout")
 	}
-	return resp.Result, resp.Error
 }
 
 func P2pIsPeerListening(address string) error {
-	chReq := &PeerListeningReq{address}
-	future := P2pServerPid.RequestFuture(chReq, common.P2P_REQ_TIMEOUT*time.Second)
-	if _, err := future.Result(); err != nil {
-		log.Error("[P2pSend] error: ", err)
-		return err
+	chReq := &PeerListeningReq{
+		Address:  address,
+		Response: make(chan *P2pResp, 1),
 	}
-	return nil
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return resp.Error
+		}
+		return nil
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		return fmt.Errorf("[P2pIsPeerListening] timeout")
+	}
+
 }
 
 func P2pGetPublicAddr() string {
-	chReq := &PublicAddrReq{}
-	future := P2pServerPid.RequestFuture(chReq, common.P2P_REQ_TIMEOUT*time.Second)
-	in, err := future.Result()
-	if err != nil {
-		log.Error("[P2pGetPublicAddr] error: ", err)
+	chReq := &PublicAddrReq{
+		Response: make(chan *PublicAddrResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			log.Errorf("[P2pGetPublicAddr] resp.Error %s", resp.Error)
+			return ""
+		}
+		return resp.Addr
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		log.Errorf("[P2pGetPublicAddr] timeout")
 		return ""
 	}
-	resp, ok := in.(*PublicAddrResp)
-	if !ok {
-		return ""
-	}
-	return resp.Addr
 }
 
 func P2pRequestWithRetry(msg proto.Message, peer interface{}, retry int) (proto.Message, error) {
-	chReq := &RequestWithRetryReq{peer, msg, retry}
-	future := P2pServerPid.RequestFuture(chReq, common.P2P_REQ_TIMEOUT*time.Second)
-	in, err := future.Result()
-	if err != nil {
-		log.Error("[P2pRequestWithRetry] error: ", err)
-		return nil, err
+	chReq := &RequestWithRetryReq{
+		Address:  peer,
+		Data:     msg,
+		Retry:    retry,
+		Response: make(chan *RequestWithRetryResp, 1),
 	}
-	resp, ok := in.(*RequestWithRetryResp)
-	if !ok {
-		return nil, errors.New("[P2pRequestWithRetry]r equestWithRetryResp type assert failed")
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			log.Errorf("[P2pGetPublicAddr] resp.Error %s", resp.Error)
+			return nil, resp.Error
+		}
+		return resp.Data, nil
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		return nil, fmt.Errorf("[P2pIsPeerListening] timeout")
 	}
-	return resp.Data, nil
 }
