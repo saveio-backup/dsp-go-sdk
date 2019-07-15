@@ -132,13 +132,13 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		localId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
 		if this.taskMgr.TaskExist(localId) {
 			log.Errorf("share task exist %s", fileMsg.Hash)
-			replyMsg := message.NewFileDownloadAck(fileMsg.Hash, nil, "", "", 0, netcom.MSG_ERROR_CODE_TASK_EXIST)
-			err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
-			log.Debugf("reply download_ack when task exist, err %s", err)
-			if err != nil {
-				log.Errorf("reply download ack err msg failed", err)
-			}
-			return
+			// replyMsg := message.NewFileDownloadAck(fileMsg.Hash, nil, "", "", 0, netcom.MSG_ERROR_CODE_TASK_EXIST)
+			// err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+			// log.Debugf("reply download_ack when task exist, err %s", err)
+			// if err != nil {
+			// 	log.Errorf("reply download ack err msg failed", err)
+			// }
+			// return
 		}
 		// TODO: check channel balance and router path
 		taskKey := this.taskMgr.NewTask()
