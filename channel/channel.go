@@ -233,7 +233,7 @@ func (this *Channel) HealthyCheckNodeState(walletAddr string) error {
 }
 
 // OpenChannel. open channel for target of token.
-func (this *Channel) OpenChannel(targetAddress string) (common.ChannelID, error) {
+func (this *Channel) OpenChannel(targetAddress string, depositAmount uint64) (common.ChannelID, error) {
 	log.Debugf("[dsp-go-sdk-channel] OpenChannel %s", targetAddress)
 	if !this.isStart {
 		return 0, errors.New("channel service is not start")
@@ -250,6 +250,26 @@ func (this *Channel) OpenChannel(targetAddress string) (common.ChannelID, error)
 	}
 	if channelID == 0 {
 		return 0, errors.New("setup channel failed")
+	}
+	log.Infof("connect to dns node :%s, deposit %d", targetAddress, depositAmount)
+	if depositAmount == 0 {
+		return channelID, nil
+	}
+	// err = this.WaitForConnected(targetAddress, time.Duration(dspcom.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+	// if err != nil {
+	// 	log.Errorf("wait channel connected err %s %s", targetAddress, err)
+	// 	return channelID, err
+	// }
+	bal, _ := this.GetTotalDepositBalance(targetAddress)
+	log.Debugf("channel to %s current balance %d", targetAddress, bal)
+	if bal >= depositAmount {
+		return channelID, nil
+	}
+	err = this.SetDeposit(targetAddress, depositAmount)
+	if err != nil && strings.Index(err.Error(), "totalDeposit must big than contractBalance") == -1 {
+		log.Debugf("deposit result %s", err)
+		// TODO: withdraw and close channel
+		return 0, err
 	}
 	return channelID, nil
 }

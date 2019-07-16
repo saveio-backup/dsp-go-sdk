@@ -96,14 +96,8 @@ func (this *Dsp) Start() error {
 		if err != nil {
 			return err
 		}
-		if this.Config.AutoSetupDNSEnable {
-			err = this.SetupDNSChannels()
-			if err != nil {
-				return err
-			}
-		}
+		this.SetOnlineDNS()
 	}
-
 	// start seed service
 	if this.Config.SeedInterval > 0 {
 		go this.StartSeedService()

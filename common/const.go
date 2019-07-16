@@ -32,7 +32,7 @@ const (
 	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval
 	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1       // check channel can transfer interval
 	CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT  = 30      // check channel can transfer interval
-	WAIT_CHANNEL_CONNECT_TIMEOUT        = 10      // wait for channel connected
+	WAIT_CHANNEL_CONNECT_TIMEOUT        = 3       // wait for channel connected
 	FILE_DNS_TTL                        = 10 * 60 //10m
 	// CHANNEL_TRANSFER_TIMEOUT     = 60      // 60s
 	CHANNEL_TRANSFER_TIMEOUT = 20 // 60s
@@ -57,6 +57,7 @@ const (
 	MAX_NETWORK_REQUEST_RETRY    = 5   // max network request retry
 	MAX_BACKUP_FILE_FAILED       = 3   // max backup file failed times
 	MAX_TRACKERS_NUM             = 100 // max tracker num
+	MAX_DNS_NUM                  = 100 // max dns num
 	MAX_PUBLICADDR_CACHE_LEN     = 100 // cache len
 )
 

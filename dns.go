@@ -37,6 +37,7 @@ type PublicAddrInfo struct {
 type DNS struct {
 	TrackerUrls     []string
 	DNSNode         *DNSNodeInfo
+	OnlineDNS       map[string]string
 	PublicAddrCache *lru.ARCCache
 }
 
@@ -45,6 +46,7 @@ func NewDNS() *DNS {
 	return &DNS{
 		TrackerUrls:     make([]string, 0, common.MAX_TRACKERS_NUM),
 		PublicAddrCache: cache,
+		OnlineDNS:       make(map[string]string),
 	}
 }
 
@@ -83,9 +85,49 @@ func (this *Dsp) SetupDNSTrackers() error {
 	return nil
 }
 
+func (this *Dsp) SetOnlineDNS() {
+	log.Debugf("SetOnlineDNS++++")
+	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
+	if err != nil {
+		return
+	}
+	if len(ns) == 0 {
+		log.Warnf("no dns nodes")
+		return
+	}
+	// first init
+	for _, v := range ns {
+		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
+		walletAddr := v.WalletAddr.ToBase58()
+		dnsUrl, _ := this.GetExternalIP(walletAddr)
+		if len(dnsUrl) == 0 {
+			dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
+		}
+		if strings.Index(dnsUrl, "0.0.0.0:0") != -1 {
+			log.Warn("it should not happen")
+			continue
+		}
+		err = this.Channel.SetHostAddr(walletAddr, dnsUrl)
+		if err != nil {
+			continue
+		}
+		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+		if err != nil {
+			log.Errorf("wait channel connected err %s %s", walletAddr, err)
+			continue
+		}
+		this.DNS.OnlineDNS[v.WalletAddr.ToBase58()] = dnsUrl
+		if len(this.DNS.OnlineDNS) > common.MAX_DNS_NUM {
+			break
+		}
+	}
+}
+
 func (this *Dsp) SetupDNSChannels() error {
 	log.Debugf("SetupDNSChannels++++")
-
+	if !this.Config.AutoSetupDNSEnable {
+		return nil
+	}
 	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
 	if err != nil {
 		return err
@@ -93,8 +135,6 @@ func (this *Dsp) SetupDNSChannels() error {
 	if len(ns) == 0 {
 		return errors.New("no dns nodes")
 	}
-	oldNodes := this.Channel.GetAllPartners()
-
 	setDNSNodeFunc := func(dnsUrl, walletAddr string) error {
 		log.Debugf("set dns node func %s %s", dnsUrl, walletAddr)
 		if strings.Index(dnsUrl, "0.0.0.0:0") != -1 {
@@ -109,7 +149,7 @@ func (this *Dsp) SetupDNSChannels() error {
 			log.Errorf("wait channel connected err %s %s", walletAddr, err)
 			return err
 		}
-		_, err = this.Channel.OpenChannel(walletAddr)
+		_, err = this.Channel.OpenChannel(walletAddr, 0)
 		if err != nil {
 			log.Debugf("open channel err %s", walletAddr)
 			return err
@@ -133,34 +173,6 @@ func (this *Dsp) SetupDNSChannels() error {
 		}
 		log.Debugf("DNSNode wallet: %v, addr: %v", this.DNS.DNSNode.WalletAddr, this.DNS.DNSNode.ChannelAddr)
 		return nil
-	}
-
-	// setup old nodes
-	// TODO: get more acculatey nodes list from channel
-	if !this.Config.AutoSetupDNSEnable && len(oldNodes) > 0 {
-		log.Debugf("set up old dns nodes %v, ns:%v", oldNodes, ns)
-		for _, walletAddr := range oldNodes {
-			address, err := chaincom.AddressFromBase58(walletAddr)
-			if err != nil {
-				continue
-			}
-			if _, ok := ns[address.ToHexString()]; !ok {
-				log.Debugf("dns not found %s", address.ToHexString())
-				continue
-			}
-			dnsUrl, _ := this.GetExternalIP(walletAddr)
-			if len(dnsUrl) == 0 {
-				dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, ns[address.ToHexString()].IP, ns[address.ToHexString()].Port)
-			}
-			log.Debugf("dns url of oldnodes %s", dnsUrl)
-			err = setDNSNodeFunc(dnsUrl, walletAddr)
-			if err != nil {
-				log.Debugf("set dns node func err %s", err)
-				continue
-			}
-			break
-		}
-		return err
 	}
 
 	// first init
