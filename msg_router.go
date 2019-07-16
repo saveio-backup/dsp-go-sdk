@@ -29,6 +29,7 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 		log.Debugf("unrecongized msg version %s", msg.Header.Version)
 		return
 	}
+	log.Debugf("receive msg.Header.Type %d", msg.Header.Type)
 	switch msg.Header.Type {
 	case netcom.MSG_TYPE_FILE:
 		this.handleFileMsg(ctx, peer, msg)
@@ -88,7 +89,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		}
 		newMsg := message.NewFileFetchAck(fileMsg.GetHash())
 		log.Debugf("send file_ack msg %v %v", peer, newMsg)
-		client.P2pSend(peer, newMsg.ToProtoMsg())
+		client.P2pSend(peer.Address, newMsg.ToProtoMsg())
 	case netcom.FILE_OP_FETCH_ACK:
 		// my task. use my wallet address
 		taskKey := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeUpload)

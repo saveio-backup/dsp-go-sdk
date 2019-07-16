@@ -608,7 +608,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	msg := message.NewPayment(this.Chain.Native.Fs.DefAcc.Address.ToBase58(), payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
 	// TODO: wait for receiver received notification (need optimized)
-	time.Sleep(time.Second)
+	// time.Sleep(time.Second)
 	_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), addr, common.MAX_NETWORK_REQUEST_RETRY)
 	log.Debugf("payment msg response :%d, err:%s", paymentId, err)
 	if err != nil {
@@ -698,6 +698,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	this.taskMgr.NewWorkers(taskId, addrs, inOrder, job)
 	go this.taskMgr.WorkBackground(taskId)
 	hasCutPrefix := false
+	log.Debugf("start download file")
 	if inOrder {
 		// hash, index, err := this.taskMgr.GetUndownloadedBlockInfo(taskId, fileHashStr)
 		// if err != nil {
@@ -810,7 +811,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		}
 		go this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 		fileDonwloadOkMsg := message.NewFileDownloadOk(fileHashStr, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), asset)
-		log.Debugf("broad file donwload ok cast msg to %v", addrs)
+		log.Debugf("download file end from %v", addrs)
 		client.P2pBroadcast(addrs, fileDonwloadOkMsg.ToProtoMsg(), true, nil, nil)
 		if len(decryptPwd) > 0 {
 			err := this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
@@ -1335,7 +1336,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr string) error {
 }
 
 // downloadBlock. download block helper function.
-func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, addr interface{}) (*task.BlockResp, error) {
+func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, addr string) (*task.BlockResp, error) {
 	var walletAddress string
 	if this.Chain.Native.Fs.DefAcc != nil {
 		walletAddress = this.Chain.Native.Fs.DefAcc.Address.ToBase58()

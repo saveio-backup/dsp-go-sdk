@@ -31,7 +31,7 @@ type CloseReq struct {
 }
 
 type SendReq struct {
-	Address  interface{}
+	Address  string
 	Data     proto.Message
 	Response chan *P2pResp
 }
@@ -69,7 +69,7 @@ type PublicAddrResp struct {
 }
 
 type RequestWithRetryReq struct {
-	Address  interface{}
+	Address  string
 	Data     proto.Message
 	Retry    int
 	Response chan *RequestWithRetryResp
@@ -114,7 +114,7 @@ func P2pClose(address string) error {
 	}
 }
 
-func P2pSend(address interface{}, data proto.Message) error {
+func P2pSend(address string, data proto.Message) error {
 	chReq := &SendReq{
 		Address:  address,
 		Data:     data,
@@ -153,24 +153,6 @@ func P2pBroadcast(addresses []string, data proto.Message, needReply bool, stop f
 	}
 }
 
-func P2pIsPeerListening(address string) error {
-	chReq := &PeerListeningReq{
-		Address:  address,
-		Response: make(chan *P2pResp, 1),
-	}
-	P2pServerPid.Tell(chReq)
-	select {
-	case resp := <-chReq.Response:
-		if resp != nil && resp.Error != nil {
-			return resp.Error
-		}
-		return nil
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
-		return fmt.Errorf("[P2pIsPeerListening] timeout")
-	}
-
-}
-
 func P2pGetPublicAddr() string {
 	chReq := &PublicAddrReq{
 		Response: make(chan *PublicAddrResp, 1),
@@ -189,7 +171,7 @@ func P2pGetPublicAddr() string {
 	}
 }
 
-func P2pRequestWithRetry(msg proto.Message, peer interface{}, retry int) (proto.Message, error) {
+func P2pRequestWithRetry(msg proto.Message, peer string, retry int) (proto.Message, error) {
 	chReq := &RequestWithRetryReq{
 		Address:  peer,
 		Data:     msg,
@@ -200,11 +182,11 @@ func P2pRequestWithRetry(msg proto.Message, peer interface{}, retry int) (proto.
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			log.Errorf("[P2pGetPublicAddr] resp.Error %s", resp.Error)
+			log.Errorf("[P2pRequestWithRetry] resp.Error %s", resp.Error)
 			return nil, resp.Error
 		}
 		return resp.Data, nil
 	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
-		return nil, fmt.Errorf("[P2pIsPeerListening] timeout")
+		return nil, fmt.Errorf("[P2pRequestWithRetry] timeout")
 	}
 }

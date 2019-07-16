@@ -14,7 +14,7 @@ func (this *Dsp) SetUnitPriceForAllFile(asset int32, price uint64) {
 
 // CleanUnitPriceForAllFile. clean unit price for block sharing for all files
 func (this *Dsp) CleanUnitPriceForAllFile(asset int32) {
-	this.Channel.CleanUninPrices(asset)
+	this.Channel.CleanUnitPrices(asset)
 }
 
 func (this *Dsp) GetFileUnitPrice(asset int32) (uint64, error) {

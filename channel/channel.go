@@ -505,7 +505,7 @@ func (this *Channel) GetUnitPrices(asset int32) (uint64, error) {
 	return p, nil
 }
 
-func (this *Channel) CleanUninPrices(asset int32) {
+func (this *Channel) CleanUnitPrices(asset int32) {
 	if this.unitPrices == nil {
 		return
 	}
@@ -520,11 +520,11 @@ func (this *Channel) DeletePayment(paymentId int32) error {
 	return this.channelDB.RemovePayment(paymentId)
 }
 
-func (this *Channel) CanOpenChannel(walletAddr string) bool {
+func (this *Channel) ChannelExist(walletAddr string) bool {
 	if !this.isStart {
 		return false
 	}
-	all := ch_actor.GetAllChannels()
+	all, _ := ch_actor.GetAllChannels()
 	if all == nil {
 		return true
 	}
@@ -548,7 +548,7 @@ func (this *Channel) AllChannels() *ChannelInfosResp {
 		BalanceFormat: "0",
 		Channels:      infos,
 	}
-	all := ch_actor.GetAllChannels()
+	all, _ := ch_actor.GetAllChannels()
 	if all == nil {
 		return resp
 	}
