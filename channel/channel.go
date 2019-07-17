@@ -59,8 +59,9 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 		ChainNodeURL:  cfg.ChainRpcAddr,
 		ListenAddress: cfg.ChannelListenAddr,
 		Protocol:      cfg.ChannelProtocol,
-		RevealTimeout: cfg.ChannelRevealTimeout,
+		RevealTimeout: cfg.ChannelRevealTimeout, // 50
 		DBPath:        cfg.ChannelDBPath,
+		SettleTimeout: cfg.ChannelSettleTimeout, // 120
 	}
 	log.Debugf("channel cfg %v", channelConfig)
 	if _, err := os.Stat(channelConfig.DBPath); os.IsNotExist(err) {

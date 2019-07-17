@@ -21,7 +21,8 @@ type DspConfig struct {
 	ChannelClientType    string // channel client type. e.g: "rpc"
 	ChannelListenAddr    string // channel listen address. e.g: "127.0.0.1:3001"
 	ChannelProtocol      string // channel network protocol. e.g: "tcp"
-	ChannelRevealTimeout string // channel reveal time out. e.g: "1000"
+	ChannelRevealTimeout string // channel reveal timeout. e.g: "50"
+	ChannelSettleTimeout string // channel settle timeout. e.g: "120"
 	ChannelDBPath        string
 
 	AutoSetupDNSEnable bool   // enable auto setup DNS node or not
@@ -43,7 +44,8 @@ func DefaultDspConfig() *DspConfig {
 		ChannelClientType:    "rpc",
 		ChannelListenAddr:    "127.0.0.1:3001",
 		ChannelProtocol:      "udp",
-		ChannelRevealTimeout: "250",
+		ChannelRevealTimeout: "50",
+		ChannelSettleTimeout: "120",
 		ChannelDBPath:        "./DB/channel",
 		AutoSetupDNSEnable:   true,
 		DnsNodeMaxNum:        1,
