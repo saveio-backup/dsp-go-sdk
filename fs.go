@@ -51,12 +51,6 @@ func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, w
 	if err != nil {
 		return 0, err
 	}
-	// userSpace, _ := this.Chain.Native.Fs.GetUserSpace(this.CurrentAccount().Address)
-	// currentHeight, err := this.Chain.GetCurrentBlockHeight()
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// estimatedTimes := uint64(math.Ceil((float64(userSpace.ExpireHeight) - float64(currentHeight)) / float64(fsSetting.DefaultProvePeriod)))
 	defer func() {
 		err = fi.Close()
 		if err != nil {
@@ -64,9 +58,8 @@ func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, w
 		}
 	}()
 	txGas := uint64(10000000)
-	log.Debugf("opt.interval:%d, opt.ProveTimes:%d, opt.CopyNum:%d, ", opt.ProveInterval, opt.ProveTimes, opt.CopyNum)
 	useDefalut := opt.StorageType == common.FileStoreTypeNormal
-	// log.Debugf("estimatedTimes: %d, userspace.expired %d, current %d, usedDefault:%t", estimatedTimes, userSpace.ExpireHeight, currentHeight, useDefalut)
+	log.Debugf("filePath %s, opt.interval:%d, opt.ProveTimes:%d, opt.CopyNum:%d, useDefalut %v ", filePath, opt.ProveInterval, opt.ProveTimes, opt.CopyNum, useDefalut)
 	if whitelistCnt > 0 {
 		fee = txGas * 4
 	} else {
