@@ -84,14 +84,12 @@ const (
 )
 
 type Task struct {
-	id         string        // id
-	fileHash   string        // task file hash
-	fileName   string        // file name
-	total      uint64        // total blockes count
-	taskType   TaskType      // task type
-	askTimeout bool          // fetch ask timeout flag
-	ack        chan struct{} // fetch ack channel
-	ready      bool          // fetch ready flag
+	id       string   // id
+	fileHash string   // task file hash
+	fileName string   // file name
+	total    uint64   // total blockes count
+	taskType TaskType // task type
+	ready    bool     // fetch ready flag
 	// TODO: refactor, delete below two channels, use request and reply
 	blockReq      chan *GetBlockReq          // fetch block request channel
 	blockRespsMap map[string]chan *BlockResp // map key <=> *BlockResp
@@ -119,12 +117,6 @@ func (this *Task) GetTaskType() TaskType {
 	return this.taskType
 }
 
-func (this *Task) GetAckCh() chan struct{} {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
-	return this.ack
-}
-
 func (this *Task) GetBlockReq() chan *GetBlockReq {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
@@ -141,8 +133,6 @@ func (this *Task) SetBoolValue(name string, value bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	switch name {
-	case FIELD_NAME_ASKTIMEOUT:
-		this.askTimeout = value
 	case FIELD_NAME_READY:
 		this.ready = value
 	case FIELD_NAME_DONE:
@@ -158,8 +148,6 @@ func (this *Task) GetBoolValue(name string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	switch name {
-	case FIELD_NAME_ASKTIMEOUT:
-		return this.askTimeout
 	case FIELD_NAME_READY:
 		return this.ready
 	case FIELD_NAME_DONE:
@@ -262,12 +250,6 @@ func (this *Task) SetBackupOpt(opt *BackupFileOpt) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	this.backupOpt = opt
-}
-
-func (this *Task) OnTaskAck() {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	this.ack <- struct{}{}
 }
 
 func (this *Task) NewWorkers(addrs []string, job jobFunc) {

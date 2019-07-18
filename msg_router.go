@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/saveio/carrier/network"
-	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	netcom "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
@@ -89,20 +88,25 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		}
 		newMsg := message.NewFileFetchAck(fileMsg.GetHash())
 		log.Debugf("send file_ack msg %v %v", peer, newMsg)
-		client.P2pSend(peer.Address, newMsg.ToProtoMsg())
+		// client.P2pSend(peer.Address, newMsg.ToProtoMsg())
+		err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply file_ack msg failed", err)
+		}
+		log.Debugf("reply file_ack msg success")
 	case netcom.FILE_OP_FETCH_ACK:
 		// my task. use my wallet address
-		taskKey := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeUpload)
-		timeout, err := this.taskMgr.TaskTimeout(taskKey)
-		if err != nil {
-			log.Errorf("get task timeout err:%s", err)
-			return
-		}
-		if timeout {
-			log.Debugf("task timeout for hash:%s", fileMsg.Hash)
-			return
-		}
-		this.taskMgr.OnTaskAck(taskKey)
+		// taskKey := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeUpload)
+		// timeout, err := this.taskMgr.TaskTimeout(taskKey)
+		// if err != nil {
+		// 	log.Errorf("get task timeout err:%s", err)
+		// 	return
+		// }
+		// if timeout {
+		// 	log.Debugf("task timeout for hash:%s", fileMsg.Hash)
+		// 	return
+		// }
+		// this.taskMgr.OnTaskAck(taskKey)
 	case netcom.FILE_OP_FETCH_RDY:
 		// my task. use my wallet address
 		taskKey := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)

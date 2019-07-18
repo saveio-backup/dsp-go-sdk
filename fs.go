@@ -1129,32 +1129,40 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 	receiverLen := int32(0)
 	msg := message.NewFileFetchAsk(fileHashStr, blockHashes, this.Chain.Native.Fs.DefAcc.Address.ToBase58(), this.Chain.Native.Fs.DefAcc.Address.ToBase58())
 	action := func(res proto.Message, addr string) {
-		log.Debugf("send file ask msg success %s", addr)
-		// block waiting for ack msg or timeout msg
-		isAck := false
-		ack, err := this.taskMgr.TaskAck(taskKey)
-		if err != nil {
+		p2pMsg := message.ReadMessage(res)
+		if p2pMsg.Error != nil {
+			log.Errorf("get file fetch_ack msg err %s", p2pMsg.Error.Message)
 			return
 		}
-		select {
-		case <-ack:
-			isAck = true
-			log.Debugf("received ack from %s", addr)
-			receivers = append(receivers, addr)
-			atomic.AddInt32(&receiverLen, 1)
-		case <-time.After(time.Duration(common.FILE_FETCH_ACK_TIMEOUT) * time.Second):
-			if isAck {
-				return
-			}
-			this.taskMgr.SetTaskTimeout(taskKey, true)
-			return
-		}
+		// waiting for ack msg
+		fileMsg := p2pMsg.Payload.(*file.File)
+		receivers = append(receivers, addr)
+		log.Debugf("send file_ask msg %s success %s, receive file_ack msg", fileMsg.Hash, addr)
+		atomic.AddInt32(&receiverLen, 1)
+		// isAck := false
+		// ack, err := this.taskMgr.TaskAck(taskKey)
+		// if err != nil {
+		// 	return
+		// }
+		// select {
+		// case <-ack:
+		// 	isAck = true
+		// 	log.Debugf("received ack from %s", addr)
+		// 	receivers = append(receivers, addr)
+		// 	atomic.AddInt32(&receiverLen, 1)
+		// case <-time.After(time.Duration(common.FILE_FETCH_ACK_TIMEOUT) * time.Second):
+		// 	if isAck {
+		// 		return
+		// 	}
+		// 	this.taskMgr.SetTaskTimeout(taskKey, true)
+		// 	return
+		// }
 	}
 	// TODO: make stop func sense in parallel mode
 	stop := func() bool {
 		return atomic.LoadInt32(&receiverLen) >= int32(receiverCount)
 	}
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), false, stop, action)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, stop, action)
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err")
 		return nil, err

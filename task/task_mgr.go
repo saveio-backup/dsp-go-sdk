@@ -38,7 +38,6 @@ func (this *TaskMgr) NewTask() string {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	t := &Task{
-		ack:           make(chan struct{}, 1),
 		blockReq:      make(chan *GetBlockReq, 100),
 		notify:        make(chan *BlockResp, 100),
 		lastWorkerIdx: -1,
@@ -140,14 +139,6 @@ func (this *TaskMgr) TaskTimeout(taskId string) (bool, error) {
 		return false, errors.New("task not found")
 	}
 	return v.GetBoolValue(FIELD_NAME_ASKTIMEOUT), nil
-}
-
-func (this *TaskMgr) TaskAck(taskId string) (chan struct{}, error) {
-	v, ok := this.GetTaskById(taskId)
-	if !ok {
-		return nil, errors.New("task not found")
-	}
-	return v.GetAckCh(), nil
 }
 
 func (this *TaskMgr) TaskReady(taskId string) (bool, error) {
@@ -262,14 +253,6 @@ func (this *TaskMgr) SetBackupOpt(taskId string, opt *BackupFileOpt) {
 		return
 	}
 	v.SetBackupOpt(opt)
-}
-
-func (this *TaskMgr) OnTaskAck(taskId string) {
-	v, ok := this.GetTaskById(taskId)
-	if !ok {
-		return
-	}
-	v.OnTaskAck()
 }
 
 func (this *TaskMgr) OnlyBlock(taskId string) bool {
