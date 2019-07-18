@@ -25,8 +25,8 @@ import (
 )
 
 type DNSNodeInfo struct {
-	WalletAddr  string
-	ChannelAddr string
+	WalletAddr string
+	HostAddr   string
 }
 
 type PublicAddrInfo struct {
@@ -121,6 +121,25 @@ func (this *Dsp) SetOnlineDNS() {
 			break
 		}
 	}
+
+	if this.Config.AutoSetupDNSEnable {
+		return
+	}
+	allsetupChannels := this.Channel.AllChannels().Channels
+	if len(allsetupChannels) == 0 {
+		return
+	}
+	for _, channel := range allsetupChannels {
+		url, ok := this.DNS.OnlineDNS[channel.Address]
+		if !ok {
+			continue
+		}
+		this.DNS.DNSNode = &DNSNodeInfo{
+			WalletAddr: channel.Address,
+			HostAddr:   url,
+		}
+		break
+	}
 }
 
 func (this *Dsp) SetupDNSChannels() error {
@@ -168,10 +187,10 @@ func (this *Dsp) SetupDNSChannels() error {
 			}
 		}
 		this.DNS.DNSNode = &DNSNodeInfo{
-			WalletAddr:  walletAddr,
-			ChannelAddr: dnsUrl,
+			WalletAddr: walletAddr,
+			HostAddr:   dnsUrl,
 		}
-		log.Debugf("DNSNode wallet: %v, addr: %v", this.DNS.DNSNode.WalletAddr, this.DNS.DNSNode.ChannelAddr)
+		log.Debugf("DNSNode wallet: %v, addr: %v", this.DNS.DNSNode.WalletAddr, this.DNS.DNSNode.HostAddr)
 		return nil
 	}
 
@@ -439,7 +458,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	for _, url := range this.DNS.TrackerUrls {
 		request := func(resp chan *trackerResp) {
 			hostAddr, err := tracker.ReqEndPoint(url, address)
-			log.Debugf("ReqEndPoint hostAddr url%s, address %s, hostaddr:%s", url, address, string(hostAddr))
+			log.Debugf("ReqEndPoint hostAddr url%s, address %s, hostaddr:%s", url, address.ToBase58(), string(hostAddr))
 			resp <- &trackerResp{
 				ret: hostAddr,
 				err: err,

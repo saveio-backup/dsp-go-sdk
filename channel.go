@@ -25,7 +25,7 @@ func (this *Dsp) setupDNSNodeHost() error {
 	if this.DNS.DNSNode == nil {
 		return errors.New("no dns node to setup")
 	}
-	err := this.Channel.SetHostAddr(this.DNS.DNSNode.WalletAddr, this.DNS.DNSNode.ChannelAddr)
+	err := this.Channel.SetHostAddr(this.DNS.DNSNode.WalletAddr, this.DNS.DNSNode.HostAddr)
 	if err != nil {
 		return err
 	}
