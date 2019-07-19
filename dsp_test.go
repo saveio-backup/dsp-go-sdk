@@ -467,7 +467,7 @@ func TestDownloadFile(t *testing.T) {
 		}
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	err = d.DownloadFile(fileHashStr, "", common.ASSET_USDT, true, "", false, 100)
+	err = d.DownloadFile(fileHashStr, "", common.ASSET_USDT, true, "", false, false, 100)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -551,7 +551,7 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	// set use free peers
 	useFree := false
-	addrs := d.GetPeerFromTracker(fileHashStr, d.TrackerUrls)
+	addrs := d.GetPeerFromTracker(fileHashStr, d.DNS.TrackerUrls)
 	quotation, err := d.GetDownloadQuotation(fileHashStr, common.ASSET_USDT, useFree, addrs)
 	if len(quotation) == 0 {
 		log.Errorf("no peer to download")
@@ -568,7 +568,7 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = d.DownloadFileWithQuotation(fileHashStr, common.ASSET_USDT, true, quotation, "")
+	err = d.DownloadFileWithQuotation(fileHashStr, common.ASSET_USDT, true, false, quotation, "")
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -619,7 +619,7 @@ func TestOpenChannel(t *testing.T) {
 		ChannelRevealTimeout: "1000",
 	}
 	d := NewDsp(dspCfg, acc, nil)
-	id, err := d.Channel.OpenChannel("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c")
+	id, err := d.Channel.OpenChannel("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -892,10 +892,10 @@ func TestGetSetupDNSNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.DNSNode == nil {
+	if d.DNS.DNSNode == nil {
 		t.Fatal("dns node can't setup")
 	}
-	fmt.Printf("trackers %v, dns %s:%s\n", d.TrackerUrls, d.DNSNode.WalletAddr, d.DNSNode.ChannelAddr)
+	fmt.Printf("trackers %v, dns %s:%s\n", d.DNS.TrackerUrls, d.DNS.DNSNode.WalletAddr, d.DNS.DNSNode.HostAddr)
 }
 
 func TestGetAllDNSNodes(t *testing.T) {
@@ -921,7 +921,7 @@ func TestRegEndpoint(t *testing.T) {
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg, nil, nil)
-	d.TrackerUrls = []string{"udp://127.0.0.1:6369/announce"}
+	d.DNS.TrackerUrls = []string{"udp://127.0.0.1:6369/announce"}
 	addr, err := chainCom.AddressFromBase58("ARH2cGhdhZgMm69XcVVBNjAbEjxvX4ywpV")
 	if err != nil {
 		t.Fatal(err)
@@ -941,8 +941,8 @@ func TestGetPublicIPFromDNS(t *testing.T) {
 		ChannelProtocol: "udp",
 	}
 	d.Config = dspCfg
-	d.TrackerUrls = make([]string, 0)
-	d.TrackerUrls = append(d.TrackerUrls, "udp://40.73.96.40:6369")
+	d.DNS.TrackerUrls = make([]string, 0)
+	d.DNS.TrackerUrls = append(d.DNS.TrackerUrls, "udp://40.73.96.40:6369")
 	publicIP, err := d.GetExternalIP("AZj9LDEP1nhB1PYVtgAaabVKvN1uAKhmHn")
 	if err != nil {
 		t.Fatal(err)

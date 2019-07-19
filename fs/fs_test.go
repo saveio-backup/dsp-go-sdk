@@ -8,10 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/saveio/dsp-go-sdk/config"
 	chain "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis-go-sdk/wallet"
+	"github.com/saveio/themis/common/log"
 )
 
 var testbigFile = "../testdata/testuploadbigfile.txt"
@@ -256,4 +258,51 @@ func TestDownloadFile(t *testing.T) {
 		fmt.Printf("write block %s-%d, len %d\n", data.Cid(), idx, len(rootdata))
 		file.Write(rootdata[:])
 	}
+}
+
+func TestGetBlockConcurrent(t *testing.T) {
+	log.InitLog(1, "./test/", log.Stdout)
+	cfg := &config.DspConfig{
+		FsRepoRoot: "test",
+		FsFileRoot: "download",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, list, err := fs.NodesFromFile("./setup.exe", "AcoudsMYA2eifS1ECKB83HnPyfay3MQwGJ", false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listMap, err := fs.BlocksListToMap(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("root %s, first item \n", root.Cid().String())
+
+	// for key, unixNode := range listMap {
+	key := "QmZZ1eELsihvZMoF9dJ6tLTxCaFvk7yJxeUQ1DLcY7x7s5-1"
+	unixNode := listMap[key]
+	// fmt.Printf("key %s\n", key)
+	unixBlock, err := unixNode.GetDagNode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// if unixBlock == nil {
+	// 	fmt.Printf("unix block is nil %s\n", key)
+	// }
+	protoNode, err := unixNode.GetDagNode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("cid %s %T", unixBlock.Cid(), unixNode)
+	for i := 0; i < 5; i++ {
+		go func() {
+			blockData := fs.BlockDataOfAny(protoNode)
+			log.Infof("%s blockdata len %d", key, len(blockData))
+		}()
+	}
+
+	time.Sleep(time.Minute)
+
 }

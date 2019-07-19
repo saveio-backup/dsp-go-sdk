@@ -19,6 +19,7 @@ import (
 
 	"github.com/saveio/max/importer/helpers"
 	max "github.com/saveio/max/max"
+	"github.com/saveio/max/merkledag"
 	ml "github.com/saveio/max/merkledag"
 	ftpb "github.com/saveio/max/unixfs/pb"
 )
@@ -116,17 +117,18 @@ func (this *Fs) BlockDataOfAny(node interface{}) []byte {
 	if ok && ipldN != nil {
 		return ipldN.RawData()
 	}
-	unixfN, ok := node.(*helpers.UnixfsNode)
-	if ok && unixfN != nil {
-		dagNode, err := unixfN.GetDagNode()
+
+	switch n := node.(type) {
+	case *helpers.UnixfsNode:
+		dagNode, err := n.GetDagNode()
 		if err != nil {
 			return nil
 		}
 		return dagNode.RawData()
-	}
-	basicBlk, ok := node.(*blocks.BasicBlock)
-	if ok && basicBlk != nil {
-		return basicBlk.RawData()
+	case *merkledag.ProtoNode:
+		return n.RawData()
+	case *blocks.BasicBlock:
+		return n.RawData()
 	}
 	return nil
 }
@@ -203,7 +205,7 @@ func (this *Fs) BlocksListToMap(list []*helpers.UnixfsNode) (map[string]*helpers
 		if err != nil {
 			return nil, err
 		}
-		key := fmt.Sprintf("%s%d", dagNode.Cid().String(), (i + 1))
+		key := fmt.Sprintf("%s-%d", dagNode.Cid().String(), (i + 1))
 		m[key] = node
 	}
 	return m, nil

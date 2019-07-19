@@ -6,11 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -199,12 +197,7 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 	}
 	for i := 0; i < maxFetchRoutines; i++ {
 		go func() {
-			temp := 0
 			for {
-				temp++
-				if temp%200 > 0 {
-					log.Debugf("routines is running")
-				}
 				select {
 				case reqInfo := <-req:
 					timeout.Reset(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
@@ -220,36 +213,21 @@ func (this *Dsp) UploadFile(filePath string, opt *common.UploadOption) (*common.
 		}()
 	}
 	select {
-	// case reqInfo := <-req:
-	// 	timeout.Reset(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
-	// 	// handle fetch request async
-	// 	go this.handleFetchBlockRequest(taskId, fileHashStr, reqInfo, int(opt.CopyNum), totalCount, root, getUnixNode, genTag, doneCh)
 	case ret := <-doneCh:
-		log.Debugf("receive done ch ret %v", ret)
+		log.Debugf("receive done ch ret %v, err %s", ret.done, ret.err)
 		if ret.err != nil {
-			return nil, err
+			err = ret.err
+			return nil, ret.err
 		}
 		if !ret.done {
 			break
 		}
 		// check all blocks has sent
 		log.Infof("all block has sent %s", taskId)
-		// finish = true
-		// sent := uint64(this.taskMgr.UploadedBlockCount(taskId) / (uint64(opt.CopyNum) + 1))
-		// if totalCount == sent {
-		// 	log.Infof("all block has sent %s", taskId)
-		// 	finish = true
-		// 	break
-		// }
 	case <-timeout.C:
 		err = errors.New("wait for fetch block timeout")
 		return nil, err
 	}
-	// 	if finish {
-	// 		log.Debugf("finish job break")
-	// 		break
-	// 	}
-	// }
 	close(doneCh)
 	proved := this.checkFileBeProved(fileHashStr, opt.ProveTimes, opt.CopyNum)
 	log.Debugf("checking file proved done %t", proved)
@@ -930,22 +908,22 @@ func (this *Dsp) StartBackupFileService() {
 // AllDownloadFiles. get all downloaded file names
 func (this *Dsp) AllDownloadFiles() []string {
 	files := make([]string, 0)
-	switch this.Config.FsType {
-	case config.FS_FILESTORE:
-		fileInfos, err := ioutil.ReadDir(this.Config.FsFileRoot)
-		if err != nil || len(fileInfos) == 0 {
-			return files
-		}
-		for _, info := range fileInfos {
-			if info.IsDir() ||
-				(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
-				continue
-			}
-			files = append(files, info.Name())
-		}
-	case config.FS_BLOCKSTORE:
-		files, _ = this.taskMgr.AllDownloadFiles()
-	}
+	// switch this.Config.FsType {
+	// case config.FS_FILESTORE:
+	// 	fileInfos, err := ioutil.ReadDir(this.Config.FsFileRoot)
+	// 	if err != nil || len(fileInfos) == 0 {
+	// 		return files
+	// 	}
+	// 	for _, info := range fileInfos {
+	// 		if info.IsDir() ||
+	// 			(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
+	// 			continue
+	// 		}
+	// 		files = append(files, info.Name())
+	// 	}
+	// case config.FS_BLOCKSTORE:
+	files, _ = this.taskMgr.AllDownloadFiles()
+	// }
 	return files
 }
 
@@ -1139,24 +1117,6 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 		receivers = append(receivers, addr)
 		log.Debugf("send file_ask msg %s success %s, receive file_ack msg", fileMsg.Hash, addr)
 		atomic.AddInt32(&receiverLen, 1)
-		// isAck := false
-		// ack, err := this.taskMgr.TaskAck(taskKey)
-		// if err != nil {
-		// 	return
-		// }
-		// select {
-		// case <-ack:
-		// 	isAck = true
-		// 	log.Debugf("received ack from %s", addr)
-		// 	receivers = append(receivers, addr)
-		// 	atomic.AddInt32(&receiverLen, 1)
-		// case <-time.After(time.Duration(common.FILE_FETCH_ACK_TIMEOUT) * time.Second):
-		// 	if isAck {
-		// 		return
-		// 	}
-		// 	this.taskMgr.SetTaskTimeout(taskKey, true)
-		// 	return
-		// }
 	}
 	// TODO: make stop func sense in parallel mode
 	stop := func() bool {
@@ -1167,8 +1127,9 @@ func (this *Dsp) waitFileReceivers(taskKey, fileHashStr string, nodeList, blockH
 		log.Errorf("wait file receivers broadcast err")
 		return nil, err
 	}
+	log.Debugf("receives :%v, receiverCount %v", receivers, receiverCount)
 	if len(receivers) >= receiverCount {
-		receivers = receivers[:receiverCount]
+		receivers = append([]string{}, receivers[:receiverCount]...)
 	}
 	log.Debugf("receives :%v, ret %v", receivers, ret)
 	return receivers, nil
@@ -1205,6 +1166,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, fileHashStr string,
 	// send block
 	var blockData []byte
 	var dataLen int64
+	log.Debugf("handleFetchBlockRequest %s-%s-%d", reqInfo.FileHash, reqInfo.Hash, reqInfo.Index)
 	if reqInfo.Hash == fileHashStr && reqInfo.Index == 0 {
 		blockData = this.Fs.BlockDataOfAny(root)
 		blockDecodedData, err := this.Fs.BlockToBytes(root)
@@ -1214,14 +1176,17 @@ func (this *Dsp) handleFetchBlockRequest(taskId, fileHashStr string,
 		}
 		dataLen = int64(len(blockDecodedData))
 	} else {
-		unixNode := getUnixNode(fmt.Sprintf("%s%d", reqInfo.Hash, reqInfo.Index))
-		// unixNode := listMap[fmt.Sprintf("%s%d", reqInfo.Hash, reqInfo.Index)]
+		unixNode := getUnixNode(fmt.Sprintf("%s-%d", reqInfo.Hash, reqInfo.Index))
 		unixBlock, err := unixNode.GetDagNode()
 		if err != nil {
 			done <- &fetchedDone{done: false, err: err}
 			return
 		}
+		if unixBlock == nil {
+			log.Errorf("unix block is nil %s", fmt.Sprintf("%s%d", reqInfo.Hash, reqInfo.Index))
+		}
 		blockData = this.Fs.BlockDataOfAny(unixNode)
+		log.Debugf("unixBlock %v, len %d", unixBlock.Cid(), len(blockData))
 		blockDecodedData, err := this.Fs.BlockToBytes(unixBlock)
 		if err != nil {
 			done <- &fetchedDone{done: false, err: err}
@@ -1229,9 +1194,10 @@ func (this *Dsp) handleFetchBlockRequest(taskId, fileHashStr string,
 		}
 		dataLen = int64(len(blockDecodedData))
 	}
-	log.Debugf("receive fetch block msg of %s-%s from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.PeerAddr)
+	log.Debugf("receive fetch block msg of %s-%s-%d from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
 	if len(blockData) == 0 {
-		err := fmt.Errorf("block is nil hash %s, peer %s failed", reqInfo.Hash, reqInfo.PeerAddr)
+		err := fmt.Errorf("block is nil hash %s-%s-%d, peer %s failed", reqInfo.FileHash, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
+		panic(err)
 		done <- &fetchedDone{done: false, err: err}
 		return
 	}
@@ -1258,7 +1224,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, fileHashStr string,
 		done <- &fetchedDone{done: false, err: err}
 		return
 	}
-	log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d ", reqInfo.Hash, reqInfo.Index, len(tag), offset)
+	log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d to %s", reqInfo.Hash, reqInfo.Index, len(tag), offset, reqInfo.PeerAddr)
 	// stored
 	this.taskMgr.AddUploadedBlock(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index), offset+dataLen)
 	// update progress
@@ -1267,7 +1233,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, fileHashStr string,
 	// check all copynum node has received the block
 	count := len(this.taskMgr.GetUploadedBlockNodeList(taskId, reqInfo.Hash, uint32(reqInfo.Index)))
 	if count < copyNum+1 {
-		log.Debugf("peer %s getUploadedBlockNodeList hash:%s, index:%d, count %d less than copynum %d", reqInfo.PeerAddr, reqInfo.Hash, reqInfo.Index, count, copyNum)
+		// log.Debugf("peer %s getUploadedBlockNodeList hash:%s, index:%d, count %d less than copynum %d", reqInfo.PeerAddr, reqInfo.Hash, reqInfo.Index, count, copyNum)
 		return
 	}
 	sent := uint64(this.taskMgr.UploadedBlockCount(taskId) / (uint64(copyNum) + 1))
