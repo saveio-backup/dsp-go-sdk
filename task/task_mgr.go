@@ -502,7 +502,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("done channel has close")
 					break
 				}
-				log.Debugf("receive resp++++ %s", resp.flightKey)
+				log.Debugf("receive resp++++ %s, err %s", resp.flightKey, resp.err)
 				// remove the request from flight
 				removeFilght(resp.flightKey)
 				flightMap.Delete(resp.flightKey)
@@ -526,7 +526,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
 					if !ok {
 						log.Debugf("break because block cache not has %v", blkKey)
-						break
+						// break
+						continue
 					}
 					blk := blktemp.(*BlockResp)
 					log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)

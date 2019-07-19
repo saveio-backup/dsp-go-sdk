@@ -56,23 +56,23 @@ func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, w
 		}
 	}()
 	txGas := uint64(10000000)
-	useDefalut := opt.StorageType == common.FileStoreTypeNormal
-	log.Debugf("filePath %s, opt.interval:%d, opt.ProveTimes:%d, opt.CopyNum:%d, useDefalut %v ", filePath, opt.ProveInterval, opt.ProveTimes, opt.CopyNum, useDefalut)
+	useDefault := opt.StorageType == common.FileStoreTypeNormal
+	log.Debugf("filePath %s, opt.interval:%d, opt.ProveTimes:%d, opt.CopyNum:%d, useDefault %v ", filePath, opt.ProveInterval, opt.ProveTimes, opt.CopyNum, useDefault)
 	if whitelistCnt > 0 {
 		fee = txGas * 4
 	} else {
 		fee = txGas * 3
 	}
-	if useDefalut {
+	if useDefault {
 		return fee, nil
 	}
 	fileSize := uint64(fileInfo.Size()) / 1024
 	if fileSize < 0 {
 		fileSize = 1
 	}
-	log.Debugf("fileSize :%d", fileSize)
 	fee += (opt.ProveInterval*fileSize*fsSetting.GasPerKBPerBlock +
 		fsSetting.GasForChallenge) * uint64(opt.ProveTimes) * fsSetting.FsGasPrice * (uint64(opt.CopyNum) + 1)
+	log.Debugf("fileSize :%d, fee", fileSize, fee)
 	return fee, nil
 }
 
