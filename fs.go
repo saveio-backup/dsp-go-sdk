@@ -512,8 +512,20 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 	if !this.taskMgr.IsDownloadInfoExist(taskId) {
 		return errors.New("download info not exist")
 	}
+	log.Debugf("GetExternalIP for downloaded nodes %v", peerPrices)
 	if len(peerPrices) == 0 {
-		return errors.New("no peers to open channel")
+		return errors.New("no peers to deposit channel")
+	}
+	for _, payInfo := range peerPrices {
+		hostAddr, err := this.GetExternalIP(payInfo.WalletAddress)
+		log.Debugf("Set host addr after deposit channel %s - %s, err %s", payInfo.WalletAddress, hostAddr, err)
+		if len(hostAddr) == 0 || err != nil {
+			continue
+		}
+		this.Channel.SetHostAddr(payInfo.WalletAddress, hostAddr)
+	}
+	if !this.Config.AutoSetupDNSEnable {
+		return nil
 	}
 	blockHashes := this.taskMgr.FileBlockHashes(taskId)
 	log.Debugf("get blockhashes from %s", taskId)
@@ -521,7 +533,7 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 		return errors.New("no blocks")
 	}
 	totalAmount := common.FILE_DOWNLOAD_UNIT_PRICE * uint64(len(blockHashes)) * uint64(common.CHUNK_SIZE)
-	log.Debugf("deposit to channel price:%d, cnt:%d, chunsize:%d, total:%d", common.FILE_DOWNLOAD_UNIT_PRICE, len(blockHashes), common.CHUNK_SIZE, totalAmount)
+	log.Debugf("deposit to channel price:%d, cnt:%d, chunksize:%d, total:%d", common.FILE_DOWNLOAD_UNIT_PRICE, len(blockHashes), common.CHUNK_SIZE, totalAmount)
 	if totalAmount/common.FILE_DOWNLOAD_UNIT_PRICE != uint64(len(blockHashes))*uint64(common.CHUNK_SIZE) {
 		return errors.New("deposit amount overflow")
 	}
@@ -533,15 +545,6 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 		if err != nil {
 			return err
 		}
-	}
-	log.Debugf("GetExternalIP for downloaded nodes %v", peerPrices)
-	for _, payInfo := range peerPrices {
-		hostAddr, err := this.GetExternalIP(payInfo.WalletAddress)
-		log.Debugf("Set host addr after deposit channel %s - %s, err %s", payInfo.WalletAddress, hostAddr, err)
-		if len(hostAddr) == 0 || err != nil {
-			continue
-		}
-		this.Channel.SetHostAddr(payInfo.WalletAddress, hostAddr)
 	}
 	return nil
 }
@@ -571,10 +574,10 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	err = this.Channel.MediaTransfer(paymentId, amount, payInfo.WalletAddress)
 	// err = this.Channel.DirectTransfer(paymentId, amount, payInfo.WalletAddress)
 	if err != nil {
-		log.Debugf("payingmentid %d, failed err %s", paymentId, err)
+		log.Debugf("paymentId %d, failed err %s", paymentId, err)
 		return 0, err
 	}
-	log.Debugf("payment id %d, for file:%s, size:%d, price:%d success", paymentId, fileHashStr, blockSize, amount)
+	log.Debugf("paymentId %d, for file:%s, size:%d, price:%d success", paymentId, fileHashStr, blockSize, amount)
 	// send payment msg
 	msg := message.NewPayment(this.Chain.Native.Fs.DefAcc.Address.ToBase58(), payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
