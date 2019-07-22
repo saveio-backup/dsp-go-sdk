@@ -415,7 +415,7 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) er
 			}
 			log.Debugf("media transfer success: %t", ret.success)
 			return nil
-		case <-time.After(time.Minute):
+		case <-time.After(time.Duration(dspcom.MEDIA_TRANSFER_TIMEOUT) * time.Second):
 			return errors.New("media transfer timeout")
 		}
 	}

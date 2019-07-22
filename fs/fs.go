@@ -2,9 +2,12 @@ package fs
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
+	"hash/crc32"
+	"io"
 	"os"
 	"strings"
 
@@ -59,6 +62,21 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 
 func (this *Fs) Close() error {
 	return this.fs.Close()
+}
+
+func (this *Fs) Crc32HashFile(filePath string, polynomial uint32) (string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	tablePolynomial := crc32.MakeTable(polynomial)
+	hash := crc32.New(tablePolynomial)
+	if _, err := io.Copy(hash, f); err != nil {
+		return "", err
+	}
+	hashInBytes := hash.Sum(nil)[:]
+	return hex.EncodeToString(hashInBytes), nil
 }
 
 func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) (ipld.Node, []*helpers.UnixfsNode, error) {

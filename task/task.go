@@ -36,16 +36,18 @@ type BlockResp struct {
 }
 
 type ProgressInfo struct {
-	TaskKey   string
-	Type      TaskType          //task type
+	TaskId    string
+	Type      TaskType          // task type
 	FileName  string            // file name
 	FileHash  string            // file hash
 	Total     uint64            // total file's blocks count
 	Count     map[string]uint64 // address <=> count
+	State     TaskProgressState // TaskProgressState
+	Result    interface{}       // finish result
+	ErrorCode uint64            // error code
+	ErrorMsg  string            // interrupt error
 	CreatedAt uint64
 	UpdatedAt uint64
-	Result    interface{} // finish result
-	ErrorMsg  string      // interrupt error
 }
 type ShareState int
 
@@ -73,23 +75,28 @@ type BackupFileOpt struct {
 }
 
 const (
-	FIELD_NAME_ASKTIMEOUT = "asktimeout"
-	FIELD_NAME_READY      = "ready"
-	FIELD_NAME_INORDER    = "inorder"
-	FIELD_NAME_ONLYBLOCK  = "onlyblock"
-	FIELD_NAME_DONE       = "done"
-	FIELD_NAME_FILEHASH   = "filehash"
-	FIELD_NAME_FILENAME   = "filename"
-	FIELD_NAME_ID         = "id"
+	FIELD_NAME_ASKTIMEOUT = iota
+	FIELD_NAME_READY
+	FIELD_NAME_INORDER
+	FIELD_NAME_ONLYBLOCK
+	FIELD_NAME_DONE
+	FIELD_NAME_FILEHASH
+	FIELD_NAME_FILENAME
+	FIELD_NAME_ID
+	FIELD_NAME_WALLETADDR
+	FIELD_NAME_FILEPATH
 )
 
 type Task struct {
-	id       string   // id
-	fileHash string   // task file hash
-	fileName string   // file name
-	total    uint64   // total blockes count
-	taskType TaskType // task type
-	ready    bool     // fetch ready flag
+	id         string            // id
+	sessionIds map[string]string // request peerAddr <=> session id
+	fileHash   string            // task file hash
+	fileName   string            // file name
+	total      uint64            // total blocks count
+	filePath   string            // file path
+	walletAddr string            // operator wallet address
+	taskType   TaskType          // task type
+	ready      bool              // fetch ready flag
 	// TODO: refactor, delete below two channels, use request and reply
 	blockReq      chan *GetBlockReq          // fetch block request channel
 	blockRespsMap map[string]chan *BlockResp // map key <=> *BlockResp
@@ -117,6 +124,18 @@ func (this *Task) GetTaskType() TaskType {
 	return this.taskType
 }
 
+func (this *Task) SetSessionId(peerWalletAddr, id string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	this.sessionIds[peerWalletAddr] = id
+}
+
+func (this *Task) GetRequestId(peerWalletAddr string) string {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.sessionIds[peerWalletAddr]
+}
+
 func (this *Task) GetBlockReq() chan *GetBlockReq {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
@@ -129,22 +148,32 @@ func (this *Task) GetBlockReq() chan *GetBlockReq {
 // 	return this.blockResp
 // }
 
-func (this *Task) SetBoolValue(name string, value bool) {
+func (this *Task) SetFieldValue(name int, value interface{}) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	switch name {
 	case FIELD_NAME_READY:
-		this.ready = value
+		this.ready = value.(bool)
 	case FIELD_NAME_DONE:
-		this.done = value
+		this.done = value.(bool)
 	case FIELD_NAME_INORDER:
-		this.inOrder = value
+		this.inOrder = value.(bool)
 	case FIELD_NAME_ONLYBLOCK:
-		this.onlyBlock = value
+		this.onlyBlock = value.(bool)
+	case FIELD_NAME_FILEHASH:
+		this.fileHash = value.(string)
+	case FIELD_NAME_FILENAME:
+		this.fileName = value.(string)
+	case FIELD_NAME_ID:
+		this.id = value.(string)
+	case FIELD_NAME_WALLETADDR:
+		this.walletAddr = value.(string)
+	case FIELD_NAME_FILEPATH:
+		this.filePath = value.(string)
 	}
 }
 
-func (this *Task) GetBoolValue(name string) bool {
+func (this *Task) GetBoolValue(name int) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	switch name {
@@ -156,24 +185,12 @@ func (this *Task) GetBoolValue(name string) bool {
 		return this.inOrder
 	case FIELD_NAME_ONLYBLOCK:
 		return this.onlyBlock
+
 	}
 	return false
 }
 
-func (this *Task) SetStringValue(name, value string) {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	switch name {
-	case FIELD_NAME_FILEHASH:
-		this.fileHash = value
-	case FIELD_NAME_FILENAME:
-		this.fileName = value
-	case FIELD_NAME_ID:
-		this.id = value
-	}
-}
-
-func (this *Task) GetStringValue(name string) string {
+func (this *Task) GetStringValue(name int) string {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	switch name {
@@ -183,6 +200,10 @@ func (this *Task) GetStringValue(name string) string {
 		return this.fileName
 	case FIELD_NAME_ID:
 		return this.id
+	case FIELD_NAME_WALLETADDR:
+		return this.walletAddr
+	case FIELD_NAME_FILEPATH:
+		return this.filePath
 	}
 	return ""
 }
@@ -252,14 +273,14 @@ func (this *Task) SetBackupOpt(opt *BackupFileOpt) {
 	this.backupOpt = opt
 }
 
-func (this *Task) NewWorkers(addrs []string, job jobFunc) {
+func (this *Task) NewWorkers(addrs map[string]string, job jobFunc) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if this.workers == nil {
 		this.workers = make(map[string]*Worker, 0)
 	}
-	for _, addr := range addrs {
-		w := NewWorker(addr, job)
+	for addr, walletAddr := range addrs {
+		w := NewWorker(addr, walletAddr, job)
 		this.workers[addr] = w
 	}
 }

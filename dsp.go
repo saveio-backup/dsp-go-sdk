@@ -51,7 +51,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 			log.Errorf("init db err %s", err)
 			return nil
 		}
-		d.taskMgr.FileDB = store.NewFileDB(dbstore)
+		d.taskMgr.SetFileDB(dbstore)
 	}
 	if len(c.FsRepoRoot) > 0 {
 		var err error
@@ -128,12 +128,10 @@ func (this *Dsp) StartChannelService() error {
 }
 
 func (this *Dsp) Stop() error {
-	if this.taskMgr.FileDB != nil {
-		err := this.taskMgr.FileDB.Close()
-		if err != nil {
-			log.Errorf("close fileDB err %s", err)
-			return err
-		}
+	err := this.taskMgr.CloseDB()
+	if err != nil {
+		log.Errorf("close fileDB err %s", err)
+		return err
 	}
 	if this.Channel != nil {
 		this.Channel.StopService()

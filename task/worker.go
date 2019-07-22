@@ -2,27 +2,29 @@ package task
 
 import "github.com/saveio/dsp-go-sdk/common"
 
-type jobFunc func(string, string, string, string, int32) (*BlockResp, error)
+type jobFunc func(string, string, string, string, string, int32) (*BlockResp, error)
 
 type Worker struct {
 	remoteAddr string
+	walletAddr string
 	working    bool
 	job        jobFunc
 	failed     map[string]int
 	unpaid     bool
 }
 
-func NewWorker(addr string, j jobFunc) *Worker {
+func NewWorker(addr, walletAddr string, j jobFunc) *Worker {
 	w := &Worker{}
 	w.remoteAddr = addr
+	w.walletAddr = walletAddr
 	w.job = j
 	w.failed = make(map[string]int, 0)
 	return w
 }
 
-func (w *Worker) Do(taskId, fileHash, blockHash, peerAddr string, index int32) (*BlockResp, error) {
+func (w *Worker) Do(taskId, fileHash, blockHash, peerAddr, walletAddr string, index int32) (*BlockResp, error) {
 	w.working = true
-	resp, err := w.job(taskId, fileHash, blockHash, peerAddr, index)
+	resp, err := w.job(taskId, fileHash, blockHash, peerAddr, walletAddr, index)
 	if err != nil {
 		cnt := w.failed[blockHash]
 		w.failed[blockHash] = cnt + 1
@@ -33,6 +35,10 @@ func (w *Worker) Do(taskId, fileHash, blockHash, peerAddr string, index int32) (
 
 func (w *Worker) RemoteAddress() string {
 	return w.remoteAddr
+}
+
+func (w *Worker) WalletAddr() string {
+	return w.walletAddr
 }
 
 func (w *Worker) Working() bool {

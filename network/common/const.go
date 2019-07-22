@@ -46,6 +46,7 @@ const (
 	MSG_ERROR_CODE_TOO_MANY_TASKS       = 50004 // too many tasks
 	MSG_ERROR_CODE_FILE_UNITPRICE_ERROR = 50005 // file unitprice error
 	MSG_ERROR_CODE_TASK_EXIST           = 50006 // file unitprice error
+	MSG_ERROR_INTERNAL_ERROR            = 50007 // internal err
 )
 
 var MSG_ERROR_MSG = map[int32]string{
@@ -56,4 +57,5 @@ var MSG_ERROR_MSG = map[int32]string{
 	MSG_ERROR_CODE_TOO_MANY_TASKS:       "too many tasks",
 	MSG_ERROR_CODE_FILE_UNITPRICE_ERROR: "file unitprice error",
 	MSG_ERROR_CODE_TASK_EXIST:           "file task exists",
+	MSG_ERROR_INTERNAL_ERROR:            "internal error",
 }

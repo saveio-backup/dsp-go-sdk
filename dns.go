@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"strconv"
 	"strings"
@@ -14,7 +13,6 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
-	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/scan/tracker"
 	dnscom "github.com/saveio/scan/tracker/common"
@@ -286,23 +284,8 @@ func (this *Dsp) PushLocalFilesToTrackers() {
 	if len(this.DNS.TrackerUrls) == 0 {
 		return
 	}
-	files := make([]string, 0)
-	switch this.Config.FsType {
-	case config.FS_FILESTORE:
-		fileInfos, err := ioutil.ReadDir(this.Config.FsFileRoot)
-		if err != nil || len(fileInfos) == 0 {
-			return
-		}
-		for _, info := range fileInfos {
-			if info.IsDir() ||
-				(!strings.HasPrefix(info.Name(), common.PROTO_NODE_PREFIX) && !strings.HasPrefix(info.Name(), common.RAW_NODE_PREFIX)) {
-				return
-			}
-			files = append(files, info.Name())
-		}
-	case config.FS_BLOCKSTORE:
-		files, _ = this.taskMgr.AllDownloadFiles()
-	}
+	files, err := this.taskMgr.AllDownloadFiles()
+	log.Debugf("all downloaded files %v, err %s", len(files), err)
 	if len(files) == 0 {
 		return
 	}

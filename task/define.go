@@ -1,0 +1,24 @@
+package task
+
+type TaskProgressState int
+
+const (
+	None TaskProgressState = iota
+	TaskUploadFileMakeSlice
+	TaskUploadFileMakeSliceDone
+	TaskUploadFilePaying
+	TaskUploadFilePayingDone
+	TaskUploadFileCommitWhitelist
+	TaskUploadFileCommitWhitelistDone
+	TaskUploadFileFindReceivers
+	TaskUploadFileFindReceiversDone
+	TaskUploadFileTransferBlocks
+	TaskUploadFileTransferBlocksDone
+	TaskUploadFileWaitForPDPProve
+	TaskUploadFileWaitForPDPProveDone
+	TaskUploadFileRegisterDNS
+	TaskUploadFileRegisterDNSDone
+	TaskDownloadFileStart
+	TaskDownloadFileDownloading
+	TaskDownloadFileMakeSeed
+)

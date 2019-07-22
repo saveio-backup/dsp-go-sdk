@@ -94,6 +94,7 @@ func (this *Dsp) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
 	if err != nil || info == nil {
 		return false
 	}
+	// TODO: check sinature
 	if info.FileOwner.ToBase58() == walletAddr {
 		return true
 	}

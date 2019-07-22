@@ -1,6 +1,9 @@
 package message
 
 import (
+	"math/rand"
+	"time"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/pb"
@@ -8,6 +11,11 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 )
+
+func GenMessageId() uint64 {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return r.Uint64()
+}
 
 func MessageHeader() *Header {
 	return &Header{
@@ -17,7 +25,8 @@ func MessageHeader() *Header {
 
 func NewEmptyMsg() *Message {
 	msg := &Message{
-		Header: MessageHeader(),
+		MessageId: GenMessageId(),
+		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_NONE
 	data, err := msg.ToProtoMsg().(*pb.Message).XXX_Marshal(nil, false)
@@ -29,12 +38,14 @@ func NewEmptyMsg() *Message {
 }
 
 // NewBlockMsg block req msg
-func NewBlockReqMsg(fileHash, blockHash string, index int32, walletAddress string, asset int32) *Message {
+func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAddress string, asset int32) *Message {
 	msg := &Message{
-		Header: MessageHeader(),
+		MessageId: GenMessageId(),
+		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_BLOCK
 	b := &block.Block{
+		SessionId: sessionId,
 		Index:     index,
 		FileHash:  fileHash,
 		Hash:      blockHash,
@@ -54,12 +65,14 @@ func NewBlockReqMsg(fileHash, blockHash string, index int32, walletAddress strin
 }
 
 // NewBlockMsg block ack msg
-func NewBlockMsg(index int32, fileHash, hash string, blockData, tag []byte, offset int64) *Message {
+func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData, tag []byte, offset int64) *Message {
 	msg := &Message{
-		Header: MessageHeader(),
+		MessageId: GenMessageId(),
+		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_BLOCK
 	b := &block.Block{
+		SessionId: sessionId,
 		Index:     index,
 		FileHash:  fileHash,
 		Hash:      hash,
@@ -80,7 +93,8 @@ func NewBlockMsg(index int32, fileHash, hash string, blockData, tag []byte, offs
 // NewFileMsg file msg
 func NewFileMsg(file *file.File, errorCode int32) *Message {
 	msg := &Message{
-		Header: MessageHeader(),
+		MessageId: GenMessageId(),
+		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_FILE
 	msg.Payload = file
@@ -103,8 +117,9 @@ func NewFileMsg(file *file.File, errorCode int32) *Message {
 }
 
 // NewFileFetchAsk
-func NewFileFetchAsk(hash string, blkHashes []string, walletAddr, prefix string) *Message {
+func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr, prefix, txHash string, height uint64) *Message {
 	f := &file.File{
+		SessionId:   sessionId,
 		Hash:        hash,
 		BlockHashes: blkHashes,
 		Operation:   common.FILE_OP_FETCH_ASK,
@@ -112,13 +127,18 @@ func NewFileFetchAsk(hash string, blkHashes []string, walletAddr, prefix string)
 		PayInfo: &file.Payment{
 			WalletAddress: walletAddr,
 		},
+		Tx: &file.Tx{
+			Hash:   txHash,
+			Height: height,
+		},
 	}
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileFetchAck
-func NewFileFetchAck(hash string) *Message {
+func NewFileFetchAck(sessionId, hash string) *Message {
 	f := &file.File{
+		SessionId: sessionId,
 		Hash:      hash,
 		Operation: common.FILE_OP_FETCH_ACK,
 	}
@@ -126,10 +146,14 @@ func NewFileFetchAck(hash string) *Message {
 }
 
 // NewFileFetchRdy
-func NewFileFetchRdy(hash string) *Message {
+func NewFileFetchRdy(sessionId, hash, walletAddr string) *Message {
 	f := &file.File{
+		SessionId: sessionId,
 		Hash:      hash,
 		Operation: common.FILE_OP_FETCH_RDY,
+		PayInfo: &file.Payment{
+			WalletAddress: walletAddr,
+		},
 	}
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
@@ -148,8 +172,9 @@ func NewFileDownloadAsk(hash, walletAddr string, asset int32) *Message {
 }
 
 // NewFileDownloadAck
-func NewFileDownloadAck(hash string, blkHashes []string, walletAddr, prefix string, uintPrice uint64, errorCode int32) *Message {
+func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr, prefix string, uintPrice uint64, asset, errorCode int32) *Message {
 	f := &file.File{
+		SessionId:   sessionId,
 		Hash:        hash,
 		BlockHashes: blkHashes,
 		Operation:   common.FILE_OP_DOWNLOAD_ACK,
@@ -157,14 +182,16 @@ func NewFileDownloadAck(hash string, blkHashes []string, walletAddr, prefix stri
 		PayInfo: &file.Payment{
 			WalletAddress: walletAddr,
 			UnitPrice:     uintPrice,
+			Asset:         asset,
 		},
 	}
 	return NewFileMsg(f, errorCode)
 }
 
 // NewFileDownload download file from server msg
-func NewFileDownload(hash, walletAddr string, asset int32) *Message {
+func NewFileDownload(sessionId, hash, walletAddr string, asset int32) *Message {
 	f := &file.File{
+		SessionId: sessionId,
 		Hash:      hash,
 		Operation: common.FILE_OP_DOWNLOAD,
 		PayInfo: &file.Payment{
@@ -175,8 +202,9 @@ func NewFileDownload(hash, walletAddr string, asset int32) *Message {
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
-func NewFileDownloadOk(hash, walletAddr string, asset int32) *Message {
+func NewFileDownloadOk(sessionId, hash, walletAddr string, asset int32) *Message {
 	f := &file.File{
+		SessionId: sessionId,
 		Hash:      hash,
 		Operation: common.FILE_OP_DOWNLOAD_OK,
 		PayInfo: &file.Payment{
@@ -188,20 +216,25 @@ func NewFileDownloadOk(hash, walletAddr string, asset int32) *Message {
 }
 
 // NewFileDelete
-func NewFileDelete(hash, walletAddr string) *Message {
+func NewFileDelete(sessionId, hash, walletAddr, txHash string, txHeight uint64) *Message {
 	f := &file.File{
 		Hash:      hash,
 		Operation: common.FILE_OP_DELETE,
 		PayInfo: &file.Payment{
 			WalletAddress: walletAddr,
 		},
+		Tx: &file.Tx{
+			Hash:   txHash,
+			Height: txHeight,
+		},
 	}
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
 // NewFileDeleteAck
-func NewFileDeleteAck(hash string) *Message {
+func NewFileDeleteAck(sessionId, hash string) *Message {
 	f := &file.File{
+		SessionId: sessionId,
 		Hash:      hash,
 		Operation: common.FILE_OP_DELETE_ACK,
 	}
@@ -211,7 +244,8 @@ func NewFileDeleteAck(hash string) *Message {
 // NewPayment new payment msg
 func NewPayment(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, errorCode int32) *Message {
 	msg := &Message{
-		Header: MessageHeader(),
+		MessageId: GenMessageId(),
+		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_PAYMENT
 	pay := &payment.Payment{

@@ -8,11 +8,18 @@ message Payment {
     uint64 unitPrice = 3; // unit price per byte
 }
 
+message Tx {
+    string hash = 1; // tx hash
+    uint64 height = 2; // tx block height
+}
+
 message File {
-   string hash = 1;  
-   repeated string blockHashes = 2;
-   int32 operation = 3;
-   string prefix = 4;
-   int32 chunkSize = 5;
-   Payment payInfo = 6;
+   string sessionId = 1;
+   string hash = 2;  
+   repeated string blockHashes = 3;
+   int32 operation = 4;
+   string prefix = 5;
+   int32 chunkSize = 6;
+   Payment payInfo = 7;
+   Tx tx = 8;
 }

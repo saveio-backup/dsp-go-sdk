@@ -132,6 +132,7 @@ func P2pSend(address string, data proto.Message) error {
 	}
 }
 
+// P2pBroadcast. broadcast one msg to different addresses
 func P2pBroadcast(addresses []string, data proto.Message, needReply bool, stop func() bool, action func(proto.Message, string)) (map[string]error, error) {
 	chReq := &BroadcastReq{
 		Addresses: addresses,

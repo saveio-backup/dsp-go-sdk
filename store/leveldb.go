@@ -9,7 +9,8 @@ import (
 )
 
 type LevelDBStore struct {
-	db *leveldb.DB
+	db    *leveldb.DB
+	batch *leveldb.Batch
 }
 
 // used to compute the size of bloom filter bits array .
@@ -90,4 +91,29 @@ func (self *LevelDBStore) QueryStringKeysByPrefix(prefix []byte) ([]string, erro
 //Close close leveldb
 func (self *LevelDBStore) Close() error {
 	return self.db.Close()
+}
+
+//NewBatch start commit batch
+func (self *LevelDBStore) NewBatch() {
+	self.batch = new(leveldb.Batch)
+}
+
+//BatchPut put a key-value pair to leveldb batch
+func (self *LevelDBStore) BatchPut(key []byte, value []byte) {
+	self.batch.Put(key, value)
+}
+
+//BatchDelete delete a key to leveldb batch
+func (self *LevelDBStore) BatchDelete(key []byte) {
+	self.batch.Delete(key)
+}
+
+//BatchCommit commit batch to leveldb
+func (self *LevelDBStore) BatchCommit() error {
+	err := self.db.Write(self.batch, nil)
+	if err != nil {
+		return err
+	}
+	self.batch = nil
+	return nil
 }

@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"regexp"
@@ -103,4 +105,10 @@ func GetFileNameAtPath(dirPath, fileHash, fileName string) string {
 		}
 	}
 	return dirPath + fileHash
+}
+
+func StringToSha256Hex(str string) string {
+	hash := sha256.Sum256([]byte(str))
+	hexStr := hex.EncodeToString(hash[:])
+	return hexStr
 }

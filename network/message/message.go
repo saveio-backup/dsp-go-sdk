@@ -21,9 +21,10 @@ type Error struct {
 }
 
 type Message struct {
-	Header  *Header
-	Payload proto.Message
-	Error   *Error
+	MessageId uint64
+	Header    *Header
+	Payload   proto.Message
+	Error     *Error
 }
 
 func ReadMessage(msg proto.Message) *Message {
@@ -73,6 +74,7 @@ func ReadMessage(msg proto.Message) *Message {
 			Message: pbMsg.GetError().GetMessage(),
 		}
 	}
+	newMsg.MessageId = pbMsg.GetMsgId()
 	return newMsg
 }
 
@@ -96,5 +98,6 @@ func (this *Message) ToProtoMsg() proto.Message {
 		msg.Error.Code = this.Error.Code
 		msg.Error.Message = this.Error.Message
 	}
+	msg.MsgId = this.MessageId
 	return msg
 }

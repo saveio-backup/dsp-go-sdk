@@ -20,16 +20,25 @@ var testbigFile = "../testdata/testuploadbigfile.txt"
 var testsmallFile = "../testdata/testuploadfile.txt"
 
 func TestNodeFromFile(t *testing.T) {
-	fs := &Fs{}
-	root, list, err := fs.NodesFromFile(testbigFile, "", false, "")
+	cfg := &config.DspConfig{
+		FsRepoRoot: "./Repo",
+		FsFileRoot: "./Downloads",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("start %d\n", time.Now().UnixNano())
+	root, list, err := fs.NodesFromFile("./win-scatter-10.1.2.exe", "", false, "")
+	fmt.Printf("end %d\n", time.Now().UnixNano())
 	if err != nil {
 		return
 	}
-	tree, err := fs.AllBlockHashes(root, list)
+	_, err = fs.AllBlockHashes(root, list)
 	if err != nil {
 		return
 	}
-	fmt.Printf("tree:%v\n", tree)
+	// fmt.Printf("tree:%v\n", tree)
 }
 
 func TestBlockToBytes(t *testing.T) {

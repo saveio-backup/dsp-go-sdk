@@ -4,12 +4,13 @@ import "payment.proto";
 package block;
 
 message Block {
-   int32 index = 1; // block index of file
-   string fileHash = 2; // file  hash
-   string hash = 3; // block hash
-   bytes data = 4; // raw data
-   bytes tag = 5; // used for pdp
-   int32 operation = 6; // block operation
-   int64 offset = 7; // data offset of file
-   payment.Payment payment = 8; // payment detail
+   string sessionId = 1; // request session id
+   int32 index = 2; // block index of file
+   string fileHash = 3; // file  hash
+   string hash = 4; // block hash
+   bytes data = 5; // raw data
+   bytes tag = 6; // used for pdp
+   int32 operation = 7; // block operation
+   int64 offset = 8; // data offset of file
+   payment.Payment payment = 9; // payment detail
 }

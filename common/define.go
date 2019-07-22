@@ -33,7 +33,7 @@ type UploadResult struct {
 	AddWhiteListTx string
 }
 
-type PayStoreFileReulst struct {
+type PayStoreFileResult struct {
 	Tx         string
 	ParamsBuf  []byte
 	PrivateKey []byte
