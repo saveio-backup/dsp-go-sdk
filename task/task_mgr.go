@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,7 +33,6 @@ func NewTaskMgr() *TaskMgr {
 		tasks: ts,
 	}
 	tmgr.blockReqCh = make(chan *GetBlockReq, 500)
-	// tmgr.FileDB = store.NewFileDB(common.FILE_DB_DIR_PATH)
 	return tmgr
 }
 
@@ -115,15 +115,6 @@ func (this *TaskMgr) SetTaskInfos(id, fileHash, filePath, fileName, walletAddres
 	}
 	this.db.SetFileInfoFields(id, m)
 }
-
-// func (this *TaskMgr) UploadFileExist(fileHash, walletAddress string) bool {
-// 	key := this.TaskIdKey(fileHash, walletAddress, TaskTypeUpload)
-// 	oldId, _ := this.GetFileInfoId(key)
-// 	if len(oldId) != 0 {
-// 		return true
-// 	}
-// 	return false
-// }
 
 // TaskId from hash-walletaddress-type
 func (this *TaskMgr) TaskId(prefix, walletAddress string, tp TaskType) string {
@@ -223,6 +214,14 @@ func (this *TaskMgr) TaskType(taskId string) TaskType {
 		return v.GetTaskType()
 	}
 	return TaskTypeNone
+}
+
+func (this *TaskMgr) TaskFileHash(taskId string) string {
+	v, ok := this.GetTaskById(taskId)
+	if ok {
+		return v.GetStringValue(FIELD_NAME_FILEHASH)
+	}
+	return ""
 }
 
 func (this *TaskMgr) TaskExist(taskId string) bool {
@@ -355,13 +354,13 @@ func (this *TaskMgr) OnlyBlock(taskId string) bool {
 // EmitProgress. emit progress to channel with taskId
 func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 	v, ok := this.GetTaskById(taskId)
-	log.Debugf("EmitProgress ok %t, this.progress %v", ok, this.progress)
 	if !ok {
 		return
 	}
 	if this.progress == nil {
 		return
 	}
+	log.Debugf("EmitProgress taskId: %s, state: %v", taskId, state)
 	pInfo := &ProgressInfo{
 		TaskId:    taskId,
 		Type:      v.GetTaskType(),
@@ -478,28 +477,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	if max > common.MAX_GOROUTINES_FOR_WORK_TASK {
 		max = common.MAX_GOROUTINES_FOR_WORK_TASK
 	}
-	// block request flights
-	var workLock sync.Mutex
-	flight := make([]string, 0)
-	addFlight := func(f string) {
-		workLock.Lock()
-		flight = append(flight, f)
-		log.Debugf("append flightkey %v workLock:%p", flight, &workLock)
-		workLock.Unlock()
-	}
-	removeFlight := func(f string) {
-		workLock.Lock()
-		for j, key := range flight {
-			if key == f {
-				flight = append(flight[:j], flight[j+1:]...)
-				break
-			}
-		}
-		log.Debugf("delete flight key %s %v", f, flight)
-		workLock.Unlock()
-	}
-	// flightMap := make(map[string]struct{}, 0)
-	// blockCache := make(map[string]*BlockResp, 0)
+
+	// pengding block count. including block at flight or at cache both
+	pendingCount := int32(0)
 	flightMap := sync.Map{}
 	blockCache := sync.Map{}
 	getBlockCacheLen := func() int {
@@ -534,10 +514,11 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				close(done)
 				break
 			}
-			// check pool has item or not
+			// check pool has item or no
 			// check all pool items are in request flights
-			if v.GetBlockReqPoolLen() == 0 || len(flight)+getBlockCacheLen() >= v.GetBlockReqPoolLen() {
-				// time.Sleep(time.Second)
+			if v.GetBlockReqPoolLen() == 0 || atomic.LoadInt32(&pendingCount) >= int32(v.GetBlockReqPoolLen()) {
+				// if v.GetBlockReqPoolLen() == 0 || len(flight)+getBlockCacheLen() >= v.GetBlockReqPoolLen() {
+				log.Debugf("sleep for pending block...")
 				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}
@@ -567,7 +548,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}
-			addFlight(flightKey)
+			atomic.AddInt32(&pendingCount, 1)
+			// addFlight(flightKey)
 			flightMap.Store(flightKey, struct{}{})
 			v.SetWorkerUnPaid(worker.remoteAddr, true)
 			jobCh <- &job{
@@ -593,7 +575,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				log.Debugf("receive resp++++ %s, err %s", resp.flightKey, resp.err)
 				// remove the request from flight
-				removeFlight(resp.flightKey)
+				// removeFlight(resp.flightKey)
+				atomic.AddInt32(&pendingCount, -1)
 				flightMap.Delete(resp.flightKey)
 				if resp.err != nil {
 					v.SetWorkerUnPaid(resp.worker.remoteAddr, false)
@@ -601,6 +584,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					continue
 				}
 				log.Debugf("add flightkey to cache %s, blockhash %s", resp.flightKey, resp.ret.Hash)
+				atomic.AddInt32(&pendingCount, 1)
 				blockCache.Store(resp.flightKey, resp.ret)
 				// notify outside
 				pool := v.GetBlockReqPool()
@@ -615,13 +599,13 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
 					if !ok {
 						log.Debugf("break because block cache not has %v", blkKey)
-						// break
-						continue
+						break
 					}
 					blk := blktemp.(*BlockResp)
 					log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
 					v.NotifyBlock(blk)
 					blockCache.Delete(blkKey)
+					atomic.AddInt32(&pendingCount, -1)
 					toDelete = append(toDelete, &toDeleteInfo{
 						hash:  r.Hash,
 						index: r.Index,

@@ -186,6 +186,8 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 			continue
 		}
 		this.Channel.SetHostAddr(payInfo.WalletAddress, hostAddr)
+		// TODO: change to parallel job
+		go client.P2pConnect(hostAddr)
 	}
 	if !this.Config.AutoSetupDNSEnable {
 		return nil
@@ -333,12 +335,21 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	// declare job for workers
 	job := func(tId, fHash, bHash, pAddr, walletAddr string, index int32) (*task.BlockResp, error) {
 		resp, err := this.downloadBlock(tId, fHash, bHash, index, pAddr, walletAddr)
-		if resp != nil {
-			log.Debugf("job done: download tId  %s-%s-%d %s-%d from %s %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr, walletAddr)
-		} else {
-			log.Errorf("download block %s-%s-%d err %s", fHash, bHash, index, err)
+		if err != nil {
+			return nil, err
 		}
-		return resp, err
+		if resp == nil {
+			return nil, fmt.Errorf("download block is nil %s-%s-%d %s-%d from %s %s, err %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr, walletAddr, err)
+		}
+		log.Debugf("job done: download tId  %s-%s-%d %s-%d from %s %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr, walletAddr)
+		payInfo := quotation[pAddr]
+		log.Debugf("start paying for block %s-%s-%d, payInfo %v", fHash, resp.Hash, resp.Index, payInfo)
+		_, err = this.PayForBlock(payInfo, pAddr, fHash, uint64(len(resp.Block)))
+		if err != nil {
+			log.Errorf("pay for block %s err %s", resp.Hash, err)
+			return nil, err
+		}
+		return resp, nil
 	}
 	this.taskMgr.NewWorkers(taskId, peerAddrWallet, inOrder, job)
 	go this.taskMgr.WorkBackground(taskId)
@@ -404,13 +415,6 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 				if err != nil {
 					return err
 				}
-			}
-			payInfo := quotation[value.PeerAddr]
-			log.Debugf("start paying for block %s, payInfo %v", value.Hash, payInfo)
-			_, err = this.PayForBlock(payInfo, value.PeerAddr, fileHashStr, uint64(len(value.Block)))
-			if err != nil {
-				log.Errorf("pay for block %s err %s", value.Hash, err)
-				return err
 			}
 			if this.Config.FsType == config.FS_FILESTORE {
 				err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(value.Offset))

@@ -61,10 +61,10 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 			return
 		}
 		log.Debugf("get file info %s success", fileMsg.Hash)
-		if fileMsg.PayInfo.WalletAddress != "AKg57FvzHNC6Q4F6Mge6aio6uhfo9cLaQ8" {
-			log.Errorf("Test receive fetch ask from %s", fileMsg.PayInfo.WalletAddress)
-			return
-		}
+		// if fileMsg.PayInfo.WalletAddress != "AKg57FvzHNC6Q4F6Mge6aio6uhfo9cLaQ8" {
+		// 	log.Errorf("!!!! Test receive fetch ask from %s", fileMsg.PayInfo.WalletAddress)
+		// 	return
+		// }
 		if info.FileOwner.ToBase58() != fileMsg.PayInfo.WalletAddress {
 			log.Errorf("receive fetch ask msg from wrong account %s", fileMsg.PayInfo.WalletAddress)
 			return
@@ -345,6 +345,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.P
 
 func (this *Dsp) waitForTxConfirmed(blockHeight uint64) error {
 	currentBlockHeight, err := this.Chain.GetCurrentBlockHeight()
+	log.Debugf("wait for tx confirmed height: %d, now: %d", blockHeight, currentBlockHeight)
 	if err != nil {
 		log.Errorf("get block height err %s", err)
 		return err
