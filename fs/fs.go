@@ -3,7 +3,6 @@ package fs
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
 	"hash/crc32"
@@ -79,49 +78,39 @@ func (this *Fs) Crc32HashFile(filePath string, polynomial uint32) (string, error
 	return hex.EncodeToString(hashInBytes), nil
 }
 
-func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) (ipld.Node, []*helpers.UnixfsNode, error) {
-	root, list, err := this.fs.NodesFromFile(fileName, filePrefix, encrypt, password)
+func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) ([]string, error) {
+	return this.fs.NodesFromFile(fileName, filePrefix, encrypt, password)
+}
+
+func (this *Fs) GetAllOffsets(rootHash string) (map[string]uint64, error) {
+	rootCid, err := cid.Decode(rootHash)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	m := make(map[string]*helpers.UnixfsNode, 0)
-	for _, node := range list {
-		dagNode, err := node.GetDagNode()
-		if err != nil {
-			return nil, nil, err
-		}
-		m[dagNode.Cid().String()] = node
+	m := make(map[string]uint64)
+	cids, offsets, err := this.fs.GetFileAllCidsWithOffset(context.Background(), rootCid)
+	if err != nil {
+		return nil, err
 	}
-	newList := make([]*helpers.UnixfsNode, 0)
-	var breadth func(block ipld.Node)
-	breadth = func(block ipld.Node) {
-		for _, l := range block.Links() {
-			n := m[l.Cid.String()]
-			if n == nil {
-				return
-			}
-			newList = append(newList, n)
-		}
-		for _, l := range block.Links() {
-			n := m[l.Cid.String()]
-			if n == nil {
-				return
-			}
-			dag, err := n.GetDagNode()
-			if err != nil {
-				return
-			}
-			if len(dag.Links()) == 0 {
-				continue
-			}
-			breadth(dag)
-		}
+	for i, cid := range cids {
+		m[cid.String()] = offsets[i]
 	}
-	breadth(root)
-	if len(list) != len(newList) {
-		return nil, nil, errors.New("build new list error")
+	return m, nil
+}
+
+func (this *Fs) GetBlockLinks(block blocks.Block) ([]string, error) {
+	if block.Cid().Type() != cid.DagProtobuf {
+		return nil, nil
 	}
-	return root, newList, nil
+	dagNode, err := merkledag.DecodeProtobufBlock(block)
+	if err != nil {
+		return nil, err
+	}
+	links := make([]string, 0, len(dagNode.Links()))
+	for _, link := range dagNode.Links() {
+		links = append(links, link.Cid.String())
+	}
+	return links, nil
 }
 
 // BlockData. get block data from blocks.BlockData

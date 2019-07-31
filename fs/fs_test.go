@@ -8,16 +8,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/saveio/dsp-go-sdk/config"
 	chain "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis-go-sdk/wallet"
-	"github.com/saveio/themis/common/log"
 )
 
 var testbigFile = "../testdata/testuploadbigfile.txt"
 var testsmallFile = "../testdata/testuploadfile.txt"
+var prefix = "AMTmKeEsHY45PGv23M5jeebEZvyECyqDTH"
+var testFile = "./setup.exe"
 
 func TestNodeFromFile(t *testing.T) {
 	cfg := &config.DspConfig{
@@ -28,26 +28,34 @@ func TestNodeFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("start %d\n", time.Now().UnixNano())
-	root, list, err := fs.NodesFromFile("./win-scatter-10.1.2.exe", "", false, "")
-	fmt.Printf("end %d\n", time.Now().UnixNano())
+	list, err := fs.NodesFromFile(testFile, prefix, false, "")
 	if err != nil {
 		return
 	}
-	_, err = fs.AllBlockHashes(root, list)
+	offset, err := fs.GetAllOffsets(list[0])
 	if err != nil {
 		return
 	}
-	// fmt.Printf("tree:%v\n", tree)
+	for _, hash := range list {
+		fmt.Printf("hash: %s, offset: %d\n", hash, offset[hash])
+	}
 }
 
 func TestBlockToBytes(t *testing.T) {
-	fs := &Fs{}
-	root, _, err := fs.NodesFromFile(testbigFile, "", false, "")
+	cfg := &config.DspConfig{
+		FsRepoRoot: "./Repo",
+		FsFileRoot: "./Downloads",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := fs.NodesFromFile(testbigFile, "", false, "")
 	if err != nil {
 		fmt.Printf("node from file err:%s\n", err)
 		return
 	}
+	root := fs.GetBlock(list[0])
 	data := fs.BlockData(root)
 	fmt.Printf("len:%d, blockdata:%v\n", len(data), data)
 
@@ -71,29 +79,30 @@ func TestEncodedToBlock(t *testing.T) {
 		FsType:     config.FS_FILESTORE,
 	}
 	fs, _ := NewFs(dspCfg, nil)
-	root, l, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
+	list, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
 	if err != nil {
 		fmt.Printf("node from file err:%s\n", err)
 		return
 	}
+	root := fs.GetBlock(list[0])
 	rootData := fs.BlockDataOfAny(root)
 	fmt.Printf("rootData :%d\n", len(rootData))
 	rootBlock := fs.EncodedToBlockWithCid(rootData, root.Cid().String())
 	fmt.Printf("blockDataLen:%d\n", len(fs.BlockData(rootBlock)))
 	rootBytes, _ := fs.BlockToBytes(root)
 	fmt.Printf("rootBlock cid:%s, len:%d, lenbtes :%d \n", rootBlock.Cid(), len(rootBlock.RawData()), len(rootBytes))
-	for _, rootC := range root.Links() {
-		fmt.Printf("rootC %s\n", rootC.Cid.String())
-	}
+	// for _, rootC := range root.Links() {
+	// 	fmt.Printf("rootC %s\n", rootC.Cid.String())
+	// }
 
-	fmt.Printf("root:%s, child len:%d\n", root.Cid().String(), len(l))
-	for _, item := range l {
-		dagNode, _ := item.GetDagNode()
-		rawData := fs.BlockDataOfAny(item)
-		itemBytes, _ := fs.BlockToBytes(dagNode)
-		block := fs.EncodedToBlockWithCid(rawData, dagNode.Cid().String())
-		fmt.Printf("block type %s, rawData len:%d, data:%d, bytes:%d\n", block.Cid(), len(rawData), len(block.RawData()), len(itemBytes))
-	}
+	// fmt.Printf("root:%s, child len:%d\n", root.Cid().String(), len(l))
+	// for _, item := range l {
+	// 	dagNode, _ := item.GetDagNode()
+	// 	rawData := fs.BlockDataOfAny(item)
+	// 	itemBytes, _ := fs.BlockToBytes(dagNode)
+	// 	block := fs.EncodedToBlockWithCid(rawData, dagNode.Cid().String())
+	// 	fmt.Printf("block type %s, rawData len:%d, data:%d, bytes:%d\n", block.Cid(), len(rawData), len(block.RawData()), len(itemBytes))
+	// }
 }
 
 func TestReadWithOffset(t *testing.T) {
@@ -229,89 +238,43 @@ func Test2GetBlockFromFileStore(t *testing.T) {
 
 func TestDownloadFile(t *testing.T) {
 	cfg := &config.DspConfig{
-		FsRepoRoot: "test",
-		FsFileRoot: "download",
+		FsRepoRoot: "./Repo",
+		FsFileRoot: "./Downloads",
 	}
 	fs, err := NewFs(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prefix := "AXjQn2mds5Saqka9ZiZke6fpJC4gM1QVm6"
-	root, list, err := fs.NodesFromFile("./win-scatter-10.1.2.exe", prefix, false, "")
+	list, err := fs.NodesFromFile(testFile, prefix, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
+	root := fs.GetBlock(list[0])
 	fmt.Printf("root %s\n", root.Cid().String())
 	file, err := os.OpenFile("./result", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for idx, item := range list {
-		data, err := item.GetDagNode()
-		if err != nil {
-			t.Fatal(err)
-		}
-		rootdata := fs.BlockData(data)
-		if len(rootdata) == 0 {
+
+	defer file.Close()
+	for idx, hash := range list {
+		block := fs.GetBlock(hash)
+		blockData := fs.BlockData(block)
+		if len(blockData) == 0 {
 			fmt.Printf("idx is 0 %d", idx)
 			continue
 		}
-		if len(data.Links()) > 0 {
+		links, err := fs.GetBlockLinks(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(links) > 0 {
 			continue
 		}
-		if string(rootdata[:len(prefix)]) == prefix {
-			fmt.Printf("cut header %v %v %v, len %d\n", rootdata[:len(prefix)], []byte(prefix), rootdata[len(prefix)-2:len(prefix)+20], len(rootdata[len(prefix):]))
-			file.Write(rootdata[len(prefix):])
+		if string(blockData[:len(prefix)]) == prefix {
+			file.Write(blockData[len(prefix):])
 			continue
 		}
-		fmt.Printf("write block %s-%d, len %d\n", data.Cid(), idx, len(rootdata))
-		file.Write(rootdata[:])
+		file.Write(blockData[:])
 	}
-}
-
-func TestGetBlockConcurrent(t *testing.T) {
-	log.InitLog(1, "./test/", log.Stdout)
-	cfg := &config.DspConfig{
-		FsRepoRoot: "test",
-		FsFileRoot: "download",
-	}
-	fs, err := NewFs(cfg, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root, list, err := fs.NodesFromFile("./setup.exe", "AcoudsMYA2eifS1ECKB83HnPyfay3MQwGJ", false, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	listMap, err := fs.BlocksListToMap(list)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Printf("root %s, first item \n", root.Cid().String())
-
-	// for key, unixNode := range listMap {
-	key := "QmZZ1eELsihvZMoF9dJ6tLTxCaFvk7yJxeUQ1DLcY7x7s5-1"
-	unixNode := listMap[key]
-	// fmt.Printf("key %s\n", key)
-	unixBlock, err := unixNode.GetDagNode()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// if unixBlock == nil {
-	// 	fmt.Printf("unix block is nil %s\n", key)
-	// }
-	protoNode, err := unixNode.GetDagNode()
-	if err != nil {
-		t.Fatal(err)
-	}
-	log.Infof("cid %s %T", unixBlock.Cid(), unixNode)
-	for i := 0; i < 5; i++ {
-		go func() {
-			blockData := fs.BlockDataOfAny(protoNode)
-			log.Infof("%s blockdata len %d", key, len(blockData))
-		}()
-	}
-
-	time.Sleep(time.Minute)
-
 }
