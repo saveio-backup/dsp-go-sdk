@@ -52,6 +52,10 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 			return nil
 		}
 		d.taskMgr.SetFileDB(dbstore)
+		err = d.taskMgr.RecoverUndoneTask()
+		if err != nil {
+			return nil
+		}
 	}
 	if len(c.FsRepoRoot) > 0 {
 		var err error
@@ -104,7 +108,8 @@ func (this *Dsp) Start() error {
 	}
 
 	// start backup service
-	if this.Config.FsType == config.FS_BLOCKSTORE {
+	if this.Config.FsType == config.FS_BLOCKSTORE && this.Config.EnableBackup {
+		log.Debugf("start backup file service ")
 		go this.StartBackupFileService()
 	}
 	return nil

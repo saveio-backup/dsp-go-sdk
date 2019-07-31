@@ -2,6 +2,7 @@ package dsp
 
 import (
 	"github.com/saveio/dsp-go-sdk/actor/client"
+	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
@@ -43,7 +44,11 @@ func (this *Dsp) StartShareServices() {
 			tag, _ := this.Fs.GetTag(req.Hash, req.FileHash, uint64(req.Index))
 			sessionId, _ := this.taskMgr.GetSeesionId(taskId, "")
 			msg := message.NewBlockMsg(sessionId, req.Index, req.FileHash, req.Hash, blockData, tag, int64(offset))
-			client.P2pSend(req.PeerAddr, msg.ToProtoMsg())
+			_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), req.PeerAddr, common.MAX_SEND_BLOCK_RETRY)
+			if err != nil {
+				log.Errorf("share send block, err: %s", err)
+				break
+			}
 			up, err := this.GetFileUnitPrice(req.Asset)
 			if err != nil {
 				log.Errorf("get file unit price err after send block, err: %s", err)

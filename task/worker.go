@@ -5,12 +5,13 @@ import "github.com/saveio/dsp-go-sdk/common"
 type jobFunc func(string, string, string, string, string, int32) (*BlockResp, error)
 
 type Worker struct {
-	remoteAddr string
-	walletAddr string
-	working    bool
-	job        jobFunc
-	failed     map[string]int
-	unpaid     bool
+	remoteAddr  string
+	walletAddr  string
+	working     bool
+	job         jobFunc
+	failed      map[string]int
+	unpaid      bool
+	totalFailed map[string]uint32
 }
 
 func NewWorker(addr, walletAddr string, j jobFunc) *Worker {
@@ -19,6 +20,7 @@ func NewWorker(addr, walletAddr string, j jobFunc) *Worker {
 	w.walletAddr = walletAddr
 	w.job = j
 	w.failed = make(map[string]int, 0)
+	w.totalFailed = make(map[string]uint32, 0)
 	return w
 }
 
@@ -28,6 +30,8 @@ func (w *Worker) Do(taskId, fileHash, blockHash, peerAddr, walletAddr string, in
 	if err != nil {
 		cnt := w.failed[blockHash]
 		w.failed[blockHash] = cnt + 1
+		totalF := w.totalFailed[fileHash]
+		w.totalFailed[fileHash] = totalF + 1
 	}
 	w.working = false
 	return resp, err
@@ -50,10 +54,14 @@ func (w *Worker) WorkFailed(hash string) bool {
 	if !ok {
 		return false
 	}
-	if cnt >= common.MAX_WORKER_FAILED_NUM {
+	if cnt >= common.MAX_WORKER_BLOCK_FAILED_NUM {
 		return true
 	}
 	return false
+}
+
+func (w *Worker) FailedTooMuch(fileHashStr string) bool {
+	return w.totalFailed[fileHashStr] >= common.MAX_WORKER_FILE_FAILED_NUM
 }
 
 func (w *Worker) SetUnpaid(unpaid bool) {

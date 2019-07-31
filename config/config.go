@@ -17,6 +17,7 @@ type DspConfig struct {
 	FsType       FSType // fs type
 	FsGcPeriod   string // fs gc period
 	FsMaxStorage string // fs max storage
+	EnableBackup bool   // enable backup file
 
 	ChannelClientType    string // channel client type. e.g: "rpc"
 	ChannelListenAddr    string // channel listen address. e.g: "127.0.0.1:3001"

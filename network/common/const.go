@@ -5,18 +5,23 @@ const (
 )
 
 const (
-	FILE_OP_NONE         = 0  // no operation
-	FILE_OP_FETCH_ASK    = 1  // client ask peers to fetch file from self
-	FILE_OP_FETCH_ACK    = 2  // peers will fetch file from client
-	FILE_OP_FETCH_RDY    = 3  // client is ready('rdy' as abbr.) to be fetched
-	FILE_OP_DOWNLOAD_ASK = 4  // client ask download file from peers
-	FILE_OP_DOWNLOAD_ACK = 5  // peers send ack to client
-	FILE_OP_DOWNLOAD     = 6  // client send download msg to chosen peers
-	FILE_OP_DOWNLOAD_OK  = 7  // client send download msg to chosen peers
-	FILE_OP_BACKUP       = 8  // client back up file from peers
-	FILE_OP_BACKUP_ACK   = 9  // client back up file from peers
-	FILE_OP_DELETE       = 10 // client delete file of peers
-	FILE_OP_DELETE_ACK   = 11 // server delete file ack
+	FILE_OP_NONE         = 0    // no operation
+	FILE_OP_FETCH_ASK    = 1000 // client ask peers to fetch file from self
+	FILE_OP_FETCH_ACK    = 1001 // peers will fetch file from client
+	FILE_OP_FETCH_RDY    = 1002 // client is ready('rdy' as abbr.) to be fetched
+	FILE_OP_FETCH_PAUSE  = 1003 // fetch pause client send to chosen peers
+	FILE_OP_FETCH_RESUME = 1004 // fetch resume client send to chosen peers
+
+	FILE_OP_DOWNLOAD_ASK = 2000 // client ask download file from peers
+	FILE_OP_DOWNLOAD_ACK = 2001 // peers send ack to client
+	FILE_OP_DOWNLOAD     = 2003 // client send download msg to chosen peers
+	FILE_OP_DOWNLOAD_OK  = 2004 // client send download msg to chosen peers
+
+	FILE_OP_BACKUP     = 3000 // client back up file from peers
+	FILE_OP_BACKUP_ACK = 3001 // client back up file from peers
+
+	FILE_OP_DELETE     = 4000 // client delete file of peers
+	FILE_OP_DELETE_ACK = 4001 // server delete file ack
 )
 
 const (

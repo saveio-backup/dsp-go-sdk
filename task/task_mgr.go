@@ -58,6 +58,8 @@ func (this *TaskMgr) NewTask(taskT TaskType) (string, error) {
 		createdAt:     time.Now().Unix(),
 		taskType:      taskT,
 		sessionIds:    make(map[string]string, common.MAX_TASK_SESSION_NUM),
+		state:         TaskStatePrepare,
+		stateChange:   make(chan TaskState, 1),
 	}
 	id, _ := uuid.NewUUID()
 	t.id = id.String()
@@ -93,6 +95,60 @@ func (this *TaskMgr) BindTaskId(id string) error {
 	return this.db.SaveFileInfoId(key, id)
 }
 
+// RecoverUndoneTask. recover unfinished task from DB
+func (this *TaskMgr) RecoverUndoneTask() error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	taskIds, err := this.db.UndoneList(store.FileInfoTypeUpload)
+	log.Debugf("recover upload task : %v", taskIds)
+	if err != nil {
+		return err
+	}
+	downloadTaskIds, err := this.db.UndoneList(store.FileInfoTypeDownload)
+	log.Debugf("recover download task : %v", downloadTaskIds)
+	if err != nil {
+		return err
+	}
+	taskIds = append(taskIds, downloadTaskIds...)
+	log.Debugf("total recover task len: %d", len(taskIds))
+	for _, id := range taskIds {
+		info, err := this.db.GetFileInfo([]byte(id))
+		if err != nil {
+			return err
+		}
+		state := TaskState(info.TaskState)
+		if state == TaskStateDoing {
+			state = TaskStatePause
+		}
+		t := &Task{
+			id:            id,
+			fileHash:      info.FileHash,
+			fileName:      info.FileName,
+			total:         info.TotalBlockCount,
+			filePath:      info.FilePath,
+			walletAddr:    info.WalletAddress,
+			createdAt:     int64(info.CreatedAt),
+			blockReq:      make(chan *GetBlockReq, common.MAX_TASK_BLOCK_REQ),
+			notify:        make(chan *BlockResp, common.MAX_TASK_BLOCK_NOTIFY),
+			lastWorkerIdx: -1,
+			sessionIds:    make(map[string]string, common.MAX_TASK_SESSION_NUM),
+			state:         state,
+			stateChange:   make(chan TaskState, 1),
+		}
+		log.Debugf("recover task %s, state %d", id, t.state)
+		switch info.InfoType {
+		case store.FileInfoTypeUpload:
+			t.taskType = TaskTypeUpload
+		case store.FileInfoTypeDownload:
+			t.taskType = TaskTypeDownload
+		case store.FileInfoTypeShare:
+			t.taskType = TaskTypeShare
+		}
+		this.tasks[id] = t
+	}
+	return nil
+}
+
 func (this *TaskMgr) TaskIdKey(hash, walletAddress string, taskType TaskType) string {
 	key := fmt.Sprintf("%s-%s-%d", hash, walletAddress, taskType)
 	return key
@@ -104,8 +160,11 @@ func (this *TaskMgr) SetTaskInfos(id, fileHash, filePath, fileName, walletAddres
 	this.lock.Unlock()
 	m := make(map[int]interface{})
 	t.SetFieldValue(FIELD_NAME_FILENAME, fileName)
-	t.SetFieldValue(FIELD_NAME_WALLETADDR, walletAddress)
 	m[store.FILEINFO_FIELD_FILENAME] = fileName
+	if len(walletAddress) != 0 {
+		t.SetFieldValue(FIELD_NAME_WALLETADDR, walletAddress)
+		m[store.FILEINFO_FIELD_WALLETADDR] = walletAddress
+	}
 	if len(filePath) != 0 {
 		t.SetFieldValue(FIELD_NAME_FILEPATH, filePath)
 	}
@@ -114,6 +173,10 @@ func (this *TaskMgr) SetTaskInfos(id, fileHash, filePath, fileName, walletAddres
 		m[store.FILEINFO_FIELD_FILEHASH] = fileHash
 	}
 	this.db.SetFileInfoFields(id, m)
+}
+
+func (this *TaskMgr) SetCopyNum(id string, copyNum uint64) {
+	this.db.SetFileInfoField(id, store.FILEINFO_FIELD_COPYNUM, copyNum)
 }
 
 // TaskId from hash-walletaddress-type
@@ -237,12 +300,12 @@ func (this *TaskMgr) TaskTimeout(taskId string) (bool, error) {
 	return v.GetBoolValue(FIELD_NAME_ASKTIMEOUT), nil
 }
 
-func (this *TaskMgr) TaskReady(taskId string) (bool, error) {
+func (this *TaskMgr) TaskTransferring(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, errors.New("task not found")
 	}
-	return v.GetBoolValue(FIELD_NAME_READY), nil
+	return v.GetBoolValue(FIELD_NAME_TRANSFERRING), nil
 }
 
 func (this *TaskMgr) TaskBlockReq(taskId string) (chan *GetBlockReq, error) {
@@ -286,13 +349,13 @@ func (this *TaskMgr) SetTaskTimeout(taskId string, timeout bool) {
 	v.SetFieldValue(FIELD_NAME_ASKTIMEOUT, timeout)
 }
 
-// SetTaskReady. set task is ready with taskid
-func (this *TaskMgr) SetTaskReady(taskId string, ready bool) {
+// SetTaskTransferring. set task is transferring with taskid
+func (this *TaskMgr) SetTaskTransferring(taskId string, transferring bool) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
-	v.SetFieldValue(FIELD_NAME_READY, ready)
+	v.SetFieldValue(FIELD_NAME_TRANSFERRING, transferring)
 }
 
 // SetFileName. set file name of task
@@ -361,16 +424,18 @@ func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 		return
 	}
 	log.Debugf("EmitProgress taskId: %s, state: %v", taskId, state)
+	v.SetFieldValue(FIELD_NAME_TRANSFERSTATE, state)
 	pInfo := &ProgressInfo{
-		TaskId:    taskId,
-		Type:      v.GetTaskType(),
-		FileName:  v.GetStringValue(FIELD_NAME_FILENAME),
-		FileHash:  v.GetStringValue(FIELD_NAME_FILEHASH),
-		Total:     v.GetTotalBlockCnt(),
-		Count:     this.db.FileProgress(taskId),
-		State:     state,
-		CreatedAt: uint64(v.GetCreatedAt()),
-		UpdatedAt: uint64(time.Now().Unix()),
+		TaskId:        taskId,
+		Type:          v.GetTaskType(),
+		FileName:      v.GetStringValue(FIELD_NAME_FILENAME),
+		FileHash:      v.GetStringValue(FIELD_NAME_FILEHASH),
+		Total:         v.GetTotalBlockCnt(),
+		Count:         this.db.FileProgress(taskId),
+		TaskState:     v.State(),
+		ProgressState: state,
+		CreatedAt:     uint64(v.GetCreatedAt()),
+		UpdatedAt:     uint64(time.Now().Unix()),
 	}
 	log.Debugf("pInfo %v", pInfo)
 	this.progress <- pInfo
@@ -411,9 +476,20 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, err *sdkErr.SDKE
 	if err != nil {
 		pInfo.ErrorCode = err.Code
 		pInfo.ErrorMsg = err.Message
+		err := this.SetTaskState(taskId, TaskStateFailed)
+		if err != nil {
+			log.Errorf("set task state err %s, %s", taskId, err)
+		}
+		log.Debugf("EmitResult, err %v", err)
 	} else if ret != nil {
+		log.Debugf("EmitResult ret %v ret == nil %t", ret, ret == nil)
 		pInfo.Result = ret
+		err := this.SetTaskState(taskId, TaskStateDone)
+		if err != nil {
+			log.Errorf("set task state err %s, %s", taskId, err)
+		}
 	}
+	pInfo.TaskState = v.State()
 	this.progress <- pInfo
 }
 
@@ -451,9 +527,7 @@ func (this *TaskMgr) EmitNotification(taskId string, state ShareState, fileHashS
 }
 
 func (this *TaskMgr) NewWorkers(taskId string, addrs map[string]string, inOrder bool, job jobFunc) {
-	this.lock.Lock()
-	v, ok := this.tasks[taskId]
-	this.lock.Unlock()
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
@@ -464,9 +538,7 @@ func (this *TaskMgr) NewWorkers(taskId string, addrs map[string]string, inOrder 
 // WorkBackground. Run n goroutines to check request pool one second a time.
 // If there exist a idle request, find the idle worker to do the job
 func (this *TaskMgr) WorkBackground(taskId string) {
-	this.lock.RLock()
-	v, ok := this.tasks[taskId]
-	this.lock.RUnlock()
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
@@ -504,14 +576,21 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 		ret       *BlockResp
 		err       error
 	}
+	dropDoneCh := uint32(0)
 
 	done := make(chan *getBlockResp, 1)
 	go func() {
 		for {
-			if v.GetBoolValue(FIELD_NAME_DONE) {
+			if v.State() == TaskStateDone {
 				log.Debugf("distribute job task is done break")
 				close(jobCh)
+				atomic.AddUint32(&dropDoneCh, 1)
 				close(done)
+				break
+			}
+			if v.State() == TaskStatePause {
+				log.Debugf("distribute job break at pause")
+				close(jobCh)
 				break
 			}
 			// check pool has item or no
@@ -541,7 +620,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				continue
 			}
 			// get next index idle worker
-			worker := v.GetIdleWorker(addrs, req.Hash)
+			worker := v.GetIdleWorker(addrs, fileHash, req.Hash)
 			if worker == nil {
 				// can't find a valid worker
 				log.Debugf("no worker...")
@@ -563,7 +642,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 
 	go func() {
 		for {
-			if v.GetBoolValue(FIELD_NAME_DONE) {
+			if v.State() == TaskStateDone {
 				log.Debugf("receive job task is done break")
 				break
 			}
@@ -579,7 +658,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				atomic.AddInt32(&pendingCount, -1)
 				flightMap.Delete(resp.flightKey)
 				if resp.err != nil {
-					v.SetWorkerUnPaid(resp.worker.remoteAddr, false)
 					log.Errorf("worker %s do job err continue %s", resp.worker.remoteAddr, resp.err)
 					continue
 				}
@@ -618,6 +696,12 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				log.Debugf("remain block cache len %d", getBlockCacheLen())
 				log.Debugf("receive resp++++ done")
 			}
+			if v.State() == TaskStatePause {
+				log.Debugf("receive channel pause")
+				atomic.AddUint32(&dropDoneCh, 1)
+				close(done)
+				break
+			}
 		}
 		log.Debugf("outside receive job task")
 	}()
@@ -627,8 +711,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	for i := 0; i < max; i++ {
 		go func() {
 			for {
-				if v.GetBoolValue(FIELD_NAME_DONE) {
-					log.Debugf("task is done break")
+				state := v.State()
+				if state == TaskStateDone || state == TaskStatePause {
+					log.Debugf("task is break, state: %d", state)
 					break
 				}
 				job, ok := <-jobCh
@@ -636,10 +721,15 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("job channel has close")
 					break
 				}
-
 				log.Debugf("start request block %s from %s", job.req.Hash, job.worker.RemoteAddress())
 				ret, err := job.worker.Do(taskId, fileHash, job.req.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr(), job.req.Index)
+				v.SetWorkerUnPaid(job.worker.remoteAddr, false)
 				log.Debugf("request block %s, err %s", job.req.Hash, err)
+				stop := atomic.LoadUint32(&dropDoneCh) > 0
+				if stop {
+					log.Debugf("stop when drop channel is not 0")
+					break
+				}
 				done <- &getBlockResp{
 					worker:    job.worker,
 					flightKey: job.flightKey,
@@ -652,20 +742,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	}
 }
 
-func (this *TaskMgr) SetWorkerPaid(taskId, addr string) {
-	this.lock.Lock()
-	v, ok := this.tasks[taskId]
-	this.lock.Unlock()
-	if !ok {
-		return
-	}
-	v.SetWorkerUnPaid(addr, false)
-}
-
 func (this *TaskMgr) TaskNotify(taskId string) chan *BlockResp {
-	this.lock.RLock()
-	v, ok := this.tasks[taskId]
-	this.lock.RUnlock()
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return nil
 	}
@@ -673,9 +751,7 @@ func (this *TaskMgr) TaskNotify(taskId string) chan *BlockResp {
 }
 
 func (this *TaskMgr) AddBlockReq(taskId, blockHash string, index int32) error {
-	this.lock.Lock()
-	v, ok := this.tasks[taskId]
-	this.lock.Unlock()
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return errors.New("task not found")
 	}
@@ -684,32 +760,103 @@ func (this *TaskMgr) AddBlockReq(taskId, blockHash string, index int32) error {
 }
 
 func (this *TaskMgr) DelBlockReq(taskId, blockHash string, index int32) {
-	this.lock.Lock()
-	v, ok := this.tasks[taskId]
-	this.lock.Unlock()
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
 	v.DelBlockReqFromPool(blockHash, index)
 }
 
-func (this *TaskMgr) SetTaskDone(taskId string, done bool) {
-	this.lock.Lock()
-	v, ok := this.tasks[taskId]
-	this.lock.Unlock()
+func (this *TaskMgr) SetTaskState(taskId string, state TaskState) error {
+	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return
+		return fmt.Errorf("task: %s, not exist", taskId)
 	}
-	v.SetFieldValue(FIELD_NAME_DONE, done)
-	switch v.taskType {
-	case TaskTypeDownload:
-		this.db.SaveFileDownloaded(taskId)
+	switch state {
+	case TaskStatePause:
+		oldState := v.State()
+		if oldState == TaskStateFailed || oldState == TaskStateDone {
+			return fmt.Errorf("can't stop a failed or completed task")
+		}
+		v.CleanBlockReqPool()
+	case TaskStateDoing:
+		oldState := v.State()
+		log.Debugf("oldstate:%d, newstate: %d", oldState, state)
+		if oldState == TaskStateDone {
+			return fmt.Errorf("can't continue a failed or completed task")
+		}
+	case TaskStateDone:
+		log.Debugf("task: %s has done", taskId)
+		switch v.taskType {
+		case TaskTypeUpload:
+			err := this.db.SaveFileUploaded(taskId)
+			if err != nil {
+				return err
+			}
+		case TaskTypeDownload:
+			err := this.db.SaveFileDownloaded(taskId)
+			if err != nil {
+				return err
+			}
+		}
 	}
+	v.SetFieldValue(FIELD_NAME_STATE, state)
+	this.db.SetFileInfoField(taskId, store.FILEINFO_FIELD_TASKSTATE, uint64(state))
+	return nil
+}
+
+func (this *TaskMgr) GetTaskState(taskId string) TaskState {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return TaskStateNone
+	}
+	return v.State()
+}
+
+func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, fmt.Errorf("task: %s, not exist", taskId)
+	}
+	return v.State() == TaskStatePause, nil
+}
+
+func (this *TaskMgr) IsTaskDone(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, fmt.Errorf("task: %s, not exist", taskId)
+	}
+	return v.State() == TaskStateDone, nil
+}
+func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, fmt.Errorf("task: %s, not exist", taskId)
+	}
+	log.Debugf("v.state: %d", v.State())
+	return v.State() == TaskStateFailed, nil
+}
+
+func (this *TaskMgr) GetTaskDetailState(taskId string) (TaskProgressState, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return 0, fmt.Errorf("task: %s, not exist", taskId)
+	}
+	return v.TransferingState(), nil
+}
+
+func (this *TaskMgr) TaskStateChange(taskId string) chan TaskState {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return nil
+	}
+	return v.stateChange
 }
 
 func (this *TaskMgr) BatchSetFileInfo(taskId string, fileHash, prefix, fileName, totalCount interface{}) error {
-	m := make(map[int]interface{})
+	log.Debugf("BatchSetFileInfo")
 	v, ok := this.GetTaskById(taskId)
+	m := make(map[int]interface{})
 	if fileHash != nil {
 		m[store.FILEINFO_FIELD_FILEHASH] = fileHash
 		if ok {
@@ -725,15 +872,18 @@ func (this *TaskMgr) BatchSetFileInfo(taskId string, fileHash, prefix, fileName,
 			v.SetFieldValue(FIELD_NAME_FILENAME, fileName)
 		}
 	}
+	log.Debugf("SetTotalBlockCnt totalCount %v", totalCount)
 	if totalCount != nil {
 		m[store.FILEINFO_FIELD_TOTALCOUNT] = totalCount
 		if ok {
 			v.SetTotalBlockCnt(totalCount.(uint64))
 		}
+		v.SetFieldValue(FIELD_NAME_STATE, TaskStateDoing)
 	}
 	if len(m) == 0 {
 		return nil
 	}
+	log.Debugf("SetFileInfoFields :%v", m)
 	err := this.db.SetFileInfoFields(taskId, m)
 	return err
 }
@@ -842,6 +992,25 @@ func (this *TaskMgr) GetStoreTx(id string) (string, error) {
 	return this.db.GetFileInfoStringValue(id, store.FILEINFO_FIELD_STORETX)
 }
 
+func (this *TaskMgr) GetRegUrlTx(id string) (string, error) {
+	return this.db.GetFileInfoStringValue(id, store.FILEINFO_FIELD_REGURL_TX)
+}
+
+func (this *TaskMgr) GetBindUrlTx(id string) (string, error) {
+	return this.db.GetFileInfoStringValue(id, store.FILEINFO_FIELD_BIND_TX)
+}
+
+func (this *TaskMgr) SetRegAndBindUrlTx(id, regTx, bindTx string) error {
+	m := make(map[int]interface{})
+	m[store.FILEINFO_FIELD_REGURL_TX] = regTx
+	m[store.FILEINFO_FIELD_BIND_TX] = bindTx
+	return this.db.SetFileInfoFields(id, m)
+}
+
+func (this *TaskMgr) GetWhitelistTx(id string) (string, error) {
+	return this.db.GetFileInfoStringValue(id, store.FILEINFO_FIELD_WHITELISTTX)
+}
+
 func (this *TaskMgr) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uint32) bool {
 	return this.db.IsBlockUploaded(id, blockHashStr, nodeAddr, index)
 }
@@ -856,4 +1025,30 @@ func (this *TaskMgr) AddUploadedBlock(id, blockHashStr, nodeAddr string, index u
 
 func (this *TaskMgr) AddShareTo(id, walletAddress string) error {
 	return this.db.AddShareTo(id, walletAddress)
+}
+
+func (this *TaskMgr) SetFilePath(id, path string) error {
+	return this.db.SetFileInfoField(id, store.FILEINFO_FIELD_FILEPATH, path)
+}
+
+func (this *TaskMgr) GetFilePath(id string) (string, error) {
+	return this.db.GetFileInfoStringValue(id, store.FILEINFO_FIELD_FILEPATH)
+}
+
+func (this *TaskMgr) SetFileUploadOptions(id string, opt *common.UploadOption) error {
+	return this.db.SetFileUploadOptions(id, opt)
+}
+func (this *TaskMgr) GetFileUploadOptions(id string) (*common.UploadOption, error) {
+	return this.db.GetFileUploadOptions(id)
+}
+
+func (this *TaskMgr) SetFileDownloadOptions(id string, opt *common.DownloadOption) error {
+	return this.db.SetFileDownloadOptions(id, opt)
+}
+func (this *TaskMgr) GetFileDownloadOptions(id string) (*common.DownloadOption, error) {
+	return this.db.GetFileDownloadOptions(id)
+}
+
+func (this *TaskMgr) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint32, error) {
+	return this.db.GetUndownloadedBlockInfo(id, rootBlockHash)
 }

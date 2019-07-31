@@ -4,6 +4,8 @@ type TaskProgressState int
 
 const (
 	None TaskProgressState = iota
+	TaskPause
+	TaskDoing
 	TaskUploadFileMakeSlice
 	TaskUploadFileMakeSliceDone
 	TaskUploadFilePaying

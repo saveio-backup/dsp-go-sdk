@@ -55,3 +55,13 @@ type DeleteUploadFileResp struct {
 	Tx     string
 	Status []DeleteFileStatus
 }
+
+type DownloadOption struct {
+	FileName    string
+	Asset       int32
+	InOrder     bool
+	DecryptPwd  string
+	Free        bool
+	SetFileName bool
+	MaxPeerCnt  int
+}

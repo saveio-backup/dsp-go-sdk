@@ -12,6 +12,9 @@ const (
 	FILE_DOWNLOADED_COUNT_PREFIX = "store_file_downloaded_count2:"
 	FILE_BLOCK_OFFSET_PREFIX     = "store_file_block_offset:"
 	FILE_BLOCK_TAIL_PREFIX       = "store_file_block_tail:"
+	FILE_OPTIONS_PREFIX          = "store_file_options:"
+	FILE_UPLOAD_UNDONE_PREFIX    = "store_file_upload_undone:"
+	FILE_DOWNLOAD_UNDONE_PREFIX  = "store_file_download_undone:"
 )
 
 func FileDownloadUnitPriceKey(fileInfoId string) string {
@@ -44,4 +47,16 @@ func FileDownloadedKey(index uint32) string {
 
 func FileBlockTailKey(fileInfoId string, index uint32) string {
 	return fmt.Sprintf("%s-%s-%d", FILE_BLOCK_TAIL_PREFIX, fileInfoId, index)
+}
+
+func FileOptionsKey(fileInfoId string) string {
+	return fmt.Sprintf("%s-%s", FILE_OPTIONS_PREFIX, fileInfoId)
+}
+
+func FileUploadUndoneKey() string {
+	return FILE_UPLOAD_UNDONE_PREFIX
+}
+
+func FileDownloadUndoneKey() string {
+	return FILE_DOWNLOAD_UNDONE_PREFIX
 }

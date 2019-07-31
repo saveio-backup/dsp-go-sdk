@@ -36,18 +36,19 @@ type BlockResp struct {
 }
 
 type ProgressInfo struct {
-	TaskId    string
-	Type      TaskType          // task type
-	FileName  string            // file name
-	FileHash  string            // file hash
-	Total     uint64            // total file's blocks count
-	Count     map[string]uint64 // address <=> count
-	State     TaskProgressState // TaskProgressState
-	Result    interface{}       // finish result
-	ErrorCode uint64            // error code
-	ErrorMsg  string            // interrupt error
-	CreatedAt uint64
-	UpdatedAt uint64
+	TaskId        string
+	Type          TaskType          // task type
+	FileName      string            // file name
+	FileHash      string            // file hash
+	Total         uint64            // total file's blocks count
+	Count         map[string]uint64 // address <=> count
+	TaskState     TaskState         // task state
+	ProgressState TaskProgressState // TaskProgressState
+	Result        interface{}       // finish result
+	ErrorCode     uint64            // error code
+	ErrorMsg      string            // interrupt error
+	CreatedAt     uint64
+	UpdatedAt     uint64
 }
 type ShareState int
 
@@ -76,40 +77,55 @@ type BackupFileOpt struct {
 
 const (
 	FIELD_NAME_ASKTIMEOUT = iota
-	FIELD_NAME_READY
+	FIELD_NAME_TRANSFERRING
 	FIELD_NAME_INORDER
 	FIELD_NAME_ONLYBLOCK
-	FIELD_NAME_DONE
+	FIELD_NAME_STATE
 	FIELD_NAME_FILEHASH
 	FIELD_NAME_FILENAME
 	FIELD_NAME_ID
 	FIELD_NAME_WALLETADDR
 	FIELD_NAME_FILEPATH
+	FIELD_NAME_TRANSFERSTATE
+)
+
+type TaskState int
+
+const (
+	TaskStatePause TaskState = iota
+	TaskStatePrepare
+	TaskStateDoing
+	TaskStateDone
+	TaskStateFailed
+	TaskStateCancel
+	TaskStateNone
 )
 
 type Task struct {
-	id         string            // id
-	sessionIds map[string]string // request peerAddr <=> session id
-	fileHash   string            // task file hash
-	fileName   string            // file name
-	total      uint64            // total blocks count
-	filePath   string            // file path
-	walletAddr string            // operator wallet address
-	taskType   TaskType          // task type
-	ready      bool              // fetch ready flag
+	id           string            // id
+	sessionIds   map[string]string // request peerAddr <=> session id
+	fileHash     string            // task file hash
+	fileName     string            // file name
+	total        uint64            // total blocks count
+	filePath     string            // file path
+	walletAddr   string            // operator wallet address
+	taskType     TaskType          // task type
+	transferring bool              // fetch is transferring flag
 	// TODO: refactor, delete below two channels, use request and reply
-	blockReq      chan *GetBlockReq          // fetch block request channel
-	blockRespsMap map[string]chan *BlockResp // map key <=> *BlockResp
-	blockReqPool  []*GetBlockReq             // get block request pool
-	workers       map[string]*Worker         // workers to request block
-	inOrder       bool                       // keep work in order
-	onlyBlock     bool                       // only send block data, without tag data
-	notify        chan *BlockResp            // notify download block
-	done          bool                       // task done
-	backupOpt     *BackupFileOpt             // backup file options
-	lock          sync.RWMutex               // lock
-	lastWorkerIdx int                        // last worker index
-	createdAt     int64                      // createdAt
+	blockReq         chan *GetBlockReq          // fetch block request channel
+	blockRespsMap    map[string]chan *BlockResp // map key <=> *BlockResp
+	blockReqPool     []*GetBlockReq             // get block request pool
+	workers          map[string]*Worker         // workers to request block
+	inOrder          bool                       // keep work in order
+	onlyBlock        bool                       // only send block data, without tag data
+	notify           chan *BlockResp            // notify download block
+	state            TaskState                  // task state
+	transferingState TaskProgressState          // transfering state
+	stateChange      chan TaskState             // state change between pause and resume
+	backupOpt        *BackupFileOpt             // backup file options
+	lock             sync.RWMutex               // lock
+	lastWorkerIdx    int                        // last worker index
+	createdAt        int64                      // createdAt
 }
 
 func (this *Task) SetTaskType(ty TaskType) {
@@ -142,20 +158,25 @@ func (this *Task) GetBlockReq() chan *GetBlockReq {
 	return this.blockReq
 }
 
-// func (this *Task) GetBlockResp(key string) chan *BlockResp {
-// 	this.lock.RLock()
-// 	defer this.lock.RUnlock()
-// 	return this.blockResp
-// }
-
 func (this *Task) SetFieldValue(name int, value interface{}) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	switch name {
-	case FIELD_NAME_READY:
-		this.ready = value.(bool)
-	case FIELD_NAME_DONE:
-		this.done = value.(bool)
+	case FIELD_NAME_TRANSFERRING:
+		this.transferring = value.(bool)
+	case FIELD_NAME_STATE:
+		newState := value.(TaskState)
+		oldState := this.state
+		this.state = value.(TaskState)
+		changeFromPause := (oldState == TaskStatePause && (newState == TaskStateDoing || newState == TaskStateCancel))
+		changeFromDoing := (oldState == TaskStateDoing && (newState == TaskStatePause || newState == TaskStateCancel))
+		if changeFromPause || changeFromDoing {
+			log.Debugf("new state change")
+			go func() {
+				log.Debugf("send new state change")
+				this.stateChange <- newState
+			}()
+		}
 	case FIELD_NAME_INORDER:
 		this.inOrder = value.(bool)
 	case FIELD_NAME_ONLYBLOCK:
@@ -170,6 +191,8 @@ func (this *Task) SetFieldValue(name int, value interface{}) {
 		this.walletAddr = value.(string)
 	case FIELD_NAME_FILEPATH:
 		this.filePath = value.(string)
+	case FIELD_NAME_TRANSFERSTATE:
+		this.transferingState = value.(TaskProgressState)
 	}
 }
 
@@ -177,10 +200,8 @@ func (this *Task) GetBoolValue(name int) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	switch name {
-	case FIELD_NAME_READY:
-		return this.ready
-	case FIELD_NAME_DONE:
-		return this.done
+	case FIELD_NAME_TRANSFERRING:
+		return this.transferring
 	case FIELD_NAME_INORDER:
 		return this.inOrder
 	case FIELD_NAME_ONLYBLOCK:
@@ -206,6 +227,18 @@ func (this *Task) GetStringValue(name int) string {
 		return this.filePath
 	}
 	return ""
+}
+
+func (this *Task) State() TaskState {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.state
+}
+
+func (this *Task) TransferingState() TaskProgressState {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.transferingState
 }
 
 func (this *Task) PushGetBlock(blockHash string, index int32, block *BlockResp) {
@@ -331,6 +364,17 @@ func (this *Task) DelBlockReqFromPool(blockHash string, index int32) {
 	log.Debugf("block req pool len: %d", len(this.blockReqPool))
 }
 
+func (this *Task) CleanBlockReqPool() {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	log.Debugf("CleanBlockReqPool")
+	if this.blockReqPool == nil {
+		this.blockReqPool = make([]*GetBlockReq, 0)
+		return
+	}
+	this.blockReqPool = this.blockReqPool[:]
+}
+
 func (this *Task) GetBlockReqPool() []*GetBlockReq {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
@@ -351,7 +395,7 @@ func (this *Task) GetWorkerAddrs() []string {
 	return addrs
 }
 
-func (this *Task) GetIdleWorker(addrs []string, reqHash string) *Worker {
+func (this *Task) GetIdleWorker(addrs []string, fileHash, reqHash string) *Worker {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var worker *Worker
@@ -362,7 +406,7 @@ func (this *Task) GetIdleWorker(addrs []string, reqHash string) *Worker {
 		}
 		idx := this.lastWorkerIdx
 		w := this.workers[addrs[idx]]
-		if w.Working() || w.WorkFailed(reqHash) || w.Unpaid() {
+		if w.Working() || w.WorkFailed(reqHash) || w.Unpaid() || w.FailedTooMuch(fileHash) {
 			log.Debugf("%d worker is working: %t, failed: %t, unpaid: %t", i, w.Working(), w.WorkFailed(reqHash), w.Unpaid())
 			continue
 		}

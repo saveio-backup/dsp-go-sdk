@@ -79,7 +79,7 @@ func IsHostAddrValid(hostAddr string) bool {
 	return false
 }
 
-func GetFileNameAtPath(dirPath, fileHash, fileName string) string {
+func GetFileNameAtPath(dirPath, fileHash, fileName string, newFile bool) string {
 	if len(fileName) == 0 {
 		return dirPath + fileHash
 	}
@@ -89,6 +89,9 @@ func GetFileNameAtPath(dirPath, fileHash, fileName string) string {
 	if i > 0 {
 		name = fileName[:i]
 		ext = fileName[i:]
+	}
+	if !newFile {
+		return dirPath + fileName
 	}
 
 	for count := 0; count < 1000; count++ {

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/themis/common/log"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -58,6 +59,11 @@ const (
 	FILEINFO_FIELD_URL
 	FILEINFO_FIELD_LINK
 	FILEINFO_FIELD_REQUESTID
+	FILEINFO_FIELD_FILEPATH
+	FILEINFO_FIELD_WALLETADDR
+	FILEINFO_FIELD_REGURL_TX
+	FILEINFO_FIELD_BIND_TX
+	FILEINFO_FIELD_TASKSTATE
 )
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
@@ -65,6 +71,8 @@ type FileInfo struct {
 	Id              string       `json:"id"`
 	FileHash        string       `json:"file_hash"`
 	FileName        string       `json:"file_name"`
+	FilePath        string       `json:"file_path"`
+	WalletAddress   string       `json:"wallet_address"`
 	CopyNum         uint64       `json:"copy_num"`
 	InfoType        FileInfoType `json:"file_info_type"`
 	StoreTx         string       `json:"store_tx"`
@@ -73,6 +81,7 @@ type FileInfo struct {
 	WhitelistTx     string       `json:"whitelist_tx"`
 	TotalBlockCount uint64       `json:"total_block_count"`
 	SaveBlockCount  uint64       `json:"save_block_count"`
+	TaskState       uint64       `json:"task_state"`
 	ProvePrivKey    []byte       `json:"prove_private_key"`
 	Prefix          string       `json:"prefix"`
 	EncryptHash     string       `json:"encrypt_hash"`
@@ -113,7 +122,52 @@ func (this *FileDB) NewFileInfo(id string, ft FileInfoType) error {
 		InfoType:  ft,
 		CreatedAt: uint64(time.Now().Unix()),
 	}
+	err := this.AddToUploadUndoneList(id, ft)
+	if err != nil {
+		return err
+	}
 	return this.saveFileInfo(fi)
+}
+
+func (this *FileDB) AddToUploadUndoneList(id string, ft FileInfoType) error {
+	var list []string
+	var undoneKey string
+	switch ft {
+	case FileInfoTypeUpload:
+		undoneKey = FileUploadUndoneKey()
+	case FileInfoTypeDownload:
+		undoneKey = FileDownloadUndoneKey()
+	case FileInfoTypeShare:
+		return nil
+	}
+	data, err := this.db.Get([]byte(undoneKey))
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
+	}
+	if len(data) == 0 {
+		list = make([]string, 0)
+		list = append(list, id)
+		data, err := json.Marshal(list)
+		if err != nil {
+			return err
+		}
+		return this.db.Put([]byte(undoneKey), data)
+	}
+	err = json.Unmarshal(data, &list)
+	if err != nil {
+		return err
+	}
+	for _, v := range list {
+		if id == v {
+			return nil
+		}
+	}
+	list = append(list, id)
+	newData, err := json.Marshal(list)
+	if err != nil {
+		return err
+	}
+	return this.db.Put([]byte(undoneKey), newData)
 }
 
 func (this *FileDB) SaveFileInfoId(key, id string) error {
@@ -164,6 +218,16 @@ func (this *FileDB) SetFileInfoField(id string, field int, value interface{}) er
 		fi.RequestId = value.(string)
 	case FILEINFO_FIELD_FILEHASH:
 		fi.FileHash = value.(string)
+	case FILEINFO_FIELD_FILEPATH:
+		fi.FilePath = value.(string)
+	case FILEINFO_FIELD_WALLETADDR:
+		fi.WalletAddress = value.(string)
+	case FILEINFO_FIELD_REGURL_TX:
+		fi.RegisterDNSTx = value.(string)
+	case FILEINFO_FIELD_BIND_TX:
+		fi.BindDNSTx = value.(string)
+	case FILEINFO_FIELD_TASKSTATE:
+		fi.TaskState = value.(uint64)
 	}
 	return this.saveFileInfo(fi)
 }
@@ -201,6 +265,16 @@ func (this *FileDB) SetFileInfoFields(id string, m map[int]interface{}) error {
 			fi.RequestId = value.(string)
 		case FILEINFO_FIELD_FILEHASH:
 			fi.FileHash = value.(string)
+		case FILEINFO_FIELD_FILEPATH:
+			fi.FilePath = value.(string)
+		case FILEINFO_FIELD_WALLETADDR:
+			fi.WalletAddress = value.(string)
+		case FILEINFO_FIELD_REGURL_TX:
+			fi.RegisterDNSTx = value.(string)
+		case FILEINFO_FIELD_BIND_TX:
+			fi.BindDNSTx = value.(string)
+		case FILEINFO_FIELD_TASKSTATE:
+			fi.TaskState = value.(uint64)
 		}
 	}
 	return this.saveFileInfo(fi)
@@ -230,6 +304,14 @@ func (this *FileDB) GetFileInfoStringValue(id string, field int) (string, error)
 		return fi.Link, nil
 	case FILEINFO_FIELD_REQUESTID:
 		return fi.RequestId, nil
+	case FILEINFO_FIELD_FILEPATH:
+		return fi.FilePath, nil
+	case FILEINFO_FIELD_WALLETADDR:
+		return fi.WalletAddress, nil
+	case FILEINFO_FIELD_REGURL_TX:
+		return fi.RegisterDNSTx, nil
+	case FILEINFO_FIELD_BIND_TX:
+		return fi.BindDNSTx, nil
 	}
 	return "", fmt.Errorf("fileinfo field not found %s %d", id, field)
 }
@@ -264,6 +346,8 @@ func (this *FileDB) GetFileInfoUint64Value(id string, field int) (uint64, error)
 		return fi.TotalBlockCount, nil
 	case FILEINFO_FIELD_COPYNUM:
 		return fi.CopyNum, nil
+	case FILEINFO_FIELD_TASKSTATE:
+		return fi.TaskState, nil
 	}
 	return 0, fmt.Errorf("fileinfo field not found %s %d", id, field)
 }
@@ -384,7 +468,7 @@ func (this *FileDB) IsFileUploaded(id string) bool {
 		return false
 	}
 	uploaded := fi.SaveBlockCount / (fi.CopyNum + 1)
-	log.Debugf("IsFileUploaded %d %d", fi.TotalBlockCount, uploaded)
+	log.Debugf("IsFileUploaded %d %d, save: %d, copyNum: %d", fi.TotalBlockCount, uploaded, fi.SaveBlockCount, fi.CopyNum)
 	return fi.TotalBlockCount > 0 && fi.TotalBlockCount == uploaded
 }
 
@@ -588,7 +672,6 @@ func (this *FileDB) IsBlockDownloaded(id, blockHashStr string, index uint32) boo
 	if block == nil || err != nil {
 		return false
 	}
-	log.Debugf("is block downloaded block %v", block)
 	if len(block.NodeList) == 0 {
 		return false
 	}
@@ -605,64 +688,188 @@ func (this *FileDB) IsFileDownloaded(id string) bool {
 }
 
 // GetUndownloadedBlockInfo. check undownloaded block in-order
-func (this *FileDB) GetUndownloadedBlockInfo(id, rootBlockHash string) (string, uint32, error) {
+func (this *FileDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint32, error) {
 	fi, err := this.GetFileInfo([]byte(id))
 	if err != nil || fi == nil {
-		return "", 0, errors.New("file not found")
+		return nil, nil, errors.New("file not found")
 	}
-	index := uint32(0)
-	// TODO: improve performance
-	var search func(blockHash string) (string, error)
-	search = func(blockHash string) (string, error) {
-		blockKey := BlockInfoKey(id, index, blockHash)
+	hashes := make([]string, 0)
+	indexMap := make(map[string]uint32)
+	var search func(string, uint32) error
+	// TEST: improve performance
+	log.Debugf("search %s", rootBlockHash)
+	search = func(blockHash string, blockIndex uint32) error {
+		blockKey := BlockInfoKey(id, blockIndex, blockHash)
 		block, err := this.getBlockInfo(blockKey)
 		if err != nil {
-			return "", err
+			return err
 		}
-		if block == nil {
-			return blockHash, nil
+		if block == nil || len(block.NodeList) == 0 {
+			hashes = append(hashes, blockHash)
+			indexMap[blockHash] = blockIndex
+			return nil
 		}
 		if len(block.LinkHashes) == 0 {
-			return "", nil
+			return nil
 		}
-		oldIndex := index
-		for _, hash := range block.LinkHashes {
-			index++
-			childBlockKey := BlockInfoKey(id, index, hash)
+		oldIndex := blockIndex
+		childUndoneIndex := -1
+		for i, hash := range block.LinkHashes {
+			blockIndex++
+			childBlockKey := BlockInfoKey(id, blockIndex, hash)
 			childBlock, err := this.getBlockInfo(childBlockKey)
 			if err != nil {
-				return "", err
+				return err
 			}
-			if childBlock == nil {
-				return "", nil
+			if childBlock != nil && len(childBlock.NodeList) > 0 {
+				// downloaded block, skip
+				continue
+			}
+			hashes = append(hashes, hash)
+			indexMap[hash] = blockIndex
+			if childUndoneIndex == -1 {
+				childUndoneIndex = i
 			}
 		}
-		for _, hash := range block.LinkHashes {
+		for i, hash := range block.LinkHashes {
+			if childUndoneIndex != -1 && i == childUndoneIndex {
+				break
+			}
 			oldIndex++
-			neighBorBlockKey := BlockInfoKey(id, index, hash)
+			neighBorBlockKey := BlockInfoKey(id, oldIndex, hash)
 			neighBlock, err := this.getBlockInfo(neighBorBlockKey)
 			if err != nil {
-				return "", err
+				return err
 			}
 			for _, ch := range neighBlock.LinkHashes {
-				index++
-				ret, err := search(ch)
+				blockIndex++
+				err := search(ch, blockIndex)
 				if err != nil {
-					return "", err
+					return err
 				}
-				if len(ret) == 0 {
-					continue
-				}
-				return ret, nil
 			}
 		}
-		return "", nil
+		return nil
 	}
-	result, err := search(rootBlockHash)
+	err = search(rootBlockHash, 0)
+	log.Debugf("search done err %s", err)
 	if err != nil {
-		return "", index, err
+		return nil, nil, err
 	}
-	return result, index, nil
+	log.Debugf("undownload hashes :%v, len:%d", hashes, len(hashes))
+	for h, i := range indexMap {
+		log.Debugf("undownload hashes-index %s-%d", h, i)
+	}
+	return hashes, indexMap, nil
+	// search = func(parentNodeHash string, parentIndex uint32, blockHash string, blockIndex uint32, uncles []string) (string, error) {
+	// 	blockKey := BlockInfoKey(id, index, blockHash)
+	// 	block, err := this.getBlockInfo(blockKey)
+	// 	if err != nil {
+	// 		return "", err
+	// 	}
+	// 	if block == nil || len(block.NodeList) == 0 {
+	// 		return blockHash, nil
+	// 	}
+	// 	if len(block.LinkHashes) == 0 {
+	// 		return "", nil
+	// 	}
+	// 	oldIndex := index
+	// 	for _, hash := range block.LinkHashes {
+	// 		index++
+	// 		childBlockKey := BlockInfoKey(id, index, hash)
+	// 		childBlock, err := this.getBlockInfo(childBlockKey)
+	// 		if err != nil {
+	// 			return "", err
+	// 		}
+	// 		if childBlock == nil || len(childBlock.NodeList) == 0 {
+	// 			return hash, nil
+	// 		}
+	// 	}
+	// 	for _, hash := range block.LinkHashes {
+	// 		oldIndex++
+	// 		neighBorBlockKey := BlockInfoKey(id, oldIndex, hash)
+	// 		neighBlock, err := this.getBlockInfo(neighBorBlockKey)
+	// 		if err != nil {
+	// 			return "", err
+	// 		}
+	// 		for _, ch := range neighBlock.LinkHashes {
+	// 			index++
+	// 			ret, err := search(ch)
+	// 			if err != nil {
+	// 				return "", err
+	// 			}
+	// 			if len(ret) == 0 {
+	// 				continue
+	// 			}
+	// 			return ret, nil
+	// 		}
+	// 	}
+	// 	return "", nil
+	// }
+}
+
+func (this *FileDB) RemoveFromUndoneList(id string, ft FileInfoType) error {
+	var list []string
+	var undoneKey string
+	switch ft {
+	case FileInfoTypeUpload:
+		undoneKey = FileUploadUndoneKey()
+	case FileInfoTypeDownload:
+		undoneKey = FileDownloadUndoneKey()
+	case FileInfoTypeShare:
+		return nil
+	}
+	data, err := this.db.Get([]byte(undoneKey))
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	err = json.Unmarshal(data, &list)
+	if err != nil {
+		return err
+	}
+	for i, v := range list {
+		if id == v {
+			list = append(list[:i], list[i+1:]...)
+			break
+		}
+	}
+	newData, err := json.Marshal(list)
+	if err != nil {
+		return err
+	}
+	return this.db.Put([]byte(undoneKey), newData)
+}
+
+func (this *FileDB) UndoneList(ft FileInfoType) ([]string, error) {
+	var list []string
+	var undoneKey string
+	switch ft {
+	case FileInfoTypeUpload:
+		undoneKey = FileUploadUndoneKey()
+	case FileInfoTypeDownload:
+		undoneKey = FileDownloadUndoneKey()
+	case FileInfoTypeShare:
+		return nil, nil
+	}
+	data, err := this.db.Get([]byte(undoneKey))
+	if err != nil && err != leveldb.ErrNotFound {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, nil
+	}
+	err = json.Unmarshal(data, &list)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (this *FileDB) SaveFileUploaded(id string) error {
+	return this.RemoveFromUndoneList(id, FileInfoTypeUpload)
 }
 
 func (this *FileDB) SaveFileDownloaded(id string) error {
@@ -678,6 +885,10 @@ func (this *FileDB) SaveFileDownloaded(id string) error {
 			return err
 		}
 		count = uint32(result)
+	}
+	err = this.RemoveFromUndoneList(id, FileInfoTypeDownload)
+	if err != nil {
+		return err
 	}
 	fileDownloadedKey := FileDownloadedKey(count)
 	this.db.NewBatch()
@@ -701,6 +912,7 @@ func (this *FileDB) AllDownloadFiles() ([]string, error) {
 		return nil, err
 	}
 	all := make([]string, 0, count)
+	fileMap := make(map[string]struct{}, 0)
 	for i := uint32(0); i < uint32(count); i++ {
 		downloadedKey := FileDownloadedKey(i)
 		idBuf, err := this.db.Get([]byte(downloadedKey))
@@ -715,6 +927,21 @@ func (this *FileDB) AllDownloadFiles() ([]string, error) {
 			continue
 		}
 		all = append(all, fi.FileHash)
+		fileMap[fi.FileHash] = struct{}{}
+	}
+
+	prefix := fmt.Sprintf("alldownloaded-type=%d&hash=", FileInfoTypeDownload)
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		return all, nil
+	}
+	for _, k := range keys {
+		hash := k[len(prefix):]
+		_, ok := fileMap[hash]
+		if ok {
+			continue
+		}
+		all = append(all, hash)
 	}
 	return all, nil
 }
@@ -762,6 +989,62 @@ func (this *FileDB) GetFileInfo(key []byte) (*FileInfo, error) {
 		return nil, err
 	}
 	return info, nil
+}
+
+func (this *FileDB) SetFileUploadOptions(fileInfoId string, options *common.UploadOption) error {
+	buf, err := json.Marshal(options)
+	if err != nil {
+		return err
+	}
+	key := FileOptionsKey(fileInfoId)
+	return this.db.Put([]byte(key), buf)
+}
+
+func (this *FileDB) GetFileUploadOptions(fileInfoId string) (*common.UploadOption, error) {
+	key := FileOptionsKey(fileInfoId)
+	value, err := this.db.Get([]byte(key))
+	if err != nil {
+		if err != leveldb.ErrNotFound {
+			return nil, err
+		}
+	}
+	if len(value) == 0 {
+		return nil, nil
+	}
+	opt := &common.UploadOption{}
+	err = json.Unmarshal(value, opt)
+	if err != nil {
+		return nil, err
+	}
+	return opt, nil
+}
+
+func (this *FileDB) SetFileDownloadOptions(fileInfoId string, options *common.DownloadOption) error {
+	buf, err := json.Marshal(options)
+	if err != nil {
+		return err
+	}
+	key := FileOptionsKey(fileInfoId)
+	return this.db.Put([]byte(key), buf)
+}
+
+func (this *FileDB) GetFileDownloadOptions(fileInfoId string) (*common.DownloadOption, error) {
+	key := FileOptionsKey(fileInfoId)
+	value, err := this.db.Get([]byte(key))
+	if err != nil {
+		if err != leveldb.ErrNotFound {
+			return nil, err
+		}
+	}
+	if len(value) == 0 {
+		return nil, nil
+	}
+	opt := &common.DownloadOption{}
+	err = json.Unmarshal(value, opt)
+	if err != nil {
+		return nil, err
+	}
+	return opt, nil
 }
 
 // saveFileInfo. helper function, put fileinfo to db

@@ -158,6 +158,26 @@ func NewFileFetchRdy(sessionId, hash, walletAddr string) *Message {
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
+// NewFileFetchPause
+func NewFileFetchPause(sessionId, hash string) *Message {
+	f := &file.File{
+		SessionId: sessionId,
+		Hash:      hash,
+		Operation: common.FILE_OP_FETCH_PAUSE,
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+}
+
+// NewFileFetchResume
+func NewFileFetchResume(sessionId, hash string) *Message {
+	f := &file.File{
+		SessionId: sessionId,
+		Hash:      hash,
+		Operation: common.FILE_OP_FETCH_RESUME,
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+}
+
 // NewFileDownloadAsk
 func NewFileDownloadAsk(hash, walletAddr string, asset int32) *Message {
 	f := &file.File{
