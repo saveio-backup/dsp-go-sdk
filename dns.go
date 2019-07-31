@@ -79,6 +79,7 @@ func (this *Dsp) SetupDNSTrackers() error {
 		}
 		this.DNS.TrackerUrls = append(this.DNS.TrackerUrls, trackerUrl)
 	}
+	this.DNS.TrackerUrls = append(this.DNS.TrackerUrls, this.Config.Trackers...)
 	log.Debugf("this.DNS.TrackerUrls %v", this.DNS.TrackerUrls)
 	return nil
 }
@@ -441,7 +442,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	for _, url := range this.DNS.TrackerUrls {
 		request := func(resp chan *trackerResp) {
 			hostAddr, err := tracker.ReqEndPoint(url, address)
-			log.Debugf("ReqEndPoint hostAddr url%s, address %s, hostaddr:%s", url, address.ToBase58(), string(hostAddr))
+			log.Debugf("ReqEndPoint hostAddr url: %s, address %s, hostaddr:%s", url, address.ToBase58(), string(hostAddr))
 			resp <- &trackerResp{
 				ret: hostAddr,
 				err: err,
@@ -452,7 +453,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 			log.Errorf("address from req failed %s", err)
 			continue
 		}
-		hostAddr := ret.([]byte)
+		hostAddr := ret.(string)
 		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddr), url)
 		if len(string(hostAddr)) == 0 || !utils.IsHostAddrValid(string(hostAddr)) {
 			continue

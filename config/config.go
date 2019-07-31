@@ -26,10 +26,11 @@ type DspConfig struct {
 	ChannelSettleTimeout string // channel settle timeout. e.g: "120"
 	ChannelDBPath        string
 
-	AutoSetupDNSEnable bool   // enable auto setup DNS node or not
-	DnsNodeMaxNum      int    // dns node max count
-	DnsChannelDeposit  uint64 // deposit amount of channel between self and dns node
-	SeedInterval       int    // push file to tracker interval in second, if it's 0, no push
+	AutoSetupDNSEnable bool     // enable auto setup DNS node or not
+	DnsNodeMaxNum      int      // dns node max count
+	DnsChannelDeposit  uint64   // deposit amount of channel between self and dns node
+	SeedInterval       int      // push file to tracker interval in second, if it's 0, no push
+	Trackers           []string // tracker address list
 }
 
 func DefaultDspConfig() *DspConfig {

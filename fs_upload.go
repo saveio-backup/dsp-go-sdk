@@ -637,11 +637,17 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *common.
 	var err error
 	if opt.RegisterDns && len(opt.DnsUrl) > 0 {
 		dnsRegTx, err = this.RegisterFileUrl(opt.DnsUrl, saveLink)
-		log.Debugf("acc %s, reg dns %s, err %s", this.Chain.Native.Dns.DefAcc.Address.ToBase58(), dnsRegTx, err)
+		if err != nil {
+			log.Errorf("register url err: %s", err)
+		}
+		log.Debugf("acc %s, reg dns %s", this.Chain.Native.Dns.DefAcc.Address.ToBase58(), dnsRegTx)
 	}
 	if opt.BindDns && len(opt.DnsUrl) > 0 {
 		dnsBindTx, err = this.BindFileUrl(opt.DnsUrl, saveLink)
-		log.Debugf("bind dns %s, err %s", dnsBindTx, err)
+		if err != nil {
+			log.Errorf("bind url err: %s", err)
+		}
+		log.Debugf("bind dns %s", dnsBindTx)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileRegisterDNSDone)
 	return dnsRegTx, dnsBindTx
