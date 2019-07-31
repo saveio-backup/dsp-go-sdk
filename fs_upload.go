@@ -97,7 +97,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
 	// emit result finally
 	defer func() {
-		log.Debugf("emit result finally id %v, ret %v err %v", taskId, uploadRet, err)
+		log.Debugf("emit result finally id %v, ret %v err %v, %v", taskId, uploadRet, err, sdkerr)
 		if uploadRet == nil {
 			this.taskMgr.EmitResult(taskId, nil, sdkerr)
 		} else {
@@ -367,6 +367,10 @@ func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *common.UploadOpti
 
 // PauseUpload. pause a task
 func (this *Dsp) PauseUpload(taskId string) error {
+	taskType := this.taskMgr.TaskType(taskId)
+	if taskType != task.TaskTypeUpload {
+		return fmt.Errorf("task %s is not a upload task", taskId)
+	}
 	err := this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
 	if err != nil {
 		return err
@@ -376,6 +380,10 @@ func (this *Dsp) PauseUpload(taskId string) error {
 }
 
 func (this *Dsp) ResumeUpload(taskId string) error {
+	taskType := this.taskMgr.TaskType(taskId)
+	if taskType != task.TaskTypeUpload {
+		return fmt.Errorf("task %s is not a upload task", taskId)
+	}
 	err := this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
 	if err != nil {
 		log.Errorf("resume task err %s", err)
@@ -386,6 +394,10 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 }
 
 func (this *Dsp) RetryUpload(taskId string) error {
+	taskType := this.taskMgr.TaskType(taskId)
+	if taskType != task.TaskTypeUpload {
+		return fmt.Errorf("task %s is not a upload task", taskId)
+	}
 	failed, err := this.taskMgr.IsTaskFailed(taskId)
 	if err != nil {
 		return err
@@ -965,6 +977,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 	// TODO: check err? replace offset calculate by fs api
 	var offset uint64
 	if reqInfo.Index > 0 {
+		log.Debugf("get block tail failed %s %d", taskId, reqInfo.Index)
 		tail, err := this.taskMgr.GetBlockTail(taskId, uint32(reqInfo.Index-1))
 		if err != nil {
 			done <- &fetchedDone{done: false, err: err}
@@ -980,7 +993,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 		done <- &fetchedDone{done: false, err: err}
 		return
 	}
-	log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d ", reqInfo.Hash, reqInfo.Index, len(blockMsgData.tag), offset)
+	log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d to %s", reqInfo.Hash, reqInfo.Index, len(blockMsgData.tag), offset, reqInfo.PeerAddr)
 	// stored
 	this.taskMgr.AddUploadedBlock(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index), blockMsgData.dataLen, offset)
 	// update progress

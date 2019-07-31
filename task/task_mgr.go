@@ -453,7 +453,7 @@ func (this *TaskMgr) GetTask(taskId string) *Task {
 }
 
 // EmitResult. emit result or error async
-func (this *TaskMgr) EmitResult(taskId string, ret interface{}, err *sdkErr.SDKError) {
+func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *sdkErr.SDKError) {
 	v := this.GetTask(taskId)
 	if v == nil {
 		log.Errorf("emit result get no task")
@@ -473,14 +473,14 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, err *sdkErr.SDKE
 		CreatedAt: uint64(v.GetCreatedAt()),
 		UpdatedAt: uint64(time.Now().Unix()),
 	}
-	if err != nil {
-		pInfo.ErrorCode = err.Code
-		pInfo.ErrorMsg = err.Message
+	if sdkErr != nil {
+		pInfo.ErrorCode = sdkErr.Code
+		pInfo.ErrorMsg = sdkErr.Message
 		err := this.SetTaskState(taskId, TaskStateFailed)
 		if err != nil {
 			log.Errorf("set task state err %s, %s", taskId, err)
 		}
-		log.Debugf("EmitResult, err %v", err)
+		log.Debugf("EmitResult, err %v, %v", err, sdkErr)
 	} else if ret != nil {
 		log.Debugf("EmitResult ret %v ret == nil %t", ret, ret == nil)
 		pInfo.Result = ret

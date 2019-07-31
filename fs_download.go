@@ -125,6 +125,10 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 }
 
 func (this *Dsp) PauseDownload(taskId string) error {
+	taskType := this.taskMgr.TaskType(taskId)
+	if taskType != task.TaskTypeDownload {
+		return fmt.Errorf("task %s is not a download task", taskId)
+	}
 	err := this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
 	if err != nil {
 		return err
@@ -134,6 +138,10 @@ func (this *Dsp) PauseDownload(taskId string) error {
 }
 
 func (this *Dsp) ResumeDownload(taskId string) error {
+	taskType := this.taskMgr.TaskType(taskId)
+	if taskType != task.TaskTypeDownload {
+		return fmt.Errorf("task %s is not a download task", taskId)
+	}
 	err := this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
 	if err != nil {
 		return err
@@ -143,6 +151,10 @@ func (this *Dsp) ResumeDownload(taskId string) error {
 }
 
 func (this *Dsp) RetryDownload(taskId string) error {
+	taskType := this.taskMgr.TaskType(taskId)
+	if taskType != task.TaskTypeDownload {
+		return fmt.Errorf("task %s is not a download task", taskId)
+	}
 	failed, err := this.taskMgr.IsTaskFailed(taskId)
 	if err != nil {
 		return err
