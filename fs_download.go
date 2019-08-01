@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
@@ -23,7 +21,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/dsp-go-sdk/utils"
-	"github.com/saveio/max/importer/helpers"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
@@ -524,7 +521,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				continue
 			}
 			block := this.Fs.EncodedToBlockWithCid(value.Block, value.Hash)
-			links, err := this.Fs.BlockLinks(block)
+			links, err := this.Fs.GetBlockLinks(block)
 			if err != nil {
 				return serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 			}
@@ -938,17 +935,20 @@ func (this *Dsp) checkIfPauseDownload(taskId, fileHashStr string) (bool, *serr.S
 }
 
 // shareUploadedFile. share uploaded file when upload success
-func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, blockHashes []string, root ipld.Node, list []*helpers.UnixfsNode) error {
-	log.Debugf("shareUploadedFile path: %s filename:%s prefix:%s hashes:%d", filePath, fileName, prefix, blockHashes)
+func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []string) error {
+	log.Debugf("shareUploadedFile path: %s filename:%s prefix:%s hashes:%d", filePath, fileName, prefix, len(hashes))
 	if this.Config.FsType != config.FS_FILESTORE {
 		return errors.New("fs type is not file store")
 	}
-	fileHashStr := root.Cid().String()
+	if len(hashes) == 0 {
+		return errors.New("no block hashes")
+	}
+	fileHashStr := hashes[0]
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	if this.taskMgr.IsFileInfoExist(taskId) {
 		return nil
 	}
-	err := this.taskMgr.AddFileBlockHashes(taskId, blockHashes)
+	err := this.taskMgr.AddFileBlockHashes(taskId, hashes)
 	if err != nil {
 		return err
 	}
@@ -960,7 +960,11 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, blockHashe
 	if err != nil {
 		return err
 	}
-	fullFilePath := this.Config.FsFileRoot + "/" + fileHashStr
+	taskDone, err := this.taskMgr.IsTaskDone(taskId)
+	if err != nil {
+		return err
+	}
+	fullFilePath := utils.GetFileNameAtPath(this.Config.FsFileRoot+"/", fileHashStr, fileName, taskDone)
 	output, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		return err
@@ -972,65 +976,27 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, blockHashe
 		return err
 	}
 
-	blockOffset := int64(0)
 	this.Fs.SetFsFilePrefix(fullFilePath, prefix)
-	if !this.taskMgr.IsBlockDownloaded(taskId, fileHashStr, uint32(0)) {
-		log.Debugf("%s-%s-%d is downloaded", fileHashStr, fileHashStr, 0)
-		links, err := this.Fs.BlockLinks(root)
-		if err != nil {
-			return err
-		}
-		log.Debugf("links count %d", len(links))
-		err = this.Fs.PutBlockForFileStore(fullFilePath, root, uint64(0))
-		if err != nil {
-			log.Errorf("put block err %s", err)
-			return err
-		}
-		err = this.taskMgr.SetBlockDownloaded(taskId, fileHashStr, client.P2pGetPublicAddr(), uint32(0), 0, links)
-		if err != nil {
-			return err
-		}
-		log.Debugf("%s-%s-%d set downloaded", fileHashStr, 0, 0)
-		blockDecodedData, err := this.Fs.BlockToBytes(root)
-		if err != nil {
-			return err
-		}
-		dataLen := int64(len(blockDecodedData))
-		blockOffset += dataLen
+	offsets, err := this.Fs.GetAllOffsets(fileHashStr)
+	if err != nil {
+		return err
 	}
-	for index, dagBlock := range list {
-		blockIndex := index + 1
-		block, err := dagBlock.GetDagNode()
-		if err != nil {
-			return err
-		}
-		blockHash := block.Cid().String()
-		// send block
-		blockDecodedData, err := this.Fs.BlockToBytes(block)
-		if err != nil {
-			return err
-		}
-		dataLen := int64(len(blockDecodedData))
-		if this.taskMgr.IsBlockDownloaded(taskId, blockHash, uint32(blockIndex)) {
-			log.Debugf("%s-%s-%d is downloaded", fileHashStr, blockHash, blockIndex)
+	for index, hash := range hashes {
+		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {
+			log.Debugf("%s-%s-%d is downloaded", fileHashStr, hash, index)
 			continue
 		}
-		links := make([]string, 0, len(block.Links()))
-		for _, l := range block.Links() {
-			links = append(links, l.Cid.String())
-		}
-		err = this.Fs.PutBlockForFileStore(fullFilePath, block, uint64(blockOffset))
-		log.Debugf("put block for file %s block: %s, offset:%d", fullFilePath, block.Cid(), blockOffset)
-		if err != nil {
-			log.Errorf("put block err %s", err)
-			return err
-		}
-		err = this.taskMgr.SetBlockDownloaded(taskId, blockHash, client.P2pGetPublicAddr(), uint32(blockIndex), blockOffset, links)
+		block := this.Fs.GetBlock(hash)
+		links, err := this.Fs.GetBlockLinks(block)
 		if err != nil {
 			return err
 		}
-		log.Debugf("%s-%s-%d set downloaded", fileHashStr, blockHash, blockIndex)
-		blockOffset += dataLen
+		offset := offsets[hash]
+		log.Debugf("hash: %s-%s-%d , offset: %d, links count %d", fileHashStr, hash, index, offset, len(links))
+		err = this.taskMgr.SetBlockDownloaded(taskId, fileHashStr, client.P2pGetPublicAddr(), uint32(index), int64(offset), links)
+		if err != nil {
+			return err
+		}
 	}
 	go this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	return nil

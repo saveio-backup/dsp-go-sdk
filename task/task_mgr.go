@@ -1015,10 +1015,6 @@ func (this *TaskMgr) IsBlockUploaded(id, blockHashStr, nodeAddr string, index ui
 	return this.db.IsBlockUploaded(id, blockHashStr, nodeAddr, index)
 }
 
-func (this *TaskMgr) GetBlockTail(id string, index uint32) (uint64, error) {
-	return this.db.GetBlockTail(id, index)
-}
-
 func (this *TaskMgr) AddUploadedBlock(id, blockHashStr, nodeAddr string, index uint32, dataSize, offset uint64) error {
 	return this.db.AddUploadedBlock(id, blockHashStr, nodeAddr, index, dataSize, offset)
 }

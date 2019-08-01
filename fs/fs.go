@@ -171,25 +171,6 @@ func (this *Fs) EncodedToBlockWithCid(data []byte, cid string) blocks.Block {
 	return nil
 }
 
-// BlockLinks. get links from a block
-func (this *Fs) BlockLinks(block blocks.Block) ([]string, error) {
-	links := make([]string, 0)
-	_, ok := block.(*ml.RawNode)
-	if ok {
-		// for *ml.RawNode, it has no links
-		return nil, nil
-	}
-	// for *ml.ProtoNode, it has links
-	dagNode, err := ml.DecodeProtobufBlock(block)
-	if err != nil {
-		return nil, err
-	}
-	for _, l := range dagNode.Links() {
-		links = append(links, l.Cid.String())
-	}
-	return links, nil
-}
-
 func (this *Fs) AllBlockHashes(root ipld.Node, list []*helpers.UnixfsNode) ([]string, error) {
 	hashes := make([]string, 0)
 	hashes = append(hashes, root.Cid().String())
