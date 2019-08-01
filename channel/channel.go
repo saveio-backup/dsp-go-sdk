@@ -56,7 +56,7 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 	}
 	var channelConfig = &ch.ChannelConfig{
 		ClientType:    cfg.ChannelClientType,
-		ChainNodeURL:  cfg.ChainRpcAddr,
+		ChainNodeURLs: []string{cfg.ChainRpcAddr},
 		ListenAddress: cfg.ChannelListenAddr,
 		Protocol:      cfg.ChannelProtocol,
 		RevealTimeout: cfg.ChannelRevealTimeout, // 50

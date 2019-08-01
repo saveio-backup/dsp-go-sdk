@@ -167,10 +167,22 @@ func (this *Dsp) RetryDownload(taskId string) error {
 	return this.checkIfResumeDownload(taskId)
 }
 
+func (this *Dsp) CancelDownload(taskId string) error {
+	taskType := this.taskMgr.TaskType(taskId)
+	if taskType != task.TaskTypeDownload {
+		return fmt.Errorf("task %s is not a download task", taskId)
+	}
+	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	return this.DeleteDownloadedFile(fileHashStr)
+}
+
 func (this *Dsp) checkIfResumeDownload(taskId string) error {
 	opt, err := this.taskMgr.GetFileDownloadOptions(taskId)
 	if err != nil {
 		return err
+	}
+	if opt == nil {
+		return errors.New("can't find download options, please retry")
 	}
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
 	if len(fileHashStr) == 0 {

@@ -799,6 +799,8 @@ func (this *TaskMgr) SetTaskState(taskId string, state TaskState) error {
 				return err
 			}
 		}
+	case TaskStateCancel:
+		return this.DeleteTask(taskId, true)
 	}
 	v.SetFieldValue(FIELD_NAME_STATE, state)
 	this.db.SetFileInfoField(taskId, store.FILEINFO_FIELD_TASKSTATE, uint64(state))

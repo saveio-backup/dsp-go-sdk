@@ -128,7 +128,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 	}
 	var tx, fileHashStr string
 	var totalCount uint64
-	log.Debugf("new upload task: %s, will split for file", taskId)
+	log.Debugf("upload task: %s, will split for file", taskId)
 	// split file to pieces
 	pause, sdkerr := this.checkIfPause(taskId, "")
 	if sdkerr != nil {
@@ -390,6 +390,15 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 	return this.checkIfResume(taskId)
 }
 
+func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, error) {
+	taskType := this.taskMgr.TaskType(taskId)
+	if taskType != task.TaskTypeUpload {
+		return nil, fmt.Errorf("task %s is not a upload task", taskId)
+	}
+	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	return this.DeleteUploadedFile(fileHashStr)
+}
+
 func (this *Dsp) RetryUpload(taskId string) error {
 	taskType := this.taskMgr.TaskType(taskId)
 	if taskType != task.TaskTypeUpload {
@@ -522,6 +531,9 @@ func (this *Dsp) checkIfResume(taskId string) error {
 	opt, err := this.taskMgr.GetFileUploadOptions(taskId)
 	if err != nil {
 		return err
+	}
+	if opt == nil {
+		return errors.New("can't find download options, please retry")
 	}
 	log.Debugf("get upload options : %v", opt)
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
