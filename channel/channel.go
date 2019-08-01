@@ -138,6 +138,7 @@ func (this *Channel) SetHostAddr(walletAddr, host string) error {
 func (this *Channel) StartService() error {
 	//start connnect target
 	log.Debugf("[dsp-go-sdk-channel] StartService")
+	this.registerReceiveNotification()
 	err := this.chActor.Start()
 	if err != nil {
 		return err
@@ -145,7 +146,6 @@ func (this *Channel) StartService() error {
 	log.Debugf("StartService done")
 	this.isStart = true
 	this.OverridePartners()
-	go this.registerReceiveNotification()
 	return nil
 }
 
@@ -592,18 +592,20 @@ func (this *Channel) registerReceiveNotification() {
 	if err != nil {
 		panic(err)
 	}
-	for {
-		select {
-		case event := <-receiveChan:
-			addr, err := chaincomm.AddressParseFromBytes(event.Initiator[:])
-			if err != nil {
-				continue
+	go func() {
+		for {
+			select {
+			case event := <-receiveChan:
+				addr, err := chaincomm.AddressParseFromBytes(event.Initiator[:])
+				if err != nil {
+					continue
+				}
+				log.Debugf("PaymentReceive2 amount %d from %s with paymentID %d\n",
+					event.Amount, addr.ToBase58(), event.Identifier)
+				this.channelDB.AddPayment(addr.ToBase58(), int32(event.Identifier), uint64(event.Amount))
+			case <-this.closeCh:
+				return
 			}
-			log.Debugf("PaymentReceive2 amount %d from %s with paymentID %d\n",
-				event.Amount, addr.ToBase58(), event.Identifier)
-			this.channelDB.AddPayment(addr.ToBase58(), int32(event.Identifier), uint64(event.Amount))
-		case <-this.closeCh:
-			return
 		}
-	}
+	}()
 }

@@ -204,6 +204,22 @@ func (this *Dsp) handleFileFetchResumeMsg(ctx *network.ComponentContext, peer *n
 	this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
 }
 
+func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
+	// my task. use my wallet address
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
+	if !this.taskMgr.IsFileInfoExist(taskId) {
+		return
+	}
+	replyMsg := message.NewEmptyMsg()
+	err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+	if err != nil {
+		log.Errorf("taskId: %s, reply cancel msg err %s", taskId, err)
+		return
+	}
+	log.Debugf("reply cancel msg success, cancel fetching blocks")
+	this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
+}
+
 // handleFileFetchPauseMsg. client send delete msg to storage nodes for telling them to delete the file and release the resources.
 func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	err := this.waitForTxConfirmed(fileMsg.Tx.Height)
@@ -345,11 +361,11 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *ne
 // handleBlockMsg handle all file msg
 func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	blockMsg := msg.Payload.(*block.Block)
-	log.Debugf("handleBlockMsg %d %s-%s-%d from peer:%s, length:%d", blockMsg.Operation, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address, msg.Header.MsgLength)
 
 	switch blockMsg.Operation {
 	case netcom.BLOCK_OP_NONE:
 		taskId := this.taskMgr.TaskId(blockMsg.FileHash, this.WalletAddress(), task.TaskTypeDownload)
+		log.Debugf("taskId: %s, receive block %d %s-%s-%d from peer:%s, length:%d", taskId, blockMsg.Operation, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address, msg.Header.MsgLength)
 		exist := this.taskMgr.TaskExist(taskId)
 		if !exist {
 			log.Debugf("task %s not exist", blockMsg.FileHash)
@@ -370,7 +386,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 		}
 	case netcom.BLOCK_OP_GET:
 		sessionId := blockMsg.SessionId
-		log.Debugf("session: %s handle get block %s-%s-%d", sessionId, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index)
+		log.Debugf("session: %s handle get block %s-%s-%d from %s", sessionId, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address)
 		if len(sessionId) == 0 {
 			return
 		}
@@ -397,6 +413,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				log.Errorf("get task block reqCh err: %s", err)
 				return
 			}
+			log.Debugf("push to request")
 			reqCh <- &task.GetBlockReq{
 				FileHash: blockMsg.FileHash,
 				Hash:     blockMsg.Hash,

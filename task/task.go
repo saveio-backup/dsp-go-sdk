@@ -171,11 +171,9 @@ func (this *Task) SetFieldValue(name int, value interface{}) {
 		changeFromPause := (oldState == TaskStatePause && (newState == TaskStateDoing || newState == TaskStateCancel))
 		changeFromDoing := (oldState == TaskStateDoing && (newState == TaskStatePause || newState == TaskStateCancel))
 		if changeFromPause || changeFromDoing {
-			log.Debugf("new state change")
-			go func() {
-				log.Debugf("send new state change")
-				this.stateChange <- newState
-			}()
+			log.Debugf("task: %s, send new state change: %d to %d", this.id, oldState, newState)
+			this.stateChange <- newState
+			log.Debugf("task: %s, send new state change: %d to %d done", this.id, oldState, newState)
 		}
 	case FIELD_NAME_INORDER:
 		this.inOrder = value.(bool)

@@ -21,7 +21,7 @@ type TaskMgr struct {
 	tasks          map[string]*Task
 	walletHostAddr map[string]string
 	lock           sync.RWMutex
-	blockReqCh     chan *GetBlockReq
+	blockReqCh     chan *GetBlockReq  // used for share blocks
 	progress       chan *ProgressInfo // progress channel
 	shareNoticeCh  chan *ShareNotification
 	db             *store.FileDB
@@ -830,6 +830,15 @@ func (this *TaskMgr) IsTaskDone(taskId string) (bool, error) {
 	}
 	return v.State() == TaskStateDone, nil
 }
+
+func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, fmt.Errorf("task: %s, not exist", taskId)
+	}
+	return v.State() == TaskStateCancel, nil
+}
+
 func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

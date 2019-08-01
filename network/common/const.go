@@ -11,6 +11,7 @@ const (
 	FILE_OP_FETCH_RDY    = 1002 // client is ready('rdy' as abbr.) to be fetched
 	FILE_OP_FETCH_PAUSE  = 1003 // fetch pause client send to chosen peers
 	FILE_OP_FETCH_RESUME = 1004 // fetch resume client send to chosen peers
+	FILE_OP_FETCH_CANCEL = 1005 // fetch cancel msg
 
 	FILE_OP_DOWNLOAD_ASK = 2000 // client ask download file from peers
 	FILE_OP_DOWNLOAD_ACK = 2001 // peers send ack to client

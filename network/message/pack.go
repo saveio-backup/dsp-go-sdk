@@ -168,6 +168,15 @@ func NewFileFetchPause(sessionId, hash string) *Message {
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
+func NewFileFetchCancel(sessionId, hash string) *Message {
+	f := &file.File{
+		SessionId: sessionId,
+		Hash:      hash,
+		Operation: common.FILE_OP_FETCH_CANCEL,
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+}
+
 // NewFileFetchResume
 func NewFileFetchResume(sessionId, hash string) *Message {
 	f := &file.File{

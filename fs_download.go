@@ -838,7 +838,11 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	if err != nil {
 		return err
 	}
+	cancel := false
 	defer func() {
+		if cancel {
+			return
+		}
 		err := this.Fs.PinRoot(context.TODO(), fileHashStr)
 		if err != nil {
 			log.Errorf("pin root file err %s", err)
@@ -852,6 +856,14 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 		}
 		if pause {
 			log.Debugf("fetch task pause break it")
+			break
+		}
+		cancel, err := this.taskMgr.IsTaskCancel(taskId)
+		if err != nil {
+			return err
+		}
+		if cancel {
+			log.Debugf("fetch task cancel break it")
 			break
 		}
 		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {

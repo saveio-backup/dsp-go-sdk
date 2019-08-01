@@ -215,6 +215,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 		sdkerr = serr.NewDetailError(serr.PAY_FOR_STORE_FILE_FAILED, err.Error())
 		return nil, err
 	}
+	log.Debugf("pay for send file success %v %d", payRet, payTxHeight)
 	err = this.taskMgr.SetStoreTx(taskId, payRet.Tx)
 	err = this.taskMgr.SetPrivateKey(taskId, payRet.PrivateKey)
 	if err != nil {
@@ -395,7 +396,22 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	if taskType != task.TaskTypeUpload {
 		return nil, fmt.Errorf("task %s is not a upload task", taskId)
 	}
+	err := this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
+	if err != nil {
+		return nil, err
+	}
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
+	if len(nodeList) == 0 {
+		return this.DeleteUploadedFile(fileHashStr)
+	}
+	// send pause msg
+	msg := message.NewFileFetchCancel(taskId, fileHashStr)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("broadcast cancel msg ret %v", ret)
 	return this.DeleteUploadedFile(fileHashStr)
 }
 
@@ -546,6 +562,15 @@ func (this *Dsp) checkIfResume(taskId string) error {
 	if len(nodeList) == 0 {
 		go this.UploadFile(taskId, filePath, opt)
 		return nil
+	}
+	// drop all pending request first
+	req, err := this.taskMgr.TaskBlockReq(taskId)
+	if err == nil && req != nil {
+		log.Warnf("drain request len: %d", len(req))
+		for len(req) > 0 {
+			<-req
+		}
+		log.Warnf("drain request len: %d", len(req))
 	}
 	msg := message.NewFileFetchResume(taskId, fileHashStr)
 	_, err = client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil, nil)
@@ -891,7 +916,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 				case reqInfo := <-req:
 					timeout.Reset(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
 					key := keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))
-					log.Debugf("get msg data by key %s", key)
+					log.Debugf("handle request key:%s, %s-%s-%d from peer: %s", key, fileHashStr, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
 					msgData := blockMsgDataMap[key]
 					// handle fetch request async
 					done, err := this.handleFetchBlockRequest(taskId, sessionId, fileHashStr, reqInfo, copyNum, totalCount, msgData)
