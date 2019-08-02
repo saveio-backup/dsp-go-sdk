@@ -231,6 +231,19 @@ func NewFileDownload(sessionId, hash, walletAddr string, asset int32) *Message {
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }
 
+func NewFileDownloadCancel(sessionId, hash string, walletAddr string, asset int32) *Message {
+	f := &file.File{
+		SessionId: sessionId,
+		Hash:      hash,
+		Operation: common.FILE_OP_DOWNLOAD_CANCEL,
+		PayInfo: &file.Payment{
+			WalletAddress: walletAddr,
+			Asset:         asset,
+		},
+	}
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+}
+
 func NewFileDownloadOk(sessionId, hash, walletAddr string, asset int32) *Message {
 	f := &file.File{
 		SessionId: sessionId,

@@ -64,6 +64,8 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		this.handleFileDownloadMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_DOWNLOAD_OK:
 		this.handleFileDownloadOkMsg(ctx, peer, fileMsg)
+	case netcom.FILE_OP_DOWNLOAD_CANCEL:
+		this.handleFileDownloadCancelMsg(ctx, peer, fileMsg)
 	default:
 	}
 }
@@ -341,6 +343,23 @@ func (this *Dsp) handleFileDownloadMsg(ctx *network.ComponentContext, peer *netw
 	this.taskMgr.EmitNotification(taskKey, task.ShareStateBegin, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
+func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
+	if !this.taskMgr.TaskExist(taskId) {
+		log.Errorf("share task not exist %s", fileMsg.Hash)
+		return
+	}
+	// TODO: check unpaid amount
+	this.taskMgr.DeleteTask(taskId, true)
+	log.Debugf("delete share task of %s", taskId)
+	err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
+	if err != nil {
+		log.Errorf("reply download msg failed, err %s", err)
+	}
+	log.Debugf("reply download ack msg success")
+	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
+}
+
 // handleFileDownloadOkMsg. client send download ok msg to remove peers for telling them the task is finished
 func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	taskId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
@@ -348,6 +367,7 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *ne
 		log.Errorf("share task not exist %s", fileMsg.Hash)
 		return
 	}
+	// TODO: check unpaid amount
 	this.taskMgr.DeleteTask(taskId, true)
 	log.Debugf("delete share task of %s", taskId)
 	err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())

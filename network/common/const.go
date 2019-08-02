@@ -13,10 +13,11 @@ const (
 	FILE_OP_FETCH_RESUME = 1004 // fetch resume client send to chosen peers
 	FILE_OP_FETCH_CANCEL = 1005 // fetch cancel msg
 
-	FILE_OP_DOWNLOAD_ASK = 2000 // client ask download file from peers
-	FILE_OP_DOWNLOAD_ACK = 2001 // peers send ack to client
-	FILE_OP_DOWNLOAD     = 2003 // client send download msg to chosen peers
-	FILE_OP_DOWNLOAD_OK  = 2004 // client send download msg to chosen peers
+	FILE_OP_DOWNLOAD_ASK    = 2000 // client ask download file from peers
+	FILE_OP_DOWNLOAD_ACK    = 2001 // peers send ack to client
+	FILE_OP_DOWNLOAD        = 2003 // client send download msg to chosen peers
+	FILE_OP_DOWNLOAD_OK     = 2004 // client send download msg to chosen peers
+	FILE_OP_DOWNLOAD_CANCEL = 2005 // client send download cancel to chosen peers
 
 	FILE_OP_BACKUP     = 3000 // client back up file from peers
 	FILE_OP_BACKUP_ACK = 3001 // client back up file from peers

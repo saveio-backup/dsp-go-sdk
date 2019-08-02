@@ -173,12 +173,30 @@ func (this *Dsp) CancelDownload(taskId string) error {
 		return fmt.Errorf("task %s is not a download task", taskId)
 	}
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
-	err := this.DeleteDownloadedFile(fileHashStr)
+	sessions, err := this.taskMgr.GetFileSessions(taskId)
 	if err != nil {
 		return err
 	}
-	// TODO: broadcast download cancel msg
-	return nil
+	if len(sessions) == 0 {
+		log.Debugf("no sessions to cancel")
+		err := this.DeleteDownloadedFile(fileHashStr)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	// broadcast download cancel msg
+	wg := sync.WaitGroup{}
+	for hostAddr, session := range sessions {
+		wg.Add(1)
+		go func(a string, ses *store.Session) {
+			msg := message.NewFileDownloadCancel(ses.SessionId, fileHashStr, ses.WalletAddr, int32(ses.Asset))
+			client.P2pRequestWithRetry(msg.ToProtoMsg(), a, common.MAX_NETWORK_REQUEST_RETRY)
+			wg.Done()
+		}(hostAddr, session)
+	}
+	wg.Wait()
+	return this.DeleteDownloadedFile(fileHashStr)
 }
 
 func (this *Dsp) checkIfResumeDownload(taskId string) error {
@@ -239,8 +257,27 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	if len(addrs) == 0 {
 		return nil, errors.New("no peer for download")
 	}
-	msg := message.NewFileDownloadAsk(fileHashStr, this.WalletAddress(), asset)
+	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	sessions, err := this.taskMgr.GetFileSessions(taskId)
+	if err != nil {
+		return nil, err
+	}
 	peerPayInfos := make(map[string]*file.Payment, 0)
+	if sessions != nil {
+		// use original sessions
+		log.Debugf("use original sessions")
+		for hostAddr, session := range sessions {
+			peerPayInfos[hostAddr] = &file.Payment{
+				WalletAddress: session.WalletAddr,
+				Asset:         int32(session.Asset),
+				UnitPrice:     session.UnitPrice,
+			}
+			this.taskMgr.SetSessionId(taskId, session.WalletAddr, session.SessionId)
+		}
+		log.Debugf("get session from db : %v", peerPayInfos)
+		return peerPayInfos, nil
+	}
+	msg := message.NewFileDownloadAsk(fileHashStr, this.WalletAddress(), asset)
 	blockHashes := make([]string, 0)
 	prefix := ""
 	sessionIds := make(map[string]string, 0)
@@ -268,7 +305,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 		peerPayInfos[addr] = fileMsg.PayInfo
 		prefix = fileMsg.Prefix
 		sessionIds[fileMsg.PayInfo.WalletAddress] = fileMsg.SessionId
-
+		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 	}
 	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)
 	log.Debugf("broadcast file download msg result %v err %s", ret, err)
@@ -276,7 +313,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	if len(peerPayInfos) == 0 {
 		return nil, errors.New("no peerPayInfos for download")
 	}
-	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+
 	totalCount := this.taskMgr.GetFileTotalBlockCount(taskId)
 	if uint64(len(blockHashes)) > totalCount {
 		log.Debugf("AddFileBlockHashes id %v hashes %s-%s, prefix %s", taskId, blockHashes[0], blockHashes[len(blockHashes)-1], prefix)
@@ -288,9 +325,6 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 		if err != nil {
 			return nil, err
 		}
-	}
-	for walletAddr, sessionId := range sessionIds {
-		this.taskMgr.SetSessionId(taskId, walletAddr, sessionId)
 	}
 	return peerPayInfos, nil
 }

@@ -1069,3 +1069,12 @@ func (this *TaskMgr) GetFileDownloadOptions(id string) (*common.DownloadOption, 
 func (this *TaskMgr) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint32, error) {
 	return this.db.GetUndownloadedBlockInfo(id, rootBlockHash)
 }
+
+func (this *TaskMgr) GetFileSessions(fileInfoId string) (map[string]*store.Session, error) {
+	return this.db.GetFileSessions(fileInfoId)
+}
+
+func (this *TaskMgr) AddFileSession(fileInfoId string, sessionId, walletAddress, hostAddress string, asset, unitPrice uint64) error {
+	this.SetSessionId(fileInfoId, walletAddress, sessionId)
+	return this.db.AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress, asset, unitPrice)
+}
