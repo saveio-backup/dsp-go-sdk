@@ -173,7 +173,12 @@ func (this *Dsp) CancelDownload(taskId string) error {
 		return fmt.Errorf("task %s is not a download task", taskId)
 	}
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
-	return this.DeleteDownloadedFile(fileHashStr)
+	err := this.DeleteDownloadedFile(fileHashStr)
+	if err != nil {
+		return err
+	}
+	// TODO: broadcast download cancel msg
+	return nil
 }
 
 func (this *Dsp) checkIfResumeDownload(taskId string) error {
@@ -189,6 +194,7 @@ func (this *Dsp) checkIfResumeDownload(taskId string) error {
 		return fmt.Errorf("filehash not found %s", taskId)
 	}
 	log.Debugf("resume download file")
+	// TODO: record original workers
 	go this.DownloadFile(taskId, fileHashStr, opt)
 	return nil
 }
@@ -850,20 +856,12 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	}()
 	// TODO: optimize this with one hash once time
 	for index, hash := range blockHashes {
-		pause, err := this.taskMgr.IsTaskPause(taskId)
+		pause, cancel, err := this.taskMgr.IsTaskPauseOrCancel(taskId)
 		if err != nil {
 			return err
 		}
-		if pause {
-			log.Debugf("fetch task pause break it")
-			break
-		}
-		cancel, err := this.taskMgr.IsTaskCancel(taskId)
-		if err != nil {
-			return err
-		}
-		if cancel {
-			log.Debugf("fetch task cancel break it")
+		if pause || cancel {
+			log.Debugf("fetch task break it pause: %t, cancel: %t", pause, cancel)
 			break
 		}
 		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {

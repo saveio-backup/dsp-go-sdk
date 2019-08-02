@@ -839,6 +839,16 @@ func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
 	return v.State() == TaskStateCancel, nil
 }
 
+func (this *TaskMgr) IsTaskPauseOrCancel(taskId string) (bool, bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, false, fmt.Errorf("task: %s, not exist", taskId)
+	}
+	state := v.State()
+	return state == TaskStatePause, state == TaskStateCancel, nil
+
+}
+
 func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

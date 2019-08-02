@@ -231,6 +231,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFilePayingDone)
 	_, sdkerr = this.addWhitelist(taskId, fileHashStr, opt)
+	log.Debugf("add whitelist sdkerr %v", sdkerr)
 	if sdkerr != nil {
 		return nil, errors.New(sdkerr.Error.Error())
 	}
@@ -660,12 +661,16 @@ func (this *Dsp) addWhitelist(taskId, fileHashStr string, opt *common.UploadOpti
 		return "", nil
 	}
 	tx, err := this.taskMgr.GetWhitelistTx(taskId)
-	if err == nil || len(tx) > 0 {
+	if err != nil {
+		return "", serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	if len(tx) > 0 {
 		log.Debugf("%s get tx %s from db", taskId, tx)
 		return tx, nil
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileCommitWhitelist)
 	addWhiteListTx, err = this.addWhitelistsForFile(fileHashStr, opt.WhiteList, opt.ProveInterval*uint64(opt.ProveTimes))
+	log.Debugf("add whitelist tx, err %s", err)
 	if err != nil {
 		return "", serr.NewDetailError(serr.ADD_WHITELIST_ERROR, err.Error())
 	}
@@ -702,6 +707,7 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *common.
 // addWhitelistsForFile. add whitelist for file with added blockcount to current height
 func (this *Dsp) addWhitelistsForFile(fileHashStr string, walletAddrs []string, blockCount uint64) (string, error) {
 	txHash, err := this.Chain.Native.Fs.AddWhiteLists(fileHashStr, walletAddrs, blockCount)
+	log.Debugf("err %v", err)
 	if err != nil {
 		return "", err
 	}

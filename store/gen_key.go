@@ -15,6 +15,8 @@ const (
 	FILE_OPTIONS_PREFIX          = "store_file_options:"
 	FILE_UPLOAD_UNDONE_PREFIX    = "store_file_upload_undone:"
 	FILE_DOWNLOAD_UNDONE_PREFIX  = "store_file_download_undone:"
+	FILE_SESSIONS_COUNT_PREFIX   = "store_file_session_count:"
+	FILE_SESSIONS_PREFIX         = "store_file_sessions:"
 )
 
 func FileDownloadUnitPriceKey(fileInfoId string) string {
@@ -59,4 +61,12 @@ func FileUploadUndoneKey() string {
 
 func FileDownloadUndoneKey() string {
 	return FILE_DOWNLOAD_UNDONE_PREFIX
+}
+
+func FileSessionCountKey(fileInfoId string) string {
+	return fmt.Sprintf("%s-%s", FILE_SESSIONS_COUNT_PREFIX, fileInfoId)
+}
+
+func FileSessionKey(fileInfoId string, index int) string {
+	return fmt.Sprintf("%s-%s-%d", FILE_SESSIONS_PREFIX, fileInfoId, index)
 }

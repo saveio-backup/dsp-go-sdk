@@ -106,6 +106,14 @@ type FileDownloadUnPaid struct {
 	Payment
 }
 
+type Session struct {
+	SessionId  string `json:"session_id"`
+	WalletAddr string `json:"wallet_addr"`
+	HostAddr   string `json:"host_addr"`
+	Asset      uint64 `json:"asset"`
+	UnitPrice  uint64 `json:"unit_price"`
+}
+
 func NewFileDB(db *LevelDBStore) *FileDB {
 	return &FileDB{
 		db: db,
@@ -355,7 +363,31 @@ func (this *FileDB) GetFileInfoUint64Value(id string, field int) (uint64, error)
 // DeleteFileInfo. delete file info from db
 func (this *FileDB) DeleteFileInfo(id string) error {
 	//TODO: clean up all
-	return this.db.Delete([]byte(id))
+	this.db.NewBatch()
+
+	// delete session
+	countKey := []byte(FileSessionCountKey(id))
+	data, err := this.db.Get(countKey)
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
+	}
+	if len(data) > 0 {
+		countBufs, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		count, err := strconv.ParseInt(string(countBufs), 10, 64)
+		if err != nil {
+			return err
+		}
+		for i := 0; i < int(count); i++ {
+			sessionKey := FileSessionKey(id, i)
+			this.db.BatchDelete([]byte(sessionKey))
+		}
+		this.db.BatchDelete(countKey)
+	}
+	this.db.BatchDelete([]byte(id))
+	return this.db.BatchCommit()
 }
 
 // AddUploadedBlock. add a uploaded block into db
@@ -1045,6 +1077,77 @@ func (this *FileDB) GetFileDownloadOptions(fileInfoId string) (*common.DownloadO
 		return nil, err
 	}
 	return opt, nil
+}
+
+func (this *FileDB) AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress string, asset, unitPrice uint64) error {
+	countKey := []byte(FileSessionCountKey(fileInfoId))
+	data, err := this.db.Get(countKey)
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
+	}
+	count := int(0)
+	if len(data) > 0 {
+		countBufs, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		parseCount, parseErr := strconv.ParseInt(string(countBufs), 10, 64)
+		if parseErr != nil {
+			return parseErr
+		}
+		count = int(parseCount)
+	}
+	sessionKey := FileSessionKey(fileInfoId, count)
+	session := &Session{
+		SessionId:  sessionId,
+		WalletAddr: walletAddress,
+		HostAddr:   hostAddress,
+		Asset:      asset,
+		UnitPrice:  unitPrice,
+	}
+	sessionBuf, err := json.Marshal(session)
+	if err != nil {
+		return err
+	}
+	this.db.NewBatch()
+	newCount := int(count) + 1
+	this.db.BatchPut(countKey, []byte(fmt.Sprintf("%d", newCount)))
+	this.db.BatchPut([]byte(sessionKey), sessionBuf)
+	return this.db.BatchCommit()
+}
+
+func (this *FileDB) GetFileSessions(fileInfoId string) (map[string]*Session, error) {
+	countKey := []byte(FileSessionCountKey(fileInfoId))
+	data, err := this.db.Get(countKey)
+	if err != nil && err != leveldb.ErrNotFound {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, nil
+	}
+	countBufs, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	count, err := strconv.ParseInt(string(countBufs), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	res := make(map[string]*Session)
+	for i := 0; i < int(count); i++ {
+		sessionKey := FileSessionKey(fileInfoId, i)
+		sessionData, err := this.db.Get([]byte(sessionKey))
+		if err != nil {
+			continue
+		}
+		var session *Session
+		err = json.Unmarshal(sessionData, &session)
+		if err != nil {
+			continue
+		}
+		res[session.HostAddr] = session
+	}
+	return res, nil
 }
 
 // saveFileInfo. helper function, put fileinfo to db
