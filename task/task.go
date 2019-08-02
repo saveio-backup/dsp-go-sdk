@@ -168,9 +168,9 @@ func (this *Task) SetFieldValue(name int, value interface{}) {
 		newState := value.(TaskState)
 		oldState := this.state
 		this.state = value.(TaskState)
-		changeFromPause := (oldState == TaskStatePause && (newState == TaskStateDoing || newState == TaskStateCancel))
+		// changeFromPause := (oldState == TaskStatePause && (newState == TaskStateDoing || newState == TaskStateCancel))
 		changeFromDoing := (oldState == TaskStateDoing && (newState == TaskStatePause || newState == TaskStateCancel))
-		if changeFromPause || changeFromDoing {
+		if changeFromDoing {
 			log.Debugf("task: %s, send new state change: %d to %d", this.id, oldState, newState)
 			this.stateChange <- newState
 			log.Debugf("task: %s, send new state change: %d to %d done", this.id, oldState, newState)
