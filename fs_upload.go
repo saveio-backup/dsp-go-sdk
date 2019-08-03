@@ -41,7 +41,6 @@ type blockMsgData struct {
 
 // CalculateUploadFee. pre-calculate upload cost by its upload options
 func (this *Dsp) CalculateUploadFee(opt *fs.UploadOption) (*fs.StorageFee, error) {
-
 	return this.Chain.Native.Fs.GetUploadStorageFee(opt)
 }
 
@@ -639,7 +638,7 @@ func (this *Dsp) addWhitelist(taskId, fileHashStr string, opt *fs.UploadOption) 
 	var addWhiteListTx string
 	var err error
 	// Don't add whitelist if resume upload
-	if len(opt.WhiteList) == 0 {
+	if opt.WhiteList.Num == 0 {
 		return "", nil
 	}
 	tx, err := this.taskMgr.GetWhitelistTx(taskId)
@@ -651,11 +650,7 @@ func (this *Dsp) addWhitelist(taskId, fileHashStr string, opt *fs.UploadOption) 
 		return tx, nil
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileCommitWhitelist)
-	whitelists := make([]string, 0, len(opt.WhiteList))
-	for _, whitelist := range opt.WhiteList {
-		whitelists = append(whitelists, string(whitelist))
-	}
-	addWhiteListTx, err = this.addWhitelistsForFile(fileHashStr, whitelists, opt.ExpiredHeight)
+	addWhiteListTx, err = this.addWhitelistsForFile(fileHashStr, opt.WhiteList.List)
 	log.Debugf("add whitelist tx, err %s", err)
 	if err != nil {
 		return "", serr.NewDetailError(serr.ADD_WHITELIST_ERROR, err.Error())
@@ -691,8 +686,8 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.Uplo
 }
 
 // addWhitelistsForFile. add whitelist for file with added blockcount to current height
-func (this *Dsp) addWhitelistsForFile(fileHashStr string, walletAddrs []string, expiredHeight uint64) (string, error) {
-	txHash, err := this.Chain.Native.Fs.AddWhiteLists(fileHashStr, walletAddrs, expiredHeight)
+func (this *Dsp) addWhitelistsForFile(fileHashStr string, rules []fs.Rule) (string, error) {
+	txHash, err := this.Chain.Native.Fs.AddWhiteLists(fileHashStr, rules)
 	log.Debugf("err %v", err)
 	if err != nil {
 		return "", err
