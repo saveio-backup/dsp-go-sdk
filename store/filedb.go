@@ -12,6 +12,8 @@ import (
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/themis/common/log"
 	"github.com/syndtr/goleveldb/leveldb"
+
+	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 // FileDB. implement a db storage for save information of sending/downloading/downloaded files
@@ -1023,7 +1025,7 @@ func (this *FileDB) GetFileInfo(key []byte) (*FileInfo, error) {
 	return info, nil
 }
 
-func (this *FileDB) SetFileUploadOptions(fileInfoId string, options *common.UploadOption) error {
+func (this *FileDB) SetFileUploadOptions(fileInfoId string, options *fs.UploadOption) error {
 	buf, err := json.Marshal(options)
 	if err != nil {
 		return err
@@ -1032,7 +1034,7 @@ func (this *FileDB) SetFileUploadOptions(fileInfoId string, options *common.Uplo
 	return this.db.Put([]byte(key), buf)
 }
 
-func (this *FileDB) GetFileUploadOptions(fileInfoId string) (*common.UploadOption, error) {
+func (this *FileDB) GetFileUploadOptions(fileInfoId string) (*fs.UploadOption, error) {
 	key := FileOptionsKey(fileInfoId)
 	value, err := this.db.Get([]byte(key))
 	if err != nil {
@@ -1043,7 +1045,7 @@ func (this *FileDB) GetFileUploadOptions(fileInfoId string) (*common.UploadOptio
 	if len(value) == 0 {
 		return nil, nil
 	}
-	opt := &common.UploadOption{}
+	opt := &fs.UploadOption{}
 	err = json.Unmarshal(value, opt)
 	if err != nil {
 		return nil, err

@@ -7,7 +7,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/themis/account"
 	chainCom "github.com/saveio/themis/common"
-	fs "github.com/saveio/themis/smartcontract/service/native/onifs"
+	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/usdt"
 )
 

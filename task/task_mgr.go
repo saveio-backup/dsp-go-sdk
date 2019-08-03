@@ -13,6 +13,8 @@ import (
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/themis/common/log"
+
+	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 // TaskMgr. implement upload/download task manager.
@@ -1052,10 +1054,10 @@ func (this *TaskMgr) GetFilePath(id string) (string, error) {
 	return this.db.GetFileInfoStringValue(id, store.FILEINFO_FIELD_FILEPATH)
 }
 
-func (this *TaskMgr) SetFileUploadOptions(id string, opt *common.UploadOption) error {
+func (this *TaskMgr) SetFileUploadOptions(id string, opt *fs.UploadOption) error {
 	return this.db.SetFileUploadOptions(id, opt)
 }
-func (this *TaskMgr) GetFileUploadOptions(id string) (*common.UploadOption, error) {
+func (this *TaskMgr) GetFileUploadOptions(id string) (*fs.UploadOption, error) {
 	return this.db.GetFileUploadOptions(id)
 }
 

@@ -21,6 +21,8 @@ import (
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/crypto/pdp"
+
+	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 // fetchedDone. handle fetched request channel data structure
@@ -38,45 +40,9 @@ type blockMsgData struct {
 }
 
 // CalculateUploadFee. pre-calculate upload cost by its upload options
-func (this *Dsp) CalculateUploadFee(filePath string, opt *common.UploadOption, whitelistCnt uint64) (uint64, error) {
-	fee := uint64(0)
-	fi, err := os.Open(filePath)
-	if err != nil {
-		return 0, err
-	}
-	fileInfo, err := fi.Stat()
-	if err != nil {
-		return 0, err
-	}
-	fsSetting, err := this.Chain.Native.Fs.GetSetting()
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		err = fi.Close()
-		if err != nil {
-			log.Errorf("close file %s err %s", filePath, err)
-		}
-	}()
-	txGas := uint64(10000000)
-	useDefault := opt.StorageType == common.FileStoreTypeNormal
-	log.Debugf("filePath %s, opt.interval:%d, opt.ProveTimes:%d, opt.CopyNum:%d, useDefault %v ", filePath, opt.ProveInterval, opt.ProveTimes, opt.CopyNum, useDefault)
-	if whitelistCnt > 0 {
-		fee = txGas * 4
-	} else {
-		fee = txGas * 3
-	}
-	if useDefault {
-		return fee, nil
-	}
-	fileSize := uint64(fileInfo.Size()) / 1024
-	if fileSize < 0 {
-		fileSize = 1
-	}
-	fee += (opt.ProveInterval*fileSize*fsSetting.GasPerKBPerBlock +
-		fsSetting.GasForChallenge) * uint64(opt.ProveTimes) * fsSetting.FsGasPrice * (uint64(opt.CopyNum) + 1)
-	log.Debugf("fileSize :%d, fee", fileSize, fee)
-	return fee, nil
+func (this *Dsp) CalculateUploadFee(opt *fs.UploadOption) (*fs.StorageFee, error) {
+
+	return this.Chain.Native.Fs.GetUploadStorageFee(opt)
 }
 
 // UploadTaskExist. check if upload task is existed by filePath hash string
@@ -86,7 +52,7 @@ func (this *Dsp) UploadTaskExist(filePath string) bool {
 }
 
 // UploadFile upload new file logic synchronously
-func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (*common.UploadResult, error) {
+func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*common.UploadResult, error) {
 	var uploadRet *common.UploadResult
 	var sdkerr *serr.SDKError
 	var err error
@@ -138,7 +104,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 		return nil, nil
 	}
 	log.Debugf("will split file")
-	hashes, err := this.Fs.NodesFromFile(filePath, this.WalletAddress(), opt.Encrypt, opt.EncryptPassword)
+	hashes, err := this.Fs.NodesFromFile(filePath, this.WalletAddress(), opt.Encrypt, string(opt.EncryptPassword))
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
 		log.Errorf("node from file err: %s", err)
@@ -154,7 +120,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSliceDone)
 	fileHashStr = hashes[0]
-	this.taskMgr.SetTaskInfos(taskId, fileHashStr, filePath, opt.FileDesc, this.WalletAddress())
+	this.taskMgr.SetTaskInfos(taskId, fileHashStr, filePath, string(opt.FileDesc), this.WalletAddress())
 	this.taskMgr.SetCopyNum(taskId, uint64(opt.CopyNum))
 	this.taskMgr.BindTaskId(taskId)
 	log.Debugf("after bind task id")
@@ -192,7 +158,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 		}
 	}
 	log.Debugf("uploading nodelist %v, opt.CopyNum %d", nodeList, opt.CopyNum)
-	if uint32(len(nodeList)) < opt.CopyNum+1 {
+	if uint64(len(nodeList)) < opt.CopyNum+1 {
 		sdkerr = serr.NewDetailError(serr.ONLINE_NODES_NOT_ENOUGH, fmt.Sprintf("node is not enough %d, copyNum %d", len(nodeList), opt.CopyNum))
 		return nil, sdkerr.Error
 	}
@@ -242,7 +208,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 		return nil, err
 	}
 	if opt != nil && opt.Share {
-		go this.shareUploadedFile(filePath, opt.FileDesc, this.WalletAddress(), hashes)
+		go this.shareUploadedFile(filePath, string(opt.FileDesc), this.WalletAddress(), hashes)
 	}
 	if !opt.Share && opt.Encrypt {
 		// TODO: delete encrypted block store
@@ -265,6 +231,9 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 		err = errors.New("file receivers is not enough")
 		sdkerr = serr.NewDetailError(serr.RECEIVERS_NOT_ENOUGH, err.Error())
 		return nil, err
+	}
+	if len(receivers) > int(opt.CopyNum)+1 {
+		receivers = receivers[:int(opt.CopyNum)+1]
 	}
 	// notify fetch ready to all receivers
 	err = this.notifyFetchReady(taskId, fileHashStr, receivers)
@@ -306,9 +275,9 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *common.UploadOption) (
 	return uploadRet, nil
 }
 
-func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *common.UploadOption, totalCount uint64) (*common.UploadResult, *serr.SDKError) {
+func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, totalCount uint64) (*common.UploadResult, *serr.SDKError) {
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileWaitForPDPProve)
-	proved := this.checkFileBeProved(fileHashStr, opt.ProveTimes, opt.CopyNum)
+	proved := this.checkFileBeProved(fileHashStr, opt.CopyNum)
 	log.Debugf("checking file proved done %t", proved)
 	var sdkerr *serr.SDKError
 	if !proved {
@@ -333,7 +302,7 @@ func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *common.UploadOpti
 		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 		return nil, sdkerr
 	}
-	saveLink := utils.GenOniLink(fileHashStr, opt.FileDesc, 0, totalCount, this.DNS.TrackerUrls)
+	saveLink := utils.GenOniLink(fileHashStr, string(opt.FileDesc), opt.FileSize, totalCount, this.DNS.TrackerUrls)
 	if len(dnsRegTx) == 0 || len(dnsBindTx) == 0 {
 		dnsRegTx, dnsBindTx = this.registerUrls(taskId, fileHashStr, saveLink, opt, totalCount)
 	}
@@ -350,7 +319,7 @@ func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *common.UploadOpti
 	uploadRet := &common.UploadResult{
 		Tx:             storeTx,
 		FileHash:       fileHashStr,
-		Url:            opt.DnsUrl,
+		Url:            string(opt.DnsURL),
 		Link:           saveLink,
 		RegisterDnsTx:  dnsRegTx,
 		BindDnsTx:      dnsBindTx,
@@ -457,7 +426,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	if info.FileOwner.ToBase58() != this.WalletAddress() {
 		return nil, fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
 	}
-	storingNode, _ := this.getFileProveNode(fileHashStr, info.ChallengeTimes)
+	storingNode := this.getFileProvedNode(fileHashStr)
 	txHash, err := this.Chain.Native.Fs.DeleteFile(fileHashStr)
 	if err != nil {
 		return nil, err
@@ -559,6 +528,24 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		go this.UploadFile(taskId, filePath, opt)
 		return nil
 	}
+	fileInfo, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
+	if fileInfo != nil {
+		// nodes := this.getFileProvedNode(fileHashStr)
+		// if uint64(len(nodes)) == opt.CopyNum+1 {
+		// 	go this.finishUpload(taskId, fileHashStr, opt, fileInfo.FileBlockNum)
+		// }
+		now, err := this.Chain.GetCurrentBlockHeight()
+		if err != nil {
+			return err
+		}
+		if fileInfo.ExpiredHeight > uint64(now) {
+			return fmt.Errorf("file:%s has expired", fileHashStr)
+		}
+	}
+
+	// if uint64(this.taskMgr.UploadedBlockCount(taskId)) == blockNum*(fileInfo.CopyNum+1) {
+	// 	return fmt.Errorf("has sent all blocks, waiting for fs node commit proves")
+	// }
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
 		go this.UploadFile(taskId, filePath, opt)
@@ -585,20 +572,13 @@ func (this *Dsp) checkIfResume(taskId string) error {
 
 // payForSendFile pay before send a file
 // return PoR params byte slice, PoR private key of the file or error
-func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum uint64, opt *common.UploadOption) (*common.PayStoreFileResult, error) {
+func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum uint64, opt *fs.UploadOption) (*common.PayStoreFileResult, error) {
 	fileInfo, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	var paramsBuf, privateKey []byte
 	var tx string
 	if fileInfo == nil {
 		log.Info("first upload file")
-		minInterval := uint64(0)
-		setting, _ := this.Chain.Native.Fs.GetSetting()
-		if setting != nil {
-			minInterval = setting.MinChallengeRate
-		}
-		if uint64(opt.ProveInterval) < minInterval {
-			return nil, fmt.Errorf("challenge rate %d less than min challenge rate %d", opt.ProveInterval, minInterval)
-		}
+
 		blockSizeInKB := uint64(math.Ceil(float64(common.CHUNK_SIZE) / 1024.0))
 		g, g0, pubKey, privKey, fileID := pdp.Init(filePath)
 		var err error
@@ -609,7 +589,7 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 			return nil, err
 		}
 		txHash, err := this.Chain.Native.Fs.StoreFile(fileHashStr, blockNum, blockSizeInKB, opt.ProveInterval,
-			uint64(opt.ProveTimes), uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege), paramsBuf, uint64(opt.StorageType))
+			opt.ExpiredHeight, uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege), paramsBuf, uint64(opt.StorageType))
 		if err != nil {
 			log.Errorf("pay store file order failed:%s", err)
 			return nil, err
@@ -621,19 +601,21 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 			return nil, errors.New("tx is not confirmed")
 		}
 	} else {
-		storing, stored := this.getFileProveNode(fileHashStr, fileInfo.ChallengeTimes)
-		if len(storing) > 0 {
-			return nil, fmt.Errorf("file:%s has stored", fileHashStr)
+		// nodes := this.getFileProvedNode(fileHashStr)
+		// if len(nodes) > 0 {
+		// 	return fmt.Errorf("file:%s has stored", fileHashStr)
+		// }
+		now, err := this.Chain.GetCurrentBlockHeight()
+		if err != nil {
+			return nil, err
 		}
-		if len(stored) > 0 {
+		if fileInfo.ExpiredHeight > uint64(now) {
 			return nil, fmt.Errorf("file:%s has expired, please delete it first", fileHashStr)
 		}
-		log.Debugf("has paid but not store")
-		if uint64(this.taskMgr.UploadedBlockCount(taskKey)) == blockNum*(fileInfo.CopyNum+1) {
-			return nil, fmt.Errorf("has sent all blocks, waiting for fs node commit proves")
-		}
+		// if uint64(this.taskMgr.UploadedBlockCount(taskId)) == blockNum*(fileInfo.CopyNum+1) {
+		// 	return fmt.Errorf("has sent all blocks, waiting for fs node commit proves")
+		// }
 		paramsBuf = fileInfo.FileProveParam
-		var err error
 		privateKey, err = this.taskMgr.GetFilePrivateKey(taskKey)
 		if err != nil {
 			return nil, err
@@ -653,7 +635,7 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 	}, nil
 }
 
-func (this *Dsp) addWhitelist(taskId, fileHashStr string, opt *common.UploadOption) (string, *serr.SDKError) {
+func (this *Dsp) addWhitelist(taskId, fileHashStr string, opt *fs.UploadOption) (string, *serr.SDKError) {
 	var addWhiteListTx string
 	var err error
 	// Don't add whitelist if resume upload
@@ -669,7 +651,11 @@ func (this *Dsp) addWhitelist(taskId, fileHashStr string, opt *common.UploadOpti
 		return tx, nil
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileCommitWhitelist)
-	addWhiteListTx, err = this.addWhitelistsForFile(fileHashStr, opt.WhiteList, opt.ProveInterval*uint64(opt.ProveTimes))
+	whitelists := make([]string, 0, len(opt.WhiteList))
+	for _, whitelist := range opt.WhiteList {
+		whitelists = append(whitelists, string(whitelist))
+	}
+	addWhiteListTx, err = this.addWhitelistsForFile(fileHashStr, whitelists, opt.ExpiredHeight)
 	log.Debugf("add whitelist tx, err %s", err)
 	if err != nil {
 		return "", serr.NewDetailError(serr.ADD_WHITELIST_ERROR, err.Error())
@@ -682,19 +668,19 @@ func (this *Dsp) addWhitelist(taskId, fileHashStr string, opt *common.UploadOpti
 	return addWhiteListTx, nil
 }
 
-func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *common.UploadOption, totalCount uint64) (string, string) {
+func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.UploadOption, totalCount uint64) (string, string) {
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileRegisterDNS)
 	var dnsRegTx, dnsBindTx string
 	var err error
-	if opt.RegisterDns && len(opt.DnsUrl) > 0 {
-		dnsRegTx, err = this.RegisterFileUrl(opt.DnsUrl, saveLink)
+	if opt.RegisterDNS && len(opt.DnsURL) > 0 {
+		dnsRegTx, err = this.RegisterFileUrl(string(opt.DnsURL), saveLink)
 		if err != nil {
 			log.Errorf("register url err: %s", err)
 		}
 		log.Debugf("acc %s, reg dns %s", this.Chain.Native.Dns.DefAcc.Address.ToBase58(), dnsRegTx)
 	}
-	if opt.BindDns && len(opt.DnsUrl) > 0 {
-		dnsBindTx, err = this.BindFileUrl(opt.DnsUrl, saveLink)
+	if opt.BindDNS && len(opt.DnsURL) > 0 {
+		dnsBindTx, err = this.BindFileUrl(string(opt.DnsURL), saveLink)
 		if err != nil {
 			log.Errorf("bind url err: %s", err)
 		}
@@ -705,8 +691,8 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *common.
 }
 
 // addWhitelistsForFile. add whitelist for file with added blockcount to current height
-func (this *Dsp) addWhitelistsForFile(fileHashStr string, walletAddrs []string, blockCount uint64) (string, error) {
-	txHash, err := this.Chain.Native.Fs.AddWhiteLists(fileHashStr, walletAddrs, blockCount)
+func (this *Dsp) addWhitelistsForFile(fileHashStr string, walletAddrs []string, expiredHeight uint64) (string, error) {
+	txHash, err := this.Chain.Native.Fs.AddWhiteLists(fileHashStr, walletAddrs, expiredHeight)
 	log.Debugf("err %v", err)
 	if err != nil {
 		return "", err
@@ -720,22 +706,21 @@ func (this *Dsp) addWhitelistsForFile(fileHashStr string, walletAddrs []string, 
 }
 
 // getFileProveNode. get file storing nodes  and stored (expired) nodes
-func (this *Dsp) getFileProveNode(fileHashStr string, challengeTimes uint64) ([]string, []string) {
+func (this *Dsp) getFileProvedNode(fileHashStr string) []string {
 	proveDetails, err := this.Chain.Native.Fs.GetFileProveDetails(fileHashStr)
-	storing, stored := make([]string, 0), make([]string, 0)
 	if proveDetails == nil {
-		return storing, stored
+		return nil
 	}
+	nodes := make([]string, 0)
 	log.Debugf("details :%v, err:%s", len(proveDetails.ProveDetails), err)
 	for _, detail := range proveDetails.ProveDetails {
-		log.Debugf("node:%s, prove times %d, challenge times %d", string(detail.NodeAddr), detail.ProveTimes, challengeTimes)
-		if detail.ProveTimes < challengeTimes+1 {
-			storing = append(storing, string(detail.NodeAddr))
-		} else {
-			stored = append(stored, string(detail.NodeAddr))
+		log.Debugf("node:%s, prove times %d", string(detail.NodeAddr), detail.ProveTimes)
+		if detail.ProveTimes == 0 {
+			continue
 		}
+		nodes = append(nodes, string(detail.NodeAddr))
 	}
-	return storing, stored
+	return nodes
 }
 
 func (this *Dsp) getUploadNodeFromDB(taskId, fileHashStr string) []string {
@@ -775,15 +760,15 @@ func (this *Dsp) getUploadNodeFromChain(filePath, taskKey, fileHashStr string, c
 }
 
 // checkFileBeProved thread-block method. check if the file has been proved for all store nodes.
-func (this *Dsp) checkFileBeProved(fileHashStr string, proveTimes, copyNum uint32) bool {
+func (this *Dsp) checkFileBeProved(fileHashStr string, copyNum uint64) bool {
 	retry := 0
 	timewait := 5
 	for {
 		if retry > common.CHECK_PROVE_TIMEOUT/timewait {
 			return false
 		}
-		storing, _ := this.getFileProveNode(fileHashStr, uint64(proveTimes))
-		if uint32(len(storing)) >= copyNum+1 {
+		nodes := this.getFileProvedNode(fileHashStr)
+		if uint64(len(nodes)) >= copyNum+1 {
 			break
 		}
 		retry++
@@ -818,11 +803,14 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 		receivers = append(receivers, addr)
 		receiverLock.Unlock()
 		log.Debugf("send file_ask msg %s success %s, receive file_ack msg", fileMsg.Hash, addr)
-		atomic.AddInt32(&receiverLen, 1)
 	}
 	// TODO: make stop func sense in parallel mode
 	stop := func() bool {
-		return atomic.LoadInt32(&receiverLen) >= int32(receiverCount)
+		isStop := false
+		receiverLock.Lock()
+		isStop = int32(len(receivers)) >= int32(receiverCount)
+		receiverLock.Unlock()
+		return isStop
 	}
 	log.Debugf("broadcast fetch_ask msg to %v", nodeList)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, stop, action)
@@ -1030,7 +1018,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 }
 
 // uploadOptValid check upload opt valid
-func uploadOptValid(filePath string, opt *common.UploadOption) error {
+func uploadOptValid(filePath string, opt *fs.UploadOption) error {
 	if !common.FileExisted(filePath) {
 		return errors.New("file not exist")
 	}
