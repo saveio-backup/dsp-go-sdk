@@ -551,7 +551,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		if err != nil {
 			return err
 		}
-		if fileInfo.ExpiredHeight > uint64(now) {
+		if fileInfo.ExpiredHeight <= uint64(now) {
 			return fmt.Errorf("file:%s has expired", fileHashStr)
 		}
 		hasProvedFile := uint64(len(this.getFileProvedNode(fileHashStr))) == opt.CopyNum+1
