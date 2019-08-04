@@ -124,6 +124,11 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 		if err != nil {
 			return err
 		}
+		if info == nil {
+			log.Warnf("get file info is nil of %v", id)
+			continue
+		}
+		log.Debugf("info :%v", info)
 		state := TaskState(info.TaskState)
 		if state == TaskStateDoing {
 			state = TaskStatePause
@@ -841,7 +846,6 @@ func (this *TaskMgr) SetTaskState(taskId string, state TaskState) error {
 			}
 		}
 	case TaskStateCancel:
-		return this.DeleteTask(taskId, true)
 	}
 	v.SetFieldValue(FIELD_NAME_STATE, state)
 	this.db.SetFileInfoField(taskId, store.FILEINFO_FIELD_TASKSTATE, uint64(state))

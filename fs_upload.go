@@ -378,11 +378,15 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	if taskType != task.TaskTypeUpload {
 		return nil, fmt.Errorf("task %s is not a upload task", taskId)
 	}
+	fileHashStr := this.taskMgr.TaskFileHash(taskId)
 	err := this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
 	if err != nil {
 		return nil, err
 	}
-	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	log.Debugf("fileHashStr :%v", fileHashStr)
+	if len(fileHashStr) == 0 {
+		return nil, fmt.Errorf("fileHashStr is empty for id %v", fileHashStr, taskId)
+	}
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
 		return this.DeleteUploadedFile(fileHashStr)
@@ -392,6 +396,11 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil, nil)
 	if err != nil {
 		return nil, err
+	}
+	for _, err := range ret {
+		if err != nil {
+			return nil, err
+		}
 	}
 	log.Debugf("broadcast cancel msg ret %v", ret)
 	return this.DeleteUploadedFile(fileHashStr)
@@ -613,7 +622,6 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 			log.Errorf("serialization prove params failed:%s", err)
 			return nil, err
 		}
-		log.Debugf("paramsBuf :%v", hex.EncodeToString(paramsBuf))
 		txHash, err := this.Chain.Native.Fs.StoreFile(fileHashStr, blockNum, blockSizeInKB, opt.ProveInterval,
 			opt.ExpiredHeight, uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege), paramsBuf, uint64(opt.StorageType))
 		if err != nil {

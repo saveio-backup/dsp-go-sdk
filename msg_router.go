@@ -58,6 +58,8 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		this.handleFileFetchResumeMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_DELETE:
 		this.handleFileDeleteMsg(ctx, peer, fileMsg)
+	case netcom.FILE_OP_FETCH_CANCEL:
+		this.handleFileFetchCancelMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_DOWNLOAD_ASK:
 		this.handleFileDownloadAskMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_DOWNLOAD:
