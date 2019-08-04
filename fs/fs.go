@@ -248,9 +248,9 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 
 // DeleteFile. delete file, unpin root block if needed
 // If a block is referenced to other file, ignore it.
-func (this *Fs) DeleteFile(fileHashStr string) error {
-	if this.fs.IsFileStore() && this.cfg.FsType == config.FS_FILESTORE {
-		return os.Remove(this.cfg.FsFileRoot + "/" + fileHashStr)
+func (this *Fs) DeleteFile(fileHashStr, filePath string) error {
+	if this.fs.IsFileStore() && this.cfg.FsType == config.FS_FILESTORE && len(filePath) > 0 {
+		return os.Remove(filePath)
 	}
 	return this.fs.DeleteFile(fileHashStr)
 }

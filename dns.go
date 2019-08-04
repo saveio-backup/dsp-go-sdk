@@ -285,7 +285,7 @@ func (this *Dsp) PushLocalFilesToTrackers() {
 	if len(this.DNS.TrackerUrls) == 0 {
 		return
 	}
-	files, err := this.taskMgr.AllDownloadFiles()
+	_, files, err := this.taskMgr.AllDownloadFiles()
 	log.Debugf("all downloaded files %v, err %s", len(files), err)
 	if len(files) == 0 {
 		return

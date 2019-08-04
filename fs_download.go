@@ -179,24 +179,25 @@ func (this *Dsp) CancelDownload(taskId string) error {
 	}
 	if len(sessions) == 0 {
 		log.Debugf("no sessions to cancel")
-		err := this.DeleteDownloadedFile(fileHashStr)
+		err := this.DeleteDownloadedFile(taskId)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
+	log.Debugf("sessions %v", sessions)
 	// broadcast download cancel msg
 	wg := sync.WaitGroup{}
 	for hostAddr, session := range sessions {
 		wg.Add(1)
 		go func(a string, ses *store.Session) {
-			msg := message.NewFileDownloadCancel(ses.SessionId, fileHashStr, ses.WalletAddr, int32(ses.Asset))
+			msg := message.NewFileDownloadCancel(ses.SessionId, fileHashStr, this.WalletAddress(), int32(ses.Asset))
 			client.P2pRequestWithRetry(msg.ToProtoMsg(), a, common.MAX_NETWORK_REQUEST_RETRY)
 			wg.Done()
 		}(hostAddr, session)
 	}
 	wg.Wait()
-	return this.DeleteDownloadedFile(fileHashStr)
+	return this.DeleteDownloadedFile(taskId)
 }
 
 func (this *Dsp) checkIfResumeDownload(taskId string) error {
@@ -265,7 +266,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	peerPayInfos := make(map[string]*file.Payment, 0)
 	if sessions != nil {
 		// use original sessions
-		log.Debugf("use original sessions")
+		log.Debugf("use original sessions: %v", sessions)
 		for hostAddr, session := range sessions {
 			peerPayInfos[hostAddr] = &file.Payment{
 				WalletAddress: session.WalletAddr,
@@ -280,7 +281,6 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	msg := message.NewFileDownloadAsk(fileHashStr, this.WalletAddress(), asset)
 	blockHashes := make([]string, 0)
 	prefix := ""
-	sessionIds := make(map[string]string, 0)
 	replyLock := &sync.Mutex{}
 	log.Debugf("will broadcast file download ask msg to %v", addrs)
 	reply := func(msg proto.Message, addr string) {
@@ -304,7 +304,6 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 		blockHashes = fileMsg.BlockHashes
 		peerPayInfos[addr] = fileMsg.PayInfo
 		prefix = fileMsg.Prefix
-		sessionIds[fileMsg.PayInfo.WalletAddress] = fileMsg.SessionId
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 	}
 	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)
@@ -475,15 +474,22 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	}
 	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v", fileHashStr, len(blockHashes), prefix)
 	fileName, _ := this.taskMgr.GetFileName(taskId)
-	fullFilePath := this.Config.FsFileRoot + "/" + fileHashStr
-	if setFileName {
-		taskDone, err := this.taskMgr.IsTaskDone(taskId)
-		if err != nil {
-			return serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
-		}
-		fullFilePath = utils.GetFileNameAtPath(this.Config.FsFileRoot+"/", fileHashStr, fileName, taskDone)
+	fullFilePath, err := this.taskMgr.GetFilePath(taskId)
+	if err != nil {
+		return serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 	}
-	log.Debugf("get fullFilePath of filehashstr %s, filename %s, path %s", fileHashStr, fileName, fullFilePath)
+	if len(fullFilePath) == 0 {
+		if setFileName {
+			fullFilePath = utils.GetFileNameAtPath(this.Config.FsFileRoot+"/", fileHashStr, fileName)
+			log.Debugf("get fullFilePath of id :%s, filehashstr %s, filename %s, taskDone: %t path %s", taskId, fileHashStr, fileName, fullFilePath)
+		} else {
+			fullFilePath = this.Config.FsFileRoot + "/" + fileHashStr
+		}
+		err = this.taskMgr.SetFilePath(taskId, fullFilePath)
+		if err != nil {
+			return serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
+		}
+	}
 	err = this.taskMgr.BatchSetFileInfo(taskId, nil, nil, nil, uint64(len(blockHashes)))
 	if err != nil {
 		return serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
@@ -553,10 +559,12 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			file.Close()
 		}()
 	}
+	timeout := time.NewTimer(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 	stateChange := this.taskMgr.TaskStateChange(taskId)
 	for {
 		select {
 		case value, ok := <-this.taskMgr.TaskNotify(taskId):
+			timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 			if !ok {
 				return serr.NewDetailError(serr.DOWNLOAD_BLOCK_FAILED, "download internal error")
 			}
@@ -654,6 +662,13 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			case task.TaskStatePause, task.TaskStateCancel:
 				return nil
 			}
+		case <-timeout.C:
+			this.taskMgr.SetTaskState(taskId, task.TaskStateFailed)
+			workerState := this.taskMgr.GetTaskWorkerState(taskId)
+			for addr, state := range workerState {
+				log.Debugf("download timeout worker addr: %s, working : %t, unpaid: %t, totalFailed %v", addr, state.Working, state.Unpaid, state.TotalFailed)
+			}
+			return serr.NewDetailError(serr.DOWNLOAD_FILE_TIMEOUT, "Download file timeout")
 		}
 		done, err := this.taskMgr.IsTaskDone(taskId)
 		if err != nil {
@@ -717,16 +732,17 @@ func (this *Dsp) addUndownloadReq(taskId, fileHashStr string) (int32, error) {
 }
 
 // DeleteDownloadedFile. Delete downloaded file in local.
-func (this *Dsp) DeleteDownloadedFile(fileHashStr string) error {
-	if len(fileHashStr) == 0 {
-		return errors.New("delete file hash string is empty")
+func (this *Dsp) DeleteDownloadedFile(taskId string) error {
+	if len(taskId) == 0 {
+		return errors.New("delete taskId is empty")
 	}
-	err := this.Fs.DeleteFile(fileHashStr)
+	filePath, _ := this.taskMgr.GetFilePath(taskId)
+	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	err := this.Fs.DeleteFile(fileHashStr, filePath)
 	if err != nil {
 		return err
 	}
-	log.Debugf("delete file success")
-	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	log.Debugf("delete local file success")
 	return this.taskMgr.DeleteTask(taskId, true)
 }
 
@@ -814,10 +830,8 @@ func (this *Dsp) StartBackupFileService() {
 }
 
 // AllDownloadFiles. get all downloaded file names
-func (this *Dsp) AllDownloadFiles() []string {
-	files := make([]string, 0)
-	files, _ = this.taskMgr.AllDownloadFiles()
-	return files
+func (this *Dsp) AllDownloadFiles() ([]*store.FileInfo, []string, error) {
+	return this.taskMgr.AllDownloadFiles()
 }
 
 func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.FileInfo, error) {
@@ -829,6 +843,7 @@ func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.FileInfo, error)
 // downloadFileFromPeers. downloadfile base methods. download file from peers.
 func (this *Dsp) downloadFileFromPeers(taskId, fileHashStr string, asset int32, inOrder bool, decryptPwd string, free, setFileName bool, maxPeerCnt int, addrs []string) *serr.SDKError {
 	quotation, err := this.GetDownloadQuotation(fileHashStr, asset, free, addrs)
+	log.Debugf("downloadFileFromPeers :%v", quotation)
 	if err != nil {
 		return serr.NewDetailError(serr.GET_DOWNLOAD_INFO_FAILED_FROM_PEERS, err.Error())
 	}
@@ -1001,14 +1016,27 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 	}
 	fileHashStr := hashes[0]
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
-	if this.taskMgr.IsFileInfoExist(taskId) {
-		return nil
+	if len(taskId) == 0 {
+		var err error
+		taskId, err = this.taskMgr.NewTask(task.TaskTypeDownload)
+		if err != nil {
+			return err
+		}
+		err = this.taskMgr.AddFileBlockHashes(taskId, hashes)
+		if err != nil {
+			return err
+		}
+		err = this.taskMgr.BatchSetFileInfo(taskId, nil, prefix, nil, nil)
+		if err != nil {
+			return err
+		}
+		fullFilePath := utils.GetFileNameAtPath(this.Config.FsFileRoot+"/", fileHashStr, fileName)
+		err = this.taskMgr.SetFilePath(taskId, fullFilePath)
+		if err != nil {
+			return err
+		}
 	}
-	err := this.taskMgr.AddFileBlockHashes(taskId, hashes)
-	if err != nil {
-		return err
-	}
-	err = this.taskMgr.BatchSetFileInfo(taskId, nil, prefix, nil, nil)
+	fullFilePath, err := this.taskMgr.GetFilePath(taskId)
 	if err != nil {
 		return err
 	}
@@ -1016,11 +1044,6 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 	if err != nil {
 		return err
 	}
-	taskDone, err := this.taskMgr.IsTaskDone(taskId)
-	if err != nil {
-		return err
-	}
-	fullFilePath := utils.GetFileNameAtPath(this.Config.FsFileRoot+"/", fileHashStr, fileName, taskDone)
 	output, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		return err
@@ -1031,7 +1054,6 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 	if err != nil {
 		return err
 	}
-
 	this.Fs.SetFsFilePrefix(fullFilePath, prefix)
 	offsets, err := this.Fs.GetAllOffsets(fileHashStr)
 	if err != nil {

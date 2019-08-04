@@ -224,7 +224,7 @@ func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *n
 	this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
 }
 
-// handleFileFetchPauseMsg. client send delete msg to storage nodes for telling them to delete the file and release the resources.
+// handleFileDeleteMsg. client send delete msg to storage nodes for telling them to delete the file and release the resources.
 func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	err := this.waitForTxConfirmed(fileMsg.Tx.Height)
 	if err != nil {
@@ -243,7 +243,8 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 	}
 	log.Debugf("reply delete ack msg success")
 	// TODO: check file owner
-	err = this.DeleteDownloadedFile(fileMsg.Hash)
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
+	err = this.DeleteDownloadedFile(taskId)
 	if err != nil {
 		log.Errorf("delete downloaded file failed", err)
 	}
@@ -358,7 +359,7 @@ func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer
 	if err != nil {
 		log.Errorf("reply download msg failed, err %s", err)
 	}
-	log.Debugf("reply download ack msg success")
+	log.Debugf("reply download cancel msg success")
 	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 

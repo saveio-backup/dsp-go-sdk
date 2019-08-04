@@ -366,7 +366,6 @@ func (this *FileDB) GetFileInfoUint64Value(id string, field int) (uint64, error)
 func (this *FileDB) DeleteFileInfo(id string) error {
 	//TODO: clean up all
 	this.db.NewBatch()
-
 	// delete session
 	countKey := []byte(FileSessionCountKey(id))
 	data, err := this.db.Get(countKey)
@@ -374,11 +373,7 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 		return err
 	}
 	if len(data) > 0 {
-		countBufs, err := json.Marshal(data)
-		if err != nil {
-			return err
-		}
-		count, err := strconv.ParseInt(string(countBufs), 10, 64)
+		count, err := strconv.ParseInt(string(data), 10, 64)
 		if err != nil {
 			return err
 		}
@@ -932,23 +927,25 @@ func (this *FileDB) SaveFileDownloaded(id string) error {
 }
 
 // AllDownloadFiles. get all download files from db
-func (this *FileDB) AllDownloadFiles() ([]string, error) {
+func (this *FileDB) AllDownloadFiles() ([]*FileInfo, []string, error) {
 	countKey := FileDownloadedCountKey()
 	countBuf, err := this.db.Get([]byte(countKey))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(countBuf) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	count, err := strconv.ParseUint(string(countBuf), 10, 32)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	log.Debugf("count :%v", count)
 	all := make([]string, 0, count)
-	fileMap := make(map[string]struct{}, 0)
+	infos := make([]*FileInfo, 0, count)
 	for i := uint32(0); i < uint32(count); i++ {
 		downloadedKey := FileDownloadedKey(i)
+		log.Debugf("download key %v", downloadedKey)
 		idBuf, err := this.db.Get([]byte(downloadedKey))
 		if err != nil || len(idBuf) == 0 {
 			continue
@@ -961,23 +958,9 @@ func (this *FileDB) AllDownloadFiles() ([]string, error) {
 			continue
 		}
 		all = append(all, fi.FileHash)
-		fileMap[fi.FileHash] = struct{}{}
+		infos = append(infos, fi)
 	}
-
-	prefix := fmt.Sprintf("alldownloaded-type=%d&hash=", FileInfoTypeDownload)
-	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
-	if err != nil {
-		return all, nil
-	}
-	for _, k := range keys {
-		hash := k[len(prefix):]
-		_, ok := fileMap[hash]
-		if ok {
-			continue
-		}
-		all = append(all, hash)
-	}
-	return all, nil
+	return infos, all, nil
 }
 
 func (this *FileDB) AddShareTo(id, walletAddress string) error {
@@ -1089,11 +1072,7 @@ func (this *FileDB) AddFileSession(fileInfoId, sessionId, walletAddress, hostAdd
 	}
 	count := int(0)
 	if len(data) > 0 {
-		countBufs, err := json.Marshal(data)
-		if err != nil {
-			return err
-		}
-		parseCount, parseErr := strconv.ParseInt(string(countBufs), 10, 64)
+		parseCount, parseErr := strconv.ParseInt(string(data), 10, 64)
 		if parseErr != nil {
 			return parseErr
 		}
@@ -1127,11 +1106,7 @@ func (this *FileDB) GetFileSessions(fileInfoId string) (map[string]*Session, err
 	if len(data) == 0 {
 		return nil, nil
 	}
-	countBufs, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	count, err := strconv.ParseInt(string(countBufs), 10, 64)
+	count, err := strconv.ParseInt(string(data), 10, 64)
 	if err != nil {
 		return nil, err
 	}

@@ -469,13 +469,14 @@ func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 	if this.progress == nil {
 		return
 	}
-	log.Debugf("EmitProgress taskId: %s, state: %v", taskId, state)
+	log.Debugf("EmitProgress taskId: %s, state: %v path %v", taskId, state, v.GetStringValue(FIELD_NAME_FILEPATH))
 	v.SetFieldValue(FIELD_NAME_TRANSFERSTATE, state)
 	pInfo := &ProgressInfo{
 		TaskId:        taskId,
 		Type:          v.GetTaskType(),
 		FileName:      v.GetStringValue(FIELD_NAME_FILENAME),
 		FileHash:      v.GetStringValue(FIELD_NAME_FILEHASH),
+		FilePath:      v.GetStringValue(FIELD_NAME_FILEPATH),
 		Total:         v.GetTotalBlockCnt(),
 		Count:         this.db.FileProgress(taskId),
 		TaskState:     v.State(),
@@ -509,11 +510,13 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *sdkErr.S
 		log.Errorf("progress is nil")
 		return
 	}
+	log.Debugf("emit result filepath %v", v.GetStringValue(FIELD_NAME_FILEPATH))
 	pInfo := &ProgressInfo{
 		TaskId:    taskId,
 		Type:      v.GetTaskType(),
 		FileName:  v.GetStringValue(FIELD_NAME_FILENAME),
 		FileHash:  v.GetStringValue(FIELD_NAME_FILEHASH),
+		FilePath:  v.GetStringValue(FIELD_NAME_FILEPATH),
 		Total:     v.GetTotalBlockCnt(),
 		Count:     this.db.FileProgress(v.GetStringValue(FIELD_NAME_ID)),
 		CreatedAt: uint64(v.GetCreatedAt()),
@@ -634,7 +637,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				close(done)
 				break
 			}
-			if v.State() == TaskStatePause {
+			if v.State() == TaskStatePause || v.State() == TaskStateFailed {
 				log.Debugf("distribute job break at pause")
 				close(jobCh)
 				break
@@ -742,8 +745,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				log.Debugf("remain block cache len %d", getBlockCacheLen())
 				log.Debugf("receive resp++++ done")
 			}
-			if v.State() == TaskStatePause {
-				log.Debugf("receive channel pause")
+			if v.State() == TaskStatePause || v.State() == TaskStateFailed {
+				log.Debugf("receive state %d", v.State())
 				atomic.AddUint32(&dropDoneCh, 1)
 				close(done)
 				break
@@ -758,7 +761,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 		go func() {
 			for {
 				state := v.State()
-				if state == TaskStateDone || state == TaskStatePause {
+				if state == TaskStateDone || state == TaskStatePause || state == TaskStateFailed {
 					log.Debugf("task is break, state: %d", state)
 					break
 				}
@@ -786,6 +789,14 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			log.Debugf("workers outside for loop")
 		}()
 	}
+}
+
+func (this *TaskMgr) GetTaskWorkerState(taskId string) map[string]*WorkerState {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return nil
+	}
+	return v.GetWorkerState()
 }
 
 func (this *TaskMgr) TaskNotify(taskId string) chan *BlockResp {
@@ -983,7 +994,7 @@ func (this *TaskMgr) GetFileName(taskId string) (string, error) {
 	return this.db.GetFileInfoStringValue(taskId, store.FILEINFO_FIELD_FILENAME)
 }
 
-func (this *TaskMgr) AllDownloadFiles() ([]string, error) {
+func (this *TaskMgr) AllDownloadFiles() ([]*store.FileInfo, []string, error) {
 	return this.db.AllDownloadFiles()
 }
 
@@ -1090,6 +1101,10 @@ func (this *TaskMgr) AddShareTo(id, walletAddress string) error {
 }
 
 func (this *TaskMgr) SetFilePath(id, path string) error {
+	v, ok := this.GetTaskById(id)
+	if ok {
+		v.SetFieldValue(FIELD_NAME_FILEPATH, path)
+	}
 	return this.db.SetFileInfoField(id, store.FILEINFO_FIELD_FILEPATH, path)
 }
 

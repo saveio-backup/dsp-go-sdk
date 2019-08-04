@@ -13,7 +13,7 @@ const (
 	TaskUploadFileCommitWhitelist
 	TaskUploadFileCommitWhitelistDone
 	TaskUploadFileFindReceivers
-	TaskUploadFileFindReceiversDone
+	TaskUploadFileFindReceiversDone // 10
 	TaskUploadFileGeneratePDPData
 	TaskUploadFileTransferBlocks
 	TaskUploadFileTransferBlocksDone

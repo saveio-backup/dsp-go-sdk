@@ -40,6 +40,7 @@ type ProgressInfo struct {
 	Type          TaskType          // task type
 	FileName      string            // file name
 	FileHash      string            // file hash
+	FilePath      string            // file path
 	Total         uint64            // total file's blocks count
 	Count         map[string]uint64 // address <=> count
 	TaskState     TaskState         // task state
@@ -73,6 +74,12 @@ type BackupFileOpt struct {
 	BakHeight  uint64
 	BackUpAddr string
 	BrokenAddr string
+}
+
+type WorkerState struct {
+	Working     bool
+	Unpaid      bool
+	TotalFailed map[string]uint32
 }
 
 const (
@@ -391,6 +398,21 @@ func (this *Task) GetWorkerAddrs() []string {
 		addrs = append(addrs, k)
 	}
 	return addrs
+}
+
+func (this *Task) GetWorkerState() map[string]*WorkerState {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	s := make(map[string]*WorkerState)
+	for addr, w := range this.workers {
+		state := &WorkerState{
+			Working:     w.Working(),
+			Unpaid:      w.Unpaid(),
+			TotalFailed: w.totalFailed,
+		}
+		s[addr] = state
+	}
+	return s
 }
 
 func (this *Task) GetIdleWorker(addrs []string, fileHash, reqHash string) *Worker {
