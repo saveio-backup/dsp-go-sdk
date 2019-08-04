@@ -91,6 +91,9 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
+	this.taskMgr.SetTaskInfos(taskId, "", filePath, string(opt.FileDesc), this.WalletAddress())
+	this.taskMgr.SetCopyNum(taskId, uint64(opt.CopyNum))
+	this.taskMgr.BindTaskId(taskId)
 	var tx, fileHashStr string
 	var totalCount uint64
 	log.Debugf("upload task: %s, will split for file", taskId)
@@ -119,11 +122,13 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSliceDone)
 	fileHashStr = hashes[0]
-	this.taskMgr.SetTaskInfos(taskId, fileHashStr, filePath, string(opt.FileDesc), this.WalletAddress())
-	this.taskMgr.SetCopyNum(taskId, uint64(opt.CopyNum))
-	this.taskMgr.BindTaskId(taskId)
 	log.Debugf("after bind task id")
 	err = this.taskMgr.BatchSetFileInfo(taskId, fileHashStr, nil, nil, totalCount)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
+		return nil, err
+	}
+	err = this.taskMgr.BindTaskId(taskId)
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
@@ -181,12 +186,6 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		return nil, err
 	}
 	log.Debugf("pay for send file success %v %d", payRet, payTxHeight)
-	err = this.taskMgr.SetStoreTx(taskId, payRet.Tx)
-	err = this.taskMgr.SetPrivateKey(taskId, payRet.PrivateKey)
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
-		return nil, err
-	}
 	pause, sdkerr = this.checkIfPause(taskId, fileHashStr)
 	if sdkerr != nil {
 		return nil, errors.New(sdkerr.Error.Error())
@@ -338,7 +337,14 @@ func (this *Dsp) PauseUpload(taskId string) error {
 	if taskType != task.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
-	err := this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
+	failed, err := this.taskMgr.IsTaskFailed(taskId)
+	if err != nil {
+		return err
+	}
+	if failed {
+		return fmt.Errorf("task %s is failed", taskId)
+	}
+	err = this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
 	if err != nil {
 		return err
 	}
@@ -351,7 +357,14 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 	if taskType != task.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
-	err := this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
+	failed, err := this.taskMgr.IsTaskFailed(taskId)
+	if err != nil {
+		return err
+	}
+	if failed {
+		return fmt.Errorf("task %s is failed", taskId)
+	}
+	err = this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
 	if err != nil {
 		log.Errorf("resume task err %s", err)
 		return err
@@ -418,6 +431,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 		return nil, errors.New("delete file hash string is empty")
 	}
 	info, err := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
+	log.Debugf("delete file get fileinfo %v, err %v", info, err)
 	if err != nil || info == nil {
 		log.Debugf("info:%v, err:%s", info, err)
 		return nil, fmt.Errorf("file info not found, %s has deleted", fileHashStr)
@@ -427,57 +441,61 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	}
 	storingNode := this.getFileProvedNode(fileHashStr)
 	txHash, err := this.Chain.Native.Fs.DeleteFile(fileHashStr)
+	log.Debugf("delete file tx %v, err %v", txHash, err)
 	if err != nil {
 		return nil, err
 	}
 	txHashStr := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
-	txHeight, err := this.Chain.GetBlockHeightByTxHash(txHashStr)
-	if err != nil {
-		return nil, err
-	}
 	log.Debugf("delete file txHash %s", txHashStr)
 	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
 	if err != nil || !confirmed {
 		return nil, errors.New("wait for tx confirmed failed")
 	}
+	txHeight, err := this.Chain.GetBlockHeightByTxHash(txHashStr)
+	log.Debugf("delete file tx height %d, err %v", txHeight, err)
+	if err != nil {
+		return nil, err
+	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
+	log.Debugf("taskId of to delete file %v", taskId)
 	if len(storingNode) == 0 {
 		// find breakpoint keep nodelist
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)...)
 	}
-	sessionId, err := this.taskMgr.GetSeesionId(taskId, "")
-	if err != nil {
-		return nil, err
-	}
 	log.Debugf("will broadcast delete msg to %v", storingNode)
 	resp := &common.DeleteUploadFileResp{}
 	if len(storingNode) > 0 {
-		msg := message.NewFileDelete(sessionId, fileHashStr, this.WalletAddress(), txHashStr, uint64(txHeight))
+		log.Debugf("send delete msg to nodes :%v", storingNode)
+		msg := message.NewFileDelete(taskId, fileHashStr, this.WalletAddress(), txHashStr, uint64(txHeight))
 		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
 		if err != nil {
 			return nil, err
 		}
 		nodeStatus := make([]common.DeleteFileStatus, 0, len(m))
 		for addr, deleteErr := range m {
-			errMsg := ""
-			if deleteErr != nil {
-				errMsg = deleteErr.Error()
-			}
-			nodeStatus = append(nodeStatus, common.DeleteFileStatus{
+			s := common.DeleteFileStatus{
 				HostAddr: addr,
-				Status:   "",
-				ErrorMsg: errMsg,
-			})
+				Code:     0,
+				Error:    "",
+			}
+			if deleteErr != nil {
+				s.Error = deleteErr.Error()
+				s.Code = serr.DELETE_FILE_FAILED
+			}
+			nodeStatus = append(nodeStatus, s)
 		}
-		resp.Status = nodeStatus
+		resp.Nodes = nodeStatus
 		log.Debugf("broadcast to delete file msg success")
 	}
+	log.Debugf("send delete msg done %v", resp)
 	// TODO: make transaction commit
 	err = this.taskMgr.DeleteTask(taskId, true)
+	log.Debugf("delete task donne ")
 	if err != nil {
 		log.Errorf("delete upload info from db err: %s", err)
 	}
 	resp.Tx = hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	log.Debugf("delete task success %v", resp)
 	return resp, nil
 }
 
@@ -529,10 +547,6 @@ func (this *Dsp) checkIfResume(taskId string) error {
 	}
 	fileInfo, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	if fileInfo != nil {
-		// nodes := this.getFileProvedNode(fileHashStr)
-		// if uint64(len(nodes)) == opt.CopyNum+1 {
-		// 	go this.finishUpload(taskId, fileHashStr, opt, fileInfo.FileBlockNum)
-		// }
 		now, err := this.Chain.GetCurrentBlockHeight()
 		if err != nil {
 			return err
@@ -540,11 +554,23 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		if fileInfo.ExpiredHeight > uint64(now) {
 			return fmt.Errorf("file:%s has expired", fileHashStr)
 		}
+		hasProvedFile := uint64(len(this.getFileProvedNode(fileHashStr))) == opt.CopyNum+1
+		hasSentAllBlock := uint64(this.taskMgr.UploadedBlockCount(taskId)) == fileInfo.FileBlockNum*(fileInfo.CopyNum+1)
+		if hasProvedFile || hasSentAllBlock {
+			log.Debugf("hasProvedFile: %t, hasSentAllBlock: %t", hasProvedFile, hasSentAllBlock)
+			uploadRet, sdkerr := this.finishUpload(taskId, fileHashStr, opt, fileInfo.FileBlockNum)
+			if uploadRet == nil {
+				this.taskMgr.EmitResult(taskId, nil, sdkerr)
+			} else {
+				this.taskMgr.EmitResult(taskId, uploadRet, sdkerr)
+			}
+			// delete task from cache in the end when success
+			if uploadRet != nil && sdkerr == nil {
+				this.taskMgr.DeleteTask(taskId, false)
+			}
+			return nil
+		}
 	}
-
-	// if uint64(this.taskMgr.UploadedBlockCount(taskId)) == blockNum*(fileInfo.CopyNum+1) {
-	// 	return fmt.Errorf("has sent all blocks, waiting for fs node commit proves")
-	// }
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
 		go this.UploadFile(taskId, filePath, opt)
@@ -571,7 +597,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 
 // payForSendFile pay before send a file
 // return PoR params byte slice, PoR private key of the file or error
-func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum uint64, opt *fs.UploadOption) (*common.PayStoreFileResult, error) {
+func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum uint64, opt *fs.UploadOption) (*common.PayStoreFileResult, error) {
 	fileInfo, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	var paramsBuf, privateKey []byte
 	var tx string
@@ -587,6 +613,7 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 			log.Errorf("serialization prove params failed:%s", err)
 			return nil, err
 		}
+		log.Debugf("paramsBuf :%v", hex.EncodeToString(paramsBuf))
 		txHash, err := this.Chain.Native.Fs.StoreFile(fileHashStr, blockNum, blockSizeInKB, opt.ProveInterval,
 			opt.ExpiredHeight, uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege), paramsBuf, uint64(opt.StorageType))
 		if err != nil {
@@ -599,27 +626,22 @@ func (this *Dsp) payForSendFile(filePath, taskKey, fileHashStr string, blockNum 
 		if err != nil || !confirmed {
 			return nil, errors.New("tx is not confirmed")
 		}
+		err = this.taskMgr.SetStoreTx(taskId, tx)
+		if err != nil {
+			return nil, err
+		}
+		err = this.taskMgr.SetPrivateKey(taskId, privateKey)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		// nodes := this.getFileProvedNode(fileHashStr)
-		// if len(nodes) > 0 {
-		// 	return fmt.Errorf("file:%s has stored", fileHashStr)
-		// }
-		now, err := this.Chain.GetCurrentBlockHeight()
-		if err != nil {
-			return nil, err
-		}
-		if fileInfo.ExpiredHeight > uint64(now) {
-			return nil, fmt.Errorf("file:%s has expired, please delete it first", fileHashStr)
-		}
-		// if uint64(this.taskMgr.UploadedBlockCount(taskId)) == blockNum*(fileInfo.CopyNum+1) {
-		// 	return fmt.Errorf("has sent all blocks, waiting for fs node commit proves")
-		// }
 		paramsBuf = fileInfo.FileProveParam
-		privateKey, err = this.taskMgr.GetFilePrivateKey(taskKey)
+		var err error
+		privateKey, err = this.taskMgr.GetFilePrivateKey(taskId)
 		if err != nil {
 			return nil, err
 		}
-		tx, err = this.taskMgr.GetStoreTx(taskKey)
+		tx, err = this.taskMgr.GetStoreTx(taskId)
 		if err != nil {
 			return nil, err
 		}

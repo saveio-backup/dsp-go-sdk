@@ -82,6 +82,8 @@ func (this *TaskMgr) NewTask(taskT TaskType) (string, error) {
 	return t.id, nil
 }
 
+// BindTaskId. set key to taskId, for upload task, if fileHash is empty, use Hex(filePath) instead.
+// for download/share task, use fileHash
 func (this *TaskMgr) BindTaskId(id string) error {
 	this.lock.Lock()
 	t := this.tasks[id]
@@ -89,7 +91,11 @@ func (this *TaskMgr) BindTaskId(id string) error {
 	hash := ""
 	switch t.taskType {
 	case TaskTypeUpload:
-		hash = utils.StringToSha256Hex(t.filePath)
+		if len(t.fileHash) == 0 {
+			hash = utils.StringToSha256Hex(t.filePath)
+		} else {
+			hash = t.fileHash
+		}
 	default:
 		hash = t.fileHash
 	}
@@ -186,41 +192,74 @@ func (this *TaskMgr) TaskId(prefix, walletAddress string, tp TaskType) string {
 	var key string
 	switch tp {
 	case TaskTypeUpload:
+		// use filePath to get id
 		hexStr := utils.StringToSha256Hex(prefix)
 		key = this.TaskIdKey(hexStr, walletAddress, tp)
+		id, _ := this.db.GetFileInfoId(key)
+		if len(id) > 0 {
+			return id
+		}
+		// use fileHash to get id
+		key = this.TaskIdKey(prefix, walletAddress, tp)
+		id, _ = this.db.GetFileInfoId(key)
+		return id
 	case TaskTypeDownload, TaskTypeShare:
 		key = this.TaskIdKey(prefix, walletAddress, tp)
+		id, _ := this.db.GetFileInfoId(key)
+		return id
 	}
-	id, _ := this.db.GetFileInfoId(key)
-	return id
+	return ""
 }
 
 // DeleteTask. delete task with task id
 func (this *TaskMgr) DeleteTask(taskId string, deleteStore bool) error {
+	if !deleteStore {
+		this.lock.Lock()
+		defer this.lock.Unlock()
+		delete(this.tasks, taskId)
+		return nil
+	}
 	var fileHash, walletAddress, filePath string
 	var tp TaskType
 	this.lock.Lock()
 	task, ok := this.tasks[taskId]
 	if !ok {
-		this.lock.Unlock()
-		return fmt.Errorf("task not found of id %s", taskId)
+		fileInfo, err := this.db.GetFileInfo([]byte(taskId))
+		if err != nil {
+			this.lock.Unlock()
+			return err
+		}
+		fileHash = fileInfo.FileHash
+		walletAddress = fileInfo.WalletAddress
+		switch fileInfo.InfoType {
+		case store.FileInfoTypeUpload:
+			tp = TaskTypeUpload
+		case store.FileInfoTypeDownload:
+			tp = TaskTypeDownload
+		case store.FileInfoTypeShare:
+			tp = TaskTypeShare
+		}
+		filePath = fileInfo.FilePath
+		log.Debugf("get value from db hash :%v, wallet: %v, tp: %v, path: %v", fileHash, walletAddress, tp, filePath)
+	} else {
+		fileHash = task.fileHash
+		walletAddress = task.walletAddr
+		tp = task.taskType
+		filePath = task.filePath
 	}
-	fileHash = task.fileHash
-	walletAddress = task.walletAddr
-	tp = task.taskType
-	filePath = task.filePath
 	delete(this.tasks, taskId)
 	this.lock.Unlock()
-	if !deleteStore {
-		return nil
-	}
-	var key string
-	if task.taskType == TaskTypeUpload {
+	log.Debugf(" will delete db info")
+	if tp == TaskTypeUpload {
 		hexStr := utils.StringToSha256Hex(filePath)
-		key = this.TaskIdKey(hexStr, walletAddress, tp)
-	} else {
-		key = this.TaskIdKey(fileHash, walletAddress, tp)
+		key := this.TaskIdKey(hexStr, walletAddress, tp)
+		err := this.db.DeleteFileInfoId(key)
+		if err != nil {
+			log.Debugf("delete file innfo err %s", err)
+			return err
+		}
 	}
+	key := this.TaskIdKey(fileHash, walletAddress, tp)
 	log.Debugf("delete local file info key %s", key)
 	err := this.db.DeleteFileInfoId(key)
 	if err != nil {

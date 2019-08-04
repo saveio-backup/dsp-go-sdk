@@ -24,13 +24,13 @@ type PayInfo struct {
 
 type DeleteFileStatus struct {
 	HostAddr string
-	Status   string
-	ErrorMsg string
+	Code     uint64
+	Error    string
 }
 
 type DeleteUploadFileResp struct {
-	Tx     string
-	Status []DeleteFileStatus
+	Tx    string
+	Nodes []DeleteFileStatus
 }
 
 type DownloadOption struct {

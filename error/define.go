@@ -53,6 +53,10 @@ const (
 	RENAME_FILED_FAILED
 )
 
+const (
+	DELETE_FILE_FAILED uint64 = iota + 60000
+)
+
 // const (
 // 	MSG_ERROR_CODE_NONE                 = 0     // success
 // 	MSG_ERROR_CODE_PARAM_INVALID        = 50001 // param invalid
