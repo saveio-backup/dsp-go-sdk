@@ -126,7 +126,16 @@ func (this *Dsp) PauseDownload(taskId string) error {
 	if taskType != task.TaskTypeDownload {
 		return fmt.Errorf("task %s is not a download task", taskId)
 	}
-	err := this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
+	canPause, err := this.taskMgr.IsTaskCanPause(taskId)
+	if err != nil {
+		log.Errorf("pause task err %s", err)
+		return err
+	}
+	if !canPause {
+		log.Debugf("task is pausing")
+		return nil
+	}
+	err = this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
 	if err != nil {
 		return err
 	}
@@ -139,7 +148,16 @@ func (this *Dsp) ResumeDownload(taskId string) error {
 	if taskType != task.TaskTypeDownload {
 		return fmt.Errorf("task %s is not a download task", taskId)
 	}
-	err := this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
+	canResume, err := this.taskMgr.IsTaskCanResume(taskId)
+	if err != nil {
+		log.Errorf("resume task err %s", err)
+		return err
+	}
+	if !canResume {
+		log.Debugf("task is resuming")
+		return nil
+	}
+	err = this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
 	if err != nil {
 		return err
 	}
@@ -171,6 +189,13 @@ func (this *Dsp) CancelDownload(taskId string) error {
 	taskType := this.taskMgr.TaskType(taskId)
 	if taskType != task.TaskTypeDownload {
 		return fmt.Errorf("task %s is not a download task", taskId)
+	}
+	cancel, err := this.taskMgr.IsTaskCancel(taskId)
+	if err != nil {
+		return err
+	}
+	if cancel {
+		return fmt.Errorf("task is cancelling: %s", taskId)
 	}
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
 	sessions, err := this.taskMgr.GetFileSessions(taskId)

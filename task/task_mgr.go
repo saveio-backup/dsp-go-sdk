@@ -148,6 +148,13 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 			state:         state,
 			stateChange:   make(chan TaskState, 1),
 		}
+		sessions, err := this.db.GetFileSessions(id)
+		if err != nil {
+			return err
+		}
+		for _, session := range sessions {
+			t.SetSessionId(session.WalletAddr, session.SessionId)
+		}
 		log.Debugf("recover task %s, state %d", id, t.state)
 		switch info.InfoType {
 		case store.FileInfoTypeUpload:
@@ -885,6 +892,22 @@ func (this *TaskMgr) IsTaskCanResume(taskId string) (bool, error) {
 	}
 	return false, nil
 }
+
+func (this *TaskMgr) IsTaskCanPause(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, fmt.Errorf("task not found: %v", taskId)
+	}
+	state := v.State()
+	if state != TaskStatePrepare && state != TaskStatePause && state != TaskStateDoing {
+		return false, fmt.Errorf("can't pause the task, it's state: %d", state)
+	}
+	if state == TaskStateDoing || state == TaskStatePrepare {
+		return true, nil
+	}
+	return false, nil
+}
+
 
 func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)

@@ -116,7 +116,11 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		return
 	}
 	this.taskMgr.SetTaskInfos(taskId, fileMsg.Hash, "", "", this.WalletAddress())
-	this.taskMgr.SetSessionId(taskId, fileMsg.PayInfo.WalletAddress, fileMsg.SessionId)
+	err = this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
+	if err != nil {
+		log.Errorf("add session err in file fetch ask %s", err)
+		return
+	}
 	err = this.taskMgr.BindTaskId(taskId)
 	if err != nil {
 		log.Errorf("set task info err in file fetch ask %s", err)

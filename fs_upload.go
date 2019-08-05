@@ -337,12 +337,14 @@ func (this *Dsp) PauseUpload(taskId string) error {
 	if taskType != task.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
-	failed, err := this.taskMgr.IsTaskFailed(taskId)
+	canPause, err := this.taskMgr.IsTaskCanPause(taskId)
 	if err != nil {
+		log.Errorf("pause task err %s", err)
 		return err
 	}
-	if failed {
-		return fmt.Errorf("task %s is failed", taskId)
+	if !canPause {
+		log.Debugf("task is pausing")
+		return nil
 	}
 	err = this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
 	if err != nil {
@@ -363,6 +365,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 		return err
 	}
 	if !canResume {
+		log.Debugf("task is resuming")
 		return nil
 	}
 	err = this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
@@ -379,8 +382,15 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	if taskType != task.TaskTypeUpload {
 		return nil, fmt.Errorf("task %s is not a upload task", taskId)
 	}
+	cancel, err := this.taskMgr.IsTaskCancel(taskId)
+	if err != nil {
+		return nil, err
+	}
+	if cancel {
+		return nil, fmt.Errorf("task is cancelling: %s", taskId)
+	}
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
-	err := this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
+	err = this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
 	if err != nil {
 		return nil, err
 	}
