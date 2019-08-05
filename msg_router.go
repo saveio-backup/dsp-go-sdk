@@ -402,10 +402,13 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 			Tag:      blockMsg.Tag,
 			Offset:   blockMsg.Offset,
 		})
+		log.Debugf("push block finished")
 		emptyMsg := message.NewEmptyMsg()
 		err := ctx.Reply(context.Background(), emptyMsg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply block msg failed", err)
+		} else {
+			log.Debugf("reply block msg success")
 		}
 	case netcom.BLOCK_OP_GET:
 		sessionId := blockMsg.SessionId

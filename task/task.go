@@ -256,8 +256,11 @@ func (this *Task) PushGetBlock(blockHash string, index int32, block *BlockResp) 
 		log.Errorf("get block resp channel is nil with key %s", key)
 		return
 	}
+	log.Debugf("push block done")
 	go func() {
+		log.Debugf("send block to channel")
 		ch <- block
+		log.Debugf("send block to channel done")
 	}()
 }
 

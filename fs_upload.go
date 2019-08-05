@@ -357,12 +357,13 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 	if taskType != task.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
-	failed, err := this.taskMgr.IsTaskFailed(taskId)
+	canResume, err := this.taskMgr.IsTaskCanResume(taskId)
 	if err != nil {
+		log.Errorf("resume task err %s", err)
 		return err
 	}
-	if failed {
-		return fmt.Errorf("task %s is failed", taskId)
+	if !canResume {
+		return nil
 	}
 	err = this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
 	if err != nil {
@@ -1021,7 +1022,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 		log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 		return false, err
 	}
-	log.Debugf("send block success %s, index:%d, taglen:%d, offset:%d to %s", reqInfo.Hash, reqInfo.Index, len(blockMsgData.tag), blockMsgData.offset, reqInfo.PeerAddr)
+	log.Debugf("send block success %s-%s-%d, taglen:%d, offset:%d to %s", fileHashStr, reqInfo.Hash, reqInfo.Index, len(blockMsgData.tag), blockMsgData.offset, reqInfo.PeerAddr)
 	// stored
 	this.taskMgr.AddUploadedBlock(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index), blockMsgData.dataLen, blockMsgData.offset)
 	// update progress

@@ -871,6 +871,21 @@ func (this *TaskMgr) GetTaskState(taskId string) TaskState {
 	return v.State()
 }
 
+func (this *TaskMgr) IsTaskCanResume(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, fmt.Errorf("task not found: %v", taskId)
+	}
+	state := v.State()
+	if state != TaskStatePrepare && state != TaskStatePause && state != TaskStateDoing {
+		return false, fmt.Errorf("can't resume the task, it's state: %d", state)
+	}
+	if state == TaskStatePause {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

@@ -398,7 +398,10 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 		request := func(resp chan *trackerResp) {
 			log.Debugf("start RegEndPoint %s ipport %v:%v", trackerUrl, netIp, netPort)
 			err := tracker.RegEndPoint(trackerUrl, sigData, this.CurrentAccount().PublicKey, wallet, netIp, uint16(netPort))
-			log.Debugf("start RegEndPoint err %s end", err)
+			log.Debugf("start RegEndPoint end")
+			if err != nil {
+				log.Errorf("req endpoint failed, err %s", err)
+			}
 			resp <- &trackerResp{
 				ret: nil,
 				err: err,
