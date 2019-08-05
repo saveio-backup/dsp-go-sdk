@@ -8,9 +8,10 @@ const (
 )
 
 type DspConfig struct {
-	DBPath             string // level DB data path
-	ChainRpcAddr       string // chain rpc address
-	CheckDepositBlkNum uint64 // check deposit price of block num. if it is 0, no checking
+	DBPath             string   // level DB data path
+	ChainRpcAddr       string   // chain rpc address
+	ChainRpcAddrs      []string // chain rpc addresses
+	CheckDepositBlkNum uint64   // check deposit price of block num. if it is 0, no checking
 
 	FsRepoRoot   string // fs block store repo root path
 	FsFileRoot   string // fs file store root path
@@ -36,7 +37,7 @@ type DspConfig struct {
 func DefaultDspConfig() *DspConfig {
 	config := &DspConfig{
 		DBPath:               "./DB/dsp",
-		ChainRpcAddr:         "http://127.0.0.1:20336",
+		ChainRpcAddrs:        []string{"http://127.0.0.1:20336"},
 		CheckDepositBlkNum:   0,
 		FsRepoRoot:           "./FS",
 		FsFileRoot:           "/",

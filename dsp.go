@@ -38,7 +38,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	}
 	d.Config = c
 	d.Chain = chain.NewChain()
-	d.Chain.NewRpcClient().SetAddress([]string{c.ChainRpcAddr})
+	d.Chain.NewRpcClient().SetAddress(c.ChainRpcAddrs)
 	if acc != nil {
 		d.Chain.SetDefaultAccount(acc)
 		d.Account = acc
