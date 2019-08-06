@@ -967,12 +967,22 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 			for {
 				select {
 				case reqInfo := <-req:
+					pause, cancel, _ := this.taskMgr.IsTaskPauseOrCancel(taskId)
+					if pause || cancel {
+						log.Debugf("stop handle request because task is pause: %t, cancel: %t", pause, cancel)
+						return
+					}
 					timeout.Reset(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
 					key := keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))
 					log.Debugf("handle request key:%s, %s-%s-%d from peer: %s", key, fileHashStr, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
 					msgData := blockMsgDataMap[key]
 					// handle fetch request async
 					done, err := this.handleFetchBlockRequest(taskId, sessionId, fileHashStr, reqInfo, copyNum, totalCount, msgData)
+					pause, cancel, _ = this.taskMgr.IsTaskPauseOrCancel(taskId)
+					if pause || cancel {
+						log.Debugf("stop handle request because task is pause: %t, cancel: %t", pause, cancel)
+						return
+					}
 					if done == false && err == nil {
 						continue
 					}
