@@ -80,6 +80,54 @@ type RequestWithRetryResp struct {
 	Error error
 }
 
+type WaitForConnectedReq struct {
+	Address  string
+	Timeout  time.Duration
+	Response chan *P2pResp
+}
+
+type ChannelWaitForConnectedReq struct {
+	Address  string
+	Timeout  time.Duration
+	Response chan *P2pResp
+}
+
+func ChannelP2pWaitForConnected(address string, timeout time.Duration) error {
+	chReq := &ChannelWaitForConnectedReq{
+		Address:  address,
+		Timeout:  timeout,
+		Response: make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return resp.Error
+		}
+		return nil
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		return fmt.Errorf("[P2pWaitForConnected] timeout")
+	}
+}
+
+func P2pWaitForConnected(address string, timeout time.Duration) error {
+	chReq := &WaitForConnectedReq{
+		Address:  address,
+		Timeout:  timeout,
+		Response: make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return resp.Error
+		}
+		return nil
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		return fmt.Errorf("[P2pWaitForConnected] timeout")
+	}
+}
+
 func P2pConnect(address string) error {
 	chReq := &ConnectReq{
 		Address:  address,

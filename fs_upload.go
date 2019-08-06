@@ -45,9 +45,32 @@ func (this *Dsp) CalculateUploadFee(opt *fs.UploadOption) (*fs.StorageFee, error
 }
 
 // UploadTaskExist. check if upload task is existed by filePath hash string
-func (this *Dsp) UploadTaskExist(filePath string) bool {
+func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
 	taskId := this.taskMgr.TaskId(filePath, this.WalletAddress(), task.TaskTypeUpload)
-	return len(taskId) > 0
+	if len(taskId) == 0 {
+		return false, nil
+	}
+	opt, err := this.taskMgr.GetFileUploadOptions(taskId)
+	if err != nil || opt == nil {
+		return true, fmt.Errorf("get file upload option is nil %s", err)
+	}
+	now, err := this.Chain.GetCurrentBlockHeight()
+	if err != nil {
+		log.Errorf("get current block height err %s", err)
+		return true, err
+	}
+	if opt.ExpiredHeight > uint64(now) {
+		return true, nil
+	}
+	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	if len(fileHashStr) == 0 {
+		return true, fmt.Errorf("file hash not found for %s", taskId)
+	}
+	err = this.taskMgr.DeleteTask(taskId, true)
+	if err != nil {
+		return true, err
+	}
+	return false, nil
 }
 
 // UploadFile upload new file logic synchronously
