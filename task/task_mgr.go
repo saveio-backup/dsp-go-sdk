@@ -153,12 +153,17 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 			return err
 		}
 		for _, session := range sessions {
+			log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
 			t.SetSessionId(session.WalletAddr, session.SessionId)
 		}
 		log.Debugf("recover task %s, state %d", id, t.state)
 		switch info.InfoType {
 		case store.FileInfoTypeUpload:
 			t.taskType = TaskTypeUpload
+			opt, _ := this.GetFileUploadOptions(id)
+			if opt != nil {
+				t.storeType = opt.StorageType
+			}
 		case store.FileInfoTypeDownload:
 			t.taskType = TaskTypeDownload
 		case store.FileInfoTypeShare:
@@ -481,6 +486,7 @@ func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 	pInfo := &ProgressInfo{
 		TaskId:        taskId,
 		Type:          v.GetTaskType(),
+		StoreType:     v.GetStoreType(),
 		FileName:      v.GetStringValue(FIELD_NAME_FILENAME),
 		FileHash:      v.GetStringValue(FIELD_NAME_FILEHASH),
 		FilePath:      v.GetStringValue(FIELD_NAME_FILEPATH),
@@ -521,6 +527,7 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *sdkErr.S
 	pInfo := &ProgressInfo{
 		TaskId:    taskId,
 		Type:      v.GetTaskType(),
+		StoreType: v.GetStoreType(),
 		FileName:  v.GetStringValue(FIELD_NAME_FILENAME),
 		FileHash:  v.GetStringValue(FIELD_NAME_FILEHASH),
 		FilePath:  v.GetStringValue(FIELD_NAME_FILEPATH),
@@ -908,7 +915,6 @@ func (this *TaskMgr) IsTaskCanPause(taskId string) (bool, error) {
 	return false, nil
 }
 
-
 func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
@@ -1151,6 +1157,10 @@ func (this *TaskMgr) GetFilePath(id string) (string, error) {
 }
 
 func (this *TaskMgr) SetFileUploadOptions(id string, opt *fs.UploadOption) error {
+	task, _ := this.GetTaskById(id)
+	if task != nil {
+		task.SetFieldValue(FIELD_NAME_STORE_TYPE, opt.StorageType)
+	}
 	return this.db.SetFileUploadOptions(id, opt)
 }
 func (this *TaskMgr) GetFileUploadOptions(id string) (*fs.UploadOption, error) {

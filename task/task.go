@@ -38,6 +38,7 @@ type BlockResp struct {
 type ProgressInfo struct {
 	TaskId        string
 	Type          TaskType          // task type
+	StoreType     uint64            // store type
 	FileName      string            // file name
 	FileHash      string            // file hash
 	FilePath      string            // file path
@@ -94,6 +95,7 @@ const (
 	FIELD_NAME_WALLETADDR
 	FIELD_NAME_FILEPATH
 	FIELD_NAME_TRANSFERSTATE
+	FIELD_NAME_STORE_TYPE
 )
 
 type TaskState int
@@ -132,6 +134,7 @@ type Task struct {
 	backupOpt        *BackupFileOpt             // backup file options
 	lock             sync.RWMutex               // lock
 	lastWorkerIdx    int                        // last worker index
+	storeType        uint64                     // store file type
 	createdAt        int64                      // createdAt
 }
 
@@ -198,6 +201,8 @@ func (this *Task) SetFieldValue(name int, value interface{}) {
 		this.filePath = value.(string)
 	case FIELD_NAME_TRANSFERSTATE:
 		this.transferingState = value.(TaskProgressState)
+	case FIELD_NAME_STORE_TYPE:
+		this.storeType = value.(uint64)
 	}
 }
 
@@ -404,8 +409,8 @@ func (this *Task) GetWorkerAddrs() []string {
 }
 
 func (this *Task) GetWorkerState() map[string]*WorkerState {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	this.lock.RLock()
+	defer this.lock.RUnlock()
 	s := make(map[string]*WorkerState)
 	for addr, w := range this.workers {
 		state := &WorkerState{
@@ -445,4 +450,10 @@ func (this *Task) NotifyBlock(blk *BlockResp) {
 	defer this.lock.Unlock()
 	log.Debugf("notify block %s-%d-%d-%s", blk.Hash, blk.Index, blk.Offset, blk.PeerAddr)
 	this.notify <- blk
+}
+
+func (this *Task) GetStoreType() uint64 {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.storeType
 }
