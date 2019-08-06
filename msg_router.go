@@ -100,12 +100,13 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	log.Debugf("fetch_ask try find localId %s", localId)
 	if len(localId) > 0 && this.taskMgr.TaskExist(localId) {
 		newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash())
-		log.Debugf("fetch task is exist send file_ack msg %v %v", peer, newMsg)
+		log.Debugf("fetch task is exist send file_ack msg %v", peer)
 		err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply file_ack msg failed", err)
 		} else {
-			this.taskMgr.SetTaskState(localId, task.TaskStateDoing)
+			err = this.taskMgr.SetTaskState(localId, task.TaskStateDoing)
+			log.Debugf("set task state err: %s", err)
 			log.Debugf("reply file_ack msg success")
 		}
 		return

@@ -843,6 +843,7 @@ func (this *TaskMgr) SetTaskState(taskId string, state TaskState) error {
 	if !ok {
 		return fmt.Errorf("task: %s, not exist", taskId)
 	}
+	log.Debugf("set task state: %s %d", taskId, state)
 	switch state {
 	case TaskStatePause:
 		oldState := v.State()

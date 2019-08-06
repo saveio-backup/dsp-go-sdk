@@ -960,7 +960,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 		}
 	}
 	if !this.taskMgr.IsFileDownloaded(taskId) {
-		return errors.New("all blocks have sent but file not be stored")
+		return errors.New("break here, but file not be stored")
 	}
 	this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	log.Infof("received all block, start pdp verify")
