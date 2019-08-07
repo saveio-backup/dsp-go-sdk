@@ -573,6 +573,7 @@ func (this *FileDB) AddFileUnpaid(id, walletAddress string, asset int32, amount 
 		info.Asset = asset
 	}
 	info.Amount = info.Amount + amount
+	log.Debugf("add file unpaid taskId: %s, sender:%s, amount: %d", id, walletAddress, amount)
 	return this.saveFileUnpaidInfo(unpaidKey, info)
 }
 

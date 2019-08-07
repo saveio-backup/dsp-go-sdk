@@ -487,12 +487,13 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.P
 	}
 	// delete record
 	taskKey := this.taskMgr.TaskId(paymentMsg.FileHash, paymentMsg.Sender, task.TaskTypeShare)
+	log.Debugf("delete payment success, taskId:%s, paymentId:%s", taskKey, paymentMsg.PaymentId)
 	err = this.taskMgr.DeleteFileUnpaid(taskKey, paymentMsg.Sender, paymentMsg.Asset, paymentMsg.Amount)
-	log.Debugf("delete unpaid success %v", paymentMsg)
 	if err != nil {
-		log.Debugf("delete share file info %s", err)
+		log.Errorf("delete share file info %s", err)
 		return
 	}
+	log.Debugf("delete unpaid success %v", paymentMsg)
 	err = ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 	if err != nil {
 		log.Errorf("reply delete ok msg failed", err)

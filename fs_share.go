@@ -55,7 +55,12 @@ func (this *Dsp) StartShareServices() {
 				break
 			}
 			// add new unpaid block request to store
-			this.taskMgr.AddFileUnpaid(taskId, req.WalletAddress, req.Asset, uint64(len(blockData))*up)
+			err = this.taskMgr.AddFileUnpaid(taskId, req.WalletAddress, req.Asset, uint64(len(blockData))*up)
+			if err != nil {
+				log.Errorf("add file unpaid failed err : %s", err)
+			} else {
+				log.Debugf("add file unpaid success")
+			}
 		}
 	}
 }
