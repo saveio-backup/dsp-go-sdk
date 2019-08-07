@@ -196,8 +196,17 @@ func (this *Dsp) SetupDNSChannels() error {
 		return nil
 	}
 
+	dnsCfgMap := make(map[string]struct{}, 0)
+	for _, addr := range this.Config.DNSWalletAddrs {
+		dnsCfgMap[addr] = struct{}{}
+	}
+
 	// first init
 	for _, v := range ns {
+		_, ok := dnsCfgMap[v.WalletAddr.ToBase58()]
+		if len(dnsCfgMap) > 0 && !ok {
+			continue
+		}
 		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
 		dnsUrl, _ := this.GetExternalIP(v.WalletAddr.ToBase58())
 		if len(dnsUrl) == 0 {
