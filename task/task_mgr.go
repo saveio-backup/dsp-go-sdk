@@ -138,6 +138,7 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 			fileHash:      info.FileHash,
 			fileName:      info.FileName,
 			total:         info.TotalBlockCount,
+			copyNum:       info.CopyNum,
 			filePath:      info.FilePath,
 			walletAddr:    info.WalletAddress,
 			createdAt:     int64(info.CreatedAt),
@@ -472,6 +473,28 @@ func (this *TaskMgr) OnlyBlock(taskId string) bool {
 	return v.GetBoolValue(FIELD_NAME_ONLYBLOCK)
 }
 
+func (this *TaskMgr) GetProgressInfo(taskId string) *ProgressInfo {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return nil
+	}
+	pInfo := &ProgressInfo{
+		TaskId:    taskId,
+		Type:      v.GetTaskType(),
+		StoreType: v.GetStoreType(),
+		FileName:  v.GetStringValue(FIELD_NAME_FILENAME),
+		FileHash:  v.GetStringValue(FIELD_NAME_FILEHASH),
+		FilePath:  v.GetStringValue(FIELD_NAME_FILEPATH),
+		Total:     v.GetTotalBlockCnt(),
+		CopyNum:   v.GetCopyNum(),
+		Count:     this.db.FileProgress(taskId),
+		TaskState: v.State(),
+		CreatedAt: uint64(v.GetCreatedAt()),
+		UpdatedAt: uint64(time.Now().Unix()),
+	}
+	return pInfo
+}
+
 // EmitProgress. emit progress to channel with taskId
 func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 	v, ok := this.GetTaskById(taskId)
@@ -491,6 +514,7 @@ func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 		FileHash:      v.GetStringValue(FIELD_NAME_FILEHASH),
 		FilePath:      v.GetStringValue(FIELD_NAME_FILEPATH),
 		Total:         v.GetTotalBlockCnt(),
+		CopyNum:       v.GetCopyNum(),
 		Count:         this.db.FileProgress(taskId),
 		TaskState:     v.State(),
 		ProgressState: state,
@@ -532,6 +556,7 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *sdkErr.S
 		FileHash:  v.GetStringValue(FIELD_NAME_FILEHASH),
 		FilePath:  v.GetStringValue(FIELD_NAME_FILEPATH),
 		Total:     v.GetTotalBlockCnt(),
+		CopyNum:   v.GetCopyNum(),
 		Count:     this.db.FileProgress(v.GetStringValue(FIELD_NAME_ID)),
 		CreatedAt: uint64(v.GetCreatedAt()),
 		UpdatedAt: uint64(time.Now().Unix()),
@@ -1161,6 +1186,7 @@ func (this *TaskMgr) SetFileUploadOptions(id string, opt *fs.UploadOption) error
 	task, _ := this.GetTaskById(id)
 	if task != nil {
 		task.SetFieldValue(FIELD_NAME_STORE_TYPE, opt.StorageType)
+		task.SetFieldValue(FIELD_NAME_COPYNUM, opt.CopyNum)
 	}
 	return this.db.SetFileUploadOptions(id, opt)
 }

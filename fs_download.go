@@ -25,25 +25,6 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
-func (this *Dsp) Progress() {
-	this.RegProgressChannel()
-	go func() {
-		stop := false
-		for {
-			v := <-this.ProgressChannel()
-			for node, cnt := range v.Count {
-				log.Infof("file:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
-				stop = (cnt == v.Total)
-			}
-			if stop {
-				break
-			}
-		}
-		// TODO: why need close
-		this.CloseProgressChannel()
-	}()
-}
-
 // DownloadFile. download file, piece by piece from addrs.
 // inOrder: if true, the file will be downloaded block by block in order
 // free: if true, query nodes who can share file free
@@ -223,24 +204,6 @@ func (this *Dsp) CancelDownload(taskId string) error {
 	}
 	wg.Wait()
 	return this.DeleteDownloadedFile(taskId)
-}
-
-func (this *Dsp) checkIfResumeDownload(taskId string) error {
-	opt, err := this.taskMgr.GetFileDownloadOptions(taskId)
-	if err != nil {
-		return err
-	}
-	if opt == nil {
-		return errors.New("can't find download options, please retry")
-	}
-	fileHashStr := this.taskMgr.TaskFileHash(taskId)
-	if len(fileHashStr) == 0 {
-		return fmt.Errorf("filehash not found %s", taskId)
-	}
-	log.Debugf("resume download file")
-	// TODO: record original workers
-	go this.DownloadFile(taskId, fileHashStr, opt)
-	return nil
 }
 
 // DownloadFileByLink. download file by link, e.g oni://Qm...&name=xxx&tr=xxx
@@ -567,6 +530,115 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	return nil
 }
 
+// DeleteDownloadedFile. Delete downloaded file in local.
+func (this *Dsp) DeleteDownloadedFile(taskId string) error {
+	if len(taskId) == 0 {
+		return errors.New("delete taskId is empty")
+	}
+	filePath, _ := this.taskMgr.GetFilePath(taskId)
+	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	err := this.Fs.DeleteFile(fileHashStr, filePath)
+	if err != nil {
+		return err
+	}
+	log.Debugf("delete local file success")
+	return this.taskMgr.DeleteTask(taskId, true)
+}
+
+// StartBackupFileService. start a backup file service to find backup jobs.
+func (this *Dsp) StartBackupFileService() {
+	backupingCnt := 0
+	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
+	backupFailedMap := make(map[string]int)
+	for {
+		select {
+		case <-ticker.C:
+			if this.Chain == nil {
+				break
+			}
+			tasks, err := this.Chain.Native.Fs.GetExpiredProveList()
+			if err != nil || tasks == nil || len(tasks.Tasks) == 0 {
+				break
+			}
+			if backupingCnt > 0 {
+				log.Debugf("doing backup jobs %d", backupingCnt)
+				break
+			}
+			// TODO: optimize with parallel download
+			for _, t := range tasks.Tasks {
+				addrCheckFailed := (t.LuckyAddr.ToBase58() != this.WalletAddress()) ||
+					(t.BackUpAddr.ToBase58() == this.WalletAddress()) ||
+					(t.BrokenAddr.ToBase58() == this.WalletAddress()) ||
+					(t.BrokenAddr.ToBase58() == t.BackUpAddr.ToBase58())
+				if addrCheckFailed {
+					// log.Debugf("address check faield file %s, lucky: %s, backup: %s, broken: %s", string(t.FileHash), t.LuckyAddr.ToBase58(), t.BackUpAddr.ToBase58(), t.BrokenAddr.ToBase58())
+					continue
+				}
+				if len(t.FileHash) == 0 || len(t.BakSrvAddr) == 0 || len(t.BackUpAddr.ToBase58()) == 0 {
+					// log.Debugf("get expired prove list params invalid:%v", t)
+					continue
+				}
+				if v, ok := backupFailedMap[string(t.FileHash)]; ok && v >= common.MAX_BACKUP_FILE_FAILED {
+					log.Debugf("skip backup this file, because has failed")
+					continue
+				}
+				backupingCnt++
+				log.Debugf("go backup file:%s, from:%s %s", t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58())
+				// TODO: test back up logic
+				serr := this.downloadFileFromPeers("", string(t.FileHash), common.ASSET_USDT, true, "", false, false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
+				if serr != nil {
+					log.Errorf("download file err %s", serr)
+					backupFailedMap[string(t.FileHash)] = backupFailedMap[string(t.FileHash)] + 1
+					continue
+				}
+				err := this.Fs.PinRoot(context.TODO(), string(t.FileHash))
+				if err != nil {
+					log.Errorf("pin root file err %s", err)
+					continue
+				}
+				log.Debugf("prove file %s, luckyNum %d, bakHeight:%d, bakNum:%d", string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum)
+				err = this.Fs.StartPDPVerify(string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum, t.BrokenAddr)
+				if err != nil {
+					log.Errorf("pdp verify error for backup task")
+					continue
+				}
+				log.Debugf("backup file:%s success", t.FileHash)
+			}
+			// reset
+			backupingCnt = 0
+		}
+	}
+}
+
+// AllDownloadFiles. get all downloaded file names
+func (this *Dsp) AllDownloadFiles() ([]*store.FileInfo, []string, error) {
+	return this.taskMgr.AllDownloadFiles()
+}
+
+func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.FileInfo, error) {
+	// my task. use my wallet address
+	fileInfoKey := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	return this.taskMgr.GetFileInfo(fileInfoKey)
+}
+
+func (this *Dsp) checkIfResumeDownload(taskId string) error {
+	opt, err := this.taskMgr.GetFileDownloadOptions(taskId)
+	if err != nil {
+		return err
+	}
+	if opt == nil {
+		return errors.New("can't find download options, please retry")
+	}
+	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	if len(fileHashStr) == 0 {
+		return fmt.Errorf("filehash not found %s", taskId)
+	}
+	log.Debugf("resume download file")
+	// TODO: record original workers
+	go this.DownloadFile(taskId, fileHashStr, opt)
+	return nil
+}
+
 func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix string, peerAddrWallet map[string]string, asset int32) *serr.SDKError {
 	blockIndex, err := this.addUndownloadReq(taskId, fileHashStr)
 	if err != nil {
@@ -754,115 +826,6 @@ func (this *Dsp) addUndownloadReq(taskId, fileHashStr string) (int32, error) {
 		}
 	}
 	return blockIndex, nil
-}
-
-// DeleteDownloadedFile. Delete downloaded file in local.
-func (this *Dsp) DeleteDownloadedFile(taskId string) error {
-	if len(taskId) == 0 {
-		return errors.New("delete taskId is empty")
-	}
-	filePath, _ := this.taskMgr.GetFilePath(taskId)
-	fileHashStr := this.taskMgr.TaskFileHash(taskId)
-	err := this.Fs.DeleteFile(fileHashStr, filePath)
-	if err != nil {
-		return err
-	}
-	log.Debugf("delete local file success")
-	return this.taskMgr.DeleteTask(taskId, true)
-}
-
-// RegProgressChannel. register progress channel
-func (this *Dsp) RegProgressChannel() {
-	if this == nil {
-		log.Errorf("this.taskMgr == nil")
-	}
-	this.taskMgr.RegProgressCh()
-}
-
-// GetProgressChannel.
-func (this *Dsp) ProgressChannel() chan *task.ProgressInfo {
-	return this.taskMgr.ProgressCh()
-}
-
-// CloseProgressChannel.
-func (this *Dsp) CloseProgressChannel() {
-	this.taskMgr.CloseProgressCh()
-}
-
-// StartBackupFileService. start a backup file service to find backup jobs.
-func (this *Dsp) StartBackupFileService() {
-	backupingCnt := 0
-	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
-	backupFailedMap := make(map[string]int)
-	for {
-		select {
-		case <-ticker.C:
-			if this.Chain == nil {
-				break
-			}
-			tasks, err := this.Chain.Native.Fs.GetExpiredProveList()
-			if err != nil || tasks == nil || len(tasks.Tasks) == 0 {
-				break
-			}
-			if backupingCnt > 0 {
-				log.Debugf("doing backup jobs %d", backupingCnt)
-				break
-			}
-			// TODO: optimize with parallel download
-			for _, t := range tasks.Tasks {
-				addrCheckFailed := (t.LuckyAddr.ToBase58() != this.WalletAddress()) ||
-					(t.BackUpAddr.ToBase58() == this.WalletAddress()) ||
-					(t.BrokenAddr.ToBase58() == this.WalletAddress()) ||
-					(t.BrokenAddr.ToBase58() == t.BackUpAddr.ToBase58())
-				if addrCheckFailed {
-					// log.Debugf("address check faield file %s, lucky: %s, backup: %s, broken: %s", string(t.FileHash), t.LuckyAddr.ToBase58(), t.BackUpAddr.ToBase58(), t.BrokenAddr.ToBase58())
-					continue
-				}
-				if len(t.FileHash) == 0 || len(t.BakSrvAddr) == 0 || len(t.BackUpAddr.ToBase58()) == 0 {
-					// log.Debugf("get expired prove list params invalid:%v", t)
-					continue
-				}
-				if v, ok := backupFailedMap[string(t.FileHash)]; ok && v >= common.MAX_BACKUP_FILE_FAILED {
-					log.Debugf("skip backup this file, because has failed")
-					continue
-				}
-				backupingCnt++
-				log.Debugf("go backup file:%s, from:%s %s", t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58())
-				// TODO: test back up logic
-				serr := this.downloadFileFromPeers("", string(t.FileHash), common.ASSET_USDT, true, "", false, false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)})
-				if serr != nil {
-					log.Errorf("download file err %s", serr)
-					backupFailedMap[string(t.FileHash)] = backupFailedMap[string(t.FileHash)] + 1
-					continue
-				}
-				err := this.Fs.PinRoot(context.TODO(), string(t.FileHash))
-				if err != nil {
-					log.Errorf("pin root file err %s", err)
-					continue
-				}
-				log.Debugf("prove file %s, luckyNum %d, bakHeight:%d, bakNum:%d", string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum)
-				err = this.Fs.StartPDPVerify(string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum, t.BrokenAddr)
-				if err != nil {
-					log.Errorf("pdp verify error for backup task")
-					continue
-				}
-				log.Debugf("backup file:%s success", t.FileHash)
-			}
-			// reset
-			backupingCnt = 0
-		}
-	}
-}
-
-// AllDownloadFiles. get all downloaded file names
-func (this *Dsp) AllDownloadFiles() ([]*store.FileInfo, []string, error) {
-	return this.taskMgr.AllDownloadFiles()
-}
-
-func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.FileInfo, error) {
-	// my task. use my wallet address
-	fileInfoKey := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
-	return this.taskMgr.GetFileInfo(fileInfoKey)
 }
 
 // downloadFileFromPeers. downloadfile base methods. download file from peers.

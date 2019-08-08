@@ -42,6 +42,7 @@ type ProgressInfo struct {
 	FileName      string            // file name
 	FileHash      string            // file hash
 	FilePath      string            // file path
+	CopyNum       uint64            // copyNum
 	Total         uint64            // total file's blocks count
 	Count         map[string]uint64 // address <=> count
 	TaskState     TaskState         // task state
@@ -96,6 +97,7 @@ const (
 	FIELD_NAME_FILEPATH
 	FIELD_NAME_TRANSFERSTATE
 	FIELD_NAME_STORE_TYPE
+	FIELD_NAME_COPYNUM
 )
 
 type TaskState int
@@ -135,6 +137,7 @@ type Task struct {
 	lock             sync.RWMutex               // lock
 	lastWorkerIdx    int                        // last worker index
 	storeType        uint64                     // store file type
+	copyNum          uint64                     // copyNum
 	createdAt        int64                      // createdAt
 }
 
@@ -203,6 +206,8 @@ func (this *Task) SetFieldValue(name int, value interface{}) {
 		this.transferingState = value.(TaskProgressState)
 	case FIELD_NAME_STORE_TYPE:
 		this.storeType = value.(uint64)
+	case FIELD_NAME_COPYNUM:
+		this.copyNum = value.(uint64)
 	}
 }
 
@@ -311,6 +316,12 @@ func (this *Task) GetCreatedAt() int64 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.createdAt
+}
+
+func (this *Task) GetCopyNum() uint64 {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.copyNum
 }
 
 func (this *Task) SetBackupOpt(opt *BackupFileOpt) {

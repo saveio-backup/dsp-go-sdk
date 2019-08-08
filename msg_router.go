@@ -99,7 +99,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	localId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 	log.Debugf("fetch_ask try find localId %s", localId)
 	if len(localId) > 0 && this.taskMgr.TaskExist(localId) {
-		newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash())
+		newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash(), "", 0)
 		log.Debugf("fetch task is exist send file_ack msg %v", peer)
 		err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
 		if err != nil {
@@ -143,7 +143,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			return
 		}
 	}
-	newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash())
+	newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash(), "", 0)
 	log.Debugf("send file_ack msg %v %v", peer, newMsg)
 	err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
 	if err != nil {

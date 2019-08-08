@@ -32,14 +32,15 @@ const (
 
 // blockInfo record a block infomation of a file
 type BlockInfo struct {
-	FileInfoId string   `json:"file_info_id"`
-	FileHash   string   `json:"file_hash"`
-	Hash       string   `json:"hash"`                  // block  hash
-	Index      uint32   `json:"index"`                 // block index of file
-	DataOffset uint64   `json:"data_offset"`           // block raw data offset
-	DataSize   uint64   `json:"data_size"`             // block data size
-	NodeList   []string `json:"node_list,omitempty"`   // uploaded node list
-	LinkHashes []string `json:"link_hashes,omitempty"` // child link hashes slice
+	FileInfoId string            `json:"file_info_id"`
+	FileHash   string            `json:"file_hash"`
+	Hash       string            `json:"hash"`                  // block  hash
+	Index      uint32            `json:"index"`                 // block index of file
+	DataOffset uint64            `json:"data_offset"`           // block raw data offset
+	DataSize   uint64            `json:"data_size"`             // block data size
+	NodeList   []string          `json:"node_list,omitempty"`   // uploaded node list
+	ReqTimes   map[string]uint64 `json:"block_req_times"`       // record block request times for peer
+	LinkHashes []string          `json:"link_hashes,omitempty"` // child link hashes slice
 }
 
 type Payment struct {
@@ -410,8 +411,20 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 			Hash:       blockHashStr,
 			Index:      index,
 			NodeList:   make([]string, 0),
+			ReqTimes:   make(map[string]uint64),
 		}
 	}
+	reqTime := block.ReqTimes[nodeAddr]
+	if reqTime > 0 {
+		block.ReqTimes[nodeAddr] = reqTime + 1
+		log.Debugf("the node has request this block: %s, times: %d", blockHashStr, reqTime)
+		blockBuf, err := json.Marshal(block)
+		if err != nil {
+			return err
+		}
+		return this.db.Put([]byte(blockKey), blockBuf)
+	}
+	block.ReqTimes[nodeAddr] = reqTime + 1
 	block.NodeList = append(block.NodeList, nodeAddr)
 	if block.DataOffset < offset {
 		block.DataOffset = offset
@@ -443,15 +456,12 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 	if err != nil {
 		return err
 	}
-	key := FileBlockTailKey(id, index)
-	value := fmt.Sprintf("%d", offset+dataSize)
 
 	this.db.NewBatch()
 	this.db.BatchPut([]byte(blockKey), blockBuf)
 	this.db.BatchPut([]byte(progressKey), progressBuf)
 	this.db.BatchPut([]byte(fi.Id), fiBuf)
-	this.db.Put([]byte(key), []byte(value))
-	log.Debugf("nodeAddr %s increase sent %d, tail %v", nodeAddr, fi.SaveBlockCount, value)
+	log.Debugf("nodeAddr %s increase sent %d, reqTime %v", nodeAddr, fi.SaveBlockCount, block.ReqTimes[nodeAddr])
 	return this.db.BatchCommit()
 }
 
@@ -509,7 +519,8 @@ func (this *FileDB) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uin
 		return false
 	}
 	for _, addr := range block.NodeList {
-		if nodeAddr == addr {
+		reqTime := block.ReqTimes[nodeAddr]
+		if nodeAddr == addr && reqTime > common.MAX_SAME_UPLOAD_BLOCK_NUM {
 			return true
 		}
 	}

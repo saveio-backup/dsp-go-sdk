@@ -136,11 +136,15 @@ func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr, pre
 }
 
 // NewFileFetchAck
-func NewFileFetchAck(sessionId, hash string) *Message {
+func NewFileFetchAck(sessionId, hash, blockHash string, blockIndex uint64) *Message {
 	f := &file.File{
 		SessionId: sessionId,
 		Hash:      hash,
 		Operation: common.FILE_OP_FETCH_ACK,
+		Breakpoint: &file.Breakpoint{
+			Hash:  blockHash,
+			Index: blockIndex,
+		},
 	}
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
 }

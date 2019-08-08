@@ -13,6 +13,11 @@ message Tx {
     uint64 height = 2; // tx block height
 }
 
+message Breakpoint {
+    string hash = 1; // breakpoint block hash
+    uint64 index = 2; // breakpoint block index
+}
+
 message File {
    string sessionId = 1;
    string hash = 2;  
@@ -22,4 +27,5 @@ message File {
    int32 chunkSize = 6;
    Payment payInfo = 7;
    Tx tx = 8;
+   Breakpoint breakpoint = 9;
 }

@@ -296,64 +296,6 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	return uploadRet, nil
 }
 
-func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, totalCount uint64) (*common.UploadResult, *serr.SDKError) {
-	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileWaitForPDPProve)
-	proved := this.checkFileBeProved(fileHashStr, opt.CopyNum)
-	log.Debugf("checking file proved done %t", proved)
-	var sdkerr *serr.SDKError
-	if !proved {
-		sdkerr = serr.NewDetailError(serr.FILE_UPLOADED_CHECK_PDP_FAILED, "file has sent, but no enough prove is finished")
-		return nil, sdkerr
-	}
-	pause, sdkerr := this.checkIfPause(taskId, fileHashStr)
-	if sdkerr != nil {
-		return nil, sdkerr
-	}
-	if pause {
-		return nil, nil
-	}
-	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileWaitForPDPProveDone)
-	dnsRegTx, err := this.taskMgr.GetRegUrlTx(taskId)
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
-		return nil, sdkerr
-	}
-	dnsBindTx, err := this.taskMgr.GetBindUrlTx(taskId)
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
-		return nil, sdkerr
-	}
-	saveLink := utils.GenOniLink(fileHashStr, string(opt.FileDesc), opt.FileSize, totalCount, this.DNS.TrackerUrls)
-	if len(dnsRegTx) == 0 || len(dnsBindTx) == 0 {
-		dnsRegTx, dnsBindTx = this.registerUrls(taskId, fileHashStr, saveLink, opt, totalCount)
-	}
-	storeTx, err := this.taskMgr.GetStoreTx(taskId)
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
-		return nil, sdkerr
-	}
-	addWhiteListTx, err := this.taskMgr.GetWhitelistTx(taskId)
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
-		return nil, sdkerr
-	}
-	uploadRet := &common.UploadResult{
-		Tx:             storeTx,
-		FileHash:       fileHashStr,
-		Url:            string(opt.DnsURL),
-		Link:           saveLink,
-		RegisterDnsTx:  dnsRegTx,
-		BindDnsTx:      dnsBindTx,
-		AddWhiteListTx: addWhiteListTx,
-	}
-	err = this.taskMgr.SetRegAndBindUrlTx(taskId, dnsRegTx, dnsBindTx)
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
-		return nil, sdkerr
-	}
-	return uploadRet, nil
-}
-
 // PauseUpload. pause a task
 func (this *Dsp) PauseUpload(taskId string) error {
 	taskType := this.taskMgr.TaskType(taskId)
@@ -458,14 +400,6 @@ func (this *Dsp) RetryUpload(taskId string) error {
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
 	return this.checkIfResume(taskId)
-}
-
-func (this *Dsp) GetTaskState(taskId string) task.TaskState {
-	return this.taskMgr.GetTaskState(taskId)
-}
-
-func (this *Dsp) IsTaskExist(taskId string) bool {
-	return this.taskMgr.TaskExist(taskId)
 }
 
 // DeleteUploadedFile. Delete uploaded file from remote nodes. it is called by the owner
@@ -1059,8 +993,8 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 		return false, nil
 	}
 	msg := message.NewBlockMsg(sessionId, int32(reqInfo.Index), fileHashStr, reqInfo.Hash, blockMsgData.blockData, blockMsgData.tag, int64(blockMsgData.offset))
-	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), reqInfo.PeerAddr, common.MAX_SEND_BLOCK_RETRY)
 	log.Debugf("sending block %s, index:%d, taglen:%d, offset:%d to %s", reqInfo.Hash, reqInfo.Index, len(blockMsgData.tag), blockMsgData.offset, reqInfo.PeerAddr)
+	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), reqInfo.PeerAddr, common.MAX_SEND_BLOCK_RETRY)
 	if err != nil {
 		log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
 		return false, err
@@ -1084,6 +1018,64 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 	}
 	log.Debugf("fetched job done of id %s hash %s index %d peer %s", taskId, fileHashStr, reqInfo.Index, reqInfo.PeerAddr)
 	return true, nil
+}
+
+func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, totalCount uint64) (*common.UploadResult, *serr.SDKError) {
+	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileWaitForPDPProve)
+	proved := this.checkFileBeProved(fileHashStr, opt.CopyNum)
+	log.Debugf("checking file proved done %t", proved)
+	var sdkerr *serr.SDKError
+	if !proved {
+		sdkerr = serr.NewDetailError(serr.FILE_UPLOADED_CHECK_PDP_FAILED, "file has sent, but no enough prove is finished")
+		return nil, sdkerr
+	}
+	pause, sdkerr := this.checkIfPause(taskId, fileHashStr)
+	if sdkerr != nil {
+		return nil, sdkerr
+	}
+	if pause {
+		return nil, nil
+	}
+	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileWaitForPDPProveDone)
+	dnsRegTx, err := this.taskMgr.GetRegUrlTx(taskId)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+		return nil, sdkerr
+	}
+	dnsBindTx, err := this.taskMgr.GetBindUrlTx(taskId)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+		return nil, sdkerr
+	}
+	saveLink := utils.GenOniLink(fileHashStr, string(opt.FileDesc), opt.FileSize, totalCount, this.DNS.TrackerUrls)
+	if len(dnsRegTx) == 0 || len(dnsBindTx) == 0 {
+		dnsRegTx, dnsBindTx = this.registerUrls(taskId, fileHashStr, saveLink, opt, totalCount)
+	}
+	storeTx, err := this.taskMgr.GetStoreTx(taskId)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+		return nil, sdkerr
+	}
+	addWhiteListTx, err := this.taskMgr.GetWhitelistTx(taskId)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+		return nil, sdkerr
+	}
+	uploadRet := &common.UploadResult{
+		Tx:             storeTx,
+		FileHash:       fileHashStr,
+		Url:            string(opt.DnsURL),
+		Link:           saveLink,
+		RegisterDnsTx:  dnsRegTx,
+		BindDnsTx:      dnsBindTx,
+		AddWhiteListTx: addWhiteListTx,
+	}
+	err = this.taskMgr.SetRegAndBindUrlTx(taskId, dnsRegTx, dnsBindTx)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
+		return nil, sdkerr
+	}
+	return uploadRet, nil
 }
 
 // uploadOptValid check upload opt valid

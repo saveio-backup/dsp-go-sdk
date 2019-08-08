@@ -2,6 +2,7 @@ package channel
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -420,7 +421,21 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) er
 			log.Debugf("media transfer success: %t", ret.success)
 			return nil
 		case <-time.After(time.Duration(dspcom.MEDIA_TRANSFER_TIMEOUT) * time.Second):
-			return errors.New("media transfer timeout")
+			resp, err := ch_actor.GetPaymentResult(common.Address(target), common.PaymentID(paymentId))
+			if err != nil {
+				if resp != nil {
+					return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t, err: %s", resp.Reason, resp.Result, err)
+				}
+				return fmt.Errorf("media transfer timeout, getPaymentResult err: %s", err)
+			}
+			if resp == nil {
+				return errors.New("media transfer timeout")
+			}
+			if resp.Result {
+				log.Debugf("media transfer check success: %t", resp.Result)
+				return nil
+			}
+			return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t", resp.Reason, resp.Result)
 		}
 	}
 }

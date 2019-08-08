@@ -65,6 +65,7 @@ const (
 	MAX_PUBLICADDR_CACHE_LEN     = 100 // cache len
 	MAX_PROGRESS_CHANNEL_SIZE    = 100 // progress channel size
 	MAX_SEND_BLOCK_RETRY         = 3   // max send block retry
+	MAX_SAME_UPLOAD_BLOCK_NUM    = 3   // max enable upload same block for same node
 )
 
 // task
