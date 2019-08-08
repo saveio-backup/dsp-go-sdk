@@ -1213,3 +1213,7 @@ func (this *TaskMgr) AddFileSession(fileInfoId string, sessionId, walletAddress,
 	this.SetSessionId(fileInfoId, walletAddress, sessionId)
 	return this.db.AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress, asset, unitPrice)
 }
+
+func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint64, error) {
+	return this.db.GetCurrentSetBlock(fileInfoId)
+}

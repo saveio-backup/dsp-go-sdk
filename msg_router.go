@@ -99,7 +99,12 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	localId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 	log.Debugf("fetch_ask try find localId %s", localId)
 	if len(localId) > 0 && this.taskMgr.TaskExist(localId) {
-		newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash(), "", 0)
+		currentBlockHash, currentBlockIndex, err := this.taskMgr.GetCurrentSetBlock(localId)
+		if err != nil {
+			log.Errorf("get current set block err %s", err)
+			return
+		}
+		newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash(), currentBlockHash, currentBlockIndex)
 		log.Debugf("fetch task is exist send file_ack msg %v", peer)
 		err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
 		if err != nil {

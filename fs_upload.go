@@ -370,15 +370,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	// send pause msg
 	msg := message.NewFileFetchCancel(taskId, fileHashStr)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	for _, err := range ret {
-		if err != nil {
-			return nil, err
-		}
-	}
-	log.Debugf("broadcast cancel msg ret %v", ret)
+	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
 	return this.DeleteUploadedFile(fileHashStr)
 }
 
@@ -444,10 +436,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	if len(storingNode) > 0 {
 		log.Debugf("send delete msg to nodes :%v", storingNode)
 		msg := message.NewFileDelete(taskId, fileHashStr, this.WalletAddress(), txHashStr, uint64(txHeight))
-		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
-		if err != nil {
-			return nil, err
-		}
+		m, _ := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
 		nodeStatus := make([]common.DeleteFileStatus, 0, len(m))
 		for addr, deleteErr := range m {
 			s := common.DeleteFileStatus{
@@ -777,7 +766,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, copyNum uint64) bool {
 func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHashes []string, receiverCount int, txHash string, txHeight uint64) ([]string, error) {
 	var receiverLock sync.Mutex
 	receivers := make([]string, 0)
-	receiverLen := int32(0)
+	receiverBreakpoint := make(map[string]*file.Breakpoint, 0)
 	sessionId, err := this.taskMgr.GetSeesionId(taskId, "")
 	if err != nil {
 		return nil, err
@@ -794,6 +783,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 		fileMsg := p2pMsg.Payload.(*file.File)
 		receiverLock.Lock()
 		receivers = append(receivers, addr)
+		receiverBreakpoint[addr] = fileMsg.Breakpoint
 		receiverLock.Unlock()
 		log.Debugf("send file_ask msg %s success %s, receive file_ack msg", fileMsg.Hash, addr)
 	}
@@ -811,11 +801,17 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 		log.Errorf("wait file receivers broadcast err")
 		return nil, err
 	}
-	log.Debugf("receives :%v, receiverCount %v, real %v", receivers, receiverCount, atomic.LoadInt32(&receiverLen))
+	log.Debugf("receives :%v, receiverCount %v, real %v", receivers, receiverCount)
 	if len(receivers) >= receiverCount {
+		log.Warnf("unbelievable not matched receiver count")
 		receivers = append([]string{}, receivers[:receiverCount]...)
 	}
+	// check breakpoint
+	// for _, addr := range receivers {
+
+	// }
 	log.Debugf("receives :%v, ret %v", receivers, ret)
+
 	return receivers, nil
 }
 

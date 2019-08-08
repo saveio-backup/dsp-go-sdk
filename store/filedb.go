@@ -61,7 +61,6 @@ const (
 	FILEINFO_FIELD_COPYNUM
 	FILEINFO_FIELD_URL
 	FILEINFO_FIELD_LINK
-	FILEINFO_FIELD_REQUESTID
 	FILEINFO_FIELD_FILEPATH
 	FILEINFO_FIELD_WALLETADDR
 	FILEINFO_FIELD_REGURL_TX
@@ -91,7 +90,8 @@ type FileInfo struct {
 	EncryptSalt     string       `json:"encrypt_salt"`
 	Url             string       `json:"url`
 	Link            string       `json:"link"`
-	RequestId       string       `json:"requestId"`
+	CurrentBlock    string       `json:"current_block_hash"`
+	CurrentIndex    uint64       `json:"current_block_index"`
 	CreatedAt       uint64       `json:"createdAt"`
 	UpdatedAt       uint64       `json:"updatedAt"`
 }
@@ -133,14 +133,14 @@ func (this *FileDB) NewFileInfo(id string, ft FileInfoType) error {
 		InfoType:  ft,
 		CreatedAt: uint64(time.Now().Unix()),
 	}
-	err := this.AddToUploadUndoneList(id, ft)
+	err := this.AddToUndoneList(id, ft)
 	if err != nil {
 		return err
 	}
 	return this.saveFileInfo(fi)
 }
 
-func (this *FileDB) AddToUploadUndoneList(id string, ft FileInfoType) error {
+func (this *FileDB) AddToUndoneList(id string, ft FileInfoType) error {
 	var list []string
 	var undoneKey string
 	switch ft {
@@ -225,8 +225,6 @@ func (this *FileDB) SetFileInfoField(id string, field int, value interface{}) er
 		fi.Url = value.(string)
 	case FILEINFO_FIELD_LINK:
 		fi.Link = value.(string)
-	case FILEINFO_FIELD_REQUESTID:
-		fi.RequestId = value.(string)
 	case FILEINFO_FIELD_FILEHASH:
 		fi.FileHash = value.(string)
 	case FILEINFO_FIELD_FILEPATH:
@@ -272,8 +270,6 @@ func (this *FileDB) SetFileInfoFields(id string, m map[int]interface{}) error {
 			fi.Url = value.(string)
 		case FILEINFO_FIELD_LINK:
 			fi.Link = value.(string)
-		case FILEINFO_FIELD_REQUESTID:
-			fi.RequestId = value.(string)
 		case FILEINFO_FIELD_FILEHASH:
 			fi.FileHash = value.(string)
 		case FILEINFO_FIELD_FILEPATH:
@@ -313,8 +309,6 @@ func (this *FileDB) GetFileInfoStringValue(id string, field int) (string, error)
 		return fi.Url, nil
 	case FILEINFO_FIELD_LINK:
 		return fi.Link, nil
-	case FILEINFO_FIELD_REQUESTID:
-		return fi.RequestId, nil
 	case FILEINFO_FIELD_FILEPATH:
 		return fi.FilePath, nil
 	case FILEINFO_FIELD_WALLETADDR:
@@ -452,6 +446,8 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 		return err
 	}
 	fi.SaveBlockCount++
+	fi.CurrentBlock = blockHashStr
+	fi.CurrentIndex = uint64(index)
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
 		return err
@@ -465,22 +461,13 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 	return this.db.BatchCommit()
 }
 
-func (this *FileDB) GetBlockTail(id string, index uint32) (uint64, error) {
-	if index == 0 {
-		return 0, nil
+// GetCurrentSetBlock.
+func (this *FileDB) GetCurrentSetBlock(id string) (string, uint64, error) {
+	fi, err := this.GetFileInfo([]byte(id))
+	if err != nil || fi == nil {
+		return "", 0, fmt.Errorf("get file info not found: %s", id)
 	}
-	key := FileBlockTailKey(id, index)
-	value, err := this.db.Get([]byte(key))
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseUint(string(value), 10, 64)
-}
-
-func (this *FileDB) SetBlockTail(id string, index, tail uint32) error {
-	key := FileBlockTailKey(id, index)
-	value := fmt.Sprintf("%d", tail)
-	return this.db.Put([]byte(key), []byte(value))
+	return fi.CurrentBlock, fi.CurrentIndex, nil
 }
 
 func (this *FileDB) GetBlockOffset(id, blockHash string, index uint32) (uint64, error) {
@@ -694,6 +681,8 @@ func (this *FileDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 		return err
 	}
 	fi.SaveBlockCount++
+	fi.CurrentBlock = blockHashStr
+	fi.CurrentIndex = uint64(index)
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
 		return err
@@ -802,51 +791,6 @@ func (this *FileDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string
 		log.Debugf("undownload hashes-index %s-%d", h, i)
 	}
 	return hashes, indexMap, nil
-	// search = func(parentNodeHash string, parentIndex uint32, blockHash string, blockIndex uint32, uncles []string) (string, error) {
-	// 	blockKey := BlockInfoKey(id, index, blockHash)
-	// 	block, err := this.getBlockInfo(blockKey)
-	// 	if err != nil {
-	// 		return "", err
-	// 	}
-	// 	if block == nil || len(block.NodeList) == 0 {
-	// 		return blockHash, nil
-	// 	}
-	// 	if len(block.LinkHashes) == 0 {
-	// 		return "", nil
-	// 	}
-	// 	oldIndex := index
-	// 	for _, hash := range block.LinkHashes {
-	// 		index++
-	// 		childBlockKey := BlockInfoKey(id, index, hash)
-	// 		childBlock, err := this.getBlockInfo(childBlockKey)
-	// 		if err != nil {
-	// 			return "", err
-	// 		}
-	// 		if childBlock == nil || len(childBlock.NodeList) == 0 {
-	// 			return hash, nil
-	// 		}
-	// 	}
-	// 	for _, hash := range block.LinkHashes {
-	// 		oldIndex++
-	// 		neighBorBlockKey := BlockInfoKey(id, oldIndex, hash)
-	// 		neighBlock, err := this.getBlockInfo(neighBorBlockKey)
-	// 		if err != nil {
-	// 			return "", err
-	// 		}
-	// 		for _, ch := range neighBlock.LinkHashes {
-	// 			index++
-	// 			ret, err := search(ch)
-	// 			if err != nil {
-	// 				return "", err
-	// 			}
-	// 			if len(ret) == 0 {
-	// 				continue
-	// 			}
-	// 			return ret, nil
-	// 		}
-	// 	}
-	// 	return "", nil
-	// }
 }
 
 func (this *FileDB) RemoveFromUndoneList(id string, ft FileInfoType) error {

@@ -39,8 +39,8 @@ const (
 	CHANNEL_TRANSFER_TIMEOUT       = 20 // 60s
 	CHANNEL_WITHDRAW_TIMEOUT       = 60 // 60s
 	P2P_REQ_TIMEOUT                = 15 // 15s
-	P2P_BROADCAST_TIMEOUT          = 60 // 30s
-	TRACKER_SERVICE_TIMEOUT        = 25 // 5s
+	P2P_BROADCAST_TIMEOUT          = 10 // 30s
+	TRACKER_SERVICE_TIMEOUT        = 15 // 5s
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT = 10 // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT         = 20 // media transfer timeout
 )
@@ -64,8 +64,9 @@ const (
 	MAX_DNS_NUM                  = 100 // max dns num
 	MAX_PUBLICADDR_CACHE_LEN     = 100 // cache len
 	MAX_PROGRESS_CHANNEL_SIZE    = 100 // progress channel size
-	MAX_SEND_BLOCK_RETRY         = 3   // max send block retry
+	MAX_SEND_BLOCK_RETRY         = 5   // max send block retry
 	MAX_SAME_UPLOAD_BLOCK_NUM    = 3   // max enable upload same block for same node
+	MAX_TRACKER_REQ_TIMEOUT_NUM  = 2   // max tracker request timeout num
 )
 
 // task

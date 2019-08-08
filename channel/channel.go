@@ -223,9 +223,9 @@ func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) 
 
 // ChannelReachale. is channel open and reachable
 func (this *Channel) ChannelReachale(walletAddr string) bool {
-	log.Debugf("[dsp-go-sdk-channel] ChannelReachale %s", walletAddr)
 	target, _ := chaincomm.AddressFromBase58(walletAddr)
 	reachable, _ := ch_actor.ChannelReachable(common.Address(target))
+	log.Debugf("[dsp-go-sdk-channel] ChannelReachale %s, reachable: %t", walletAddr, reachable)
 	return reachable
 }
 
@@ -357,31 +357,27 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 	if err != nil {
 		return err
 	}
-	type transferResp struct {
-		success bool
-		err     error
+
+	success, err := ch_actor.DirectTransferAsync(common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
+	log.Debugf("media transfer success: %t, err: %s", success, err)
+	if success && err == nil {
+		return nil
 	}
-	transferRespCh := make(chan *transferResp, 0)
-	go func() {
-		success, err := ch_actor.DirectTransferAsync(common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
-		transferRespCh <- &transferResp{
-			success: success,
-			err:     err,
+	resp, err := ch_actor.GetPaymentResult(common.Address(target), common.PaymentID(paymentId))
+	if err != nil {
+		if resp != nil {
+			return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t, err: %s", resp.Reason, resp.Result, err)
 		}
-		log.Debugf("direct transfer success: %t", success)
-	}()
-	for {
-		select {
-		case ret := <-transferRespCh:
-			if ret.err != nil {
-				return ret.err
-			}
-			log.Debugf("direct transfer success: %t", ret.success)
-			return nil
-		case <-time.After(time.Minute):
-			return errors.New("direct transfer timeout")
-		}
+		return fmt.Errorf("media transfer timeout, getPaymentResult err: %s", err)
 	}
+	if resp == nil {
+		return errors.New("media transfer timeout, resp and err is both nil")
+	}
+	if resp.Result {
+		log.Debugf("media transfer check success: %t", resp.Result)
+		return nil
+	}
+	return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t", resp.Reason, resp.Result)
 }
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) error {
@@ -400,44 +396,27 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) er
 	if err != nil {
 		return err
 	}
-	type mediaTransferResp struct {
-		success bool
-		err     error
+	success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
+	log.Debugf("media transfer success: %t, err: %s", success, err)
+	if success && err == nil {
+		return nil
 	}
-	mediaTransferCh := make(chan *mediaTransferResp, 0)
-	go func() {
-		success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
-		mediaTransferCh <- &mediaTransferResp{
-			success: success,
-			err:     err,
+	resp, err := ch_actor.GetPaymentResult(common.Address(target), common.PaymentID(paymentId))
+	if err != nil {
+		if resp != nil {
+			return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t, err: %s", resp.Reason, resp.Result, err)
 		}
-	}()
-	for {
-		select {
-		case ret := <-mediaTransferCh:
-			if ret.err != nil {
-				return ret.err
-			}
-			log.Debugf("media transfer success: %t", ret.success)
-			return nil
-		case <-time.After(time.Duration(dspcom.MEDIA_TRANSFER_TIMEOUT) * time.Second):
-			resp, err := ch_actor.GetPaymentResult(common.Address(target), common.PaymentID(paymentId))
-			if err != nil {
-				if resp != nil {
-					return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t, err: %s", resp.Reason, resp.Result, err)
-				}
-				return fmt.Errorf("media transfer timeout, getPaymentResult err: %s", err)
-			}
-			if resp == nil {
-				return errors.New("media transfer timeout")
-			}
-			if resp.Result {
-				log.Debugf("media transfer check success: %t", resp.Result)
-				return nil
-			}
-			return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t", resp.Reason, resp.Result)
-		}
+		return fmt.Errorf("media transfer timeout, getPaymentResult err: %s", err)
 	}
+	if resp == nil {
+		return errors.New("media transfer timeout, resp and err is both nil")
+	}
+	if resp.Result {
+		log.Debugf("media transfer check success: %t", resp.Result)
+		return nil
+	}
+	return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t", resp.Reason, resp.Result)
+
 }
 
 // GetTargetBalance. check total deposit balance
@@ -568,8 +547,11 @@ func (this *Channel) AllChannels() *ChannelInfosResp {
 		BalanceFormat: "0",
 		Channels:      infos,
 	}
-	all, _ := ch_actor.GetAllChannels()
+	all, err := ch_actor.GetAllChannels()
 	if all == nil {
+		if err != nil {
+			log.Errorf("GetAllChannels err %s", err)
+		}
 		return resp
 	}
 	resp.Balance = all.Balance

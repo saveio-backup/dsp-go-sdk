@@ -33,18 +33,20 @@ type PublicAddrInfo struct {
 }
 
 type DNS struct {
-	TrackerUrls     []string
-	DNSNode         *DNSNodeInfo
-	OnlineDNS       map[string]string
-	PublicAddrCache *lru.ARCCache
+	TrackerUrls      []string
+	TrackerFailedCnt map[string]uint64
+	DNSNode          *DNSNodeInfo
+	OnlineDNS        map[string]string
+	PublicAddrCache  *lru.ARCCache
 }
 
 func NewDNS() *DNS {
 	cache, _ := lru.NewARC(common.MAX_PUBLICADDR_CACHE_LEN)
 	return &DNS{
-		TrackerUrls:     make([]string, 0, common.MAX_TRACKERS_NUM),
-		PublicAddrCache: cache,
-		OnlineDNS:       make(map[string]string),
+		TrackerUrls:      make([]string, 0, common.MAX_TRACKERS_NUM),
+		TrackerFailedCnt: make(map[string]uint64),
+		PublicAddrCache:  cache,
+		OnlineDNS:        make(map[string]string),
 	}
 }
 
@@ -264,7 +266,7 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 				err: nil,
 			}
 		}
-		ret, err := trackerReq(request)
+		ret, err := this.trackerReq(trackerUrl, request)
 		if err != nil {
 			continue
 		}
@@ -281,6 +283,7 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 		}
 		break
 	}
+	this.removeLowQoSTracker()
 	return peerAddrs
 }
 
@@ -419,7 +422,7 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 				err: err,
 			}
 		}
-		_, err = trackerReq(request)
+		_, err = this.trackerReq(trackerUrl, request)
 		if err != nil {
 			continue
 		}
@@ -430,6 +433,7 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 			hasRegister = true
 		}
 	}
+	this.removeLowQoSTracker()
 	if !hasRegister {
 		return errors.New("register endpoint failed for all dns nodes")
 	}
@@ -463,7 +467,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 				err: err,
 			}
 		}
-		ret, err := trackerReq(request)
+		ret, err := this.trackerReq(url, request)
 		if err != nil {
 			log.Errorf("address from req failed %s", err)
 			continue
@@ -483,6 +487,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 		})
 		return hostAddrStr, nil
 	}
+	this.removeLowQoSTracker()
 	return "", errors.New("host addr not found")
 }
 
@@ -503,7 +508,7 @@ type trackerResp struct {
 	err error
 }
 
-func trackerReq(request func(chan *trackerResp)) (interface{}, error) {
+func (this *Dsp) trackerReq(trackerUrl string, request func(chan *trackerResp)) (interface{}, error) {
 	done := make(chan *trackerResp, 1)
 	go request(done)
 	for {
@@ -512,7 +517,25 @@ func trackerReq(request func(chan *trackerResp)) (interface{}, error) {
 			return ret.ret, ret.err
 		case <-time.After(time.Duration(common.TRACKER_SERVICE_TIMEOUT) * time.Second):
 			log.Errorf("tracker request timeout")
+			errCnt := this.DNS.TrackerFailedCnt[trackerUrl]
+			this.DNS.TrackerFailedCnt[trackerUrl] = errCnt + 1
 			return nil, errors.New("tracker request timeout")
 		}
 	}
+}
+
+func (this *Dsp) removeLowQoSTracker() {
+	newTrackers := this.DNS.TrackerUrls[:]
+	for _, url := range this.DNS.TrackerUrls {
+		errCnt := this.DNS.TrackerFailedCnt[url]
+		if errCnt >= common.MAX_TRACKER_REQ_TIMEOUT_NUM {
+			delete(this.DNS.TrackerFailedCnt, url)
+			log.Debugf("remove low QoS tracker %s", url)
+			continue
+		}
+		newTrackers = append(newTrackers, url)
+	}
+	this.DNS.TrackerUrls = newTrackers
+	log.Debugf("new tracker cnt: %d", len(this.DNS.TrackerUrls))
+	log.Debugf("new tracker cnt: %v", this.DNS.TrackerUrls)
 }
