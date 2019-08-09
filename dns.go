@@ -525,7 +525,8 @@ func (this *Dsp) trackerReq(trackerUrl string, request func(chan *trackerResp)) 
 }
 
 func (this *Dsp) removeLowQoSTracker() {
-	newTrackers := this.DNS.TrackerUrls[:]
+	newTrackers := this.DNS.TrackerUrls[:0]
+	log.Debugf("newTrackers: %v", newTrackers)
 	for _, url := range this.DNS.TrackerUrls {
 		errCnt := this.DNS.TrackerFailedCnt[url]
 		if errCnt >= common.MAX_TRACKER_REQ_TIMEOUT_NUM {
@@ -537,5 +538,4 @@ func (this *Dsp) removeLowQoSTracker() {
 	}
 	this.DNS.TrackerUrls = newTrackers
 	log.Debugf("new tracker cnt: %d", len(this.DNS.TrackerUrls))
-	log.Debugf("new tracker cnt: %v", this.DNS.TrackerUrls)
 }

@@ -802,7 +802,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 		return nil, err
 	}
 	log.Debugf("receives :%v, receiverCount %v, real %v", receivers, receiverCount)
-	if len(receivers) >= receiverCount {
+	if len(receivers) > receiverCount {
 		log.Warnf("unbelievable not matched receiver count")
 		receivers = append([]string{}, receivers[:receiverCount]...)
 	}
@@ -978,7 +978,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 	totalCount uint64,
 	blockMsgData *blockMsgData) (bool, error) {
 	// send block
-	log.Debugf("receive fetch block msg of %s-%s-%d from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
+	log.Debugf("receive fetch block msg of %s-%s-%d-%d from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.Index, totalCount, reqInfo.PeerAddr)
 	if len(blockMsgData.blockData) == 0 || len(blockMsgData.tag) == 0 {
 		err := fmt.Errorf("block len %d, tag len %d hash %s, peer %s failed", len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
 		return false, err
