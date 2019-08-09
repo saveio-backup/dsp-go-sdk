@@ -7,6 +7,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/ontio/ontology-eventbus/actor"
 	"github.com/saveio/dsp-go-sdk/common"
+	netCom "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -235,7 +236,7 @@ func P2pRequestWithRetry(msg proto.Message, peer string, retry int) (proto.Messa
 			return nil, resp.Error
 		}
 		return resp.Data, nil
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration((netCom.REQUEST_MSG_TIMEOUT+1)*retry) * time.Second):
 		return nil, fmt.Errorf("[P2pRequestWithRetry] timeout")
 	}
 }
