@@ -886,7 +886,8 @@ func (this *FileDB) SaveFileDownloaded(id string) error {
 func (this *FileDB) AllDownloadFiles() ([]*FileInfo, []string, error) {
 	countKey := FileDownloadedCountKey()
 	countBuf, err := this.db.Get([]byte(countKey))
-	if err != nil {
+	log.Debugf("countkey:%v, countbuf:%v, err %s", countKey, countBuf, err)
+	if err != nil && err != leveldb.ErrNotFound {
 		return nil, nil, err
 	}
 	if len(countBuf) == 0 {

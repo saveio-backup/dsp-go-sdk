@@ -888,7 +888,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 	closeDoneChannel := uint32(0)
 	defer func() {
 		log.Debugf("close doneCh")
-		close(doneCh)
+		// close(doneCh)
 	}()
 	cancelFetch := make(chan struct{})
 	log.Debugf("open %d go routines for fetched, stateChange: %v", maxFetchRoutines, stateChange)
