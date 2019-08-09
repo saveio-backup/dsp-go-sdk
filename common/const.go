@@ -66,7 +66,7 @@ const (
 	MAX_PROGRESS_CHANNEL_SIZE    = 100 // progress channel size
 	MAX_SEND_BLOCK_RETRY         = 5   // max send block retry
 	MAX_SAME_UPLOAD_BLOCK_NUM    = 3   // max enable upload same block for same node
-	MAX_TRACKER_REQ_TIMEOUT_NUM  = 2   // max tracker request timeout num
+	MAX_TRACKER_REQ_TIMEOUT_NUM  = 5   // max tracker request timeout num
 )
 
 // task

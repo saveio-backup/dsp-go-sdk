@@ -536,6 +536,11 @@ func (this *Dsp) removeLowQoSTracker() {
 		}
 		newTrackers = append(newTrackers, url)
 	}
-	this.DNS.TrackerUrls = newTrackers
 	log.Debugf("new tracker cnt: %d", len(this.DNS.TrackerUrls))
+	if len(newTrackers) > 0 {
+		this.DNS.TrackerUrls = newTrackers
+	} else {
+		log.Debugf("set up trackers because of all tracker provide low QoS")
+		this.SetupDNSTrackers()
+	}
 }
