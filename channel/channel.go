@@ -536,53 +536,12 @@ func (this *Channel) ChannelExist(walletAddr string) bool {
 	return true
 }
 
-func (this *Channel) AllChannels() *ChannelInfosResp {
+func (this *Channel) AllChannels() (*ch_actor.ChannelsInfoResp, error) {
 	log.Debugf("[dsp-go-sdk-channel] AllChannels")
 	if !this.isStart {
-		return nil
+		return nil, nil
 	}
-	infos := make([]*channelInfo, 0)
-	resp := &ChannelInfosResp{
-		Balance:       0,
-		BalanceFormat: "0",
-		Channels:      infos,
-	}
-	all, err := ch_actor.GetAllChannels()
-	if all == nil {
-		if err != nil {
-			log.Errorf("GetAllChannels err %s", err)
-		}
-		return resp
-	}
-	resp.Balance = all.Balance
-	resp.BalanceFormat = all.BalanceFormat
-	for _, ch := range all.Channels {
-		info, err := this.chain.Native.Channel.GetChannelInfo(uint64(ch.ChannelId), chaincomm.ADDRESS_EMPTY, chaincomm.ADDRESS_EMPTY)
-		if err != nil {
-			log.Errorf("get channel info err %s", err)
-		}
-		state1 := 1
-		if info != nil && info.Participant1.IsCloser {
-			state1 = 0
-		}
-
-		state2 := 1
-		if info != nil && info.Participant2.IsCloser {
-			state2 = 0
-		}
-
-		resp.Channels = append(resp.Channels, &channelInfo{
-			ChannelId:         ch.ChannelId,
-			Address:           ch.Address,
-			Balance:           ch.Balance,
-			BalanceFormat:     ch.BalanceFormat,
-			HostAddr:          ch.HostAddr,
-			TokenAddr:         ch.TokenAddr,
-			Participant1State: state1,
-			ParticiPant2State: state2,
-		})
-	}
-	return resp
+	return ch_actor.GetAllChannels()
 }
 
 // registerReceiveNotification. register receive payment notification

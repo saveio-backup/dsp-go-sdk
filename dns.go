@@ -128,11 +128,15 @@ func (this *Dsp) SetOnlineDNS() {
 	if this.Config.AutoSetupDNSEnable {
 		return
 	}
-	allsetupChannels := this.Channel.AllChannels().Channels
-	if len(allsetupChannels) == 0 {
+	channels, err := this.Channel.AllChannels()
+	if err != nil {
+		log.Errorf("get all channel err %s", err)
 		return
 	}
-	for _, channel := range allsetupChannels {
+	if len(channels.Channels) == 0 {
+		return
+	}
+	for _, channel := range channels.Channels {
 		url, ok := this.DNS.OnlineDNS[channel.Address]
 		if !ok {
 			continue

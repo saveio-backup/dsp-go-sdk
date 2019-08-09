@@ -12,6 +12,9 @@ func (this *Dsp) GetProgressInfo(taskId string) *task.ProgressInfo {
 }
 
 func (this *Dsp) GetTaskState(taskId string) (task.TaskState, error) {
+	if this.taskMgr == nil {
+		return task.TaskStateNone, nil
+	}
 	_, ok := this.taskMgr.GetTaskById(taskId)
 	if !ok {
 		return 0, fmt.Errorf("get task by id not found %s", taskId)
