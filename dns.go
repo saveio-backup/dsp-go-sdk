@@ -141,6 +141,11 @@ func (this *Dsp) SetOnlineDNS() {
 		if !ok {
 			continue
 		}
+		_, err := this.Channel.OpenChannel(channel.Address, 0)
+		if err != nil {
+			log.Errorf("open channel failed, err %s", err)
+			continue
+		}
 		this.DNS.DNSNode = &DNSNodeInfo{
 			WalletAddr: channel.Address,
 			HostAddr:   url,

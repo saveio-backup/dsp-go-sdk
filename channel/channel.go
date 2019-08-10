@@ -261,11 +261,6 @@ func (this *Channel) OpenChannel(targetAddress string, depositAmount uint64) (co
 	if depositAmount == 0 {
 		return channelID, nil
 	}
-	// err = this.WaitForConnected(targetAddress, time.Duration(dspcom.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
-	// if err != nil {
-	// 	log.Errorf("wait channel connected err %s %s", targetAddress, err)
-	// 	return channelID, err
-	// }
 	bal, _ := this.GetTotalDepositBalance(targetAddress)
 	log.Debugf("channel to %s current balance %d", targetAddress, bal)
 	if bal >= depositAmount {
