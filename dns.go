@@ -69,13 +69,22 @@ func (this *Dsp) SetupDNSTrackers() error {
 	for _, trackerUrl := range this.DNS.TrackerUrls {
 		existDNSMap[trackerUrl] = struct{}{}
 	}
+	dnsCfgMap := make(map[string]struct{}, 0)
+	for _, addr := range this.Config.DNSWalletAddrs {
+		dnsCfgMap[addr] = struct{}{}
+	}
+
 	for _, v := range ns {
+		_, ok := dnsCfgMap[v.WalletAddr.ToBase58()]
+		if len(dnsCfgMap) > 0 && !ok {
+			continue
+		}
 		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
 		if len(this.DNS.TrackerUrls) >= maxTrackerNum {
 			break
 		}
 		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
-		_, ok := existDNSMap[trackerUrl]
+		_, ok = existDNSMap[trackerUrl]
 		if ok {
 			continue
 		}
@@ -96,9 +105,17 @@ func (this *Dsp) SetOnlineDNS() {
 		log.Warnf("no dns nodes")
 		return
 	}
+	dnsCfgMap := make(map[string]struct{}, 0)
+	for _, addr := range this.Config.DNSWalletAddrs {
+		dnsCfgMap[addr] = struct{}{}
+	}
 	// first init
 	for _, v := range ns {
 		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
+		_, ok := dnsCfgMap[v.WalletAddr.ToBase58()]
+		if len(dnsCfgMap) > 0 && !ok {
+			continue
+		}
 		walletAddr := v.WalletAddr.ToBase58()
 		dnsUrl, _ := this.GetExternalIP(walletAddr)
 		if len(dnsUrl) == 0 {
