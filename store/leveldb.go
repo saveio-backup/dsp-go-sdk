@@ -94,26 +94,26 @@ func (self *LevelDBStore) Close() error {
 }
 
 //NewBatch start commit batch
-func (self *LevelDBStore) NewBatch() {
-	self.batch = new(leveldb.Batch)
+func (self *LevelDBStore) NewBatch() *leveldb.Batch {
+	return new(leveldb.Batch)
 }
 
 //BatchPut put a key-value pair to leveldb batch
-func (self *LevelDBStore) BatchPut(key []byte, value []byte) {
-	self.batch.Put(key, value)
+func (self *LevelDBStore) BatchPut(batch *leveldb.Batch, key []byte, value []byte) {
+	batch.Put(key, value)
 }
 
 //BatchDelete delete a key to leveldb batch
-func (self *LevelDBStore) BatchDelete(key []byte) {
-	self.batch.Delete(key)
+func (self *LevelDBStore) BatchDelete(batch *leveldb.Batch, key []byte) {
+	batch.Delete(key)
 }
 
 //BatchCommit commit batch to leveldb
-func (self *LevelDBStore) BatchCommit() error {
-	err := self.db.Write(self.batch, nil)
+func (self *LevelDBStore) BatchCommit(batch *leveldb.Batch) error {
+	err := self.db.Write(batch, nil)
 	if err != nil {
 		return err
 	}
-	self.batch = nil
+	batch = nil
 	return nil
 }

@@ -1217,3 +1217,7 @@ func (this *TaskMgr) AddFileSession(fileInfoId string, sessionId, walletAddress,
 func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint64, error) {
 	return this.db.GetCurrentSetBlock(fileInfoId)
 }
+
+func (this *TaskMgr) SetUploadProgressDone(id, nodeAddr string) error {
+	return this.db.SetUploadProgressDone(id, nodeAddr)
+}

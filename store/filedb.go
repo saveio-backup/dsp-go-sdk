@@ -70,30 +70,30 @@ const (
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type FileInfo struct {
-	Id              string       `json:"id"`
-	FileHash        string       `json:"file_hash"`
-	FileName        string       `json:"file_name"`
-	FilePath        string       `json:"file_path"`
-	WalletAddress   string       `json:"wallet_address"`
-	CopyNum         uint64       `json:"copy_num"`
-	InfoType        FileInfoType `json:"file_info_type"`
-	StoreTx         string       `json:"store_tx"`
-	RegisterDNSTx   string       `json:"register_dns_tx"`
-	BindDNSTx       string       `json:"bind_dns_tx"`
-	WhitelistTx     string       `json:"whitelist_tx"`
-	TotalBlockCount uint64       `json:"total_block_count"`
-	SaveBlockCount  uint64       `json:"save_block_count"`
-	TaskState       uint64       `json:"task_state"`
-	ProvePrivKey    []byte       `json:"prove_private_key"`
-	Prefix          string       `json:"prefix"`
-	EncryptHash     string       `json:"encrypt_hash"`
-	EncryptSalt     string       `json:"encrypt_salt"`
-	Url             string       `json:"url`
-	Link            string       `json:"link"`
-	CurrentBlock    string       `json:"current_block_hash"`
-	CurrentIndex    uint64       `json:"current_block_index"`
-	CreatedAt       uint64       `json:"createdAt"`
-	UpdatedAt       uint64       `json:"updatedAt"`
+	Id                string            `json:"id"`
+	FileHash          string            `json:"file_hash"`
+	FileName          string            `json:"file_name"`
+	FilePath          string            `json:"file_path"`
+	WalletAddress     string            `json:"wallet_address"`
+	CopyNum           uint64            `json:"copy_num"`
+	InfoType          FileInfoType      `json:"file_info_type"`
+	StoreTx           string            `json:"store_tx"`
+	RegisterDNSTx     string            `json:"register_dns_tx"`
+	BindDNSTx         string            `json:"bind_dns_tx"`
+	WhitelistTx       string            `json:"whitelist_tx"`
+	TotalBlockCount   uint64            `json:"total_block_count"`
+	SaveBlockCountMap map[string]uint64 `json:"save_block_count_map"`
+	TaskState         uint64            `json:"task_state"`
+	ProvePrivKey      []byte            `json:"prove_private_key"`
+	Prefix            string            `json:"prefix"`
+	EncryptHash       string            `json:"encrypt_hash"`
+	EncryptSalt       string            `json:"encrypt_salt"`
+	Url               string            `json:"url`
+	Link              string            `json:"link"`
+	CurrentBlock      string            `json:"current_block_hash"`
+	CurrentIndex      uint64            `json:"current_block_index"`
+	CreatedAt         uint64            `json:"createdAt"`
+	UpdatedAt         uint64            `json:"updatedAt"`
 }
 
 type FileProgress struct {
@@ -129,9 +129,10 @@ func (this *FileDB) Close() error {
 
 func (this *FileDB) NewFileInfo(id string, ft FileInfoType) error {
 	fi := &FileInfo{
-		Id:        id,
-		InfoType:  ft,
-		CreatedAt: uint64(time.Now().Unix()),
+		Id:                id,
+		InfoType:          ft,
+		CreatedAt:         uint64(time.Now().Unix()),
+		SaveBlockCountMap: make(map[string]uint64, 0),
 	}
 	err := this.AddToUndoneList(id, ft)
 	if err != nil {
@@ -360,7 +361,7 @@ func (this *FileDB) GetFileInfoUint64Value(id string, field int) (uint64, error)
 // DeleteFileInfo. delete file info from db
 func (this *FileDB) DeleteFileInfo(id string) error {
 	//TODO: clean up all
-	this.db.NewBatch()
+	batch := this.db.NewBatch()
 	// delete session
 	countKey := []byte(FileSessionCountKey(id))
 	data, err := this.db.Get(countKey)
@@ -374,12 +375,12 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 		}
 		for i := 0; i < int(count); i++ {
 			sessionKey := FileSessionKey(id, i)
-			this.db.BatchDelete([]byte(sessionKey))
+			this.db.BatchDelete(batch, []byte(sessionKey))
 		}
-		this.db.BatchDelete(countKey)
+		this.db.BatchDelete(batch, countKey)
 	}
-	this.db.BatchDelete([]byte(id))
-	return this.db.BatchCommit()
+	this.db.BatchDelete(batch, []byte(id))
+	return this.db.BatchCommit(batch)
 }
 
 // AddUploadedBlock. add a uploaded block into db
@@ -445,7 +446,7 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 	if err != nil {
 		return err
 	}
-	fi.SaveBlockCount++
+	fi.SaveBlockCountMap[nodeAddr]++
 	fi.CurrentBlock = blockHashStr
 	fi.CurrentIndex = uint64(index)
 	fiBuf, err := json.Marshal(fi)
@@ -453,12 +454,12 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 		return err
 	}
 
-	this.db.NewBatch()
-	this.db.BatchPut([]byte(blockKey), blockBuf)
-	this.db.BatchPut([]byte(progressKey), progressBuf)
-	this.db.BatchPut([]byte(fi.Id), fiBuf)
-	log.Debugf("nodeAddr %s increase sent %d, reqTime %v", nodeAddr, fi.SaveBlockCount, block.ReqTimes[nodeAddr])
-	return this.db.BatchCommit()
+	batch := this.db.NewBatch()
+	this.db.BatchPut(batch, []byte(blockKey), blockBuf)
+	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
+	this.db.BatchPut(batch, []byte(fi.Id), fiBuf)
+	log.Debugf("nodeAddr %s increase sent %d, reqTime %v", nodeAddr, fi.SaveBlockCountMap, block.ReqTimes[nodeAddr])
+	return this.db.BatchCommit(batch)
 }
 
 // GetCurrentSetBlock.
@@ -493,8 +494,12 @@ func (this *FileDB) IsFileUploaded(id string) bool {
 	if err != nil || fi == nil {
 		return false
 	}
-	uploaded := fi.SaveBlockCount / (fi.CopyNum + 1)
-	log.Debugf("IsFileUploaded %d %d, save: %d, copyNum: %d", fi.TotalBlockCount, uploaded, fi.SaveBlockCount, fi.CopyNum)
+	sum := uint64(0)
+	for _, cnt := range fi.SaveBlockCountMap {
+		sum += cnt
+	}
+	uploaded := sum / (fi.CopyNum + 1)
+	log.Debugf("IsFileUploaded %d %d, save: %d, copyNum: %d", fi.TotalBlockCount, uploaded, sum, fi.CopyNum)
 	return fi.TotalBlockCount > 0 && fi.TotalBlockCount == uploaded
 }
 
@@ -532,14 +537,18 @@ func (this *FileDB) UploadedBlockCount(id string) uint64 {
 	if err != nil || fi == nil {
 		return 0
 	}
-	log.Debugf("get sent %d", fi.SaveBlockCount)
-	return fi.SaveBlockCount
+	sum := uint64(0)
+	for _, cnt := range fi.SaveBlockCountMap {
+		sum += cnt
+	}
+	log.Debugf("get sent %d", sum)
+	return sum
 }
 
 // AddFileBlockHashes add all blocks' hash, using for detect whether the node has stored the file
 func (this *FileDB) AddFileBlockHashes(id string, blocks []string) error {
 	// TODO: test performance
-	this.db.NewBatch()
+	batch := this.db.NewBatch()
 	for index, hash := range blocks {
 		key := BlockInfoKey(id, uint32(index), hash)
 		info := &BlockInfo{
@@ -551,9 +560,9 @@ func (this *FileDB) AddFileBlockHashes(id string, blocks []string) error {
 		if err != nil {
 			return err
 		}
-		this.db.BatchPut([]byte(key), buf)
+		this.db.BatchPut(batch, []byte(key), buf)
 	}
-	return this.db.BatchCommit()
+	return this.db.BatchCommit(batch)
 }
 
 func (this *FileDB) AddFileUnpaid(id, walletAddress string, asset int32, amount uint64) error {
@@ -680,19 +689,19 @@ func (this *FileDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 	if err != nil {
 		return err
 	}
-	fi.SaveBlockCount++
+	fi.SaveBlockCountMap[nodeAddr]++
 	fi.CurrentBlock = blockHashStr
 	fi.CurrentIndex = uint64(index)
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
 		return err
 	}
-	this.db.NewBatch()
+	batch := this.db.NewBatch()
 	log.Debugf("set block %s, len %d", blockKey, len(blockBuf))
-	this.db.BatchPut([]byte(blockKey), blockBuf)
-	this.db.BatchPut([]byte(progressKey), progressBuf)
-	this.db.BatchPut([]byte(id), fiBuf)
-	return this.db.BatchCommit()
+	this.db.BatchPut(batch, []byte(blockKey), blockBuf)
+	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
+	this.db.BatchPut(batch, []byte(id), fiBuf)
+	return this.db.BatchCommit(batch)
 }
 
 //  IsBlockDownloaded
@@ -714,7 +723,11 @@ func (this *FileDB) IsFileDownloaded(id string) bool {
 	if err != nil || fi == nil {
 		return false
 	}
-	return fi.SaveBlockCount == fi.TotalBlockCount
+	sum := uint64(0)
+	for _, cnt := range fi.SaveBlockCountMap {
+		sum += cnt
+	}
+	return sum == fi.TotalBlockCount
 }
 
 // GetUndownloadedBlockInfo. check undownloaded block in-order
@@ -853,6 +866,43 @@ func (this *FileDB) UndoneList(ft FileInfoType) ([]string, error) {
 	return list, nil
 }
 
+func (this *FileDB) SetUploadProgressDone(id, nodeAddr string) error {
+	log.Debugf("SetUploadProgressDone :%s, addr: %s", id, nodeAddr)
+	fi, err := this.GetFileInfo([]byte(id))
+	if err != nil {
+		log.Errorf("get info err %s", err)
+		return err
+	}
+	if fi == nil {
+		log.Errorf("file info not found %d", id)
+		return errors.New("file info not found")
+	}
+	// save upload progress info
+	progressKey := FileProgressKey(fi.Id, nodeAddr)
+	progress, _ := this.getProgressInfo(progressKey)
+	if progress == nil {
+		progress = &FileProgress{
+			FileInfoId:   fi.Id,
+			NodeHostAddr: nodeAddr,
+		}
+	}
+	progress.Progress = fi.TotalBlockCount
+	progressBuf, err := json.Marshal(progress)
+	if err != nil {
+		return err
+	}
+	// TODO: split save block count for each node
+	fi.SaveBlockCountMap[nodeAddr] = fi.TotalBlockCount
+	fiBuf, err := json.Marshal(fi)
+	if err != nil {
+		return err
+	}
+	batch := this.db.NewBatch()
+	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
+	this.db.BatchPut(batch, []byte(fi.Id), fiBuf)
+	return this.db.BatchCommit(batch)
+}
+
 func (this *FileDB) SaveFileUploaded(id string) error {
 	return this.RemoveFromUndoneList(id, FileInfoTypeUpload)
 }
@@ -876,10 +926,10 @@ func (this *FileDB) SaveFileDownloaded(id string) error {
 		return err
 	}
 	fileDownloadedKey := FileDownloadedKey(count)
-	this.db.NewBatch()
-	this.db.BatchPut([]byte(countKey), []byte(fmt.Sprintf("%d", count+1)))
-	this.db.BatchPut([]byte(fileDownloadedKey), []byte(id))
-	return this.db.BatchCommit()
+	batch := this.db.NewBatch()
+	this.db.BatchPut(batch, []byte(countKey), []byte(fmt.Sprintf("%d", count+1)))
+	this.db.BatchPut(batch, []byte(fileDownloadedKey), []byte(id))
+	return this.db.BatchCommit(batch)
 }
 
 // AllDownloadFiles. get all download files from db
@@ -1047,11 +1097,11 @@ func (this *FileDB) AddFileSession(fileInfoId, sessionId, walletAddress, hostAdd
 	if err != nil {
 		return err
 	}
-	this.db.NewBatch()
+	batch := this.db.NewBatch()
 	newCount := int(count) + 1
-	this.db.BatchPut(countKey, []byte(fmt.Sprintf("%d", newCount)))
-	this.db.BatchPut([]byte(sessionKey), sessionBuf)
-	return this.db.BatchCommit()
+	this.db.BatchPut(batch, countKey, []byte(fmt.Sprintf("%d", newCount)))
+	this.db.BatchPut(batch, []byte(sessionKey), sessionBuf)
+	return this.db.BatchCommit(batch)
 }
 
 func (this *FileDB) GetFileSessions(fileInfoId string) (map[string]*Session, error) {

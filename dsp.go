@@ -54,6 +54,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 		d.taskMgr.SetFileDB(dbstore)
 		err = d.taskMgr.RecoverUndoneTask()
 		if err != nil {
+			log.Errorf("recover undone task err %s", err)
 			return nil
 		}
 	}

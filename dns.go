@@ -520,7 +520,7 @@ func (this *Dsp) trackerReq(trackerUrl string, request func(chan *trackerResp)) 
 		case ret := <-done:
 			return ret.ret, ret.err
 		case <-time.After(time.Duration(common.TRACKER_SERVICE_TIMEOUT) * time.Second):
-			log.Errorf("tracker request timeout")
+			log.Errorf("tracker: %s request timeout", trackerUrl)
 			errCnt := this.DNS.TrackerFailedCnt[trackerUrl]
 			this.DNS.TrackerFailedCnt[trackerUrl] = errCnt + 1
 			return nil, errors.New("tracker request timeout")

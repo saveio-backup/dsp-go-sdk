@@ -936,6 +936,9 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	// TODO: remove unused file info fields after prove pdp success
 	this.taskMgr.SetTaskState(taskId, task.TaskStateDone)
 	this.taskMgr.DeleteTask(taskId, false)
+	doneMsg := message.NewFileFetchDone(taskId, fileHashStr)
+	client.P2pSend(addr, doneMsg.ToProtoMsg())
+	log.Debugf("fetch file done, send done msg to %s", addr)
 	return nil
 }
 

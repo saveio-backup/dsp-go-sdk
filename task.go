@@ -15,11 +15,11 @@ func (this *Dsp) GetTaskState(taskId string) (task.TaskState, error) {
 	if this.taskMgr == nil {
 		return task.TaskStateNone, nil
 	}
-	_, ok := this.taskMgr.GetTaskById(taskId)
-	if !ok {
-		return 0, fmt.Errorf("get task by id not found %s", taskId)
+	s := this.taskMgr.GetTaskState(taskId)
+	if s == task.TaskStateNone {
+		return 0, fmt.Errorf("get task state is none %s", taskId)
 	}
-	return this.taskMgr.GetTaskState(taskId), nil
+	return s, nil
 }
 
 func (this *Dsp) IsTaskExist(taskId string) bool {

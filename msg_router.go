@@ -56,10 +56,14 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		this.handleFileFetchPauseMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_FETCH_RESUME:
 		this.handleFileFetchResumeMsg(ctx, peer, fileMsg)
-	case netcom.FILE_OP_DELETE:
-		this.handleFileDeleteMsg(ctx, peer, fileMsg)
+	case netcom.FILE_OP_FETCH_DONE:
+		this.handleFileFetchDoneMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_FETCH_CANCEL:
 		this.handleFileFetchCancelMsg(ctx, peer, fileMsg)
+
+	case netcom.FILE_OP_DELETE:
+		this.handleFileDeleteMsg(ctx, peer, fileMsg)
+
 	case netcom.FILE_OP_DOWNLOAD_ASK:
 		this.handleFileDownloadAskMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_DOWNLOAD:
@@ -68,6 +72,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		this.handleFileDownloadOkMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_DOWNLOAD_CANCEL:
 		this.handleFileDownloadCancelMsg(ctx, peer, fileMsg)
+
 	default:
 	}
 }
@@ -209,6 +214,16 @@ func (this *Dsp) handleFileFetchResumeMsg(ctx *network.ComponentContext, peer *n
 	}
 	log.Debugf("reply resume msg success, resume fetching blocks")
 	this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
+}
+
+func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeUpload)
+	if !this.taskMgr.IsFileInfoExist(taskId) {
+		return
+	}
+	log.Debugf("receive fetch done msg, save task done")
+	this.taskMgr.SetTaskState(taskId, task.TaskStateDone)
+	this.taskMgr.SetUploadProgressDone(taskId, peer.Address)
 }
 
 func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
