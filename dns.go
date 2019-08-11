@@ -471,10 +471,12 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	info, ok := this.DNS.PublicAddrCache.Get(walletAddr)
 	if ok && info != nil {
 		addrInfo, ok := info.(*PublicAddrInfo)
-		if ok && addrInfo != nil && (addrInfo.UpdatedAt+60) > time.Now().Unix() {
+		now := time.Now().Unix()
+		if ok && addrInfo != nil && (addrInfo.UpdatedAt+common.MAX_PUBLIC_IP_UPDATE_SECOND) > now {
 			log.Debugf("GetExternalIP %s addr %s from cache", walletAddr, addrInfo.HostAddr)
 			return addrInfo.HostAddr, nil
 		}
+		log.Debugf("wallet: %s, old host ip :%s, now :%d", walletAddr, addrInfo.HostAddr, addrInfo.UpdatedAt)
 	}
 	address, err := chaincom.AddressFromBase58(walletAddr)
 	if err != nil {

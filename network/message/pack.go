@@ -91,7 +91,7 @@ func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData
 }
 
 // NewFileMsg file msg
-func NewFileMsg(file *file.File, errorCode int32) *Message {
+func NewFileMsg(file *file.File, errorCode uint32) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
@@ -117,7 +117,7 @@ func NewFileMsg(file *file.File, errorCode int32) *Message {
 }
 
 // NewFileFetchAsk
-func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr, prefix, txHash string, height uint64) *Message {
+func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr, prefix string) *Message {
 	f := &file.File{
 		SessionId:   sessionId,
 		Hash:        hash,
@@ -126,10 +126,6 @@ func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr, pre
 		Prefix:      prefix,
 		PayInfo: &file.Payment{
 			WalletAddress: walletAddr,
-		},
-		Tx: &file.Tx{
-			Hash:   txHash,
-			Height: height,
 		},
 	}
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
@@ -150,13 +146,17 @@ func NewFileFetchAck(sessionId, hash, blockHash string, blockIndex uint64) *Mess
 }
 
 // NewFileFetchRdy
-func NewFileFetchRdy(sessionId, hash, walletAddr string) *Message {
+func NewFileFetchRdy(sessionId, hash, walletAddr string, tx string, txHeight uint64) *Message {
 	f := &file.File{
 		SessionId: sessionId,
 		Hash:      hash,
 		Operation: common.FILE_OP_FETCH_RDY,
 		PayInfo: &file.Payment{
 			WalletAddress: walletAddr,
+		},
+		Tx: &file.Tx{
+			Hash:   tx,
+			Height: txHeight,
 		},
 	}
 	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
@@ -215,7 +215,7 @@ func NewFileDownloadAsk(hash, walletAddr string, asset int32) *Message {
 }
 
 // NewFileDownloadAck
-func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr, prefix string, uintPrice uint64, asset, errorCode int32) *Message {
+func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr, prefix string, uintPrice uint64, asset int32, errorCode uint32) *Message {
 	f := &file.File{
 		SessionId:   sessionId,
 		Hash:        hash,
@@ -298,7 +298,7 @@ func NewFileDeleteAck(sessionId, hash string) *Message {
 }
 
 // NewPayment new payment msg
-func NewPayment(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, errorCode int32) *Message {
+func NewPayment(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, errorCode uint32) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),

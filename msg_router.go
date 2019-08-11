@@ -80,26 +80,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 // handleFileAskMsg. client send file ask msg to storage node for handshake and share file metadata
 func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	//TODO: verify & save info
-	err := this.waitForTxConfirmed(fileMsg.Tx.Height)
-	if err != nil {
-		log.Errorf("get block height err %s", err)
-		return
-	}
-	info, _ := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
-	if info == nil {
-		log.Errorf("fetch ask file info is nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
-		return
-	}
-	log.Debugf("get file info %s success", fileMsg.Hash)
-	if info.FileOwner.ToBase58() != fileMsg.PayInfo.WalletAddress {
-		log.Errorf("receive fetch ask msg from wrong account %s", fileMsg.PayInfo.WalletAddress)
-		return
-	}
 
-	if uint64(len(fileMsg.BlockHashes)) != info.FileBlockNum {
-		log.Errorf("block number is unmatched %d, %d", len(fileMsg.BlockHashes), info.FileBlockNum)
-		return
-	}
 	// task exist at runtime
 	localId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 	log.Debugf("fetch_ask try find localId %s", localId)
@@ -166,6 +147,30 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	// my task. use my wallet address
 	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
+	err := this.waitForTxConfirmed(fileMsg.Tx.Height)
+	if err != nil {
+		log.Errorf("get block height err %s", err)
+		this.taskMgr.DeleteTask(taskId, false)
+		return
+	}
+	info, _ := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
+	if info == nil {
+		log.Errorf("fetch ask file info is nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+		this.taskMgr.DeleteTask(taskId, false)
+		return
+	}
+	log.Debugf("get file info %s success", fileMsg.Hash)
+	if info.FileOwner.ToBase58() != fileMsg.PayInfo.WalletAddress {
+		log.Errorf("receive fetch ask msg from wrong account %s", fileMsg.PayInfo.WalletAddress)
+		this.taskMgr.DeleteTask(taskId, false)
+		return
+	}
+	totalCount := this.taskMgr.GetFileTotalBlockCount(taskId)
+	if totalCount != info.FileBlockNum {
+		log.Errorf("block number is unmatched %d, %d", len(fileMsg.BlockHashes), info.FileBlockNum)
+		this.taskMgr.DeleteTask(taskId, false)
+		return
+	}
 	if !this.taskMgr.IsFileInfoExist(taskId) {
 		return
 	}
@@ -174,7 +179,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		return
 	}
 	log.Debugf("start fetching blocks")
-	err := this.startFetchBlocks(fileMsg.Hash, peer.Address, fileMsg.PayInfo.WalletAddress)
+	err = this.startFetchBlocks(fileMsg.Hash, peer.Address, fileMsg.PayInfo.WalletAddress)
 	if err != nil {
 		log.Errorf("start fetch blocks for file %s failed, err:%s", fileMsg.Hash, err)
 	}
@@ -276,7 +281,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		return
 	}
 	replyErr := func(sessionId, fileHash string, errorCode int32, ctx *network.ComponentContext) {
-		replyMsg := message.NewFileDownloadAck(sessionId, fileMsg.Hash, nil, "", "", 0, 0, errorCode)
+		replyMsg := message.NewFileDownloadAck(sessionId, fileMsg.Hash, nil, "", "", 0, 0, uint32(errorCode))
 		err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		log.Debugf("reply download_ack errmsg code %d, err %s", errorCode, err)
 		if err != nil {

@@ -128,15 +128,14 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	if pause {
 		return nil, nil
 	}
-	log.Debugf("will split file")
 	hashes, err := this.Fs.NodesFromFile(filePath, this.WalletAddress(), opt.Encrypt, string(opt.EncryptPassword))
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
 		log.Errorf("node from file err: %s", err)
 		return nil, err
 	}
-	log.Debugf("node from file finished")
 	totalCount = uint64(len(hashes))
+	log.Debugf("node from file finished, taskId:%s, path: %s, fileHash: %s, totalCount:%d", taskId, filePath, hashes[0], totalCount)
 	if totalCount == 0 {
 		err = errors.New("sharding failed no blocks")
 		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
@@ -188,6 +187,22 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	if uint64(len(nodeList)) < opt.CopyNum+1 {
 		sdkerr = serr.NewDetailError(serr.ONLINE_NODES_NOT_ENOUGH, fmt.Sprintf("node is not enough %d, copyNum %d", len(nodeList), opt.CopyNum))
 		return nil, sdkerr.Error
+	}
+	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileFindReceivers)
+	// receivers, err := this.waitFileReceivers(taskId, fileHashStr, nodeList, hashes, int(opt.CopyNum)+1, tx, uint64(payTxHeight))
+	receivers, err := this.waitFileReceivers(taskId, fileHashStr, nodeList, hashes, int(opt.CopyNum)+1)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.SEARCH_RECEIVERS_FAILED, err.Error())
+		return nil, err
+	}
+	log.Debugf("receivers:%v", receivers)
+	if len(receivers) < int(opt.CopyNum)+1 {
+		err = errors.New("file receivers is not enough")
+		sdkerr = serr.NewDetailError(serr.RECEIVERS_NOT_ENOUGH, err.Error())
+		return nil, err
+	}
+	if len(receivers) > int(opt.CopyNum)+1 {
+		receivers = receivers[:int(opt.CopyNum)+1]
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFilePaying)
 	pause, sdkerr = this.checkIfPause(taskId, fileHashStr)
@@ -241,23 +256,8 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	if pause {
 		return nil, nil
 	}
-	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileFindReceivers)
-	receivers, err := this.waitFileReceivers(taskId, fileHashStr, nodeList, hashes, int(opt.CopyNum)+1, tx, uint64(payTxHeight))
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.SEARCH_RECEIVERS_FAILED, err.Error())
-		return nil, err
-	}
-	log.Debugf("receivers:%v", receivers)
-	if len(receivers) < int(opt.CopyNum)+1 {
-		err = errors.New("file receivers is not enough")
-		sdkerr = serr.NewDetailError(serr.RECEIVERS_NOT_ENOUGH, err.Error())
-		return nil, err
-	}
-	if len(receivers) > int(opt.CopyNum)+1 {
-		receivers = receivers[:int(opt.CopyNum)+1]
-	}
 	// notify fetch ready to all receivers
-	err = this.notifyFetchReady(taskId, fileHashStr, receivers)
+	err = this.notifyFetchReady(taskId, fileHashStr, receivers, tx, uint64(payTxHeight))
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.RECEIVERS_REJECTED, err.Error())
 		return nil, err
@@ -277,7 +277,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		maxFetchRoutines = common.MAX_UPLOAD_ROUTINES
 	}
 	sdkerr = this.waitForFetchBlock(taskId, hashes, maxFetchRoutines, int(opt.CopyNum), p.G0, p.FileId, payRet.PrivateKey)
-	log.Debugf("waitForFetchBlock finish %v ", sdkerr)
+	log.Debugf("waitForFetchBlock finish id: %s, %v ", taskId, sdkerr)
 	if sdkerr != nil {
 		return nil, errors.New(sdkerr.Error.Error())
 	}
@@ -763,7 +763,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, copyNum uint64) bool {
 // client -> fetch_ask -> peer.
 // client <- fetch_ack <- peer.
 // return receivers
-func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHashes []string, receiverCount int, txHash string, txHeight uint64) ([]string, error) {
+func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	var receiverLock sync.Mutex
 	receivers := make([]string, 0)
 	receiverBreakpoint := make(map[string]*file.Breakpoint, 0)
@@ -771,7 +771,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 	if err != nil {
 		return nil, err
 	}
-	msg := message.NewFileFetchAsk(sessionId, fileHashStr, blockHashes, this.WalletAddress(), this.WalletAddress(), txHash, txHeight)
+	msg := message.NewFileFetchAsk(sessionId, fileHashStr, blockHashes, this.WalletAddress(), this.WalletAddress())
 	action := func(res proto.Message, addr string) {
 		log.Debugf("send file ask msg success %s", addr)
 		p2pMsg := message.ReadMessage(res)
@@ -816,12 +816,12 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 }
 
 // notifyFetchReady send fetch_rdy msg to receivers
-func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string) error {
+func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string, tx string, txHeight uint64) error {
 	sessionId, err := this.taskMgr.GetSeesionId(taskId, "")
 	if err != nil {
 		return err
 	}
-	msg := message.NewFileFetchRdy(sessionId, fileHashStr, this.WalletAddress())
+	msg := message.NewFileFetchRdy(sessionId, fileHashStr, this.WalletAddress(), tx, txHeight)
 	this.taskMgr.SetTaskTransferring(taskId, true)
 	ret, err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil, nil)
 	if err != nil {
@@ -1019,7 +1019,7 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, totalCount uint64) (*common.UploadResult, *serr.SDKError) {
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileWaitForPDPProve)
 	proved := this.checkFileBeProved(fileHashStr, opt.CopyNum)
-	log.Debugf("checking file proved done %t", proved)
+	log.Debugf("checking file: %s proved done %t", fileHashStr, proved)
 	var sdkerr *serr.SDKError
 	if !proved {
 		sdkerr = serr.NewDetailError(serr.FILE_UPLOADED_CHECK_PDP_FAILED, "file has sent, but no enough prove is finished")

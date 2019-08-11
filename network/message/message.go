@@ -16,7 +16,7 @@ type Header struct {
 }
 
 type Error struct {
-	Code    int32
+	Code    uint32
 	Message string
 }
 

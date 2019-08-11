@@ -57,7 +57,7 @@ const (
 	MSG_ERROR_INTERNAL_ERROR            = 50007 // internal err
 )
 
-var MSG_ERROR_MSG = map[int32]string{
+var MSG_ERROR_MSG = map[uint32]string{
 	MSG_ERROR_CODE_NONE:                 "success",
 	MSG_ERROR_CODE_PARAM_INVALID:        "invalid params",
 	MSG_ERROR_CODE_DOWNLOAD_REFUSED:     "download refused",

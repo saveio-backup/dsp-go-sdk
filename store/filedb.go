@@ -886,6 +886,7 @@ func (this *FileDB) SetUploadProgressDone(id, nodeAddr string) error {
 			NodeHostAddr: nodeAddr,
 		}
 	}
+	log.Debugf("save upload progress done before: %v %v", fi.SaveBlockCountMap, progress.Progress)
 	progress.Progress = fi.TotalBlockCount
 	progressBuf, err := json.Marshal(progress)
 	if err != nil {
@@ -893,6 +894,7 @@ func (this *FileDB) SetUploadProgressDone(id, nodeAddr string) error {
 	}
 	// TODO: split save block count for each node
 	fi.SaveBlockCountMap[nodeAddr] = fi.TotalBlockCount
+	log.Debugf("save upload progress done after: %v %v", fi.SaveBlockCountMap, progress.Progress)
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
 		return err
