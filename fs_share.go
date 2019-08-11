@@ -43,12 +43,6 @@ func (this *Dsp) StartShareServices() {
 			// TEST: client get tag
 			tag, _ := this.Fs.GetTag(req.Hash, req.FileHash, uint64(req.Index))
 			sessionId, _ := this.taskMgr.GetSeesionId(taskId, "")
-			msg := message.NewBlockMsg(sessionId, req.Index, req.FileHash, req.Hash, blockData, tag, int64(offset))
-			_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), req.PeerAddr, common.MAX_SEND_BLOCK_RETRY)
-			if err != nil {
-				log.Errorf("share send block, err: %s", err)
-				break
-			}
 			up, err := this.GetFileUnitPrice(req.Asset)
 			if err != nil {
 				log.Errorf("get file unit price err after send block, err: %s", err)
@@ -58,8 +52,16 @@ func (this *Dsp) StartShareServices() {
 			err = this.taskMgr.AddFileUnpaid(taskId, req.WalletAddress, req.Asset, uint64(len(blockData))*up)
 			if err != nil {
 				log.Errorf("add file unpaid failed err : %s", err)
+				break
 			} else {
 				log.Debugf("add file unpaid success")
+			}
+
+			msg := message.NewBlockMsg(sessionId, req.Index, req.FileHash, req.Hash, blockData, tag, int64(offset))
+			_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), req.PeerAddr, common.MAX_SEND_BLOCK_RETRY)
+			if err != nil {
+				log.Errorf("share send block, err: %s", err)
+				// TODO: delete unpaid msg if need
 			}
 		}
 	}

@@ -494,7 +494,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 // handlePaymentMsg. handle payment msg
 func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	paymentMsg := msg.Payload.(*payment.Payment)
-	log.Debugf("received paymentMsg sender:%v, asset:%d, amount:%d", paymentMsg.Sender, paymentMsg.Asset, paymentMsg.Amount)
+	log.Debugf("received paymentMsg: %v sender:%v, asset:%d, amount:%d", paymentMsg.PaymentId, paymentMsg.Sender, paymentMsg.Asset, paymentMsg.Amount)
 	// check
 	pay, err := this.Channel.GetPayment(paymentMsg.PaymentId)
 	if err != nil || pay == nil {

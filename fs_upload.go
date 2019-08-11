@@ -821,6 +821,7 @@ func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string
 	if err != nil {
 		return err
 	}
+	log.Debugf("send ready msg %s %d", tx, txHeight)
 	msg := message.NewFileFetchRdy(sessionId, fileHashStr, this.WalletAddress(), tx, txHeight)
 	this.taskMgr.SetTaskTransferring(taskId, true)
 	ret, err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil, nil)

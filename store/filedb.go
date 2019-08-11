@@ -580,7 +580,7 @@ func (this *FileDB) AddFileUnpaid(id, walletAddress string, asset int32, amount 
 		info.Asset = asset
 	}
 	info.Amount = info.Amount + amount
-	log.Debugf("add file unpaid taskId: %s, sender:%s, amount: %d", id, walletAddress, amount)
+	log.Debugf("add file unpaid %s taskId: %s, sender:%s, amount: %d", unpaidKey, id, walletAddress, amount)
 	return this.saveFileUnpaidInfo(unpaidKey, info)
 }
 
@@ -1208,6 +1208,7 @@ func (this *FileDB) getFileUnpaidInfo(key string) (*FileDownloadUnPaid, error) {
 		}
 	}
 	if len(value) == 0 {
+		log.Warnf("get file unpaid info len is 0 %s", key)
 		return nil, nil
 	}
 	info := &FileDownloadUnPaid{}
