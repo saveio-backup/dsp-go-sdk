@@ -147,6 +147,9 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	// my task. use my wallet address
 	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
+	if fileMsg.Tx == nil {
+		return
+	}
 	err := this.waitForTxConfirmed(fileMsg.Tx.Height)
 	if err != nil {
 		log.Errorf("get block height err %s", err)
