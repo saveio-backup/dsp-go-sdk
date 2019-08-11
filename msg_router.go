@@ -340,7 +340,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		replyErr(sessionId, fileMsg.Hash, netcom.MSG_ERROR_CODE_FILE_NOT_EXIST, ctx)
 		return
 	}
-	if this.taskMgr.TaskNum() >= common.MAX_TASKS_NUM {
+	if this.taskMgr.ShareTaskNum() >= common.MAX_TASKS_NUM {
 		replyErr(sessionId, fileMsg.Hash, netcom.MSG_ERROR_CODE_TOO_MANY_TASKS, ctx)
 		return
 	}

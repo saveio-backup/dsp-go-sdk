@@ -290,6 +290,18 @@ func (this *TaskMgr) TaskNum() int {
 	return len(this.tasks)
 }
 
+func (this *TaskMgr) ShareTaskNum() int {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	cnt := 0
+	for _, t := range this.tasks {
+		if t.state == TaskStateDoing && t.taskType == TaskTypeShare {
+			cnt++
+		}
+	}
+	return cnt
+}
+
 func (this *TaskMgr) BlockReqCh() chan *GetBlockReq {
 	return this.blockReqCh
 }
