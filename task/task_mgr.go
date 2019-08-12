@@ -1068,6 +1068,11 @@ func (this *TaskMgr) GetFilePrefix(taskId string) (string, error) {
 	return this.db.GetFileInfoStringValue(taskId, store.FILEINFO_FIELD_PREFIX)
 }
 
+func (this *TaskMgr) GetTaskUpdatedAt(taskId string) int64 {
+	v, _ := this.GetTaskById(taskId)
+	return v.GetUpdatedAt()
+}
+
 func (this *TaskMgr) GetFileName(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if ok {

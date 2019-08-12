@@ -757,6 +757,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 		case newState := <-stateChange:
 			switch newState {
 			case task.TaskStatePause, task.TaskStateCancel:
+				log.Debugf("download break when receive state change of %d", newState)
 				return nil
 			}
 		case <-timeout.C:

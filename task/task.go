@@ -139,6 +139,7 @@ type Task struct {
 	storeType        uint64                     // store file type
 	copyNum          uint64                     // copyNum
 	createdAt        int64                      // createdAt
+	updatedAt        int64                      // updatedAt
 }
 
 func (this *Task) SetTaskType(ty TaskType) {
@@ -467,4 +468,16 @@ func (this *Task) GetStoreType() uint64 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.storeType
+}
+
+func (this *Task) SetUpdatedAt(at int64) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	this.updatedAt = at
+}
+
+func (this *Task) GetUpdatedAt() int64 {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.updatedAt
 }
