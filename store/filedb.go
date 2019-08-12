@@ -441,6 +441,11 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 			NodeHostAddr: nodeAddr,
 		}
 	}
+	if progress.Progress == fi.TotalBlockCount && fi.SaveBlockCountMap[nodeAddr] == fi.TotalBlockCount && fi.TotalBlockCount > 0 {
+		// has done
+		log.Debugf("block has added: %d, %d, %v, %s", progress.Progress, fi.TotalBlockCount, fi.SaveBlockCountMap, nodeAddr)
+		return nil
+	}
 	progress.Progress++
 	progressBuf, err := json.Marshal(progress)
 	if err != nil {
