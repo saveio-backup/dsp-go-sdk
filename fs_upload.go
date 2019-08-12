@@ -356,23 +356,35 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 		return nil, fmt.Errorf("task is cancelling: %s", taskId)
 	}
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	oldState := this.taskMgr.GetTaskState(taskId)
 	err = this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
 	if err != nil {
 		return nil, err
 	}
 	log.Debugf("fileHashStr :%v", fileHashStr)
 	if len(fileHashStr) == 0 {
+		this.taskMgr.SetTaskState(taskId, oldState)
 		return nil, fmt.Errorf("fileHashStr is empty for id %v", fileHashStr, taskId)
 	}
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
-		return this.DeleteUploadedFile(fileHashStr)
+		resp, err := this.DeleteUploadedFile(fileHashStr)
+		if err != nil {
+			this.taskMgr.SetTaskState(taskId, oldState)
+			return nil, err
+		}
+		return resp, nil
 	}
 	// send pause msg
 	msg := message.NewFileFetchCancel(taskId, fileHashStr)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil, nil)
 	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
-	return this.DeleteUploadedFile(fileHashStr)
+	resp, err := this.DeleteUploadedFile(fileHashStr)
+	if err != nil {
+		this.taskMgr.SetTaskState(taskId, oldState)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (this *Dsp) RetryUpload(taskId string) error {
