@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -401,11 +402,11 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	}
 	info, err := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	log.Debugf("delete file get fileinfo %v, err %v", info, err)
-	if err != nil || info == nil {
+	if err != nil && !strings.Contains(err.Error(), "[FS Profit] FsGetFileInfo not found") {
 		log.Debugf("info:%v, err:%s", info, err)
 		return nil, fmt.Errorf("file info not found, %s has deleted", fileHashStr)
 	}
-	if info.FileOwner.ToBase58() != this.WalletAddress() {
+	if info != nil && info.FileOwner.ToBase58() != this.WalletAddress() {
 		return nil, fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
 	}
 	storingNode := this.getFileProvedNode(fileHashStr)
@@ -430,13 +431,28 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	if len(storingNode) == 0 {
 		// find breakpoint keep nodelist
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)...)
+		log.Debugf("storingNode: %v", storingNode)
+		storingNode = []string{"tcp://40.73.103.72:33378", "tcp://40.73.103.72:33148", "tcp://40.73.103.72:35940"}
 	}
 	log.Debugf("will broadcast delete msg to %v", storingNode)
 	resp := &common.DeleteUploadFileResp{}
-	if len(storingNode) > 0 {
+	resp.Tx = hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	if len(storingNode) == 0 {
+		// TODO: make transaction commit
+		err = this.taskMgr.DeleteTask(taskId, true)
+		log.Debugf("delete task donne ")
+		if err != nil {
+			log.Errorf("delete upload info from db err: %s", err)
+			return nil, err
+		}
+		log.Debugf("delete task success %v", resp)
+		return resp, nil
+	}
+
+	go func() {
 		log.Debugf("send delete msg to nodes :%v", storingNode)
 		msg := message.NewFileDelete(taskId, fileHashStr, this.WalletAddress(), txHashStr, uint64(txHeight))
-		m, _ := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
+		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
 		nodeStatus := make([]common.DeleteFileStatus, 0, len(m))
 		for addr, deleteErr := range m {
 			s := common.DeleteFileStatus{
@@ -450,17 +466,16 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 			}
 			nodeStatus = append(nodeStatus, s)
 		}
-		resp.Nodes = nodeStatus
-		log.Debugf("broadcast to delete file msg success")
-	}
-	log.Debugf("send delete msg done %v", resp)
+		// resp.Nodes = nodeStatus
+		log.Debugf("send delete msg done ret: %v, err: %s", m, err)
+	}()
 	// TODO: make transaction commit
 	err = this.taskMgr.DeleteTask(taskId, true)
 	log.Debugf("delete task donne ")
 	if err != nil {
 		log.Errorf("delete upload info from db err: %s", err)
+		return nil, err
 	}
-	resp.Tx = hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	log.Debugf("delete task success %v", resp)
 	return resp, nil
 }
