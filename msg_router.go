@@ -181,7 +181,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		log.Warnf("fetch_rdy msg no contains wallet address")
 		return
 	}
-	log.Debugf("start fetching blocks")
+	log.Debugf("start fetching blocks of taskId:%s, file: %s", taskId, fileMsg.Hash)
 	err = this.startFetchBlocks(fileMsg.Hash, peer.Address, fileMsg.PayInfo.WalletAddress)
 	if err != nil {
 		log.Errorf("start fetch blocks for file %s failed, err:%s", fileMsg.Hash, err)

@@ -3,6 +3,7 @@ package dsp
 import (
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
@@ -41,7 +42,10 @@ func (this *Dsp) StartShareServices() {
 			}
 			// TODO: only send tag with tagflag enabled
 			// TEST: client get tag
-			tag, _ := this.Fs.GetTag(req.Hash, req.FileHash, uint64(req.Index))
+			var tag []byte
+			if this.Config.FsType == config.FS_BLOCKSTORE {
+				tag, _ = this.Fs.GetTag(req.Hash, req.FileHash, uint64(req.Index))
+			}
 			sessionId, _ := this.taskMgr.GetSeesionId(taskId, "")
 			up, err := this.GetFileUnitPrice(req.Asset)
 			if err != nil {

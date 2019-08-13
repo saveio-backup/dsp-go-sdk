@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -16,8 +17,8 @@ import (
 
 var testbigFile = "../testdata/testuploadbigfile.txt"
 var testsmallFile = "../testdata/testuploadfile.txt"
-var prefix = "AMTmKeEsHY45PGv23M5jeebEZvyECyqDTH"
-var testFile = "./setup.exe"
+var prefix = "AUY6eomVSoCRDGods2XetKAfffmhzKK7DC"
+var testFile = "./ONIOnchain.key"
 
 func TestNodeFromFile(t *testing.T) {
 	cfg := &config.DspConfig{
@@ -32,13 +33,27 @@ func TestNodeFromFile(t *testing.T) {
 	if err != nil {
 		return
 	}
-	offset, err := fs.GetAllOffsets(list[0])
-	if err != nil {
-		return
+
+	var downloadData []byte
+	root := list[0]
+	block := fs.GetBlock(root)
+	links, _ := fs.GetBlockLinks(block)
+	for i, l := range links {
+		fmt.Printf("#%d = %s\n", i, l)
+		block := fs.GetBlock(l)
+		blockData := fs.BlockData(block)
+		if len(blockData) == 0 {
+			fmt.Printf("idx is 0 %d", i)
+			continue
+		}
+		if string(blockData[:len(prefix)]) == prefix {
+			downloadData = append(downloadData, blockData[len(prefix):]...)
+			continue
+		}
+		downloadData = append(downloadData, blockData[:]...)
 	}
-	for _, hash := range list {
-		fmt.Printf("hash: %s, offset: %d\n", hash, offset[hash])
-	}
+	read, _ := ioutil.ReadFile(testFile)
+	fmt.Printf("read: %x, download: %x\n", md5.Sum(read), md5.Sum(downloadData))
 }
 
 func TestBlockToBytes(t *testing.T) {
@@ -134,16 +149,16 @@ func TestGetBlock(t *testing.T) {
 		return
 	}
 	dspCfg := &config.DspConfig{
-		DBPath:       fmt.Sprintf("%s/db%d", fileRoot, 1),
-		FsRepoRoot:   fileRoot + "/max1",
-		FsFileRoot:   fileRoot,
-		FsType:       config.FS_BLOCKSTORE,
-		FsGcPeriod:   "1h",
-		FsMaxStorage: "10G",
-		ChainRpcAddr: "http://localhost:20336",
+		DBPath:        fmt.Sprintf("%s/db%d", fileRoot, 1),
+		FsRepoRoot:    fileRoot + "/max1",
+		FsFileRoot:    fileRoot,
+		FsType:        config.FS_BLOCKSTORE,
+		FsGcPeriod:    "1h",
+		FsMaxStorage:  "10G",
+		ChainRpcAddrs: []string{"http://localhost:20336"},
 	}
 	c := chain.NewChain()
-	c.NewRpcClient().SetAddress(dspCfg.ChainRpcAddr)
+	c.NewRpcClient().SetAddress(dspCfg.ChainRpcAddrs)
 	w, err := wallet.OpenWallet(fileRoot + "/wallet.dat")
 	if err != nil {
 		t.Fatal(err)
