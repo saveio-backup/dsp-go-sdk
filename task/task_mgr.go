@@ -387,28 +387,29 @@ func (this *TaskMgr) TaskBlockReq(taskId string) (chan *GetBlockReq, error) {
 	return v.GetBlockReq(), nil
 }
 
-func (this *TaskMgr) PushGetBlock(taskId string, block *BlockResp) {
+func (this *TaskMgr) PushGetBlock(taskId, sessionId string, block *BlockResp) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
-	v.PushGetBlock(block.Hash, block.Index, block)
+	v.PushGetBlock(sessionId, block.Hash, block.Index, block)
 }
 
-func (this *TaskMgr) GetBlockRespCh(taskId, blockHash string, index int32) chan *BlockResp {
+func (this *TaskMgr) NewBlockRespCh(taskId, sessionId, blockHash string, index int32) chan *BlockResp {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
+		log.Warnf("get block resp channel taskId not found: %d", taskId)
 		return nil
 	}
-	return v.GetBlockRespCh(blockHash, index)
+	return v.NewBlockRespCh(sessionId, blockHash, index)
 }
 
-func (this *TaskMgr) DropBlockRespCh(taskId, blockHash string, index int32) {
+func (this *TaskMgr) DropBlockRespCh(taskId, sessionId, blockHash string, index int32) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
-	v.DropBlockRespCh(blockHash, index)
+	v.DropBlockRespCh(sessionId, blockHash, index)
 }
 
 // SetTaskTimeout. set task timeout with taskid

@@ -418,13 +418,13 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 	switch blockMsg.Operation {
 	case netcom.BLOCK_OP_NONE:
 		taskId := this.taskMgr.TaskId(blockMsg.FileHash, this.WalletAddress(), task.TaskTypeDownload)
-		log.Debugf("taskId: %s, receive block %d %s-%s-%d from peer:%s, length:%d", taskId, blockMsg.Operation, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address, msg.Header.MsgLength)
+		log.Debugf("taskId: %s, sessionId: %s receive block %d %s-%s-%d from peer:%s, length:%d", taskId, blockMsg.SessionId, blockMsg.Operation, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address, msg.Header.MsgLength)
 		exist := this.taskMgr.TaskExist(taskId)
 		if !exist {
 			log.Debugf("task %s not exist", blockMsg.FileHash)
 			return
 		}
-		this.taskMgr.PushGetBlock(taskId, &task.BlockResp{
+		this.taskMgr.PushGetBlock(taskId, blockMsg.SessionId, &task.BlockResp{
 			Hash:     blockMsg.Hash,
 			Index:    blockMsg.Index,
 			PeerAddr: peer.Address,

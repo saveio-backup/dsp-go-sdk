@@ -945,14 +945,14 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 
 // downloadBlock. download block helper function.
 func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, addr, peerWalletAddr string) (*task.BlockResp, error) {
-	walletAddress := this.WalletAddress()
-	log.Debugf("download block  of %s-%s-%d to %s", fileHashStr, hash, index, addr)
-	ch := this.taskMgr.GetBlockRespCh(taskId, hash, index)
-	defer this.taskMgr.DropBlockRespCh(taskId, hash, index)
 	sessionId, err := this.taskMgr.GetSeesionId(taskId, peerWalletAddr)
 	if err != nil {
 		return nil, err
 	}
+	walletAddress := this.WalletAddress()
+	log.Debugf("download block  of %s-%s-%d to %s", fileHashStr, hash, index, addr)
+	ch := this.taskMgr.NewBlockRespCh(taskId, sessionId, hash, index)
+	defer this.taskMgr.DropBlockRespCh(taskId, sessionId, hash, index)
 	msg := message.NewBlockReqMsg(sessionId, fileHashStr, hash, index, walletAddress, common.ASSET_USDT)
 	err = client.P2pSend(addr, msg.ToProtoMsg())
 	log.Debugf("send download block msg sessionId %s of %s-%s-%d to %s, err %s", sessionId, fileHashStr, hash, index, addr, err)

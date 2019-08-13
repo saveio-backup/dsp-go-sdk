@@ -257,11 +257,11 @@ func (this *Task) TransferingState() TaskProgressState {
 	return this.transferingState
 }
 
-func (this *Task) PushGetBlock(blockHash string, index int32, block *BlockResp) {
+func (this *Task) PushGetBlock(sessionId, blockHash string, index int32, block *BlockResp) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	key := fmt.Sprintf("%s-%s-%s-%d", this.id, this.fileHash, blockHash, index)
-	log.Debugf("push block %s", key)
+	key := fmt.Sprintf("%s-%s-%s-%s-%d", this.id, sessionId, this.fileHash, blockHash, index)
+	log.Debugf("push block to resp channel: %s", key)
 	ch, ok := this.blockRespsMap[key]
 	if !ok {
 		log.Errorf("get block resp channel is nil with key %s", key)
@@ -275,10 +275,10 @@ func (this *Task) PushGetBlock(blockHash string, index int32, block *BlockResp) 
 	}()
 }
 
-func (this *Task) GetBlockRespCh(blockHash string, index int32) chan *BlockResp {
+func (this *Task) NewBlockRespCh(sessionId, blockHash string, index int32) chan *BlockResp {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	key := fmt.Sprintf("%s-%s-%s-%d", this.id, this.fileHash, blockHash, index)
+	key := fmt.Sprintf("%s-%s-%s-%s-%d", this.id, sessionId, this.fileHash, blockHash, index)
 	if this.blockRespsMap == nil {
 		this.blockRespsMap = make(map[string]chan *BlockResp)
 	}
@@ -287,13 +287,15 @@ func (this *Task) GetBlockRespCh(blockHash string, index int32) chan *BlockResp 
 		ch = make(chan *BlockResp, 1)
 		this.blockRespsMap[key] = ch
 	}
+	log.Debugf("generated block resp channel %s", key)
 	return ch
 }
 
-func (this *Task) DropBlockRespCh(blockHash string, index int32) {
+func (this *Task) DropBlockRespCh(sessionId, blockHash string, index int32) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	key := fmt.Sprintf("%s-%s-%s-%d", this.id, this.fileHash, blockHash, index)
+	key := fmt.Sprintf("%s-%s-%s-%s-%d", this.id, sessionId, this.fileHash, blockHash, index)
+	log.Debugf("drop block resp channel key: %s", key)
 	ch := this.blockRespsMap[key]
 	delete(this.blockRespsMap, key)
 	if ch != nil {
