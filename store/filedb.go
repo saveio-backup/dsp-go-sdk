@@ -585,7 +585,7 @@ func (this *FileDB) AddFileUnpaid(id, walletAddress string, asset int32, amount 
 		info.Asset = asset
 	}
 	info.Amount = info.Amount + amount
-	log.Debugf("add file unpaid %s taskId: %s, sender:%s, amount: %d", unpaidKey, id, walletAddress, amount)
+	log.Debugf("add file unpaid %s taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, walletAddress, amount, info.Amount)
 	return this.saveFileUnpaidInfo(unpaidKey, info)
 }
 
@@ -601,8 +601,10 @@ func (this *FileDB) DeleteFileUnpaid(id, walletAddress string, asset int32, amou
 	}
 	if info.Amount > amount {
 		info.Amount = info.Amount - amount
+		log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, walletAddress, amount, info.Amount)
 		return this.saveFileUnpaidInfo(unpaidKey, info)
 	}
+	log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, walletAddress, amount, info.Amount)
 	return this.db.Delete([]byte(unpaidKey))
 }
 

@@ -62,3 +62,7 @@ func (this *Dsp) ProgressChannel() chan *task.ProgressInfo {
 func (this *Dsp) CloseProgressChannel() {
 	this.taskMgr.CloseProgressCh()
 }
+
+func (this *Dsp) GetTaskFileName(id string) string {
+	return this.taskMgr.FileNameFromTask(id)
+}

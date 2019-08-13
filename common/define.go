@@ -29,8 +29,9 @@ type DeleteFileStatus struct {
 }
 
 type DeleteUploadFileResp struct {
-	Tx    string
-	Nodes []DeleteFileStatus
+	Tx       string
+	FileName string
+	Nodes    []DeleteFileStatus
 }
 
 type DownloadOption struct {

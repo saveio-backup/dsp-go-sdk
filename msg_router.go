@@ -479,6 +479,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 			return
 		case task.TaskTypeDownload, task.TaskTypeShare:
 			reqCh := this.taskMgr.BlockReqCh()
+			log.Debugf("push get block req")
 			reqCh <- &task.GetBlockReq{
 				FileHash:      blockMsg.FileHash,
 				Hash:          blockMsg.Hash,
@@ -487,6 +488,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				WalletAddress: blockMsg.Payment.Sender,
 				Asset:         blockMsg.Payment.Asset,
 			}
+			log.Debugf("push get block req done")
 		default:
 			log.Debugf("handle block get msg, tasktype not found")
 		}

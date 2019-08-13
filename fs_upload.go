@@ -449,6 +449,7 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	log.Debugf("will broadcast delete msg to %v", storingNode)
 	resp := &common.DeleteUploadFileResp{}
 	resp.Tx = hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	resp.FileName = this.taskMgr.FileNameFromTask(taskId)
 	if len(storingNode) == 0 {
 		// TODO: make transaction commit
 		err = this.taskMgr.DeleteTask(taskId, true)
@@ -1029,12 +1030,6 @@ func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
 	// update progress
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
 	log.Debugf("upload node list len %d, taskkey %s, hash %s, index %d", len(this.taskMgr.GetUploadedBlockNodeList(taskId, reqInfo.Hash, uint32(reqInfo.Index))), taskId, reqInfo.Hash, reqInfo.Index)
-	// check all copynum node has received the block
-	count := len(this.taskMgr.GetUploadedBlockNodeList(taskId, reqInfo.Hash, uint32(reqInfo.Index)))
-	if count < copyNum+1 {
-		log.Debugf("peer %s getUploadedBlockNodeList hash:%s, index:%d, count %d less than copynum %d", reqInfo.PeerAddr, reqInfo.Hash, reqInfo.Index, count, copyNum)
-		return false, nil
-	}
 	sent := uint64(this.taskMgr.UploadedBlockCount(taskId) / (uint64(copyNum) + 1))
 	if totalCount != sent {
 		log.Debugf("totalCount %d != sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))

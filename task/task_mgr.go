@@ -821,10 +821,14 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("job channel has close")
 					break
 				}
-				log.Debugf("start request block %s from %s", job.req.Hash, job.worker.RemoteAddress())
+				log.Debugf("start request block %s from %s, wallet: %s", job.req.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
 				ret, err := job.worker.Do(taskId, fileHash, job.req.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr(), job.req.Index)
 				v.SetWorkerUnPaid(job.worker.remoteAddr, false)
-				log.Debugf("request block %s, err %s", job.req.Hash, err)
+				if err != nil {
+					log.Errorf("request block %s, err %s", job.req.Hash, err)
+				} else {
+					log.Debugf("request block %s success", job.req.Hash)
+				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0
 				if stop {
 					log.Debugf("stop when drop channel is not 0")

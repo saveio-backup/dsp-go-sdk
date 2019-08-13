@@ -35,7 +35,7 @@ func (this *Dsp) StartShareServices() {
 			}
 			downloadTaskKey := this.taskMgr.TaskId(req.FileHash, this.WalletAddress(), task.TaskTypeDownload)
 			offset, err := this.taskMgr.GetBlockOffset(downloadTaskKey, req.Hash, uint32(req.Index))
-			log.Debugf("share block get offset from download info %s,  hash %s, index %v, offset %v, err %s", downloadTaskKey, req.Hash, req.Index, offset, err)
+			log.Debugf("share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s", taskId, downloadTaskKey, req.FileHash, req.Hash, req.Index, offset, req.PeerAddr, err)
 			if err != nil {
 				log.Errorf("get block offset, err: %s", err)
 				break
