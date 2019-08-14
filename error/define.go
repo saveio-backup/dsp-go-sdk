@@ -4,12 +4,15 @@ const (
 	SUCCESS = 0
 )
 
+// sdk internal error
 const (
-	INVALID_PARAMS uint64 = iota + 40000
+	INVALID_PARAMS uint32 = iota + 40000
 	INTERNAL_ERROR
 )
+
+// task error
 const (
-	NEW_TASK_FAILED uint64 = iota + 50000
+	NEW_TASK_FAILED uint32 = iota + 50000
 	PREPARE_UPLOAD_ERROR
 	TASK_INTERNAL_ERROR
 	UPLOAD_TASK_EXIST
@@ -52,19 +55,14 @@ const (
 	DECRYPT_FILE_FAILED
 	RENAME_FILED_FAILED
 	DOWNLOAD_FILE_TIMEOUT
+	DOWNLOAD_FILE_RESUSED
+	UNITPRICE_ERROR
+	DOWNLOAD_TASK_EXIST
 )
 
+// delete file error
 const (
-	DELETE_FILE_FAILED uint64 = iota + 60000
+	DELETE_FILE_FAILED uint32 = iota + 60000
+	DELETE_FILE_TX_UNCONFIRMED
+	DELETE_FILE_FILEINFO_EXISTS
 )
-
-// const (
-// 	MSG_ERROR_CODE_NONE                 = 0     // success
-// 	MSG_ERROR_CODE_PARAM_INVALID        = 50001 // param invalid
-// 	MSG_ERROR_CODE_DOWNLOAD_REFUSED     = 50002 // download refused
-// 	MSG_ERROR_CODE_FILE_NOT_EXIST       = 50003 // file not found
-// 	MSG_ERROR_CODE_TOO_MANY_TASKS       = 50004 // too many tasks
-// 	MSG_ERROR_CODE_FILE_UNITPRICE_ERROR = 50005 // file unitprice error
-// 	MSG_ERROR_CODE_TASK_EXIST           = 50006 // file unitprice error
-// 	MSG_ERROR_INTERNAL_ERROR            = 50007 // internal err
-// )

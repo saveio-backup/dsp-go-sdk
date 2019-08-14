@@ -48,7 +48,7 @@ type ProgressInfo struct {
 	TaskState     TaskState         // task state
 	ProgressState TaskProgressState // TaskProgressState
 	Result        interface{}       // finish result
-	ErrorCode     uint64            // error code
+	ErrorCode     uint32            // error code
 	ErrorMsg      string            // interrupt error
 	CreatedAt     uint64
 	UpdatedAt     uint64

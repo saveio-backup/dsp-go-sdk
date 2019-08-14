@@ -8,6 +8,7 @@ import (
 
 	"github.com/saveio/carrier/network"
 	"github.com/saveio/dsp-go-sdk/common"
+	serr "github.com/saveio/dsp-go-sdk/error"
 	netcom "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
@@ -80,11 +81,14 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 // handleFileAskMsg. client send file ask msg to storage node for handshake and share file metadata
 func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	//TODO: verify & save info
-
 	// task exist at runtime
 	localId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
-	log.Debugf("fetch_ask try find localId %s", localId)
 	if len(localId) > 0 && this.taskMgr.TaskExist(localId) {
+		state := this.taskMgr.GetTaskState(localId)
+		log.Debugf("fetch_ask task exist localId %s, state: %d", localId, state)
+		if state == task.TaskStateCancel || state == task.TaskStateFailed || state == task.TaskStateDone {
+			log.Warnf("the task has a wrong state of file_ask %s", state)
+		}
 		currentBlockHash, currentBlockIndex, err := this.taskMgr.GetCurrentSetBlock(localId)
 		if err != nil {
 			log.Errorf("get current set block err %s", err)
@@ -256,19 +260,34 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 	err := this.waitForTxConfirmed(fileMsg.Tx.Height)
 	if err != nil {
 		log.Errorf("get block height err %s", err)
+		replyMsg := message.NewFileDeleteAck(fileMsg.SessionId, fileMsg.Hash, serr.DELETE_FILE_TX_UNCONFIRMED, err.Error())
+		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply delete ok msg failed", err)
+		} else {
+			log.Debugf("reply delete ack msg success")
+		}
 		return
 	}
 	info, err := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
 	if info != nil || strings.Index(err.Error(), "FsGetFileInfo not found") == -1 {
 		log.Errorf("delete file info is not nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+		replyMsg := message.NewFileDeleteAck(fileMsg.SessionId, fileMsg.Hash, serr.DELETE_FILE_FILEINFO_EXISTS, "file info hasn't been deleted")
+		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply delete ok msg failed", err)
+		} else {
+			log.Debugf("reply delete ack msg success")
+		}
 		return
 	}
-	replyMsg := message.NewFileDeleteAck(fileMsg.SessionId, fileMsg.Hash)
+	replyMsg := message.NewFileDeleteAck(fileMsg.SessionId, fileMsg.Hash, serr.SUCCESS, "")
 	err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 	if err != nil {
 		log.Errorf("reply delete ok msg failed", err)
+	} else {
+		log.Debugf("reply delete ack msg success")
 	}
-	log.Debugf("reply delete ack msg success")
 	// TODO: check file owner
 	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 	err = this.DeleteDownloadedFile(taskId)
@@ -283,8 +302,8 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
 		return
 	}
-	replyErr := func(sessionId, fileHash string, errorCode int32, ctx *network.ComponentContext) {
-		replyMsg := message.NewFileDownloadAck(sessionId, fileMsg.Hash, nil, "", "", 0, 0, uint32(errorCode))
+	replyErr := func(sessionId, fileHash string, errorCode uint32, errorMsg string, ctx *network.ComponentContext) {
+		replyMsg := message.NewFileDownloadAck(sessionId, fileMsg.Hash, nil, "", "", 0, 0, errorCode, errorMsg)
 		err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		log.Debugf("reply download_ack errmsg code %d, err %s", errorCode, err)
 		if err != nil {
@@ -294,12 +313,12 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 	downloadInfoId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 	price, err := this.GetFileUnitPrice(fileMsg.PayInfo.Asset)
 	if err != nil {
-		replyErr("", fileMsg.Hash, netcom.MSG_ERROR_CODE_FILE_UNITPRICE_ERROR, ctx)
+		replyErr("", fileMsg.Hash, serr.UNITPRICE_ERROR, err.Error(), ctx)
 		return
 	}
 	prefix, err := this.taskMgr.GetFilePrefix(downloadInfoId)
 	if err != nil {
-		replyErr("", fileMsg.Hash, netcom.MSG_ERROR_INTERNAL_ERROR, ctx)
+		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return
 	}
 	localId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
@@ -307,12 +326,12 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		// old task
 		sessionId, err := this.taskMgr.GetSeesionId(localId, "")
 		if err != nil {
-			replyErr(sessionId, fileMsg.Hash, netcom.MSG_ERROR_INTERNAL_ERROR, ctx)
+			replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 			return
 		}
 		replyMsg := message.NewFileDownloadAck(sessionId, fileMsg.Hash, this.taskMgr.FileBlockHashes(downloadInfoId),
 			this.WalletAddress(), prefix,
-			price, fileMsg.PayInfo.Asset, netcom.MSG_ERROR_CODE_NONE)
+			price, fileMsg.PayInfo.Asset, serr.SUCCESS, "")
 		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply download ack  msg failed", err)
@@ -325,30 +344,30 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 	// TODO: check channel balance and router path
 	taskId, err := this.taskMgr.NewTask(task.TaskTypeShare)
 	if err != nil {
-		replyErr("", fileMsg.Hash, netcom.MSG_ERROR_INTERNAL_ERROR, ctx)
+		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return
 	}
 	sessionId, err := this.taskMgr.GetSeesionId(taskId, "")
 	if err != nil {
-		replyErr(sessionId, fileMsg.Hash, netcom.MSG_ERROR_INTERNAL_ERROR, ctx)
+		replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return
 	}
 	rootBlk := this.Fs.GetBlock(fileMsg.Hash)
 
 	if !this.taskMgr.IsFileInfoExist(downloadInfoId) || rootBlk == nil {
 		log.Errorf("file ask err root block %t", rootBlk == nil)
-		replyErr(sessionId, fileMsg.Hash, netcom.MSG_ERROR_CODE_FILE_NOT_EXIST, ctx)
+		replyErr(sessionId, fileMsg.Hash, serr.FILEINFO_NOT_EXIST, "", ctx)
 		return
 	}
 	if this.taskMgr.ShareTaskNum() >= common.MAX_TASKS_NUM {
-		replyErr(sessionId, fileMsg.Hash, netcom.MSG_ERROR_CODE_TOO_MANY_TASKS, ctx)
+		replyErr(sessionId, fileMsg.Hash, serr.TOO_MANY_TASKS, "", ctx)
 		return
 	}
 
 	log.Debugf("sessionId %s blockCount %v %s prefix %s", sessionId, len(this.taskMgr.FileBlockHashes(downloadInfoId)), downloadInfoId, prefix)
 	replyMsg := message.NewFileDownloadAck(sessionId, fileMsg.Hash, this.taskMgr.FileBlockHashes(downloadInfoId),
 		this.WalletAddress(), prefix,
-		price, fileMsg.PayInfo.Asset, netcom.MSG_ERROR_CODE_NONE)
+		price, fileMsg.PayInfo.Asset, serr.SUCCESS, "")
 	err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 	if err != nil {
 		log.Errorf("reply download ack  msg failed", err)

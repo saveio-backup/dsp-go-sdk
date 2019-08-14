@@ -91,22 +91,16 @@ func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData
 }
 
 // NewFileMsg file msg
-func NewFileMsg(file *file.File, errorCode uint32) *Message {
+func NewFileMsg(file *file.File, errorCode uint32, errorMsg string) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_FILE
 	msg.Payload = file
-	if errorCode != common.MSG_ERROR_CODE_NONE {
-		errorMsg, ok := common.MSG_ERROR_MSG[errorCode]
-		if !ok {
-			errorMsg = "error"
-		}
-		msg.Error = &Error{
-			Code:    errorCode,
-			Message: errorMsg,
-		}
+	msg.Error = &Error{
+		Code:    errorCode,
+		Message: errorMsg,
 	}
 	data, err := proto.Marshal(msg.ToProtoMsg())
 	if err != nil {
@@ -128,7 +122,7 @@ func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr, pre
 			WalletAddress: walletAddr,
 		},
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileFetchAck
@@ -142,7 +136,7 @@ func NewFileFetchAck(sessionId, hash, blockHash string, blockIndex uint64) *Mess
 			Index: blockIndex,
 		},
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileFetchRdy
@@ -159,7 +153,7 @@ func NewFileFetchRdy(sessionId, hash, walletAddr string, tx string, txHeight uin
 			Height: txHeight,
 		},
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileFetchPause
@@ -169,7 +163,7 @@ func NewFileFetchPause(sessionId, hash string) *Message {
 		Hash:      hash,
 		Operation: common.FILE_OP_FETCH_PAUSE,
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 func NewFileFetchCancel(sessionId, hash string) *Message {
@@ -178,7 +172,7 @@ func NewFileFetchCancel(sessionId, hash string) *Message {
 		Hash:      hash,
 		Operation: common.FILE_OP_FETCH_CANCEL,
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileFetchResume
@@ -188,7 +182,7 @@ func NewFileFetchResume(sessionId, hash string) *Message {
 		Hash:      hash,
 		Operation: common.FILE_OP_FETCH_RESUME,
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileFetchDone
@@ -198,7 +192,7 @@ func NewFileFetchDone(sessionId, hash string) *Message {
 		Hash:      hash,
 		Operation: common.FILE_OP_FETCH_DONE,
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileDownloadAsk
@@ -211,11 +205,11 @@ func NewFileDownloadAsk(hash, walletAddr string, asset int32) *Message {
 			Asset:         asset,
 		},
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileDownloadAck
-func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr, prefix string, uintPrice uint64, asset int32, errorCode uint32) *Message {
+func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr, prefix string, uintPrice uint64, asset int32, errorCode uint32, errorMsg string) *Message {
 	f := &file.File{
 		SessionId:   sessionId,
 		Hash:        hash,
@@ -228,7 +222,7 @@ func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr, 
 			Asset:         asset,
 		},
 	}
-	return NewFileMsg(f, errorCode)
+	return NewFileMsg(f, errorCode, errorMsg)
 }
 
 // NewFileDownload download file from server msg
@@ -242,7 +236,7 @@ func NewFileDownload(sessionId, hash, walletAddr string, asset int32) *Message {
 			Asset:         asset,
 		},
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 func NewFileDownloadCancel(sessionId, hash string, walletAddr string, asset int32) *Message {
@@ -255,7 +249,7 @@ func NewFileDownloadCancel(sessionId, hash string, walletAddr string, asset int3
 			Asset:         asset,
 		},
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 func NewFileDownloadOk(sessionId, hash, walletAddr string, asset int32) *Message {
@@ -268,7 +262,7 @@ func NewFileDownloadOk(sessionId, hash, walletAddr string, asset int32) *Message
 			Asset:         asset,
 		},
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileDelete
@@ -284,17 +278,17 @@ func NewFileDelete(sessionId, hash, walletAddr, txHash string, txHeight uint64) 
 			Height: txHeight,
 		},
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
 }
 
 // NewFileDeleteAck
-func NewFileDeleteAck(sessionId, hash string) *Message {
+func NewFileDeleteAck(sessionId, hash string, errorCode uint32, errorMsg string) *Message {
 	f := &file.File{
 		SessionId: sessionId,
 		Hash:      hash,
 		Operation: common.FILE_OP_DELETE_ACK,
 	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE)
+	return NewFileMsg(f, errorCode, errorMsg)
 }
 
 // NewPayment new payment msg

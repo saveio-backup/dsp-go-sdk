@@ -24,7 +24,7 @@ type PayInfo struct {
 
 type DeleteFileStatus struct {
 	HostAddr string
-	Code     uint64
+	Code     uint32
 	Error    string
 }
 

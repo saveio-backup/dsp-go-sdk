@@ -539,9 +539,10 @@ func (this *Dsp) DeleteDownloadedFile(taskId string) error {
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
 	err := this.Fs.DeleteFile(fileHashStr, filePath)
 	if err != nil {
+		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHashStr, filePath, err)
 		return err
 	}
-	log.Debugf("delete local file success")
+	log.Debugf("delete local file success fileHash:%s, path:%s", fileHashStr, filePath)
 	return this.taskMgr.DeleteTask(taskId, true)
 }
 
@@ -882,7 +883,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	if err != nil {
 		return err
 	}
-	cancel := false
+	pause, cancel := false, false
 	defer func() {
 		if cancel {
 			return
@@ -894,7 +895,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	}()
 	// TODO: optimize this with one hash once time
 	for index, hash := range blockHashes {
-		pause, cancel, err := this.taskMgr.IsTaskPauseOrCancel(taskId)
+		pause, cancel, err = this.taskMgr.IsTaskPauseOrCancel(taskId)
 		if err != nil {
 			return err
 		}

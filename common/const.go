@@ -40,7 +40,7 @@ const (
 	CHANNEL_WITHDRAW_TIMEOUT       = 60 // 60s
 	P2P_REQ_TIMEOUT                = 15 // 15s
 	P2P_BROADCAST_TIMEOUT          = 10 // 30s
-	TRACKER_SERVICE_TIMEOUT        = 10 // 10s
+	TRACKER_SERVICE_TIMEOUT        = 15 // 15s
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT = 10 // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT         = 20 // media transfer timeout
 )

@@ -3,12 +3,12 @@ package error
 import "errors"
 
 type SDKError struct {
-	Code    uint64
+	Code    uint32
 	Message string
 	Error   error
 }
 
-func NewDetailError(code uint64, msg string) *SDKError {
+func NewDetailError(code uint32, msg string) *SDKError {
 	err := errors.New(msg)
 	return &SDKError{
 		Code:    code,

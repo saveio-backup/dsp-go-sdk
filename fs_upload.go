@@ -444,7 +444,6 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 		// find breakpoint keep nodelist
 		storingNode = append(storingNode, this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)...)
 		log.Debugf("storingNode: %v", storingNode)
-		storingNode = []string{"tcp://40.73.103.72:33378", "tcp://40.73.103.72:33148", "tcp://40.73.103.72:35940"}
 	}
 	log.Debugf("will broadcast delete msg to %v", storingNode)
 	resp := &common.DeleteUploadFileResp{}
@@ -462,29 +461,25 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 		return resp, nil
 	}
 
-	go func() {
-		log.Debugf("send delete msg to nodes :%v", storingNode)
-		msg := message.NewFileDelete(taskId, fileHashStr, this.WalletAddress(), txHashStr, uint64(txHeight))
-		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, nil)
-		nodeStatus := make([]common.DeleteFileStatus, 0, len(m))
-		for addr, deleteErr := range m {
-			s := common.DeleteFileStatus{
-				HostAddr: addr,
-				Code:     0,
-				Error:    "",
-			}
-			if deleteErr != nil {
-				s.Error = deleteErr.Error()
-				s.Code = serr.DELETE_FILE_FAILED
-			}
-			nodeStatus = append(nodeStatus, s)
-		}
-		// resp.Nodes = nodeStatus
-		log.Debugf("send delete msg done ret: %v, err: %s", m, err)
-	}()
+	log.Debugf("send delete msg to nodes :%v", storingNode)
+	msg := message.NewFileDelete(taskId, fileHashStr, this.WalletAddress(), txHashStr, uint64(txHeight))
+	nodeStatusLock := new(sync.Mutex)
+	nodeStatus := make([]common.DeleteFileStatus, 0, len(storingNode))
+	reply := func(msg proto.Message, addr string) {
+		ackMsg := message.ReadMessage(msg)
+		nodeStatusLock.Lock()
+		defer nodeStatusLock.Unlock()
+		nodeStatus = append(nodeStatus, common.DeleteFileStatus{
+			HostAddr: addr,
+			Code:     ackMsg.Error.Code,
+			Error:    ackMsg.Error.Message,
+		})
+	}
+	m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, reply)
+	resp.Nodes = nodeStatus
+	log.Debugf("send delete msg done ret: %v, nodeStatus: %v, err: %s", m, nodeStatus, err)
 	// TODO: make transaction commit
 	err = this.taskMgr.DeleteTask(taskId, true)
-	log.Debugf("delete task donne ")
 	if err != nil {
 		log.Errorf("delete upload info from db err: %s", err)
 		return nil, err
