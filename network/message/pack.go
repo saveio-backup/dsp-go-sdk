@@ -98,9 +98,11 @@ func NewFileMsg(file *file.File, errorCode uint32, errorMsg string) *Message {
 	}
 	msg.Header.Type = common.MSG_TYPE_FILE
 	msg.Payload = file
-	msg.Error = &Error{
-		Code:    errorCode,
-		Message: errorMsg,
+	if errorCode != common.MSG_ERROR_CODE_NONE {
+		msg.Error = &Error{
+			Code:    errorCode,
+			Message: errorMsg,
+		}
 	}
 	data, err := proto.Marshal(msg.ToProtoMsg())
 	if err != nil {
