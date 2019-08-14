@@ -927,7 +927,6 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	if !this.taskMgr.IsFileDownloaded(taskId) {
 		return errors.New("break here, but file not be stored")
 	}
-	this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	log.Infof("received all block, start pdp verify")
 	// all block is saved, prove it
 	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
@@ -935,6 +934,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 		log.Errorf("start pdp verify err %s", err)
 		return err
 	}
+	this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	// TODO: remove unused file info fields after prove pdp success
 	this.taskMgr.SetTaskState(taskId, task.TaskStateDone)
 	this.taskMgr.DeleteTask(taskId, false)

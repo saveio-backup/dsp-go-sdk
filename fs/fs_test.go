@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -17,8 +16,8 @@ import (
 
 var testbigFile = "../testdata/testuploadbigfile.txt"
 var testsmallFile = "../testdata/testuploadfile.txt"
-var prefix = "AUY6eomVSoCRDGods2XetKAfffmhzKK7DC"
-var testFile = "./ONIOnchain.key"
+var prefix = "ANPCCWJbCimJ2fsohgkrziUeQGikRpMuez"
+var testFile = "./南戴河之旅.7z"
 
 func TestNodeFromFile(t *testing.T) {
 	cfg := &config.DspConfig{
@@ -33,27 +32,40 @@ func TestNodeFromFile(t *testing.T) {
 	if err != nil {
 		return
 	}
-
-	var downloadData []byte
-	root := list[0]
-	block := fs.GetBlock(root)
-	links, _ := fs.GetBlockLinks(block)
-	for i, l := range links {
-		fmt.Printf("#%d = %s\n", i, l)
-		block := fs.GetBlock(l)
-		blockData := fs.BlockData(block)
-		if len(blockData) == 0 {
-			fmt.Printf("idx is 0 %d", i)
+	hashMap := make(map[string]struct{})
+	for i, l := range list {
+		if i == 0 {
+			fmt.Printf("#%v hash = %s\n", i, l)
+		}
+		_, ok := hashMap[l]
+		if ok {
+			fmt.Printf("duplicated %s", l)
+			panic("123")
 			continue
 		}
-		if string(blockData[:len(prefix)]) == prefix {
-			downloadData = append(downloadData, blockData[len(prefix):]...)
-			continue
-		}
-		downloadData = append(downloadData, blockData[:]...)
+		hashMap[l] = struct{}{}
 	}
-	read, _ := ioutil.ReadFile(testFile)
-	fmt.Printf("read: %x, download: %x\n", md5.Sum(read), md5.Sum(downloadData))
+
+	// var downloadData []byte
+	// root := list[0]
+	// block := fs.GetBlock(root)
+	// links, _ := fs.GetBlockLinks(block)
+	// for i, l := range links {
+	// 	fmt.Printf("#%d = %s\n", i, l)
+	// 	block := fs.GetBlock(l)
+	// 	blockData := fs.BlockData(block)
+	// 	if len(blockData) == 0 {
+	// 		fmt.Printf("idx is 0 %d", i)
+	// 		continue
+	// 	}
+	// 	if string(blockData[:len(prefix)]) == prefix {
+	// 		downloadData = append(downloadData, blockData[len(prefix):]...)
+	// 		continue
+	// 	}
+	// 	downloadData = append(downloadData, blockData[:]...)
+	// }
+	// read, _ := ioutil.ReadFile(testFile)
+	// fmt.Printf("read: %x, download: %x\n", md5.Sum(read), md5.Sum(downloadData))
 }
 
 func TestBlockToBytes(t *testing.T) {

@@ -108,12 +108,10 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	taskIds, err := this.db.UndoneList(store.FileInfoTypeUpload)
-	log.Debugf("recover upload task : %v", taskIds)
 	if err != nil {
 		return err
 	}
 	downloadTaskIds, err := this.db.UndoneList(store.FileInfoTypeDownload)
-	log.Debugf("recover download task : %v", downloadTaskIds)
 	if err != nil {
 		return err
 	}
@@ -125,10 +123,9 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 			return err
 		}
 		if info == nil {
-			log.Warnf("get file info is nil of %v", id)
+			log.Warnf("recover task get file info is nil of %v", id)
 			continue
 		}
-		log.Debugf("info :%v", info)
 		state := TaskState(info.TaskState)
 		if state == TaskStateDoing {
 			state = TaskStatePause
@@ -157,7 +154,6 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 			log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
 			t.SetSessionId(session.WalletAddr, session.SessionId)
 		}
-		log.Debugf("recover task %s, state %d", id, t.state)
 		switch info.InfoType {
 		case store.FileInfoTypeUpload:
 			t.taskType = TaskTypeUpload
@@ -170,6 +166,7 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 		case store.FileInfoTypeShare:
 			t.taskType = TaskTypeShare
 		}
+		log.Debugf("recover id: %s, type: %d, state: %d", id, t.taskType, t.state)
 		this.tasks[id] = t
 	}
 	return nil
@@ -979,6 +976,7 @@ func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("task: %s, not exist", taskId)
 	}
+	log.Debugf("task state %s, %d", taskId, v.State())
 	return v.State() == TaskStateCancel, nil
 }
 

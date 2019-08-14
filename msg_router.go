@@ -257,17 +257,19 @@ func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *n
 
 // handleFileDeleteMsg. client send delete msg to storage nodes for telling them to delete the file and release the resources.
 func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
-	err := this.waitForTxConfirmed(fileMsg.Tx.Height)
-	if err != nil {
-		log.Errorf("get block height err %s", err)
-		replyMsg := message.NewFileDeleteAck(fileMsg.SessionId, fileMsg.Hash, serr.DELETE_FILE_TX_UNCONFIRMED, err.Error())
-		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+	if fileMsg.Tx != nil && fileMsg.Tx.Height > 0 {
+		err := this.waitForTxConfirmed(fileMsg.Tx.Height)
 		if err != nil {
-			log.Errorf("reply delete ok msg failed", err)
-		} else {
-			log.Debugf("reply delete ack msg success")
+			log.Errorf("get block height err %s", err)
+			replyMsg := message.NewFileDeleteAck(fileMsg.SessionId, fileMsg.Hash, serr.DELETE_FILE_TX_UNCONFIRMED, err.Error())
+			err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
+			if err != nil {
+				log.Errorf("reply delete ok msg failed", err)
+			} else {
+				log.Debugf("reply delete ack msg success")
+			}
+			return
 		}
-		return
 	}
 	info, err := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
 	if info != nil || strings.Index(err.Error(), "FsGetFileInfo not found") == -1 {

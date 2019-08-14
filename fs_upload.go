@@ -415,28 +415,32 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	info, err := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	log.Debugf("delete file get fileinfo %v, err %v", info, err)
 	if err != nil && !strings.Contains(err.Error(), "[FS Profit] FsGetFileInfo not found") {
-		log.Debugf("info:%v, err:%s", info, err)
+		log.Debugf("info:%v, other err:%s", info, err)
 		return nil, fmt.Errorf("file info not found, %s has deleted", fileHashStr)
 	}
 	if info != nil && info.FileOwner.ToBase58() != this.WalletAddress() {
 		return nil, fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
 	}
 	storingNode := this.getFileProvedNode(fileHashStr)
-	txHash, err := this.Chain.Native.Fs.DeleteFile(fileHashStr)
-	log.Debugf("delete file tx %v, err %v", txHash, err)
-	if err != nil {
-		return nil, err
-	}
-	txHashStr := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
-	log.Debugf("delete file txHash %s", txHashStr)
-	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
-	if err != nil || !confirmed {
-		return nil, errors.New("wait for tx confirmed failed")
-	}
-	txHeight, err := this.Chain.GetBlockHeightByTxHash(txHashStr)
-	log.Debugf("delete file tx height %d, err %v", txHeight, err)
-	if err != nil {
-		return nil, err
+	var txHashStr string
+	var txHeight uint32
+	if info != nil && err == nil {
+		txHash, err := this.Chain.Native.Fs.DeleteFile(fileHashStr)
+		log.Debugf("delete file tx %v, err %v", txHash, err)
+		if err != nil {
+			return nil, err
+		}
+		txHashStr = hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+		log.Debugf("delete file txHash %s", txHashStr)
+		confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
+		if err != nil || !confirmed {
+			return nil, errors.New("wait for tx confirmed failed")
+		}
+		txHeight, err = this.Chain.GetBlockHeightByTxHash(txHashStr)
+		log.Debugf("delete file tx height %d, err %v", txHeight, err)
+		if err != nil {
+			return nil, err
+		}
 	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
 	log.Debugf("taskId of to delete file %v", taskId)
@@ -447,10 +451,9 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	}
 	log.Debugf("will broadcast delete msg to %v", storingNode)
 	resp := &common.DeleteUploadFileResp{}
-	resp.Tx = hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	resp.Tx = txHashStr
 	resp.FileName = this.taskMgr.FileNameFromTask(taskId)
 	if len(storingNode) == 0 {
-		// TODO: make transaction commit
 		err = this.taskMgr.DeleteTask(taskId, true)
 		log.Debugf("delete task donne ")
 		if err != nil {
@@ -478,7 +481,6 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 	m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, reply)
 	resp.Nodes = nodeStatus
 	log.Debugf("send delete msg done ret: %v, nodeStatus: %v, err: %s", m, nodeStatus, err)
-	// TODO: make transaction commit
 	err = this.taskMgr.DeleteTask(taskId, true)
 	if err != nil {
 		log.Errorf("delete upload info from db err: %s", err)
