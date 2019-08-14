@@ -192,7 +192,6 @@ func (this *Dsp) SetupDNSChannels() error {
 		if err != nil {
 			return err
 		}
-		// err = client.ChannelP2pWaitForConnected(dnsUrl, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		if err != nil {
 			log.Errorf("wait channel connected err %s %s", walletAddr, err)

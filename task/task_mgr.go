@@ -305,6 +305,9 @@ func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 		log.Warnf("GetFileInfo failed: %s", taskId)
 		return nil, false
 	}
+	if fi == nil {
+		return nil, false
+	}
 	task := this.setTaskWithFileInfo(taskId, fi)
 	return task, true
 }
