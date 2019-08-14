@@ -824,6 +824,7 @@ func (this *FileDB) RemoveFromUndoneList(id string, ft FileInfoType) error {
 	case FileInfoTypeShare:
 		return nil
 	}
+	log.Debugf("remove undone file id: %s, key %s", id, undoneKey)
 	data, err := this.db.Get([]byte(undoneKey))
 	if err != nil && err != leveldb.ErrNotFound {
 		return err

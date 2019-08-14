@@ -472,10 +472,16 @@ func (this *Dsp) DeleteUploadedFile(fileHashStr string) (*common.DeleteUploadFil
 		ackMsg := message.ReadMessage(msg)
 		nodeStatusLock.Lock()
 		defer nodeStatusLock.Unlock()
+		errCode := uint32(0)
+		errMsg := ""
+		if ackMsg.Error != nil {
+			errCode = ackMsg.Error.Code
+			errMsg = ackMsg.Error.Message
+		}
 		nodeStatus = append(nodeStatus, common.DeleteFileStatus{
 			HostAddr: addr,
-			Code:     ackMsg.Error.Code,
-			Error:    ackMsg.Error.Message,
+			Code:     errCode,
+			Error:    errMsg,
 		})
 	}
 	m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, reply)

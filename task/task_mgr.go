@@ -126,45 +126,9 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 			log.Warnf("recover task get file info is nil of %v", id)
 			continue
 		}
-		state := TaskState(info.TaskState)
-		if state == TaskStateDoing {
-			state = TaskStatePause
-		}
-		t := &Task{
-			id:            id,
-			fileHash:      info.FileHash,
-			fileName:      info.FileName,
-			total:         info.TotalBlockCount,
-			copyNum:       info.CopyNum,
-			filePath:      info.FilePath,
-			walletAddr:    info.WalletAddress,
-			createdAt:     int64(info.CreatedAt),
-			blockReq:      make(chan *GetBlockReq, common.MAX_TASK_BLOCK_REQ),
-			notify:        make(chan *BlockResp, common.MAX_TASK_BLOCK_NOTIFY),
-			lastWorkerIdx: -1,
-			sessionIds:    make(map[string]string, common.MAX_TASK_SESSION_NUM),
-			state:         state,
-			stateChange:   make(chan TaskState, 1),
-		}
-		sessions, err := this.db.GetFileSessions(id)
-		if err != nil {
-			return err
-		}
-		for _, session := range sessions {
-			log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
-			t.SetSessionId(session.WalletAddr, session.SessionId)
-		}
-		switch info.InfoType {
-		case store.FileInfoTypeUpload:
-			t.taskType = TaskTypeUpload
-			opt, _ := this.GetFileUploadOptions(id)
-			if opt != nil {
-				t.storeType = opt.StorageType
-			}
-		case store.FileInfoTypeDownload:
-			t.taskType = TaskTypeDownload
-		case store.FileInfoTypeShare:
-			t.taskType = TaskTypeShare
+		t := this.setTaskWithFileInfo(id, info)
+		if t == nil {
+			continue
 		}
 		log.Debugf("recover id: %s, type: %d, state: %d", id, t.taskType, t.state)
 		this.tasks[id] = t
@@ -330,12 +294,19 @@ func (this *TaskMgr) GetSeesionId(taskId, peerWalletAddr string) (string, error)
 
 func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 	this.lock.RLock()
+	defer this.lock.RUnlock()
 	v, ok := this.tasks[taskId]
-	this.lock.RUnlock()
-	if !ok {
-		log.Debugf("[dsp-go-sdk-taskmgr]: GetTaskById failed %s", taskId)
+	if ok {
+		return v, ok
 	}
-	return v, ok
+	log.Debugf("GetTaskById failed %s", taskId)
+	fi, err := this.db.GetFileInfo([]byte(taskId))
+	if err != nil {
+		log.Warnf("GetFileInfo failed: %s", taskId)
+		return nil, false
+	}
+	task := this.setTaskWithFileInfo(taskId, fi)
+	return task, true
 }
 
 // TaskType.
@@ -1240,4 +1211,49 @@ func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint64, erro
 
 func (this *TaskMgr) SetUploadProgressDone(id, nodeAddr string) error {
 	return this.db.SetUploadProgressDone(id, nodeAddr)
+}
+
+func (this *TaskMgr) setTaskWithFileInfo(id string, info *store.FileInfo) *Task {
+	state := TaskState(info.TaskState)
+	if state == TaskStateDoing {
+		state = TaskStatePause
+	}
+	t := &Task{
+		id:            id,
+		fileHash:      info.FileHash,
+		fileName:      info.FileName,
+		total:         info.TotalBlockCount,
+		copyNum:       info.CopyNum,
+		filePath:      info.FilePath,
+		walletAddr:    info.WalletAddress,
+		createdAt:     int64(info.CreatedAt),
+		blockReq:      make(chan *GetBlockReq, common.MAX_TASK_BLOCK_REQ),
+		notify:        make(chan *BlockResp, common.MAX_TASK_BLOCK_NOTIFY),
+		lastWorkerIdx: -1,
+		sessionIds:    make(map[string]string, common.MAX_TASK_SESSION_NUM),
+		state:         state,
+		stateChange:   make(chan TaskState, 1),
+	}
+	sessions, err := this.db.GetFileSessions(id)
+	if err != nil {
+		log.Errorf("set task session: %s", err)
+		return nil
+	}
+	for _, session := range sessions {
+		log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
+		t.SetSessionId(session.WalletAddr, session.SessionId)
+	}
+	switch info.InfoType {
+	case store.FileInfoTypeUpload:
+		t.taskType = TaskTypeUpload
+		opt, _ := this.GetFileUploadOptions(id)
+		if opt != nil {
+			t.storeType = opt.StorageType
+		}
+	case store.FileInfoTypeDownload:
+		t.taskType = TaskTypeDownload
+	case store.FileInfoTypeShare:
+		t.taskType = TaskTypeShare
+	}
+	return t
 }
