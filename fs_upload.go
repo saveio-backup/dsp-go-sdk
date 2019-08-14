@@ -800,7 +800,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 	action := func(res proto.Message, addr string) {
 		log.Debugf("send file ask msg success %s", addr)
 		p2pMsg := message.ReadMessage(res)
-		if p2pMsg.Error != nil {
+		if p2pMsg.Error != nil && p2pMsg.Error.Code != serr.SUCCESS {
 			log.Errorf("get file fetch_ack msg err %s", p2pMsg.Error.Message)
 			return
 		}

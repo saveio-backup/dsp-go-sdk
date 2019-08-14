@@ -400,7 +400,13 @@ func (this *Dsp) handleFileDownloadMsg(ctx *network.ComponentContext, peer *netw
 func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	taskId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
 	if !this.taskMgr.TaskExist(taskId) {
-		log.Errorf("share task not exist %s", fileMsg.Hash)
+		log.Warnf("share task not exist %s", fileMsg.Hash)
+		err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply download msg failed, err %s", err)
+		} else {
+			log.Debugf("reply download cancel msg success")
+		}
 		return
 	}
 	// TODO: check unpaid amount
@@ -409,8 +415,9 @@ func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer
 	err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 	if err != nil {
 		log.Errorf("reply download msg failed, err %s", err)
+	} else {
+		log.Debugf("reply download cancel msg success")
 	}
-	log.Debugf("reply download cancel msg success")
 	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
