@@ -872,28 +872,20 @@ func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string
 }
 
 // generateBlockMsgData. generate blockdata, blockEncodedData, tagData with prove params
-func (this *Dsp) generateBlockMsgData(hashes []string, fileID, g0, privateKey []byte) (map[string]*blockMsgData, error) {
+func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64, fileID, g0, privateKey []byte) (*blockMsgData, error) {
 	// TODO: use disk fetch rather then memory access
-	m := make(map[string]*blockMsgData, 0)
-	allOffset, err := this.Fs.GetAllOffsets(hashes[0])
+	block := this.Fs.GetBlock(hash)
+	blockData := this.Fs.BlockDataOfAny(block)
+	tag, err := pdp.SignGenerate(blockData, fileID, uint32(index+1), g0, privateKey)
 	if err != nil {
 		return nil, err
 	}
-	for i, hash := range hashes {
-		block := this.Fs.GetBlock(hash)
-		blockData := this.Fs.BlockDataOfAny(block)
-		key := keyOfUnixNode(hash, uint32(i))
-		tag, err := pdp.SignGenerate(blockData, fileID, uint32(i+1), g0, privateKey)
-		if err != nil {
-			return nil, err
-		}
-		m[key] = &blockMsgData{
-			blockData: blockData,
-			tag:       tag,
-			offset:    allOffset[hash],
-		}
+	msgData := &blockMsgData{
+		blockData: blockData,
+		tag:       tag,
+		offset:    offset,
 	}
-	return m, nil
+	return msgData, nil
 }
 
 // waitForFetchBlock. wait for fetched blocks concurrent
@@ -903,9 +895,9 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		return serr.NewDetailError(serr.PREPARE_UPLOAD_ERROR, err.Error())
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileGeneratePDPData)
-	blockMsgDataMap, err := this.generateBlockMsgData(hashes, fileID, g0, privateKey)
+	allOffset, err := this.Fs.GetAllOffsets(hashes[0])
 	if err != nil {
-		return serr.NewDetailError(serr.GET_ALL_BLOCK_ERROR, err.Error())
+		return serr.NewDetailError(serr.PREPARE_UPLOAD_ERROR, err.Error())
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
 	timeout := time.NewTimer(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
@@ -914,7 +906,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		return serr.NewDetailError(serr.GET_SESSION_ID_FAILED, err.Error())
 	}
 	fileHashStr := this.taskMgr.TaskFileHash(taskId)
-	totalCount := uint64(len(blockMsgDataMap))
+	totalCount := uint64(len(hashes))
 	stateChange := this.taskMgr.TaskStateChange(taskId)
 	doneCh := make(chan *fetchedDone)
 	closeDoneChannel := uint32(0)
@@ -922,6 +914,29 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		log.Debugf("close doneCh")
 		// close(doneCh)
 	}()
+	var getMsgDataLock sync.Mutex
+	blockMsgDataMap := make(map[string]*blockMsgData)
+	getMsgData := func(hash string, index uint32) *blockMsgData {
+		getMsgDataLock.Lock()
+		defer getMsgDataLock.Unlock()
+		key := keyOfUnixNode(hash, index)
+		data, ok := blockMsgDataMap[key]
+		if ok {
+			log.Debugf("get block data %v", data)
+			return data
+		}
+		offset, _ := allOffset[hash]
+		var err error
+		data, err = this.generateBlockMsgData(hash, index, offset, fileID, g0, privateKey)
+		if err != nil {
+			return nil
+		}
+		blockMsgDataMap[key] = data
+		return data
+	}
+	cleanMsgData := func(hash string, index uint32) {
+		// TODO
+	}
 	cancelFetch := make(chan struct{})
 	log.Debugf("open %d go routines for fetched, stateChange: %v", maxFetchRoutines, stateChange)
 	for i := 0; i < maxFetchRoutines; i++ {
@@ -937,7 +952,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 					timeout.Reset(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
 					key := keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))
 					log.Debugf("handle request key:%s, %s-%s-%d from peer: %s", key, fileHashStr, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
-					msgData := blockMsgDataMap[key]
+					msgData := getMsgData(reqInfo.Hash, uint32(reqInfo.Index))
 					// handle fetch request async
 					done, err := this.handleFetchBlockRequest(taskId, sessionId, fileHashStr, reqInfo, copyNum, totalCount, msgData)
 					pause, cancel, _ = this.taskMgr.IsTaskPauseOrCancel(taskId)
@@ -946,6 +961,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 						return
 					}
 					if done == false && err == nil {
+						cleanMsgData(reqInfo.Hash, uint32(reqInfo.Index))
 						continue
 					}
 					swapped := atomic.CompareAndSwapUint32(&closeDoneChannel, 0, 1)

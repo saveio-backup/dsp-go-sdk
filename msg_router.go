@@ -502,7 +502,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				log.Errorf("get task block reqCh err: %s", err)
 				return
 			}
-			log.Debugf("push to request")
+			log.Debugf("push get block to request")
 			reqCh <- &task.GetBlockReq{
 				FileHash: blockMsg.FileHash,
 				Hash:     blockMsg.Hash,
@@ -512,7 +512,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 			return
 		case task.TaskTypeDownload, task.TaskTypeShare:
 			reqCh := this.taskMgr.BlockReqCh()
-			log.Debugf("push get block req")
+			log.Debugf("push get block req: %s-%s-%s-%d-%s", sessionId, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address)
 			reqCh <- &task.GetBlockReq{
 				FileHash:      blockMsg.FileHash,
 				Hash:          blockMsg.Hash,
