@@ -35,7 +35,14 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 	var err error
 	if len(taskId) == 0 {
 		taskId, err = this.taskMgr.NewTask(task.TaskTypeDownload)
+	} else {
+		log.Warnf("download task has exists %s", taskId)
+		if this.taskMgr.GetTaskState(taskId) == task.TaskStateDoing || this.taskMgr.GetTaskState(taskId) == task.TaskStatePrepare {
+			log.Warnf("download task is doing")
+			return nil
+		}
 	}
+	log.Debugf("download file id: %s, fileHash: %s, option: %v", taskId, fileHashStr, opt)
 	defer func() {
 		if err != nil {
 			log.Errorf("download file %s err %s", fileHashStr, err)
@@ -220,7 +227,8 @@ func (this *Dsp) DownloadFileByLink(link string, asset int32, inOrder bool, decr
 		SetFileName: setFileName,
 		MaxPeerCnt:  maxPeerCnt,
 	}
-	return this.DownloadFile("", fileHashStr, opt)
+	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	return this.DownloadFile(taskId, fileHashStr, opt)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
@@ -237,8 +245,26 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 		SetFileName: setFileName,
 		MaxPeerCnt:  maxPeerCnt,
 	}
+	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	log.Debugf("DownloadFileByUrl %s, hash %s, opt %v", url, fileHashStr, opt)
-	return this.DownloadFile("", fileHashStr, opt)
+	return this.DownloadFile(taskId, fileHashStr, opt)
+}
+
+// DownloadFileByUrl. download file by link, e.g dsp://file1
+func (this *Dsp) DownloadFileByHash(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free, setFileName bool, maxPeerCnt int) error {
+	// TODO: get file name
+	opt := &common.DownloadOption{
+		FileName:    "",
+		Asset:       asset,
+		InOrder:     inOrder,
+		DecryptPwd:  decryptPwd,
+		Free:        free,
+		SetFileName: setFileName,
+		MaxPeerCnt:  maxPeerCnt,
+	}
+	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	log.Debugf("DownloadFileByHash %s,opt %v", fileHashStr, opt)
+	return this.DownloadFile(taskId, fileHashStr, opt)
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
@@ -493,12 +519,12 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileDownloading)
 	// declare job for workers
 	job := func(tId, fHash, bHash, pAddr, walletAddr string, index int32) (*task.BlockResp, error) {
-		resp, err := this.downloadBlock(tId, fHash, bHash, index, pAddr, walletAddr, 0)
+		resp, err := this.downloadBlock(tId, fHash, bHash, index, pAddr, walletAddr, 1)
 		if err != nil {
 			return nil, err
 		}
 		if resp == nil {
-			return nil, fmt.Errorf("download block is nil %s-%s-%d %s-%d from %s %s, err %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr, walletAddr, err)
+			return nil, fmt.Errorf("download block is nil %s-%s-%d from %s %s, err %s", fHash, bHash, index, pAddr, walletAddr, err)
 		}
 		log.Debugf("job done: download tId  %s-%s-%d %s-%d from %s %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr, walletAddr)
 		payInfo := quotation[pAddr]
