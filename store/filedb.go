@@ -1014,6 +1014,7 @@ func (this *FileDB) GetFileInfo(key []byte) (*FileInfo, error) {
 		}
 	}
 	if len(value) == 0 {
+		log.Debugf("get file info value is empty %s", key)
 		return nil, nil
 	}
 

@@ -130,7 +130,7 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 		if t == nil {
 			continue
 		}
-		log.Debugf("recover id: %s, type: %d, state: %d", id, t.taskType, t.state)
+
 		this.tasks[id] = t
 	}
 	return nil
@@ -308,6 +308,7 @@ func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 	if fi == nil {
 		return nil, false
 	}
+	log.Debugf("get task by info success %d", fi)
 	task := this.setTaskWithFileInfo(taskId, fi)
 	return task, true
 }
@@ -1218,7 +1219,7 @@ func (this *TaskMgr) SetUploadProgressDone(id, nodeAddr string) error {
 
 func (this *TaskMgr) setTaskWithFileInfo(id string, info *store.FileInfo) *Task {
 	state := TaskState(info.TaskState)
-	if state == TaskStateDoing {
+	if state == TaskStateDoing || state == TaskStateCancel {
 		state = TaskStatePause
 	}
 	t := &Task{
@@ -1258,5 +1259,6 @@ func (this *TaskMgr) setTaskWithFileInfo(id string, info *store.FileInfo) *Task 
 	case store.FileInfoTypeShare:
 		t.taskType = TaskTypeShare
 	}
+	log.Debugf("set task id: %s, type: %d, state: %d", id, t.taskType, t.state)
 	return t
 }
