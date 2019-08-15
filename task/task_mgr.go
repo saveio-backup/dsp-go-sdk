@@ -331,7 +331,9 @@ func (this *TaskMgr) TaskFileHash(taskId string) string {
 }
 
 func (this *TaskMgr) TaskExist(taskId string) bool {
-	_, ok := this.GetTaskById(taskId)
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	_, ok := this.tasks[taskId]
 	return ok
 }
 

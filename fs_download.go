@@ -228,7 +228,16 @@ func (this *Dsp) DownloadFileByLink(link string, asset int32, inOrder bool, decr
 		MaxPeerCnt:  maxPeerCnt,
 	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
-	return this.DownloadFile(taskId, fileHashStr, opt)
+	if !this.taskMgr.TaskExist(taskId) {
+		log.Debugf("DownloadFileByLink %s, hash %s, opt %v", fileHashStr, fileHashStr, opt)
+		return this.DownloadFile("", fileHashStr, opt)
+	}
+	taskDone, _ := this.taskMgr.IsTaskDone(taskId)
+	if taskDone {
+		log.Debugf("DownloadFileByLink %s, hash %s, opt %v, download a done task", fileHashStr, fileHashStr, opt)
+		return this.DownloadFile("", fileHashStr, opt)
+	}
+	return fmt.Errorf("task has exist, but not finished %s", taskId)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
@@ -246,8 +255,16 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 		MaxPeerCnt:  maxPeerCnt,
 	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
-	log.Debugf("DownloadFileByUrl %s, hash %s, opt %v", url, fileHashStr, opt)
-	return this.DownloadFile(taskId, fileHashStr, opt)
+	if !this.taskMgr.TaskExist(taskId) {
+		log.Debugf("DownloadFileByUrl %s, hash %s, opt %v", url, fileHashStr, opt)
+		return this.DownloadFile("", fileHashStr, opt)
+	}
+	taskDone, _ := this.taskMgr.IsTaskDone(taskId)
+	if taskDone {
+		log.Debugf("DownloadFileByUrl %s, hash %s, opt %v, download a done task", url, fileHashStr, opt)
+		return this.DownloadFile("", fileHashStr, opt)
+	}
+	return fmt.Errorf("task has exist, but not finished %s", taskId)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
@@ -263,8 +280,16 @@ func (this *Dsp) DownloadFileByHash(fileHashStr string, asset int32, inOrder boo
 		MaxPeerCnt:  maxPeerCnt,
 	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
-	log.Debugf("DownloadFileByHash %s,opt %v", fileHashStr, opt)
-	return this.DownloadFile(taskId, fileHashStr, opt)
+	if !this.taskMgr.TaskExist(taskId) {
+		log.Debugf("DownloadFileByHash %s, hash %s, opt %v", fileHashStr, fileHashStr, opt)
+		return this.DownloadFile("", fileHashStr, opt)
+	}
+	taskDone, _ := this.taskMgr.IsTaskDone(taskId)
+	if taskDone {
+		log.Debugf("DownloadFileByHash %s, hash %s, opt %v, download a done task", fileHashStr, fileHashStr, opt)
+		return this.DownloadFile("", fileHashStr, opt)
+	}
+	return fmt.Errorf("task has exist, but not finished %s", taskId)
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
@@ -988,7 +1013,7 @@ func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, ad
 	var block *task.BlockResp
 	for i := uint32(0); i < retry; i++ {
 		err = client.P2pSend(addr, msg.ToProtoMsg())
-		log.Debugf("send download block msg sessionId %s of %s-%s-%d to %s, err %s, retry: %d", sessionId, fileHashStr, hash, index, addr, err, retry)
+		log.Debugf("send download block msg sessionId %s of %s-%s-%d to %s, err %s, retry: %d", sessionId, fileHashStr, hash, index, addr, err, i)
 		if err != nil {
 			continue
 		}
