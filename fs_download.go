@@ -528,8 +528,8 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		}
 		log.Debugf("job done: download tId  %s-%s-%d %s-%d from %s %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr, walletAddr)
 		payInfo := quotation[pAddr]
-		log.Debugf("start paying for block %s-%s-%d, payInfo %v", fHash, resp.Hash, resp.Index, payInfo)
-		_, err = this.PayForBlock(payInfo, pAddr, fHash, uint64(len(resp.Block)))
+		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(len(resp.Block)))
+		log.Debugf("pay for block: %s-%s-%d to %s, wallet: %s success, paymentId: %s", fHash, bHash, index, pAddr, walletAddr, paymentId)
 		if err != nil {
 			log.Errorf("pay for block %s err %s", resp.Hash, err)
 			return nil, err

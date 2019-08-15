@@ -668,9 +668,10 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			}
 			// check pool has item or no
 			// check all pool items are in request flights
-			if v.GetBlockReqPoolLen() == 0 || atomic.LoadInt32(&pendingCount) >= int32(v.GetBlockReqPoolLen()) {
+			reqPoolLen := v.GetBlockReqPoolLen()
+			if reqPoolLen == 0 || atomic.LoadInt32(&pendingCount) >= int32(reqPoolLen) {
 				// if v.GetBlockReqPoolLen() == 0 || len(flight)+getBlockCacheLen() >= v.GetBlockReqPoolLen() {
-				log.Debugf("sleep for pending block...")
+				log.Debugf("sleep for pending block... req pool len: %d", reqPoolLen)
 				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}
