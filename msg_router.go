@@ -452,15 +452,20 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 			log.Debugf("task %s not exist", blockMsg.FileHash)
 			return
 		}
-		this.taskMgr.PushGetBlock(taskId, blockMsg.SessionId, &task.BlockResp{
-			Hash:     blockMsg.Hash,
-			Index:    blockMsg.Index,
-			PeerAddr: peer.Address,
-			Block:    blockMsg.Data,
-			Tag:      blockMsg.Tag,
-			Offset:   blockMsg.Offset,
-		})
-		log.Debugf("push block finished")
+		isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
+		if !isDownloaded {
+			this.taskMgr.PushGetBlock(taskId, blockMsg.SessionId, &task.BlockResp{
+				Hash:     blockMsg.Hash,
+				Index:    blockMsg.Index,
+				PeerAddr: peer.Address,
+				Block:    blockMsg.Data,
+				Tag:      blockMsg.Tag,
+				Offset:   blockMsg.Offset,
+			})
+			log.Debugf("push block finished")
+		} else {
+			log.Debugf("the block has downloaded")
+		}
 		emptyMsg := message.NewEmptyMsg()
 		err := ctx.Reply(context.Background(), emptyMsg.ToProtoMsg())
 		if err != nil {
