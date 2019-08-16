@@ -703,6 +703,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}
+			log.Debugf("add flight %s, worker %s", flightKey, worker.RemoteAddress())
 			atomic.AddInt32(&pendingCount, 1)
 			// addFlight(flightKey)
 			flightMap.Store(flightKey, struct{}{})
@@ -728,18 +729,17 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("done channel has close")
 					break
 				}
-				log.Debugf("receive resp++++ %s, err %s", resp.flightKey, resp.err)
-				// remove the request from flight
-				// removeFlight(resp.flightKey)
-				atomic.AddInt32(&pendingCount, -1)
-				flightMap.Delete(resp.flightKey)
+				log.Debugf("receive response of flight %s, err %s", resp.flightKey, resp.err)
 				if resp.err != nil {
+					atomic.AddInt32(&pendingCount, -1)
+					flightMap.Delete(resp.flightKey)
+					// remove the request from flight
 					log.Errorf("worker %s do job err continue %s", resp.worker.remoteAddr, resp.err)
 					continue
 				}
 				log.Debugf("add flightkey to cache %s, blockhash %s", resp.flightKey, resp.ret.Hash)
-				atomic.AddInt32(&pendingCount, 1)
 				blockCache.Store(resp.flightKey, resp.ret)
+				flightMap.Delete(resp.flightKey)
 				// notify outside
 				pool := v.GetBlockReqPool()
 				type toDeleteInfo struct {
@@ -749,28 +749,34 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				toDelete := make([]*toDeleteInfo, 0)
 				for poolIdx, r := range pool {
 					blkKey := fmt.Sprintf("%s-%d", r.Hash, r.Index)
-					blktemp, ok := blockCache.Load(blkKey)
+					_, ok := blockCache.Load(blkKey)
 					log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
 					if !ok {
 						log.Debugf("break because block cache not has %v", blkKey)
 						break
 					}
-					blk := blktemp.(*BlockResp)
-					log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
-					v.NotifyBlock(blk)
-					blockCache.Delete(blkKey)
-					atomic.AddInt32(&pendingCount, -1)
 					toDelete = append(toDelete, &toDeleteInfo{
 						hash:  r.Hash,
 						index: r.Index,
 					})
 				}
-				log.Debugf("to delete len %d", len(toDelete))
+				log.Debugf("remove %d response from req pool", len(toDelete))
 				for _, toD := range toDelete {
+					blkKey := fmt.Sprintf("%s-%d", toD.hash, toD.index)
+					blktemp, ok := blockCache.Load(blkKey)
+					if !ok {
+						log.Warnf("break because block cache not has %v!", blkKey)
+						continue
+					}
 					this.DelBlockReq(taskId, toD.hash, toD.index)
+					blk := blktemp.(*BlockResp)
+					log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
+					v.NotifyBlock(blk)
+					blockCache.Delete(blkKey)
+					atomic.AddInt32(&pendingCount, -1)
 				}
-				log.Debugf("remain block cache len %d", getBlockCacheLen())
-				log.Debugf("receive resp++++ done")
+				log.Debugf("remain %d response at block cache", getBlockCacheLen())
+				log.Debugf("receive response process done")
 			}
 			if v.State() == TaskStatePause || v.State() == TaskStateFailed {
 				log.Debugf("receive state %d", v.State())

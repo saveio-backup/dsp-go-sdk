@@ -449,7 +449,7 @@ func (this *Task) GetIdleWorker(addrs []string, fileHash, reqHash string) *Worke
 		idx := this.lastWorkerIdx
 		w := this.workers[addrs[idx]]
 		if w.Working() || w.WorkFailed(reqHash) || w.Unpaid() || w.FailedTooMuch(fileHash) {
-			log.Debugf("%d worker is working: %t, failed: %t, unpaid: %t", i, w.Working(), w.WorkFailed(reqHash), w.Unpaid())
+			log.Debugf("#%d worker is working: %t, failed: %t, unpaid: %t, file: %s, block: %s", i, w.Working(), w.WorkFailed(reqHash), w.Unpaid(), fileHash, reqHash)
 			continue
 		}
 		worker = w

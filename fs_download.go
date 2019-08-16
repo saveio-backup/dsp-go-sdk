@@ -553,7 +553,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		log.Debugf("job done: download tId  %s-%s-%d %s-%d from %s %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr, walletAddr)
 		payInfo := quotation[pAddr]
 		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(len(resp.Block)))
-		log.Debugf("pay for block: %s-%s-%d to %s, wallet: %s success, paymentId: %s", fHash, bHash, index, pAddr, walletAddr, paymentId)
+		log.Debugf("pay for block: %s-%s-%d to %s, wallet: %s success, paymentId: %d", fHash, bHash, index, pAddr, walletAddr, paymentId)
 		if err != nil {
 			log.Errorf("pay for block %s err %s", resp.Hash, err)
 			return nil, err
@@ -1002,6 +1002,7 @@ func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, ad
 		return nil, err
 	}
 	walletAddress := this.WalletAddress()
+	// TODO: refactor to request - reply model
 	log.Debugf("download block of task: %s %s-%s-%d to %s", taskId, fileHashStr, hash, index, addr)
 	ch := this.taskMgr.NewBlockRespCh(taskId, sessionId, hash, index)
 	defer func() {
