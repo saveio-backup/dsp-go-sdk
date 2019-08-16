@@ -875,6 +875,8 @@ func (this *FileDB) UndoneList(ft FileInfoType) ([]string, error) {
 }
 
 func (this *FileDB) SetUploadProgressDone(id, nodeAddr string) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	log.Debugf("SetUploadProgressDone :%s, addr: %s", id, nodeAddr)
 	fi, err := this.GetFileInfo([]byte(id))
 	if err != nil {
