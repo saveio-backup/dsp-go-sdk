@@ -129,12 +129,12 @@ func (this *Channel) SetHostAddr(walletAddr, host string) error {
 		prefix := this.cfg.ChannelProtocol + "://"
 		realHost = host[index+len(prefix):]
 	}
-	log.Debugf("[dsp-go-sdk-channel] SetHostAddr %s %s", walletAddr, realHost)
 	addr, err := chaincomm.AddressFromBase58(walletAddr)
 	if err != nil {
 		return err
 	}
 	ch_actor.SetHostAddr(common.Address(addr), realHost)
+	log.Debugf("[dsp-go-sdk-channel] SetHostAddr %s %s", walletAddr, realHost)
 	this.channelDB.AddPartner(this.walletAddr, walletAddr)
 	return nil
 }

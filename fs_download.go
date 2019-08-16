@@ -28,7 +28,7 @@ import (
 // DownloadFile. download file, piece by piece from addrs.
 // inOrder: if true, the file will be downloaded block by block in order
 // free: if true, query nodes who can share file free
-// maxPeeCnt: download with max number peers with min price
+// maxPeeCnt: download with max number peers who provide file at the less price
 func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOption) error {
 	// start a task
 	var sdkErr *serr.SDKError
