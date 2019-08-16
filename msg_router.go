@@ -234,7 +234,6 @@ func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext, peer *net
 		return
 	}
 	log.Debugf("receive fetch done msg, save task id:%s fileHash: %s done", taskId, fileMsg.Hash)
-	this.taskMgr.SetTaskState(taskId, task.TaskStateDone)
 	this.taskMgr.SetUploadProgressDone(taskId, peer.Address)
 }
 

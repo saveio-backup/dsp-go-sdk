@@ -443,7 +443,7 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 	}
 	if progress.Progress == fi.TotalBlockCount && fi.SaveBlockCountMap[nodeAddr] == fi.TotalBlockCount && fi.TotalBlockCount > 0 {
 		// has done
-		log.Debugf("block has added: %d, %d, %v, %s", progress.Progress, fi.TotalBlockCount, fi.SaveBlockCountMap, nodeAddr)
+		log.Debugf("block has added: %d, %v, %v, %s", progress.Progress, fi.TotalBlockCount, fi.SaveBlockCountMap, nodeAddr)
 		return nil
 	}
 	progress.Progress++
@@ -463,7 +463,7 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 	this.db.BatchPut(batch, []byte(blockKey), blockBuf)
 	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
 	this.db.BatchPut(batch, []byte(fi.Id), fiBuf)
-	log.Debugf("nodeAddr %s increase sent %d, reqTime %v", nodeAddr, fi.SaveBlockCountMap, block.ReqTimes[nodeAddr])
+	log.Debugf("nodeAddr %s increase sent %v, reqTime %v", nodeAddr, fi.SaveBlockCountMap, block.ReqTimes[nodeAddr])
 	return this.db.BatchCommit(batch)
 }
 

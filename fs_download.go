@@ -592,7 +592,7 @@ func (this *Dsp) DeleteDownloadedFile(taskId string) error {
 	err := this.Fs.DeleteFile(fileHashStr, filePath)
 	if err != nil {
 		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHashStr, filePath, err)
-		return err
+		// return err
 	}
 	log.Debugf("delete local file success fileHash:%s, path:%s", fileHashStr, filePath)
 	return this.taskMgr.DeleteTask(taskId, true)
