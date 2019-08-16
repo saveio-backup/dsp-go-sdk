@@ -451,7 +451,7 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 	if err != nil {
 		return err
 	}
-	fi.SaveBlockCountMap[nodeAddr]++
+	fi.SaveBlockCountMap[nodeAddr] = fi.SaveBlockCountMap[nodeAddr] + 1
 	fi.CurrentBlock = blockHashStr
 	fi.CurrentIndex = uint64(index)
 	fiBuf, err := json.Marshal(fi)

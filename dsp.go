@@ -124,7 +124,6 @@ func (this *Dsp) StartChannelService() error {
 	if err != nil {
 		return err
 	}
-	this.SetupPartnerHost(this.Channel.GetAllPartners())
 	err = this.Channel.StartService()
 	if err != nil {
 		return err

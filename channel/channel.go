@@ -63,7 +63,6 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 		ClientType:    cfg.ChannelClientType,
 		ChainNodeURLs: rpcAddrs,
 		ListenAddress: cfg.ChannelListenAddr,
-		Protocol:      cfg.ChannelProtocol,
 		RevealTimeout: cfg.ChannelRevealTimeout, // 50
 		DBPath:        cfg.ChannelDBPath,
 		SettleTimeout: cfg.ChannelSettleTimeout, // 120
@@ -119,24 +118,6 @@ func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
 		return host, nil
 	}
 	return prefix + host, nil
-}
-
-// SetHostAddr. set host address for wallet
-func (this *Channel) SetHostAddr(walletAddr, host string) error {
-	index := strings.Index(host, this.cfg.ChannelProtocol)
-	realHost := host
-	if index != -1 {
-		prefix := this.cfg.ChannelProtocol + "://"
-		realHost = host[index+len(prefix):]
-	}
-	addr, err := chaincomm.AddressFromBase58(walletAddr)
-	if err != nil {
-		return err
-	}
-	ch_actor.SetHostAddr(common.Address(addr), realHost)
-	log.Debugf("[dsp-go-sdk-channel] SetHostAddr %s %s", walletAddr, realHost)
-	this.channelDB.AddPartner(this.walletAddr, walletAddr)
-	return nil
 }
 
 // StartService. start channel service

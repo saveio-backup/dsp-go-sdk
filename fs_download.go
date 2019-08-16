@@ -383,7 +383,6 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 		if len(hostAddr) == 0 || err != nil {
 			continue
 		}
-		this.Channel.SetHostAddr(payInfo.WalletAddress, hostAddr)
 		// TODO: change to parallel job
 		go client.P2pConnect(hostAddr)
 	}

@@ -383,12 +383,9 @@ func (this *Dsp) handleFileDownloadMsg(ctx *network.ComponentContext, peer *netw
 	taskKey := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
 	// TODO: check channel balance and router path
 	this.taskMgr.AddShareTo(taskKey, fileMsg.PayInfo.WalletAddress)
-	hostAddr, err := this.GetExternalIP(fileMsg.PayInfo.WalletAddress)
+	hostAddr, _ := this.GetExternalIP(fileMsg.PayInfo.WalletAddress)
 	log.Debugf("Set host addr after recv file download %s - %s", fileMsg.PayInfo.WalletAddress, hostAddr)
-	if len(hostAddr) > 0 || err != nil {
-		this.Channel.SetHostAddr(fileMsg.PayInfo.WalletAddress, hostAddr)
-	}
-	err = ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
+	err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 	if err != nil {
 		log.Errorf("reply download msg failed, err %s", err)
 	}

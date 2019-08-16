@@ -125,12 +125,6 @@ func (this *Dsp) SetOnlineDNS() {
 			log.Warn("it should not happen")
 			continue
 		}
-		err = this.Channel.SetHostAddr(walletAddr, dnsUrl)
-		if err != nil {
-			continue
-		}
-		// err = client.ChannelP2pWaitForConnected(dnsUrl, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
-		// TODO: wait for channel to refactor
 		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		if err != nil {
 			log.Errorf("wait channel connected err %s %s", walletAddr, err)
@@ -187,10 +181,6 @@ func (this *Dsp) SetupDNSChannels() error {
 		log.Debugf("set dns node func %s %s", dnsUrl, walletAddr)
 		if strings.Index(dnsUrl, "0.0.0.0:0") != -1 {
 			return errors.New("invalid host addr")
-		}
-		err = this.Channel.SetHostAddr(walletAddr, dnsUrl)
-		if err != nil {
-			return err
 		}
 		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		if err != nil {
@@ -516,18 +506,6 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	}
 	this.removeLowQoSTracker()
 	return "", errors.New("host addr not found")
-}
-
-// SetupPartnerHost. setup host addr for partners
-func (this *Dsp) SetupPartnerHost(partners []string) {
-	for _, addr := range partners {
-		host, err := this.GetExternalIP(addr)
-		log.Debugf("[SetupPartnerHost] get external ip %v, %v, err %s", addr, host, err)
-		if err != nil || len(host) == 0 {
-			continue
-		}
-		this.Channel.SetHostAddr(addr, host)
-	}
 }
 
 type trackerResp struct {

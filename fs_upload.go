@@ -1004,8 +1004,13 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 			this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocksDone)
 			return nil
 		case <-timeout.C:
-			err = errors.New("wait for fetch block timeout")
-			return serr.NewDetailError(serr.TASK_WAIT_TIMEOUT, err.Error())
+			sent := uint64(this.taskMgr.UploadedBlockCount(taskId) / (uint64(copyNum) + 1))
+			log.Debugf("timeout check totalCount %d != sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))
+			if totalCount != sent {
+				err = errors.New("wait for fetch block timeout")
+				return serr.NewDetailError(serr.TASK_WAIT_TIMEOUT, err.Error())
+			}
+			return nil
 		case newState := <-stateChange:
 			log.Debugf("receive stateChange newState: %d", newState)
 			switch newState {
