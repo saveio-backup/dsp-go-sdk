@@ -94,6 +94,11 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			log.Errorf("get current set block err %s", err)
 			return
 		}
+		err = this.taskMgr.AddFileSession(localId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
+		if err != nil {
+			log.Errorf("add session err in file fetch ask %s", err)
+			return
+		}
 		newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash(), currentBlockHash, currentBlockIndex)
 		log.Debugf("fetch task is exist send file_ack msg %v", peer)
 		err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())

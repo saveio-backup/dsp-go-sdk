@@ -627,6 +627,7 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 			return nil, err
 		}
 		err = this.taskMgr.SetPrivateKey(taskId, privateKey)
+		log.Debugf("set private key for task %s, key: %d", taskId, len(privateKey))
 		if err != nil {
 			return nil, err
 		}
@@ -634,6 +635,7 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 		paramsBuf = fileInfo.FileProveParam
 		var err error
 		privateKey, err = this.taskMgr.GetFilePrivateKey(taskId)
+		log.Debugf("get private key from task %s, key: %d", taskId, len(privateKey))
 		if err != nil {
 			return nil, err
 		}
@@ -643,7 +645,8 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 		}
 	}
 	if len(paramsBuf) == 0 || len(privateKey) == 0 {
-		return nil, fmt.Errorf("params.length is %d, prove private key length is %d. please delete file and re-send it", len(paramsBuf), len(privateKey))
+		log.Errorf("param buf len: %d, private key len: %d", len(paramsBuf), len(privateKey))
+		return nil, errors.New("PDP private key is not found. Please delete file and retry to upload it")
 	}
 	return &common.PayStoreFileResult{
 		Tx:         tx,
