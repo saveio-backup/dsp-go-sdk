@@ -500,11 +500,11 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 			continue
 		}
 		hostAddr := ret.(string)
-		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddr), url)
 		if len(string(hostAddr)) == 0 || !utils.IsHostAddrValid(string(hostAddr)) {
 			continue
 		}
 		hostAddrStr := utils.FullHostAddr(string(hostAddr), this.Config.ChannelProtocol)
+		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddr), url)
 		if strings.Index(hostAddrStr, "0.0.0.0:0") != -1 {
 			continue
 		}

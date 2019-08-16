@@ -922,7 +922,6 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		key := keyOfUnixNode(hash, index)
 		data, ok := blockMsgDataMap[key]
 		if ok {
-			log.Debugf("get block data %v", data)
 			return data
 		}
 		offset, _ := allOffset[hash]
