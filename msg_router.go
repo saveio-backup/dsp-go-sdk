@@ -325,7 +325,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 	localId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, task.TaskTypeShare)
 	if this.taskMgr.TaskExist(localId) {
 		// old task
-		sessionId, err := this.taskMgr.GetSeesionId(localId, "")
+		sessionId, err := this.taskMgr.GetSessionId(localId, "")
 		if err != nil {
 			replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 			return
@@ -348,7 +348,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return
 	}
-	sessionId, err := this.taskMgr.GetSeesionId(taskId, "")
+	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
 		replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return

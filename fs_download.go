@@ -492,7 +492,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	wg := sync.WaitGroup{}
 	for addr, payInfo := range quotation {
 		wg.Add(1)
-		sessionId, err := this.taskMgr.GetSeesionId(taskId, payInfo.WalletAddress)
+		sessionId, err := this.taskMgr.GetSessionId(taskId, payInfo.WalletAddress)
 		if err != nil {
 			continue
 		}
@@ -832,7 +832,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileMakeSeed)
 	go this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	for addr, walletAddr := range peerAddrWallet {
-		sessionId, err := this.taskMgr.GetSeesionId(taskId, walletAddr)
+		sessionId, err := this.taskMgr.GetSessionId(taskId, walletAddr)
 		if err != nil {
 			continue
 		}
@@ -997,7 +997,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 
 // downloadBlock. download block helper function.
 func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, addr, peerWalletAddr string, retry uint32) (*task.BlockResp, error) {
-	sessionId, err := this.taskMgr.GetSeesionId(taskId, peerWalletAddr)
+	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
 	if err != nil {
 		return nil, err
 	}

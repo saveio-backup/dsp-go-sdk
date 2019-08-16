@@ -46,7 +46,7 @@ func (this *Dsp) StartShareServices() {
 			if this.Config.FsType == config.FS_BLOCKSTORE {
 				tag, _ = this.Fs.GetTag(req.Hash, req.FileHash, uint64(req.Index))
 			}
-			sessionId, _ := this.taskMgr.GetSeesionId(taskId, "")
+			sessionId, _ := this.taskMgr.GetSessionId(taskId, "")
 			up, err := this.GetFileUnitPrice(req.Asset)
 			if err != nil {
 				log.Errorf("get file unit price err after send block, err: %s", err)

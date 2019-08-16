@@ -275,7 +275,7 @@ func (this *TaskMgr) SetSessionId(taskId, peerWalletAddr, id string) {
 	v.SetSessionId(peerWalletAddr, id)
 }
 
-func (this *TaskMgr) GetSeesionId(taskId, peerWalletAddr string) (string, error) {
+func (this *TaskMgr) GetSessionId(taskId, peerWalletAddr string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return "", fmt.Errorf("get request id failed, no task of %s", taskId)

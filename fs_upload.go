@@ -798,7 +798,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 	var receiverLock sync.Mutex
 	receivers := make([]string, 0)
 	receiverBreakpoint := make(map[string]*file.Breakpoint, 0)
-	sessionId, err := this.taskMgr.GetSeesionId(taskId, "")
+	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
 		return nil, err
 	}
@@ -848,7 +848,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 
 // notifyFetchReady send fetch_rdy msg to receivers
 func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string, tx string, txHeight uint64) error {
-	sessionId, err := this.taskMgr.GetSeesionId(taskId, "")
+	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
 		return err
 	}
@@ -901,7 +901,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
 	timeout := time.NewTimer(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
-	sessionId, err := this.taskMgr.GetSeesionId(taskId, "")
+	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
 		return serr.NewDetailError(serr.GET_SESSION_ID_FAILED, err.Error())
 	}
