@@ -379,7 +379,23 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 		}
 		this.db.BatchDelete(batch, countKey)
 	}
+	fi, _ := this.GetFileInfo([]byte(id))
+	if fi != nil {
+		// delete undone list
+		this.RemoveFromUndoneList(batch, id, fi.InfoType)
+	}
+	// delete blocks
+
+	// delete progress
+
+	// delete options
+	optionKey := FileOptionsKey(id)
+	this.db.BatchDelete(batch, []byte(optionKey))
+
+	// delete fileInfo
 	this.db.BatchDelete(batch, []byte(id))
+
+	// commit
 	return this.db.BatchCommit(batch)
 }
 
@@ -813,7 +829,7 @@ func (this *FileDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string
 	return hashes, indexMap, nil
 }
 
-func (this *FileDB) RemoveFromUndoneList(id string, ft FileInfoType) error {
+func (this *FileDB) RemoveFromUndoneList(batch *leveldb.Batch, id string, ft FileInfoType) error {
 	var list []string
 	var undoneKey string
 	switch ft {
@@ -846,7 +862,12 @@ func (this *FileDB) RemoveFromUndoneList(id string, ft FileInfoType) error {
 	if err != nil {
 		return err
 	}
-	return this.db.Put([]byte(undoneKey), newData)
+	if batch == nil {
+		return this.db.Put([]byte(undoneKey), newData)
+	} else {
+		this.db.BatchPut(batch, []byte(undoneKey), newData)
+		return nil
+	}
 }
 
 func (this *FileDB) UndoneList(ft FileInfoType) ([]string, error) {
@@ -916,7 +937,7 @@ func (this *FileDB) SetUploadProgressDone(id, nodeAddr string) error {
 }
 
 func (this *FileDB) SaveFileUploaded(id string) error {
-	return this.RemoveFromUndoneList(id, FileInfoTypeUpload)
+	return this.RemoveFromUndoneList(nil, id, FileInfoTypeUpload)
 }
 
 func (this *FileDB) SaveFileDownloaded(id string) error {
@@ -933,7 +954,7 @@ func (this *FileDB) SaveFileDownloaded(id string) error {
 		}
 		count = uint32(result)
 	}
-	err = this.RemoveFromUndoneList(id, FileInfoTypeDownload)
+	err = this.RemoveFromUndoneList(nil, id, FileInfoTypeDownload)
 	if err != nil {
 		return err
 	}

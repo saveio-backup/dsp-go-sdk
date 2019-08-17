@@ -85,7 +85,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	localId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 	if len(localId) > 0 && this.taskMgr.TaskExist(localId) {
 		state := this.taskMgr.GetTaskState(localId)
-		log.Debugf("fetch_ask task exist localId %s, state: %d", localId, state)
+		log.Debugf("fetch_ask task exist localId %s, %s state: %d", localId, fileMsg.Hash, state)
 		if state == task.TaskStateCancel || state == task.TaskStateFailed || state == task.TaskStateDone {
 			log.Warnf("the task has a wrong state of file_ask %s", state)
 		}
