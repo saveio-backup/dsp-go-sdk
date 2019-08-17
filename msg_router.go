@@ -191,6 +191,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		return
 	}
 	log.Debugf("start fetching blocks of taskId:%s, file: %s", taskId, fileMsg.Hash)
+	this.taskMgr.SetFileOwner(taskId, info.FileOwner.ToBase58())
 	err = this.startFetchBlocks(fileMsg.Hash, peer.Address, fileMsg.PayInfo.WalletAddress)
 	if err != nil {
 		log.Errorf("start fetch blocks for file %s failed, err:%s", fileMsg.Hash, err)
@@ -395,7 +396,10 @@ func (this *Dsp) handleFileDownloadMsg(ctx *network.ComponentContext, peer *netw
 		log.Errorf("reply download msg failed, err %s", err)
 	}
 	log.Debugf("reply download msg success")
-	this.taskMgr.EmitNotification(taskKey, task.ShareStateBegin, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
+	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
+	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
+	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
+	this.taskMgr.EmitNotification(taskKey, task.ShareStateBegin, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
 func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
@@ -419,7 +423,10 @@ func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer
 	} else {
 		log.Debugf("reply download cancel msg success")
 	}
-	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
+	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
+	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
+	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
+	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
 // handleFileDownloadOkMsg. client send download ok msg to remove peers for telling them the task is finished
@@ -437,7 +444,10 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *ne
 		log.Errorf("reply download msg failed, err %s", err)
 	}
 	log.Debugf("reply download ack msg success")
-	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileMsg.PayInfo.WalletAddress, 0, 0)
+	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
+	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
+	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
+	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
 // handleBlockMsg handle all file msg
@@ -563,7 +573,10 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.P
 		log.Errorf("reply delete ok msg failed", err)
 	}
 	log.Debugf("reply handle payment msg")
-	this.taskMgr.EmitNotification(taskKey, task.ShareStateReceivedPaying, paymentMsg.FileHash, paymentMsg.Sender, uint64(paymentMsg.PaymentId), uint64(paymentMsg.Amount))
+	downloadTaskId := this.taskMgr.TaskId(paymentMsg.FileHash, this.WalletAddress(), task.TaskTypeDownload)
+	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
+	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
+	this.taskMgr.EmitNotification(taskKey, task.ShareStateReceivedPaying, paymentMsg.FileHash, fileName, fileOwner, paymentMsg.Sender, uint64(paymentMsg.PaymentId), uint64(paymentMsg.Amount))
 }
 
 func (this *Dsp) waitForTxConfirmed(blockHeight uint64) error {

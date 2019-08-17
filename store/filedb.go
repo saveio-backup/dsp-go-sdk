@@ -66,6 +66,7 @@ const (
 	FILEINFO_FIELD_REGURL_TX
 	FILEINFO_FIELD_BIND_TX
 	FILEINFO_FIELD_TASKSTATE
+	FILEINFO_FIELD_OWNER
 )
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
@@ -74,6 +75,7 @@ type FileInfo struct {
 	FileHash          string            `json:"file_hash"`
 	FileName          string            `json:"file_name"`
 	FilePath          string            `json:"file_path"`
+	FileOwner         string            `json:"file_owner"`
 	WalletAddress     string            `json:"wallet_address"`
 	CopyNum           uint64            `json:"copy_num"`
 	InfoType          FileInfoType      `json:"file_info_type"`
@@ -238,6 +240,8 @@ func (this *FileDB) SetFileInfoField(id string, field int, value interface{}) er
 		fi.BindDNSTx = value.(string)
 	case FILEINFO_FIELD_TASKSTATE:
 		fi.TaskState = value.(uint64)
+	case FILEINFO_FIELD_OWNER:
+		fi.FileOwner = value.(string)
 	}
 	return this.saveFileInfo(fi)
 }
@@ -283,6 +287,8 @@ func (this *FileDB) SetFileInfoFields(id string, m map[int]interface{}) error {
 			fi.BindDNSTx = value.(string)
 		case FILEINFO_FIELD_TASKSTATE:
 			fi.TaskState = value.(uint64)
+		case FILEINFO_FIELD_OWNER:
+			fi.FileOwner = value.(string)
 		}
 	}
 	return this.saveFileInfo(fi)

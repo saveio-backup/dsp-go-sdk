@@ -65,6 +65,8 @@ type ShareNotification struct {
 	TaskKey       string
 	State         ShareState
 	FileHash      string
+	FileName      string
+	FileOwner     string
 	ToWalletAddr  string
 	PaymentId     uint64
 	PaymentAmount uint64
@@ -98,6 +100,7 @@ const (
 	FIELD_NAME_TRANSFERSTATE
 	FIELD_NAME_STORE_TYPE
 	FIELD_NAME_COPYNUM
+	FIELD_NAME_OWNER
 )
 
 type TaskState int
@@ -117,6 +120,7 @@ type Task struct {
 	sessionIds   map[string]string // request peerAddr <=> session id
 	fileHash     string            // task file hash
 	fileName     string            // file name
+	fileOwner    string            // file owner
 	total        uint64            // total blocks count
 	filePath     string            // file path
 	walletAddr   string            // operator wallet address
@@ -209,6 +213,8 @@ func (this *Task) SetFieldValue(name int, value interface{}) {
 		this.storeType = value.(uint64)
 	case FIELD_NAME_COPYNUM:
 		this.copyNum = value.(uint64)
+	case FIELD_NAME_OWNER:
+		this.fileOwner = value.(string)
 	}
 }
 
@@ -241,6 +247,8 @@ func (this *Task) GetStringValue(name int) string {
 		return this.walletAddr
 	case FIELD_NAME_FILEPATH:
 		return this.filePath
+	case FIELD_NAME_OWNER:
+		return this.fileOwner
 	}
 	return ""
 }

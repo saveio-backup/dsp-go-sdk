@@ -73,10 +73,18 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 	log.Debugf("download file dns node %s", this.DNS.DNSNode.WalletAddr)
 	this.taskMgr.SetTaskInfos(taskId, fileHashStr, "", opt.FileName, this.WalletAddress())
 	err = this.taskMgr.SetFileDownloadOptions(taskId, opt)
+	if err != nil {
+		sdkErr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
+		return err
+	}
 	err = this.taskMgr.BindTaskId(taskId)
 	if err != nil {
 		sdkErr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return err
+	}
+	info, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
+	if info != nil {
+		this.taskMgr.SetFileOwner(taskId, info.FileOwner.ToBase58())
 	}
 	pause, sdkErr := this.checkIfPauseDownload(taskId, fileHashStr)
 	if sdkErr != nil {

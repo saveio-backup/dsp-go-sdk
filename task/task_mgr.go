@@ -587,11 +587,13 @@ func (this *TaskMgr) CloseShareNotification() {
 }
 
 // EmitNotification. emit notification
-func (this *TaskMgr) EmitNotification(taskId string, state ShareState, fileHashStr, toWalletAddr string, paymentId, paymentAmount uint64) {
+func (this *TaskMgr) EmitNotification(taskId string, state ShareState, fileHashStr, fileName, fileOwner, toWalletAddr string, paymentId, paymentAmount uint64) {
 	n := &ShareNotification{
 		TaskKey:       taskId,
 		State:         state,
 		FileHash:      fileHashStr,
+		FileName:      fileName,
+		FileOwner:     fileOwner,
 		ToWalletAddr:  toWalletAddr,
 		PaymentId:     paymentId,
 		PaymentAmount: paymentAmount,
@@ -1066,6 +1068,23 @@ func (this *TaskMgr) GetFileName(taskId string) (string, error) {
 		return v.GetStringValue(FIELD_NAME_FILENAME), nil
 	}
 	return this.db.GetFileInfoStringValue(taskId, store.FILEINFO_FIELD_FILENAME)
+}
+
+func (this *TaskMgr) SetFileOwner(taskId, owner string) {
+	v, ok := this.GetTaskById(taskId)
+	if ok {
+		v.SetFieldValue(FIELD_NAME_OWNER, owner)
+		return
+	}
+	this.db.SetFileInfoField(taskId, store.FILEINFO_FIELD_OWNER, owner)
+}
+
+func (this *TaskMgr) GetFileOwner(taskId string) (string, error) {
+	v, ok := this.GetTaskById(taskId)
+	if ok {
+		return v.GetStringValue(FIELD_NAME_OWNER), nil
+	}
+	return this.db.GetFileInfoStringValue(taskId, store.FILEINFO_FIELD_OWNER)
 }
 
 func (this *TaskMgr) AllDownloadFiles() ([]*store.FileInfo, []string, error) {
