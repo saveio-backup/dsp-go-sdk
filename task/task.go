@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -18,6 +19,7 @@ const (
 )
 
 type GetBlockReq struct {
+	TimeStamp     int64
 	FileHash      string
 	Hash          string
 	Index         int32
@@ -127,23 +129,24 @@ type Task struct {
 	taskType     TaskType          // task type
 	transferring bool              // fetch is transferring flag
 	// TODO: refactor, delete below two channels, use request and reply
-	blockReq         chan *GetBlockReq          // fetch block request channel
-	blockRespsMap    map[string]chan *BlockResp // map key <=> *BlockResp
-	blockReqPool     []*GetBlockReq             // get block request pool
-	workers          map[string]*Worker         // workers to request block
-	inOrder          bool                       // keep work in order
-	onlyBlock        bool                       // only send block data, without tag data
-	notify           chan *BlockResp            // notify download block
-	state            TaskState                  // task state
-	transferingState TaskProgressState          // transfering state
-	stateChange      chan TaskState             // state change between pause and resume
-	backupOpt        *BackupFileOpt             // backup file options
-	lock             sync.RWMutex               // lock
-	lastWorkerIdx    int                        // last worker index
-	storeType        uint64                     // store file type
-	copyNum          uint64                     // copyNum
-	createdAt        int64                      // createdAt
-	updatedAt        int64                      // updatedAt
+	blockReq            chan *GetBlockReq            // fetch block request channel
+	blockRespsMap       map[string]chan *BlockResp   // map key <=> *BlockResp
+	blockFlightRespsMap map[string]chan []*BlockResp // map key <=> []*BlockResp
+	blockReqPool        []*GetBlockReq               // get block request pool
+	workers             map[string]*Worker           // workers to request block
+	inOrder             bool                         // keep work in order
+	onlyBlock           bool                         // only send block data, without tag data
+	notify              chan *BlockResp              // notify download block
+	state               TaskState                    // task state
+	transferingState    TaskProgressState            // transfering state
+	stateChange         chan TaskState               // state change between pause and resume
+	backupOpt           *BackupFileOpt               // backup file options
+	lock                sync.RWMutex                 // lock
+	lastWorkerIdx       int                          // last worker index
+	storeType           uint64                       // store file type
+	copyNum             uint64                       // copyNum
+	createdAt           int64                        // createdAt
+	updatedAt           int64                        // updatedAt
 }
 
 func (this *Task) SetTaskType(ty TaskType) {
@@ -265,10 +268,10 @@ func (this *Task) TransferingState() TaskProgressState {
 	return this.transferingState
 }
 
-func (this *Task) PushGetBlock(sessionId, blockHash string, index int32, block *BlockResp) {
+func (this *Task) PushGetBlock(sessionId, blockHash string, block *BlockResp, timeStamp int64) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	key := fmt.Sprintf("%s-%s-%s-%s-%d", this.id, sessionId, this.fileHash, blockHash, index)
+	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.fileHash, timeStamp)
 	log.Debugf("push block to resp channel: %s", key)
 	ch, ok := this.blockRespsMap[key]
 	if !ok {
@@ -306,7 +309,37 @@ func (this *Task) DropBlockRespCh(sessionId, blockHash string, index int32) {
 	log.Debugf("drop block resp channel key: %s", key)
 	delete(this.blockRespsMap, key)
 }
+func (this *Task) NewBlockFlightsRespCh(sessionId string, blocks []*block.Block, timeStamp int64) chan []*BlockResp {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.fileHash, timeStamp)
 
+	if this.blockFlightRespsMap == nil {
+		this.blockFlightRespsMap = make(map[string]chan []*BlockResp)
+	}
+	ch, ok := this.blockFlightRespsMap[key]
+	if !ok {
+		ch = make(chan []*BlockResp, 1)
+		this.blockFlightRespsMap[key] = ch
+	}
+	log.Debugf("generated block flight resp channel %s", key)
+	return ch
+}
+
+func (this *Task) DropBlockFlightsRespCh(sessionId string, blocks []*block.Block, timeStamp int64) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.fileHash, timeStamp)
+	for _, v := range blocks {
+		key += fmt.Sprintf("-%d", v.GetIndex())
+	}
+	log.Debugf("drop block resp channel key: %s", key)
+	ch := this.blockFlightRespsMap[key]
+	delete(this.blockFlightRespsMap, key)
+	if ch != nil {
+		close(ch)
+	}
+}
 func (this *Task) SetTotalBlockCnt(cnt uint64) {
 	this.lock.Lock()
 	defer this.lock.Unlock()

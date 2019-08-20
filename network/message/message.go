@@ -52,6 +52,13 @@ func ReadMessage(msg proto.Message) *Message {
 				return nil
 			}
 			newMsg.Payload = blk
+		case common.MSG_TYPE_BLOCK_FLIGHTS:
+			blk := &block.BlockFlights{}
+			err := proto.Unmarshal(data, blk)
+			if err != nil {
+				return nil
+			}
+			newMsg.Payload = blk
 		case common.MSG_TYPE_FILE:
 			file := &file.File{}
 			err := proto.Unmarshal(data, file)

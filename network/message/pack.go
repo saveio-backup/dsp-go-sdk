@@ -90,6 +90,42 @@ func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData
 	return msg
 }
 
+// NewBlockFlightsReqMsg blockflights req msg
+func NewBlockFlightsReqMsg(blocks []*block.Block, timeStamp int64) *Message {
+	msg := &Message{
+		MessageId: GenMessageId(),
+		Header:    MessageHeader(),
+	}
+	msg.Header.Type = common.MSG_TYPE_BLOCK_FLIGHTS
+	flights := &block.BlockFlights{
+		TimeStamp: timeStamp,
+		Blocks:    blocks,
+	}
+	msg.Payload = flights
+	data, err := msg.ToProtoMsg().(*pb.Message).XXX_Marshal(nil, false)
+	if err != nil {
+		return nil
+	}
+	msg.Header.MsgLength = int32(len(data))
+	return msg
+}
+
+// NewBlockFlightsMsg block ack msg
+func NewBlockFlightsMsg(flights *block.BlockFlights) *Message {
+	msg := &Message{
+		MessageId: GenMessageId(),
+		Header:    MessageHeader(),
+	}
+	msg.Header.Type = common.MSG_TYPE_BLOCK_FLIGHTS
+	msg.Payload = flights
+	data, err := proto.Marshal(msg.ToProtoMsg())
+	if err != nil {
+		return nil
+	}
+	msg.Header.MsgLength = int32(len(data))
+	return msg
+}
+
 // NewFileMsg file msg
 func NewFileMsg(file *file.File, errorCode uint32, errorMsg string) *Message {
 	msg := &Message{

@@ -10,6 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/saveio/dsp-go-sdk/common"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
+	netcom "github.com/saveio/dsp-go-sdk/network/common"
+	"github.com/saveio/dsp-go-sdk/network/message/types/block"
+	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/themis/common/log"
@@ -23,8 +26,8 @@ type TaskMgr struct {
 	tasks          map[string]*Task
 	walletHostAddr map[string]string
 	lock           sync.RWMutex
-	blockReqCh     chan *GetBlockReq  // used for share blocks
-	progress       chan *ProgressInfo // progress channel
+	blockReqCh     chan []*GetBlockReq // used for share blocks
+	progress       chan *ProgressInfo  // progress channel
 	shareNoticeCh  chan *ShareNotification
 	db             *store.FileDB
 }
@@ -34,7 +37,7 @@ func NewTaskMgr() *TaskMgr {
 	tmgr := &TaskMgr{
 		tasks: ts,
 	}
-	tmgr.blockReqCh = make(chan *GetBlockReq, 500)
+	tmgr.blockReqCh = make(chan []*GetBlockReq, common.MAX_GOROUTINES_FOR_WORK_TASK)
 	return tmgr
 }
 
@@ -266,7 +269,7 @@ func (this *TaskMgr) ShareTaskNum() int {
 	return cnt
 }
 
-func (this *TaskMgr) BlockReqCh() chan *GetBlockReq {
+func (this *TaskMgr) BlockReqCh() chan []*GetBlockReq {
 	return this.blockReqCh
 }
 
@@ -376,12 +379,12 @@ func (this *TaskMgr) TaskBlockReq(taskId string) (chan *GetBlockReq, error) {
 	return v.GetBlockReq(), nil
 }
 
-func (this *TaskMgr) PushGetBlock(taskId, sessionId string, block *BlockResp) {
+func (this *TaskMgr) PushGetBlock(taskId, sessionId string, block *BlockResp, timeStamp int64) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
-	v.PushGetBlock(sessionId, block.Hash, block.Index, block)
+	v.PushGetBlock(sessionId, block.Hash, block, timeStamp)
 }
 
 func (this *TaskMgr) NewBlockRespCh(taskId, sessionId, blockHash string, index int32) chan *BlockResp {
@@ -399,6 +402,22 @@ func (this *TaskMgr) DropBlockRespCh(taskId, sessionId, blockHash string, index 
 		return
 	}
 	v.DropBlockRespCh(sessionId, blockHash, index)
+}
+func (this *TaskMgr) NewBlockFlightsRespCh(taskId, sessionId string, blocks []*block.Block, timeStamp int64) chan []*BlockResp {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		log.Warnf("get block resp channel taskId not found: %d", taskId)
+		return nil
+	}
+	return v.NewBlockFlightsRespCh(sessionId, blocks, timeStamp)
+}
+
+func (this *TaskMgr) DropBlockFlightsRespCh(taskId, sessionId string, blocks []*block.Block, timeStamp int64) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return
+	}
+	v.DropBlockFlightsRespCh(sessionId, blocks, timeStamp)
 }
 
 // SetTaskTimeout. set task timeout with taskid
@@ -630,20 +649,18 @@ func (this *TaskMgr) NewWorkers(taskId string, addrs map[string]string, inOrder 
 // WorkBackground. Run n goroutines to check request pool one second a time.
 // If there exist a idle request, find the idle worker to do the job
 func (this *TaskMgr) WorkBackground(taskId string) {
-	v, ok := this.GetTaskById(taskId)
+	tsk, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
-	fileHash := v.GetStringValue(FIELD_NAME_FILEHASH)
-	addrs := v.GetWorkerAddrs()
+	fileHash := tsk.GetStringValue(FIELD_NAME_FILEHASH)
+	addrs := tsk.GetWorkerAddrs()
 	// lock for local go routines variables
 	max := len(addrs)
 	if max > common.MAX_GOROUTINES_FOR_WORK_TASK {
 		max = common.MAX_GOROUTINES_FOR_WORK_TASK
 	}
 
-	// pengding block count. including block at flight or at cache both
-	pendingCount := int32(0)
 	flightMap := sync.Map{}
 	blockCache := sync.Map{}
 	getBlockCacheLen := func() int {
@@ -656,48 +673,49 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	}
 
 	type job struct {
-		req       *GetBlockReq
+		req       []*GetBlockReq
 		worker    *Worker
-		flightKey string
+		flightKey []string
 	}
 	jobCh := make(chan *job, max)
 
-	type getBlockResp struct {
+	type getBlocksResp struct {
 		worker    *Worker
-		flightKey string
-		ret       *BlockResp
+		flightKey []string
+		ret       []*BlockResp
 		err       error
 	}
 	dropDoneCh := uint32(0)
 
-	done := make(chan *getBlockResp, 1)
+	done := make(chan *getBlocksResp, 1)
 	go func() {
 		for {
-			if v.State() == TaskStateDone {
+			if tsk.State() == TaskStateDone {
 				log.Debugf("distribute job task is done break")
 				close(jobCh)
 				atomic.AddUint32(&dropDoneCh, 1)
 				close(done)
 				break
 			}
-			if v.State() == TaskStatePause || v.State() == TaskStateFailed {
+			if tsk.State() == TaskStatePause || tsk.State() == TaskStateFailed {
 				log.Debugf("distribute job break at pause")
 				close(jobCh)
 				break
 			}
 			// check pool has item or no
 			// check all pool items are in request flights
-			reqPoolLen := v.GetBlockReqPoolLen()
-			if reqPoolLen == 0 || atomic.LoadInt32(&pendingCount) >= int32(reqPoolLen) {
+			reqPoolLen := tsk.GetBlockReqPoolLen()
+			if reqPoolLen == 0 {
 				// if v.GetBlockReqPoolLen() == 0 || len(flight)+getBlockCacheLen() >= v.GetBlockReqPoolLen() {
 				log.Debugf("sleep for pending block... req pool len: %d", reqPoolLen)
 				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}
 			// get the idle request
-			var req *GetBlockReq
+			var req []*GetBlockReq
 			var flightKey string
-			pool := v.GetBlockReqPool()
+			var flights []string
+			pool := tsk.GetBlockReqPool()
 			for _, r := range pool {
 				flightKey = fmt.Sprintf("%s-%d", r.Hash, r.Index)
 				if _, ok := flightMap.Load(flightKey); ok {
@@ -706,28 +724,34 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				if _, ok := blockCache.Load(flightKey); ok {
 					continue
 				}
-				req = r
-				break
+				req = append(req, r)
+				log.Debugf("add block req to pool %v", r)
+				flights = append(flights, flightKey)
+				if len(req) == common.MAX_REQ_BLOCK_COUNT {
+					break
+				}
 			}
 			if req == nil {
 				continue
 			}
 			// get next index idle worker
-			worker := v.GetIdleWorker(addrs, fileHash, req.Hash)
+			worker := tsk.GetIdleWorker(addrs, fileHash, req[0].Hash)
 			if worker == nil {
 				// can't find a valid worker
 				log.Debugf("no worker...")
 				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}
-			log.Debugf("add flight %s, worker %s", flightKey, worker.RemoteAddress())
-			atomic.AddInt32(&pendingCount, 1)
+			for _, v := range flights {
+				log.Debugf("add flight %s, worker %s", v, worker.RemoteAddress())
+			}
+
 			// addFlight(flightKey)
 			flightMap.Store(flightKey, struct{}{})
-			v.SetWorkerUnPaid(worker.remoteAddr, true)
+			tsk.SetWorkerUnPaid(worker.remoteAddr, true)
 			jobCh <- &job{
 				req:       req,
-				flightKey: flightKey,
+				flightKey: flights,
 				worker:    worker,
 			}
 		}
@@ -736,7 +760,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 
 	go func() {
 		for {
-			if v.State() == TaskStateDone {
+			if tsk.State() == TaskStateDone {
 				log.Debugf("receive job task is done break")
 				break
 			}
@@ -746,57 +770,58 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("done channel has close")
 					break
 				}
-				log.Debugf("receive response of flight %s, err %s", resp.flightKey, resp.err)
-				if resp.err != nil {
-					atomic.AddInt32(&pendingCount, -1)
-					flightMap.Delete(resp.flightKey)
-					// remove the request from flight
-					log.Errorf("worker %s do job err continue %s", resp.worker.remoteAddr, resp.err)
-					continue
-				}
-				log.Debugf("add flightkey to cache %s, blockhash %s", resp.flightKey, resp.ret.Hash)
-				blockCache.Store(resp.flightKey, resp.ret)
-				flightMap.Delete(resp.flightKey)
-				// notify outside
-				pool := v.GetBlockReqPool()
-				type toDeleteInfo struct {
-					hash  string
-					index int32
-				}
-				toDelete := make([]*toDeleteInfo, 0)
-				for poolIdx, r := range pool {
-					blkKey := fmt.Sprintf("%s-%d", r.Hash, r.Index)
-					_, ok := blockCache.Load(blkKey)
-					log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
-					if !ok {
-						log.Debugf("break because block cache not has %v", blkKey)
-						break
-					}
-					toDelete = append(toDelete, &toDeleteInfo{
-						hash:  r.Hash,
-						index: r.Index,
-					})
-				}
-				log.Debugf("remove %d response from req pool", len(toDelete))
-				for _, toD := range toDelete {
-					blkKey := fmt.Sprintf("%s-%d", toD.hash, toD.index)
-					blktemp, ok := blockCache.Load(blkKey)
-					if !ok {
-						log.Warnf("break because block cache not has %v!", blkKey)
+				for k, v := range resp.flightKey {
+
+					log.Debugf("receive response of flight %s, err %s", v, resp.err)
+					if resp.err != nil {
+						flightMap.Delete(v)
+						// remove the request from flight
+						log.Errorf("worker %s do job err continue %s", resp.worker.remoteAddr, resp.err)
 						continue
 					}
-					this.DelBlockReq(taskId, toD.hash, toD.index)
-					blk := blktemp.(*BlockResp)
-					log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
-					v.NotifyBlock(blk)
-					blockCache.Delete(blkKey)
-					atomic.AddInt32(&pendingCount, -1)
+					log.Debugf("add flightkey to cache %s, blockhash %s", v, resp.ret[k].Hash)
+					blockCache.Store(v, resp.ret[k])
+					flightMap.Delete(v)
+					// notify outside
+					pool := tsk.GetBlockReqPool()
+					type toDeleteInfo struct {
+						hash  string
+						index int32
+					}
+					toDelete := make([]*toDeleteInfo, 0)
+					for poolIdx, r := range pool {
+						blkKey := fmt.Sprintf("%s-%d", r.Hash, r.Index)
+						_, ok := blockCache.Load(blkKey)
+						log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
+						if !ok {
+							log.Debugf("break because block cache not has %v", blkKey)
+							break
+						}
+						toDelete = append(toDelete, &toDeleteInfo{
+							hash:  r.Hash,
+							index: r.Index,
+						})
+					}
+					log.Debugf("remove %d response from req pool", len(toDelete))
+					for _, toD := range toDelete {
+						blkKey := fmt.Sprintf("%s-%d", toD.hash, toD.index)
+						blktemp, ok := blockCache.Load(blkKey)
+						if !ok {
+							log.Warnf("break because block cache not has %v!", blkKey)
+							continue
+						}
+						this.DelBlockReq(taskId, toD.hash, toD.index)
+						blk := blktemp.(*BlockResp)
+						log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
+						tsk.NotifyBlock(blk)
+						blockCache.Delete(blkKey)
+					}
 				}
 				log.Debugf("remain %d response at block cache", getBlockCacheLen())
 				log.Debugf("receive response process done")
 			}
-			if v.State() == TaskStatePause || v.State() == TaskStateFailed {
-				log.Debugf("receive state %d", v.State())
+			if tsk.State() == TaskStatePause || tsk.State() == TaskStateFailed {
+				log.Debugf("receive state %d", tsk.State())
 				atomic.AddUint32(&dropDoneCh, 1)
 				close(done)
 				break
@@ -810,7 +835,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	for i := 0; i < max; i++ {
 		go func() {
 			for {
-				state := v.State()
+				state := tsk.State()
 				if state == TaskStateDone || state == TaskStatePause || state == TaskStateFailed {
 					log.Debugf("task is break, state: %d", state)
 					break
@@ -820,20 +845,36 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("job channel has close")
 					break
 				}
-				log.Debugf("start request block %s from %s, wallet: %s", job.req.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
-				ret, err := job.worker.Do(taskId, fileHash, job.req.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr(), job.req.Index)
-				v.SetWorkerUnPaid(job.worker.remoteAddr, false)
+				flights := make([]*block.Block, 0)
+				sessionId, err := this.GetSessionId(taskId, job.worker.WalletAddr())
+				for _, v := range job.req {
+					log.Debugf("start request block %s from %s,peer wallet: %s", v.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
+					b := &block.Block{
+						SessionId: sessionId,
+						Index:     v.Index,
+						FileHash:  v.FileHash,
+						Hash:      v.Hash,
+						Operation: netcom.BLOCK_OP_GET,
+						Payment: &payment.Payment{
+							Sender: tsk.walletAddr,
+							Asset:  common.ASSET_USDT,
+						},
+					}
+					flights = append(flights, b)
+				}
+				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(), job.worker.WalletAddr(), flights)
+				tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 				if err != nil {
-					log.Errorf("request block %s, err %s", job.req.Hash, err)
+					log.Errorf("request blocks from %s, err %s", job.req[0].Hash, err)
 				} else {
-					log.Debugf("request block %s success", job.req.Hash)
+					log.Debugf("request blocks from %s success", job.req[0].Hash)
 				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0
 				if stop {
 					log.Debugf("stop when drop channel is not 0")
 					break
 				}
-				done <- &getBlockResp{
+				done <- &getBlocksResp{
 					worker:    job.worker,
 					flightKey: job.flightKey,
 					ret:       ret,

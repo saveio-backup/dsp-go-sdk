@@ -37,6 +37,8 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 		this.handleFileMsg(ctx, peer, msg)
 	case netcom.MSG_TYPE_BLOCK:
 		this.handleBlockMsg(ctx, peer, msg)
+	case netcom.MSG_TYPE_BLOCK_FLIGHTS:
+		this.handleBlockFlightsMsg(ctx, peer, msg)
 	case netcom.MSG_TYPE_PAYMENT:
 		this.handlePaymentMsg(ctx, peer, msg)
 	default:
@@ -459,6 +461,89 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *ne
 	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
+// handleBlockFlightsMsg handle block flight msg
+func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
+	blockFlightsMsg := msg.Payload.(*block.BlockFlights)
+	if blockFlightsMsg == nil {
+		log.Error("msg Payload is not valid *block.BlockFlights")
+		return
+	}
+	switch blockFlightsMsg.Blocks[0].Operation {
+	case netcom.BLOCK_OP_NONE:
+		taskId := this.taskMgr.TaskId(blockFlightsMsg.Blocks[0].FileHash, this.WalletAddress(), task.TaskTypeDownload)
+		log.Debugf("taskId: %s, sessionId: %s receive %d blocks %d %s from peer:%s, length:%d", taskId, blockFlightsMsg.Blocks[0].SessionId, len(blockFlightsMsg.Blocks), blockFlightsMsg.Blocks[0].Operation, blockFlightsMsg.Blocks[0].FileHash, peer.Address, msg.Header.MsgLength)
+		exist := this.taskMgr.TaskExist(taskId)
+		if !exist {
+			log.Debugf("task %s not exist", blockFlightsMsg.Blocks[0].FileHash)
+			return
+		}
+		for _, blockMsg := range blockFlightsMsg.Blocks {
+			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
+			if !isDownloaded {
+				this.taskMgr.PushGetBlock(taskId, blockMsg.SessionId, &task.BlockResp{
+					Hash:     blockMsg.Hash,
+					Index:    blockMsg.Index,
+					PeerAddr: peer.Address,
+					Block:    blockMsg.Data,
+					Tag:      blockMsg.Tag,
+					Offset:   blockMsg.Offset,
+				}, blockFlightsMsg.TimeStamp)
+				log.Debugf("push block finished")
+			} else {
+				log.Debugf("the block has downloaded")
+			}
+		}
+		emptyMsg := message.NewEmptyMsg()
+		err := ctx.Reply(context.Background(), emptyMsg.ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply block flight msg failed", err)
+		} else {
+			log.Debugf("reply block flight msg success")
+		}
+	case netcom.BLOCK_OP_GET:
+		blockMsg := blockFlightsMsg.Blocks[0]
+		sessionId := blockMsg.SessionId
+		for _, block := range blockFlightsMsg.Blocks {
+			log.Debugf("session: %s handle get block %s-%s-%d from %s", sessionId, block.FileHash, block.Hash, block.Index, peer.Address)
+
+			if len(sessionId) == 0 {
+				return
+			}
+			exist := this.taskMgr.TaskExist(sessionId)
+			if !exist {
+				log.Debugf("task %s not exist", blockMsg.FileHash)
+				return
+			}
+		}
+		taskType := this.taskMgr.TaskType(sessionId)
+		log.Debugf("task key:%s type %d", sessionId, taskType)
+		switch taskType {
+		case task.TaskTypeDownload, task.TaskTypeShare:
+			reqCh := this.taskMgr.BlockReqCh()
+			req := make([]*task.GetBlockReq, 0)
+			for _, v := range blockFlightsMsg.Blocks {
+				log.Debugf("push get block req: %s-%s-%d from %s - %s", v.GetSessionId(), v.GetFileHash(), blockFlightsMsg.TimeStamp, v.Payment.Sender, peer.Address)
+				r := &task.GetBlockReq{
+					TimeStamp:     blockFlightsMsg.TimeStamp,
+					FileHash:      v.FileHash,
+					Hash:          v.Hash,
+					Index:         v.Index,
+					PeerAddr:      peer.Address,
+					WalletAddress: v.Payment.Sender,
+					Asset:         v.Payment.Asset,
+				}
+				req = append(req, r)
+			}
+
+			reqCh <- req
+			log.Debugf("push get block flights req done")
+		default:
+			log.Debugf("handle block flights get msg, tasktype not support")
+		}
+	default:
+	}
+}
+
 // handleBlockMsg handle all file msg
 func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	blockMsg := msg.Payload.(*block.Block)
@@ -481,7 +566,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				Block:    blockMsg.Data,
 				Tag:      blockMsg.Tag,
 				Offset:   blockMsg.Offset,
-			})
+			}, 0)
 			log.Debugf("push block finished")
 		} else {
 			log.Debugf("the block has downloaded")
@@ -530,18 +615,6 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				PeerAddr: peer.Address,
 			}
 			return
-		case task.TaskTypeDownload, task.TaskTypeShare:
-			reqCh := this.taskMgr.BlockReqCh()
-			log.Debugf("push get block req: %s-%s-%s-%d-%s", sessionId, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address)
-			reqCh <- &task.GetBlockReq{
-				FileHash:      blockMsg.FileHash,
-				Hash:          blockMsg.Hash,
-				Index:         blockMsg.Index,
-				PeerAddr:      peer.Address,
-				WalletAddress: blockMsg.Payment.Sender,
-				Asset:         blockMsg.Payment.Asset,
-			}
-			log.Debugf("push get block req done")
 		default:
 			log.Debugf("handle block get msg, tasktype not found %v", taskType)
 		}

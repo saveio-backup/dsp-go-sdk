@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+import "block.proto";
+package block;
+
+
+message BlockFlights{
+   int64 TimeStamp = 1;
+   repeated Block blocks = 2;
+}

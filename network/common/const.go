@@ -34,10 +34,11 @@ const (
 
 // message type
 const (
-	MSG_TYPE_NONE    = "none"
-	MSG_TYPE_BLOCK   = "block"
-	MSG_TYPE_FILE    = "file"
-	MSG_TYPE_PAYMENT = "payment"
+	MSG_TYPE_NONE          = "none"
+	MSG_TYPE_BLOCK         = "block"
+	MSG_TYPE_BLOCK_FLIGHTS = "blockflights"
+	MSG_TYPE_FILE          = "file"
+	MSG_TYPE_PAYMENT       = "payment"
 )
 
 const (

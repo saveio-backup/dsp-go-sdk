@@ -1,8 +1,11 @@
 package task
 
-import "github.com/saveio/dsp-go-sdk/common"
+import (
+	"github.com/saveio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/network/message/types/block"
+)
 
-type jobFunc func(string, string, string, string, string, int32) (*BlockResp, error)
+type jobFunc func(string, string, string, string, []*block.Block) ([]*BlockResp, error)
 
 type Worker struct {
 	remoteAddr  string
@@ -24,15 +27,15 @@ func NewWorker(addr, walletAddr string, j jobFunc) *Worker {
 	return w
 }
 
-func (w *Worker) Do(taskId, fileHash, blockHash, peerAddr, walletAddr string, index int32) (*BlockResp, error) {
+func (w *Worker) Do(taskId, fileHash, peerAddr, walletAddr string, blocks []*block.Block) ([]*BlockResp, error) {
 	w.working = true
-	resp, err := w.job(taskId, fileHash, blockHash, peerAddr, walletAddr, index)
-	if err != nil {
-		cnt := w.failed[blockHash]
-		w.failed[blockHash] = cnt + 1
-		totalF := w.totalFailed[fileHash]
-		w.totalFailed[fileHash] = totalF + 1
-	}
+	resp, err := w.job(taskId, fileHash, peerAddr, walletAddr, blocks)
+	//if err != nil {
+	//cnt := w.failed[blockHash]
+	//w.failed[blockHash] = cnt + 1
+	//totalF := w.totalFailed[fileHash]
+	//w.totalFailed[fileHash] = totalF + 1
+	//}
 	w.working = false
 	return resp, err
 }
@@ -50,13 +53,13 @@ func (w *Worker) Working() bool {
 }
 
 func (w *Worker) WorkFailed(hash string) bool {
-	cnt, ok := w.failed[hash]
-	if !ok {
-		return false
-	}
-	if cnt >= common.MAX_WORKER_BLOCK_FAILED_NUM {
-		return true
-	}
+	// cnt, ok := w.failed[hash]
+	// if !ok {
+	// 	return false
+	// }
+	// if cnt >= common.MAX_WORKER_BLOCK_FAILED_NUM {
+	// 	return true
+	// }
 	return false
 }
 

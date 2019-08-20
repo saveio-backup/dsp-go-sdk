@@ -17,6 +17,7 @@ import (
 	serr "github.com/saveio/dsp-go-sdk/error"
 	netcom "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
+	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
@@ -574,20 +575,24 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileDownloading)
 	// declare job for workers
-	job := func(tId, fHash, bHash, pAddr, walletAddr string, index int32) (*task.BlockResp, error) {
-		resp, err := this.downloadBlock(tId, fHash, bHash, index, pAddr, walletAddr, 1)
+	job := func(tId, fHash, pAddr, walletAddr string, blocks []*block.Block) ([]*task.BlockResp, error) {
+		resp, err := this.downloadBlockFlights(tId, fHash, pAddr, walletAddr, blocks, 1)
 		if err != nil {
 			return nil, err
 		}
 		if resp == nil {
-			return nil, fmt.Errorf("download block is nil %s-%s-%d from %s %s, err %s", fHash, bHash, index, pAddr, walletAddr, err)
+			return nil, fmt.Errorf("download blocks is nil %s from %s %s, err %s", fHash, pAddr, walletAddr, err)
 		}
-		log.Debugf("job done: download tId  %s-%s-%d %s-%d from %s %s", fHash, bHash, index, resp.Hash, resp.Index, pAddr, walletAddr)
+
 		payInfo := quotation[pAddr]
-		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(len(resp.Block)))
-		log.Debugf("pay for block: %s-%s-%d to %s, wallet: %s success, paymentId: %d", fHash, bHash, index, pAddr, walletAddr, paymentId)
+		var totalBytes int
+		for _, v := range resp {
+			totalBytes += len(v.Block)
+		}
+		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(totalBytes))
+		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d", fHash, pAddr, walletAddr, paymentId)
 		if err != nil {
-			log.Errorf("pay for block %s err %s", resp.Hash, err)
+			log.Errorf("pay for blocks err %s", err)
 			return nil, err
 		}
 		return resp, nil
@@ -1109,6 +1114,58 @@ func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, ad
 	return block, err
 }
 
+// downloadBlockUnits. download block helper function for client.
+func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAddr string, blocks []*block.Block, retry uint32) ([]*task.BlockResp, error) {
+	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range blocks {
+		log.Debugf("download block of task: %s %s-%s-%d from %s", taskId, fileHashStr, v.Hash, v.Index, ipAddr)
+	}
+	timeStamp := time.Now().UnixNano()
+	log.Debugf("download block timestamp %d", timeStamp)
+	ch := this.taskMgr.NewBlockFlightsRespCh(taskId, sessionId, blocks, timeStamp)
+	defer func() {
+		log.Debugf("drop blockflight resp channel: %s-%s", taskId, sessionId)
+		this.taskMgr.DropBlockFlightsRespCh(taskId, sessionId, blocks, timeStamp)
+	}()
+	msg := message.NewBlockFlightsReqMsg(blocks, timeStamp)
+
+	var ret []*task.BlockResp
+	for i := uint32(0); i < retry; i++ {
+		err = client.P2pSend(ipAddr, msg.ToProtoMsg())
+		log.Debugf("send download blockflights msg sessionId %s of %s from %s, err %s, retry: %d", sessionId, fileHashStr, ipAddr, err, i)
+		if err != nil {
+			continue
+		}
+		received := false
+		timeout := false
+		select {
+		case value, ok := <-ch:
+			received = true
+			if !ok {
+				err = fmt.Errorf("receiving block channel close")
+				continue
+			}
+			if timeout {
+				err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
+				continue
+			}
+			ret = value
+			err = nil
+			break
+		case <-time.After(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second):
+			if received {
+				break
+			}
+			timeout = true
+			err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
+			continue
+		}
+	}
+	return ret, err
+}
 func (this *Dsp) checkIfPauseDownload(taskId, fileHashStr string) (bool, *serr.SDKError) {
 	pause, err := this.taskMgr.IsTaskPause(taskId)
 	if err != nil {
