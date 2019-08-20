@@ -337,6 +337,18 @@ func (this *TaskMgr) TaskExist(taskId string) bool {
 	return ok
 }
 
+// UploadingFileHashExist. check if a uploading task has contained the file
+func (this *TaskMgr) UploadingFileHashExist(fileHashStr string) bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	for _, t := range this.tasks {
+		if t.GetStringValue(FIELD_NAME_FILEHASH) == fileHashStr {
+			return true
+		}
+	}
+	return false
+}
+
 func (this *TaskMgr) TaskTimeout(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

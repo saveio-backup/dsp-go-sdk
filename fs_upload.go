@@ -79,8 +79,10 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	var uploadRet *common.UploadResult
 	var sdkerr *serr.SDKError
 	var err error
+	newTask := false
 	if len(taskId) == 0 {
 		taskId, err = this.taskMgr.NewTask(task.TaskTypeUpload)
+		newTask = true
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
 	// emit result finally
@@ -134,6 +136,14 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
 		log.Errorf("node from file err: %s", err)
 		return nil, err
+	}
+	if newTask {
+		hasUploading := this.checkFileHasUpload(hashes[0])
+		if hasUploading {
+			err = errors.New("file has uploading or uploaded, please cancel the task")
+			sdkerr = serr.NewDetailError(serr.UPLOAD_TASK_EXIST, err.Error())
+			return nil, err
+		}
 	}
 	totalCount = uint64(len(hashes))
 	log.Debugf("node from file finished, taskId:%s, path: %s, fileHash: %s, totalCount:%d", taskId, filePath, hashes[0], totalCount)
@@ -590,6 +600,19 @@ func (this *Dsp) checkIfResume(taskId string) error {
 	log.Debugf("resume upload file")
 	go this.UploadFile(taskId, filePath, opt)
 	return nil
+}
+
+// checkFileHasUpload. check the file is uploading or uploaded
+func (this *Dsp) checkFileHasUpload(fileHashStr string) bool {
+	list, _ := this.Chain.Native.Fs.GetFileList()
+	if list != nil {
+		for _, l := range list.List {
+			if string(l.Hash) == fileHashStr {
+				return true
+			}
+		}
+	}
+	return this.taskMgr.UploadingFileHashExist(fileHashStr)
 }
 
 // payForSendFile pay before send a file

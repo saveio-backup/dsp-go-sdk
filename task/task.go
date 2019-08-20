@@ -277,9 +277,9 @@ func (this *Task) PushGetBlock(sessionId, blockHash string, index int32, block *
 	}
 	log.Debugf("push block done")
 	go func() {
-		log.Debugf("send block to channel")
+		log.Debugf("send block to channel: %s", key)
 		ch <- block
-		log.Debugf("send block to channel done")
+		log.Debugf("send block to channel done: %s", key)
 	}()
 }
 
@@ -304,11 +304,7 @@ func (this *Task) DropBlockRespCh(sessionId, blockHash string, index int32) {
 	defer this.lock.Unlock()
 	key := fmt.Sprintf("%s-%s-%s-%s-%d", this.id, sessionId, this.fileHash, blockHash, index)
 	log.Debugf("drop block resp channel key: %s", key)
-	ch := this.blockRespsMap[key]
 	delete(this.blockRespsMap, key)
-	if ch != nil {
-		close(ch)
-	}
 }
 
 func (this *Task) SetTotalBlockCnt(cnt uint64) {
