@@ -26,6 +26,7 @@ type DspConfig struct {
 	ChannelRevealTimeout string // channel reveal timeout. e.g: "50"
 	ChannelSettleTimeout string // channel settle timeout. e.g: "120"
 	ChannelDBPath        string
+	BlockDelay           string
 
 	AutoSetupDNSEnable bool     // enable auto setup DNS node or not
 	DnsNodeMaxNum      int      // dns node max count
