@@ -67,6 +67,7 @@ func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
 	if len(fileHashStr) == 0 {
 		return true, fmt.Errorf("file hash not found for %s", taskId)
 	}
+	log.Debugf("upload task exist, but expired, delete it")
 	err = this.taskMgr.DeleteTask(taskId, true)
 	if err != nil {
 		return true, err

@@ -311,7 +311,7 @@ func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 	if fi == nil {
 		return nil, false
 	}
-	log.Debugf("get task by info success %d", fi)
+	log.Debugf("get task by info success %v", fi)
 	task := this.setTaskWithFileInfo(taskId, fi)
 	return task, true
 }

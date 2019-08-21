@@ -425,6 +425,9 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		log.Warn("payinfo is nil")
 		return 0, nil
 	}
+	if payInfo.WalletAddress == this.WalletAddress() {
+		return 0, fmt.Errorf("can't pay to self : %s", payInfo.WalletAddress)
+	}
 	amount := blockSize * payInfo.UnitPrice
 	if amount/blockSize != payInfo.UnitPrice {
 		return 0, errors.New("total price overflow")
