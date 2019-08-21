@@ -137,14 +137,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		log.Errorf("node from file err: %s", err)
 		return nil, err
 	}
-	if newTask {
-		hasUploading := this.checkFileHasUpload(hashes[0])
-		if hasUploading {
-			err = errors.New("file has uploading or uploaded, please cancel the task")
-			sdkerr = serr.NewDetailError(serr.UPLOAD_TASK_EXIST, err.Error())
-			return nil, err
-		}
-	}
+
 	totalCount = uint64(len(hashes))
 	log.Debugf("node from file finished, taskId:%s, path: %s, fileHash: %s, totalCount:%d", taskId, filePath, hashes[0], totalCount)
 	if totalCount == 0 {
@@ -160,6 +153,14 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
+	}
+	if newTask {
+		hasUploading := this.checkFileHasUpload(taskId, hashes[0])
+		if hasUploading {
+			err = errors.New("file has uploading or uploaded, please cancel the task")
+			sdkerr = serr.NewDetailError(serr.UPLOAD_TASK_EXIST, err.Error())
+			return nil, err
+		}
 	}
 	err = this.taskMgr.BindTaskId(taskId)
 	if err != nil {
@@ -373,8 +374,13 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	}
 	log.Debugf("fileHashStr :%v", fileHashStr)
 	if len(fileHashStr) == 0 {
+		err = this.taskMgr.DeleteTask(taskId, true)
+		if err == nil {
+			return nil, nil
+		}
+		log.Errorf("delete task err %s", err)
 		this.taskMgr.SetTaskState(taskId, oldState)
-		return nil, fmt.Errorf("fileHashStr is empty for id %v", fileHashStr, taskId)
+		return nil, fmt.Errorf("delete task failed %v", fileHashStr, err)
 	}
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
@@ -603,7 +609,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 }
 
 // checkFileHasUpload. check the file is uploading or uploaded
-func (this *Dsp) checkFileHasUpload(fileHashStr string) bool {
+func (this *Dsp) checkFileHasUpload(taskId, fileHashStr string) bool {
 	list, _ := this.Chain.Native.Fs.GetFileList()
 	if list != nil {
 		for _, l := range list.List {
@@ -612,7 +618,7 @@ func (this *Dsp) checkFileHasUpload(fileHashStr string) bool {
 			}
 		}
 	}
-	return this.taskMgr.UploadingFileHashExist(fileHashStr)
+	return this.taskMgr.UploadingFileExist(taskId, fileHashStr)
 }
 
 // payForSendFile pay before send a file

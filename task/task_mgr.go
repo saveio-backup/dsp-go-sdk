@@ -208,18 +208,20 @@ func (this *TaskMgr) DeleteTask(taskId string, deleteStore bool) error {
 			this.lock.Unlock()
 			return err
 		}
-		fileHash = fileInfo.FileHash
-		walletAddress = fileInfo.WalletAddress
-		switch fileInfo.InfoType {
-		case store.FileInfoTypeUpload:
-			tp = TaskTypeUpload
-		case store.FileInfoTypeDownload:
-			tp = TaskTypeDownload
-		case store.FileInfoTypeShare:
-			tp = TaskTypeShare
+		if fileInfo != nil {
+			fileHash = fileInfo.FileHash
+			walletAddress = fileInfo.WalletAddress
+			switch fileInfo.InfoType {
+			case store.FileInfoTypeUpload:
+				tp = TaskTypeUpload
+			case store.FileInfoTypeDownload:
+				tp = TaskTypeDownload
+			case store.FileInfoTypeShare:
+				tp = TaskTypeShare
+			}
+			filePath = fileInfo.FilePath
+			log.Debugf("get value from db hash :%v, wallet: %v, tp: %v, path: %v", fileHash, walletAddress, tp, filePath)
 		}
-		filePath = fileInfo.FilePath
-		log.Debugf("get value from db hash :%v, wallet: %v, tp: %v, path: %v", fileHash, walletAddress, tp, filePath)
 	} else {
 		fileHash = task.fileHash
 		walletAddress = task.walletAddr
@@ -229,12 +231,12 @@ func (this *TaskMgr) DeleteTask(taskId string, deleteStore bool) error {
 	delete(this.tasks, taskId)
 	this.lock.Unlock()
 	log.Debugf(" will delete db info")
-	if tp == TaskTypeUpload {
+	if tp == TaskTypeUpload && len(filePath) > 0 {
 		hexStr := utils.StringToSha256Hex(filePath)
 		key := this.TaskIdKey(hexStr, walletAddress, tp)
 		err := this.db.DeleteFileInfoId(key)
 		if err != nil {
-			log.Debugf("delete file innfo err %s", err)
+			log.Debugf("delete file info err %s", err)
 			return err
 		}
 	}
@@ -242,6 +244,7 @@ func (this *TaskMgr) DeleteTask(taskId string, deleteStore bool) error {
 	log.Debugf("delete local file info key %s", key)
 	err := this.db.DeleteFileInfoId(key)
 	if err != nil {
+		log.Errorf("delete file info id err %s", err)
 		return err
 	}
 	return this.db.DeleteFileInfo(taskId)
@@ -338,11 +341,11 @@ func (this *TaskMgr) TaskExist(taskId string) bool {
 }
 
 // UploadingFileHashExist. check if a uploading task has contained the file
-func (this *TaskMgr) UploadingFileHashExist(fileHashStr string) bool {
+func (this *TaskMgr) UploadingFileExist(taskId, fileHashStr string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	for _, t := range this.tasks {
-		if t.GetStringValue(FIELD_NAME_FILEHASH) == fileHashStr {
+		if t.GetStringValue(FIELD_NAME_FILEHASH) == fileHashStr && t.id != taskId {
 			return true
 		}
 	}
@@ -1151,6 +1154,9 @@ func (this *TaskMgr) IsBlockDownloaded(id, blockHashStr string, index uint32) bo
 }
 
 func (this *TaskMgr) GetUploadedBlockNodeList(id, blockHashStr string, index uint32) []string {
+	if len(blockHashStr) == 0 {
+		return nil
+	}
 	return this.db.GetUploadedBlockNodeList(id, blockHashStr, index)
 }
 
