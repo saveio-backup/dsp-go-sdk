@@ -873,21 +873,27 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(), job.worker.WalletAddr(), flights)
 				tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 				if err != nil {
-					log.Errorf("request blocks from %s, err %s", job.req[0].Hash, err)
+					log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
 				} else {
-					log.Debugf("request blocks from %s success", job.req[0].Hash)
+					log.Debugf("request blocks %q from %s success", ret, job.worker.remoteAddr)
 				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0
 				if stop {
 					log.Debugf("stop when drop channel is not 0")
 					break
 				}
-				done <- &getBlocksResp{
+				flightskey := make([]string, 0)
+				for _, v := range ret {
+					flightskey = append(flightskey, fmt.Sprintf("%s-%d", v.Hash, v.Index))
+				}
+				resp := &getBlocksResp{
 					worker:    job.worker,
-					flightKey: job.flightKey,
+					flightKey: flightskey,
 					ret:       ret,
 					err:       err,
 				}
+				done <- resp
+				log.Debugf("push done channel %q", resp)
 			}
 			log.Debugf("workers outside for loop")
 		}()
