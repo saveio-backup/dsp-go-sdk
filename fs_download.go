@@ -428,6 +428,9 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	if payInfo.WalletAddress == this.WalletAddress() {
 		return 0, fmt.Errorf("can't pay to self : %s", payInfo.WalletAddress)
 	}
+	if this.DNS == nil || this.DNS.DNSNode == nil {
+		return 0, fmt.Errorf("no dns")
+	}
 	amount := blockSize * payInfo.UnitPrice
 	if amount/blockSize != payInfo.UnitPrice {
 		return 0, errors.New("total price overflow")
@@ -443,6 +446,16 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	paymentId := r.Int31()
+	err = this.Channel.WaitForConnected(this.DNS.DNSNode.WalletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+	if err != nil {
+		log.Errorf("wait channel connected err %s %s", this.DNS.DNSNode.WalletAddr, err)
+		return 0, err
+	}
+	err = this.Channel.WaitForConnected(payInfo.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+	if err != nil {
+		log.Errorf("wait channel connected err %s %s", payInfo.WalletAddress, err)
+		return 0, err
+	}
 	log.Debugf("paying to %s, id %v, err:%s", payInfo.WalletAddress, paymentId, err)
 	err = this.Channel.MediaTransfer(paymentId, amount, payInfo.WalletAddress)
 	if err != nil {
