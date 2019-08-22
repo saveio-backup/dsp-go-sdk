@@ -1125,10 +1125,10 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	}
 	timeStamp := time.Now().UnixNano()
 	log.Debugf("download block timestamp %d", timeStamp)
-	ch := this.taskMgr.NewBlockFlightsRespCh(taskId, sessionId, blocks, timeStamp)
+	ch := this.taskMgr.NewBlockFlightsRespCh(taskId, sessionId, timeStamp)
 	defer func() {
-		log.Debugf("drop blockflight resp channel: %s-%s", taskId, sessionId)
-		this.taskMgr.DropBlockFlightsRespCh(taskId, sessionId, blocks, timeStamp)
+		log.Debugf("drop blockflight resp channel: %s-%s-%d", taskId, sessionId, timeStamp)
+		this.taskMgr.DropBlockFlightsRespCh(taskId, sessionId, timeStamp)
 	}()
 	msg := message.NewBlockFlightsReqMsg(blocks, timeStamp)
 

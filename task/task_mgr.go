@@ -379,12 +379,20 @@ func (this *TaskMgr) TaskBlockReq(taskId string) (chan *GetBlockReq, error) {
 	return v.GetBlockReq(), nil
 }
 
-func (this *TaskMgr) PushGetBlock(taskId, sessionId string, block *BlockResp, timeStamp int64) {
+func (this *TaskMgr) PushGetBlock(taskId, sessionId string, index int32, block *BlockResp) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
-	v.PushGetBlock(sessionId, block.Hash, block, timeStamp)
+	v.PushGetBlock(sessionId, block.Hash, index, block)
+}
+
+func (this *TaskMgr) PushGetBlockFlights(taskId, sessionId string, blocks []*BlockResp, timeStamp int64) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return
+	}
+	v.PushGetBlockFlights(sessionId, blocks, timeStamp)
 }
 
 func (this *TaskMgr) NewBlockRespCh(taskId, sessionId, blockHash string, index int32) chan *BlockResp {
@@ -403,21 +411,21 @@ func (this *TaskMgr) DropBlockRespCh(taskId, sessionId, blockHash string, index 
 	}
 	v.DropBlockRespCh(sessionId, blockHash, index)
 }
-func (this *TaskMgr) NewBlockFlightsRespCh(taskId, sessionId string, blocks []*block.Block, timeStamp int64) chan []*BlockResp {
+func (this *TaskMgr) NewBlockFlightsRespCh(taskId, sessionId string, timeStamp int64) chan []*BlockResp {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		log.Warnf("get block resp channel taskId not found: %d", taskId)
 		return nil
 	}
-	return v.NewBlockFlightsRespCh(sessionId, blocks, timeStamp)
+	return v.NewBlockFlightsRespCh(sessionId, timeStamp)
 }
 
-func (this *TaskMgr) DropBlockFlightsRespCh(taskId, sessionId string, blocks []*block.Block, timeStamp int64) {
+func (this *TaskMgr) DropBlockFlightsRespCh(taskId, sessionId string, timeStamp int64) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
-	v.DropBlockFlightsRespCh(sessionId, blocks, timeStamp)
+	v.DropBlockFlightsRespCh(sessionId, timeStamp)
 }
 
 // SetTaskTimeout. set task timeout with taskid

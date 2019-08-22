@@ -471,28 +471,34 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 	switch blockFlightsMsg.Blocks[0].Operation {
 	case netcom.BLOCK_OP_NONE:
 		taskId := this.taskMgr.TaskId(blockFlightsMsg.Blocks[0].FileHash, this.WalletAddress(), task.TaskTypeDownload)
-		log.Debugf("taskId: %s, sessionId: %s receive %d blocks %d %s from peer:%s, length:%d", taskId, blockFlightsMsg.Blocks[0].SessionId, len(blockFlightsMsg.Blocks), blockFlightsMsg.Blocks[0].Operation, blockFlightsMsg.Blocks[0].FileHash, peer.Address, msg.Header.MsgLength)
+		log.Debugf("taskId: %s, sessionId: %s receive %d blocks from peer:%s", taskId, blockFlightsMsg.Blocks[0].SessionId, len(blockFlightsMsg.Blocks), peer.Address)
 		exist := this.taskMgr.TaskExist(taskId)
 		if !exist {
 			log.Debugf("task %s not exist", blockFlightsMsg.Blocks[0].FileHash)
 			return
 		}
+		blocks := make([]*task.BlockResp, 0)
 		for _, blockMsg := range blockFlightsMsg.Blocks {
 			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
 			if !isDownloaded {
-				this.taskMgr.PushGetBlock(taskId, blockMsg.SessionId, &task.BlockResp{
+				b := &task.BlockResp{
 					Hash:     blockMsg.Hash,
 					Index:    blockMsg.Index,
 					PeerAddr: peer.Address,
 					Block:    blockMsg.Data,
 					Tag:      blockMsg.Tag,
 					Offset:   blockMsg.Offset,
-				}, blockFlightsMsg.TimeStamp)
-				log.Debugf("push block finished")
+				}
+				blocks = append(blocks, b)
+				log.Debugf("append block %s finished", blockMsg.Hash)
 			} else {
 				log.Debugf("the block has downloaded")
 			}
 		}
+		if len(blocks) == 0 {
+			log.Debug("all download blocks have been downloaded")
+		}
+		this.taskMgr.PushGetBlockFlights(taskId, blockFlightsMsg.Blocks[0].SessionId, blocks, blockFlightsMsg.TimeStamp)
 		emptyMsg := message.NewEmptyMsg()
 		err := ctx.Reply(context.Background(), emptyMsg.ToProtoMsg())
 		if err != nil {
@@ -559,14 +565,14 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 		}
 		isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
 		if !isDownloaded {
-			this.taskMgr.PushGetBlock(taskId, blockMsg.SessionId, &task.BlockResp{
+			this.taskMgr.PushGetBlock(taskId, blockMsg.SessionId, blockMsg.Index, &task.BlockResp{
 				Hash:     blockMsg.Hash,
 				Index:    blockMsg.Index,
 				PeerAddr: peer.Address,
 				Block:    blockMsg.Data,
 				Tag:      blockMsg.Tag,
 				Offset:   blockMsg.Offset,
-			}, 0)
+			})
 			log.Debugf("push block finished")
 		} else {
 			log.Debugf("the block has downloaded")

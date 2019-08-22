@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -268,10 +267,10 @@ func (this *Task) TransferingState() TaskProgressState {
 	return this.transferingState
 }
 
-func (this *Task) PushGetBlock(sessionId, blockHash string, block *BlockResp, timeStamp int64) {
+func (this *Task) PushGetBlock(sessionId, blockHash string, index int32, block *BlockResp) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.fileHash, timeStamp)
+	key := fmt.Sprintf("%s-%s-%s-%s-%d", this.id, sessionId, this.fileHash, blockHash, index)
 	log.Debugf("push block to resp channel: %s", key)
 	ch, ok := this.blockRespsMap[key]
 	if !ok {
@@ -282,6 +281,23 @@ func (this *Task) PushGetBlock(sessionId, blockHash string, block *BlockResp, ti
 	go func() {
 		log.Debugf("send block to channel: %s", key)
 		ch <- block
+		log.Debugf("send block to channel done: %s", key)
+	}()
+}
+func (this *Task) PushGetBlockFlights(sessionId string, blocks []*BlockResp, timeStamp int64) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.fileHash, timeStamp)
+	log.Debugf("push block to resp channel: %s", key)
+	ch, ok := this.blockFlightRespsMap[key]
+	if !ok {
+		log.Errorf("get block resp channel is nil with key %s", key)
+		return
+	}
+	log.Debugf("push block done")
+	go func() {
+		log.Debugf("send block to channel: %s", key)
+		ch <- blocks
 		log.Debugf("send block to channel done: %s", key)
 	}()
 }
@@ -309,7 +325,7 @@ func (this *Task) DropBlockRespCh(sessionId, blockHash string, index int32) {
 	log.Debugf("drop block resp channel key: %s", key)
 	delete(this.blockRespsMap, key)
 }
-func (this *Task) NewBlockFlightsRespCh(sessionId string, blocks []*block.Block, timeStamp int64) chan []*BlockResp {
+func (this *Task) NewBlockFlightsRespCh(sessionId string, timeStamp int64) chan []*BlockResp {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.fileHash, timeStamp)
@@ -326,13 +342,10 @@ func (this *Task) NewBlockFlightsRespCh(sessionId string, blocks []*block.Block,
 	return ch
 }
 
-func (this *Task) DropBlockFlightsRespCh(sessionId string, blocks []*block.Block, timeStamp int64) {
+func (this *Task) DropBlockFlightsRespCh(sessionId string, timeStamp int64) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.fileHash, timeStamp)
-	for _, v := range blocks {
-		key += fmt.Sprintf("-%d", v.GetIndex())
-	}
 	log.Debugf("drop block resp channel key: %s", key)
 	ch := this.blockFlightRespsMap[key]
 	delete(this.blockFlightRespsMap, key)
