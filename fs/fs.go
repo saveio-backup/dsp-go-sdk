@@ -16,8 +16,10 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
+	"github.com/saveio/dsp-go-sdk/utils"
 	sdk "github.com/saveio/themis-go-sdk"
 	chainCom "github.com/saveio/themis/common"
+	"github.com/saveio/themis/common/log"
 
 	"github.com/saveio/max/importer/helpers"
 	max "github.com/saveio/max/max"
@@ -27,8 +29,10 @@ import (
 )
 
 type Fs struct {
-	fs  *max.MaxService
-	cfg *config.DspConfig
+	fs             *max.MaxService
+	cfg            *config.DspConfig
+	closeCh        chan struct{}
+	removeFileList utils.Queue
 }
 
 func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
@@ -48,18 +52,21 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 			return nil, err
 		}
 	}
-
 	fs, err := max.NewMaxService(fsConfig, chain)
 	if err != nil {
 		return nil, err
 	}
-	return &Fs{
-		fs:  fs,
-		cfg: cfg,
-	}, nil
+	service := &Fs{
+		fs:      fs,
+		cfg:     cfg,
+		closeCh: make(chan struct{}, 1),
+	}
+	go service.registerRemoveNotify()
+	return service, nil
 }
 
 func (this *Fs) Close() error {
+	close(this.closeCh)
 	return this.fs.Close()
 }
 
@@ -263,4 +270,27 @@ func (this *Fs) AESDecryptFile(file, password, outputPath string) error {
 // AESEncryptFile. encrypt file
 func (this *Fs) AESEncryptFile(file, password, outputPath string) error {
 	return max.EncryptFile(file, password, outputPath)
+}
+
+func (this *Fs) RemovedExpiredFiles() []interface{} {
+	return this.removeFileList.PopAll()
+}
+
+func (this *Fs) registerRemoveNotify() {
+	for {
+		select {
+		case ret, ok := <-this.fs.Notify:
+			if !ok {
+				return
+			}
+			if ret == nil {
+				continue
+			}
+			log.Debugf("remove file notify fileHash: %v, reason: %s", ret.FileHash, ret.Reason)
+			this.removeFileList.Push(ret.FileHash)
+		case <-this.closeCh:
+			log.Debugf("stop notify because fs has closed")
+			return
+		}
+	}
 }

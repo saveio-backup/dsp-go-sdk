@@ -27,6 +27,7 @@ type Dsp struct {
 	Channel *channel.Channel
 	DNS     *DNS
 	taskMgr *task.TaskMgr
+	stop    bool
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
@@ -109,10 +110,14 @@ func (this *Dsp) Start() error {
 	}
 
 	// start backup service
-	if this.Config.FsType == config.FS_BLOCKSTORE && this.Config.EnableBackup {
-		log.Debugf("start backup file service ")
-		go this.StartBackupFileService()
+	if this.Config.FsType == config.FS_BLOCKSTORE {
+		if this.Config.EnableBackup {
+			log.Debugf("start backup file service ")
+			go this.StartBackupFileService()
+		}
+		go this.StartCheckRemoveFiles()
 	}
+	this.stop = false
 	return nil
 }
 
@@ -148,6 +153,8 @@ func (this *Dsp) Stop() error {
 			return err
 		}
 	}
+	log.Debugf("stop dsp success")
+	this.stop = true
 	return nil
 }
 

@@ -55,6 +55,10 @@ func ValidateDomainName(domain string) bool {
 }
 
 func FullHostAddr(hostAddr, protocol string) string {
+	if len(protocol) == 0 {
+		log.Warnf("full host addr no protocol: %s", protocol)
+		protocol = "tcp"
+	}
 	if strings.Index(hostAddr, protocol) != -1 {
 		return hostAddr
 	}

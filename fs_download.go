@@ -616,6 +616,10 @@ func (this *Dsp) StartBackupFileService() {
 	for {
 		select {
 		case <-ticker.C:
+			if this.stop {
+				log.Debugf("stop backup file service")
+				return
+			}
 			if this.Chain == nil {
 				break
 			}
@@ -669,6 +673,34 @@ func (this *Dsp) StartBackupFileService() {
 			}
 			// reset
 			backupingCnt = 0
+		}
+	}
+}
+
+// StartCheckRemoveFiles. check to remove files after prove PDP done
+func (this *Dsp) StartCheckRemoveFiles() {
+	log.Debugf("StartCheckRemoveFiles ")
+	ticker := time.NewTicker(time.Duration(common.REMOVE_FILES_DURATION) * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			if this.stop {
+				log.Debugf("stop check remove files service")
+				return
+			}
+			files := this.Fs.RemovedExpiredFiles()
+			if len(files) == 0 {
+				continue
+			}
+			for _, f := range files {
+				hash, ok := f.(string)
+				if !ok {
+					continue
+				}
+				taskId := this.taskMgr.TaskId(hash, this.WalletAddress(), task.TaskTypeDownload)
+				log.Debugf("delete removed file %s %s", taskId, hash)
+				this.DeleteDownloadedFile(taskId)
+			}
 		}
 	}
 }

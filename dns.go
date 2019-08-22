@@ -262,7 +262,7 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	copy(hashBytes[:], []byte(hash)[:])
 	for _, trackerUrl := range trackerUrls {
 		log.Debugf("trackerurl %s hashBytes: %v netIp:%v netPort:%v", trackerUrl, hashBytes, netIp, netPort)
-		go tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
+		tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
 	}
 	return nil
 }
@@ -303,10 +303,17 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 }
 
 func (this *Dsp) StartSeedService() {
+	log.Debugf("start seed service")
 	tick := time.NewTicker(time.Duration(this.Config.SeedInterval) * time.Second)
 	for {
-		<-tick.C
-		this.PushLocalFilesToTrackers()
+		select {
+		case <-tick.C:
+			if this.stop {
+				log.Debugf("stop seed service")
+				return
+			}
+			this.PushLocalFilesToTrackers()
+		}
 	}
 }
 
@@ -494,7 +501,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 			continue
 		}
 		hostAddrStr := utils.FullHostAddr(string(hostAddr), this.Config.ChannelProtocol)
-		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddr), url)
+		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddrStr), url)
 		if strings.Index(hostAddrStr, "0.0.0.0:0") != -1 {
 			continue
 		}

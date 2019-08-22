@@ -68,7 +68,7 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 		SettleTimeout: cfg.ChannelSettleTimeout, // 120
 		BlockDelay:    cfg.BlockDelay,
 	}
-	log.Debugf("channel cfg %v", channelConfig)
+	log.Debugf("pylons cfg: %v", channelConfig)
 	if _, err := os.Stat(channelConfig.DBPath); os.IsNotExist(err) {
 		err = os.MkdirAll(channelConfig.DBPath, 0755)
 		if err != nil {
@@ -123,7 +123,7 @@ func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
 
 // StartService. start channel service
 func (this *Channel) StartService() error {
-	//start connnect target
+	//start connect target
 	log.Debugf("[dsp-go-sdk-channel] StartService")
 	this.registerReceiveNotification()
 	err := this.chActor.Start()
