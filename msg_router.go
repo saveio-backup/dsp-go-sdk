@@ -534,7 +534,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 			}
 			log.Debugf("push get block req done")
 		default:
-			log.Debugf("handle block get msg, tasktype not found")
+			log.Debugf("handle block get msg, tasktype not found %v", taskType)
 		}
 	default:
 	}

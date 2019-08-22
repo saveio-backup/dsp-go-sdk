@@ -63,9 +63,9 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 		ClientType:    cfg.ChannelClientType,
 		ChainNodeURLs: rpcAddrs,
 		ListenAddress: cfg.ChannelListenAddr,
-		RevealTimeout: cfg.ChannelRevealTimeout, // 50
+		RevealTimeout: cfg.ChannelRevealTimeout,
 		DBPath:        cfg.ChannelDBPath,
-		SettleTimeout: cfg.ChannelSettleTimeout, // 120
+		SettleTimeout: cfg.ChannelSettleTimeout,
 		BlockDelay:    cfg.BlockDelay,
 	}
 	log.Debugf("pylons cfg: %v", channelConfig)

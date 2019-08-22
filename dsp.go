@@ -19,6 +19,8 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
+var Version string
+
 type Dsp struct {
 	Account *account.Account
 	Config  *config.DspConfig
