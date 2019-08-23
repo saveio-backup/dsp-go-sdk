@@ -836,20 +836,17 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 		return nil, err
 	}
 	msg := message.NewFileFetchAsk(sessionId, fileHashStr, blockHashes, this.WalletAddress(), this.WalletAddress())
+	type responseData struct {
+		res  proto.Message
+		addr string
+	}
+	responseCh := make(chan *responseData, 0)
 	action := func(res proto.Message, addr string) {
 		log.Debugf("send file ask msg success %s", addr)
-		p2pMsg := message.ReadMessage(res)
-		if p2pMsg.Error != nil && p2pMsg.Error.Code != serr.SUCCESS {
-			log.Errorf("get file fetch_ack msg err %s", p2pMsg.Error.Message)
-			return
+		responseCh <- &responseData{
+			res:  res,
+			addr: addr,
 		}
-		// waiting for ack msg
-		fileMsg := p2pMsg.Payload.(*file.File)
-		receiverLock.Lock()
-		receivers = append(receivers, addr)
-		log.Debugf("send file_ask msg %s success %s, receive file_ack msg, receivers: %v", fileMsg.Hash, addr, receivers)
-		receiverBreakpoint[addr] = fileMsg.Breakpoint
-		receiverLock.Unlock()
 	}
 	// TODO: make stop func sense in parallel mode
 	stop := func() bool {
@@ -857,8 +854,32 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 		receiverLock.Lock()
 		isStop = int32(len(receivers)) >= int32(receiverCount)
 		receiverLock.Unlock()
+		log.Debugf("stop :%t\n", isStop)
 		return isStop
 	}
+	go func() {
+		for {
+			data := <-responseCh
+			log.Debugf("receive response %v", data)
+			p2pMsg := message.ReadMessage(data.res)
+			if p2pMsg.Error != nil && p2pMsg.Error.Code != serr.SUCCESS {
+				log.Errorf("get file fetch_ack msg err %s", p2pMsg.Error.Message)
+				continue
+			}
+			// waiting for ack msg
+			fileMsg := p2pMsg.Payload.(*file.File)
+			receiverLock.Lock()
+			receivers = append(receivers, data.addr)
+			receiverBreakpoint[data.addr] = fileMsg.Breakpoint
+			receiverLock.Unlock()
+			log.Debugf("send file_ask msg success of file: %s, to: %s, receivers: %v", fileMsg.Hash, data.addr, receivers)
+			if len(receivers) >= receiverCount || len(receivers) >= len(nodeList) {
+				log.Debugf("break receiver goroutine")
+				return
+			}
+			log.Debugf("continue....")
+		}
+	}()
 	log.Debugf("broadcast fetch_ask msg to %v", nodeList)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, stop, action)
 	if err != nil {
@@ -875,7 +896,6 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 
 	// }
 	log.Debugf("receives :%v, ret %v", receivers, ret)
-
 	return receivers, nil
 }
 
