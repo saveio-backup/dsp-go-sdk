@@ -990,7 +990,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		// TODO
 	}
 	cancelFetch := make(chan struct{})
-	log.Debugf("open %d go routines for fetched, stateChange: %v", maxFetchRoutines, stateChange)
+	log.Debugf("open %d go routines for fetched file %s, stateChange: %v", maxFetchRoutines, fileHashStr, stateChange)
 	for i := 0; i < maxFetchRoutines; i++ {
 		go func() {
 			for {
@@ -1046,6 +1046,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 			}
 			log.Debugf("receive fetch file done channel done: %v, err: %s", ret.done, ret.err)
 			if ret.err != nil {
+				close(cancelFetch)
 				return serr.NewDetailError(serr.TASK_INTERNAL_ERROR, ret.err.Error())
 			}
 			if !ret.done {
@@ -1057,6 +1058,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 			this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocksDone)
 			return nil
 		case <-timeout.C:
+			close(cancelFetch)
 			sent := uint64(this.taskMgr.UploadedBlockCount(taskId) / (uint64(copyNum) + 1))
 			log.Debugf("timeout check totalCount %d != sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))
 			if totalCount != sent {
