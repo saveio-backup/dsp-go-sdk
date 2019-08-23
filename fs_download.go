@@ -357,7 +357,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 	log.Debugf("broadcast file download msg result %v err %s", ret, err)
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {
-		return nil, errors.New("no peerPayInfos for download")
+		return nil, errors.New("remote peer has deleted the file")
 	}
 
 	totalCount := this.taskMgr.GetFileTotalBlockCount(taskId)
@@ -446,14 +446,22 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	paymentId := r.Int31()
-	err = this.Channel.WaitForConnected(this.DNS.DNSNode.WalletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+	dnsHostAddr, err := this.GetExternalIP(this.DNS.DNSNode.WalletAddr)
 	if err != nil {
-		log.Errorf("wait channel connected err %s %s", this.DNS.DNSNode.WalletAddr, err)
 		return 0, err
 	}
-	err = this.Channel.WaitForConnected(payInfo.WalletAddress, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+	err = client.P2pReconnectPeer(dnsHostAddr, client.P2pNetTypeChannel)
 	if err != nil {
-		log.Errorf("wait channel connected err %s %s", payInfo.WalletAddress, err)
+		log.Errorf("reconnect channel err %s %s", this.DNS.DNSNode.WalletAddr, err)
+		return 0, err
+	}
+	targetHostAddr, err := this.GetExternalIP(payInfo.WalletAddress)
+	if err != nil {
+		return 0, err
+	}
+	err = client.P2pReconnectPeer(targetHostAddr, client.P2pNetTypeChannel)
+	if err != nil {
+		log.Errorf("reconnect channel err %s %s", payInfo.WalletAddress, err)
 		return 0, err
 	}
 	log.Debugf("paying to %s, id %v, err:%s", payInfo.WalletAddress, paymentId, err)

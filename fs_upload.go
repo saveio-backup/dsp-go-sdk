@@ -847,9 +847,9 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 		fileMsg := p2pMsg.Payload.(*file.File)
 		receiverLock.Lock()
 		receivers = append(receivers, addr)
+		log.Debugf("send file_ask msg %s success %s, receive file_ack msg, receivers: %v", fileMsg.Hash, addr, receivers)
 		receiverBreakpoint[addr] = fileMsg.Breakpoint
 		receiverLock.Unlock()
-		log.Debugf("send file_ask msg %s success %s, receive file_ack msg", fileMsg.Hash, addr)
 	}
 	// TODO: make stop func sense in parallel mode
 	stop := func() bool {
@@ -865,7 +865,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 		log.Errorf("wait file receivers broadcast err")
 		return nil, err
 	}
-	log.Debugf("receives :%v, receiverCount %v, real %v", receivers, receiverCount)
+	log.Debugf("receives :%v, receiverCount %v", receivers, receiverCount)
 	if len(receivers) > receiverCount {
 		log.Warnf("unbelievable not matched receiver count")
 		receivers = append([]string{}, receivers[:receiverCount]...)

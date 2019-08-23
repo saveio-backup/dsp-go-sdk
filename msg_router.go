@@ -361,11 +361,20 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 	}
 	rootBlk := this.Fs.GetBlock(fileMsg.Hash)
 
-	if !this.taskMgr.IsFileInfoExist(downloadInfoId) || rootBlk == nil {
-		log.Errorf("file ask err root block %t", rootBlk == nil)
+	if !this.taskMgr.IsFileInfoExist(downloadInfoId) {
 		replyErr(sessionId, fileMsg.Hash, serr.FILEINFO_NOT_EXIST, "", ctx)
 		return
 	}
+	if this.taskMgr.IsFileInfoExist(downloadInfoId) && rootBlk == nil {
+		log.Error("file info exist but root block not found")
+		err = this.DeleteDownloadedFile(downloadInfoId)
+		if err != nil {
+			log.Errorf("delete downloaded file err %s", err)
+		}
+		replyErr(sessionId, fileMsg.Hash, serr.FILEINFO_NOT_EXIST, "", ctx)
+		return
+	}
+
 	if this.taskMgr.ShareTaskNum() >= common.MAX_TASKS_NUM {
 		replyErr(sessionId, fileMsg.Hash, serr.TOO_MANY_TASKS, "", ctx)
 		return
