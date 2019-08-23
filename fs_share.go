@@ -80,7 +80,7 @@ func (this *Dsp) StartShareServices() {
 			}
 			if len(blocks) == 0 {
 				log.Warn("no block shared")
-				return
+				break
 			}
 			flights := &block.BlockFlights{
 				TimeStamp: req[0].TimeStamp,

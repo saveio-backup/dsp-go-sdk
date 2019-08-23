@@ -1033,7 +1033,11 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 		if err != nil {
 			return err
 		}
-		err = this.Fs.PutBlock(this.Fs.EncodedToBlockWithCid(value.Block, hash))
+		block := this.Fs.EncodedToBlockWithCid(value.Block, hash)
+		if block.Cid().String() != hash {
+			return fmt.Errorf("receive a wrong block: %s, expected: %s", block.Cid().String(), hash)
+		}
+		err = this.Fs.PutBlock(block)
 		if err != nil {
 			return err
 		}

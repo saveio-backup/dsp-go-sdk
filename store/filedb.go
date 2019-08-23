@@ -1246,7 +1246,7 @@ func (this *FileDB) getFileUnpaidInfo(key string) (*FileDownloadUnPaid, error) {
 		}
 	}
 	if len(value) == 0 {
-		log.Warnf("get file unpaid info len is 0 %s", key)
+		// log.Warnf("get file unpaid info len is 0 %s", key)
 		return nil, nil
 	}
 	info := &FileDownloadUnPaid{}
