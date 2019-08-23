@@ -294,7 +294,7 @@ func (this *Task) PushGetBlockFlights(sessionId string, blocks []*BlockResp, tim
 		log.Errorf("get block resp channel is nil with key %s", key)
 		return
 	}
-	log.Debugf("push block done")
+
 	go func() {
 		log.Debugf("send block to channel: %s", key)
 		ch <- blocks

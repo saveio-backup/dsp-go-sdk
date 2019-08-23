@@ -497,8 +497,11 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 		}
 		if len(blocks) == 0 {
 			log.Debug("all download blocks have been downloaded")
+		} else {
+			log.Debugf("push %d blocks to channel", len(blocks))
+			this.taskMgr.PushGetBlockFlights(taskId, blockFlightsMsg.Blocks[0].SessionId, blocks, blockFlightsMsg.TimeStamp)
 		}
-		this.taskMgr.PushGetBlockFlights(taskId, blockFlightsMsg.Blocks[0].SessionId, blocks, blockFlightsMsg.TimeStamp)
+
 		emptyMsg := message.NewEmptyMsg()
 		err := ctx.Reply(context.Background(), emptyMsg.ToProtoMsg())
 		if err != nil {

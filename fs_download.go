@@ -589,6 +589,9 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		for _, v := range resp {
 			totalBytes += len(v.Block)
 		}
+		if totalBytes == 0 {
+			return nil, errors.New("request total bytes count 0")
+		}
 		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(totalBytes))
 		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d", fHash, pAddr, walletAddr, paymentId)
 		if err != nil {

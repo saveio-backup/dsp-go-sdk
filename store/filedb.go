@@ -1028,7 +1028,7 @@ func (this *FileDB) CanShareTo(id, walletAddress string, asset int32) (bool, err
 	if err != nil {
 		return false, err
 	}
-	if unpaid != nil && unpaid.Amount < common.CHUNK_SIZE*common.MAX_REQ_BLOCK_COUNT {
+	if unpaid != nil && unpaid.Amount >= common.CHUNK_SIZE*common.MAX_REQ_BLOCK_COUNT {
 		return false, fmt.Errorf("can't share to: %s, has unpaid amount: %d", walletAddress, unpaid.Amount)
 	}
 	return true, nil

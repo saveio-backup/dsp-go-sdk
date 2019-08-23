@@ -733,7 +733,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					continue
 				}
 				req = append(req, r)
-				log.Debugf("add block req to pool %v", r)
+				log.Debugf("add block req to flights %v", r)
 				flights = append(flights, flightKey)
 				if len(req) == common.MAX_REQ_BLOCK_COUNT {
 					break
@@ -752,10 +752,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			}
 			for _, v := range flights {
 				log.Debugf("add flight %s, worker %s", v, worker.RemoteAddress())
+				flightMap.Store(v, struct{}{})
 			}
 
-			// addFlight(flightKey)
-			flightMap.Store(flightKey, struct{}{})
 			tsk.SetWorkerUnPaid(worker.remoteAddr, true)
 			jobCh <- &job{
 				req:       req,
@@ -875,7 +874,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				if err != nil {
 					log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
 				} else {
-					log.Debugf("request blocks %q from %s success", ret, job.worker.remoteAddr)
+					for _, v := range ret {
+						log.Debugf("request block %s from %s success", v.Hash, job.worker.remoteAddr)
+					}
 				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0
 				if stop {
@@ -884,7 +885,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				flightskey := make([]string, 0)
 				for _, v := range ret {
-					flightskey = append(flightskey, fmt.Sprintf("%s-%d", v.Hash, v.Index))
+					key := fmt.Sprintf("%s-%d", v.Hash, v.Index)
+					flightskey = append(flightskey, key)
+					log.Debugf("push flightskey %q", key)
 				}
 				resp := &getBlocksResp{
 					worker:    job.worker,
@@ -893,7 +896,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					err:       err,
 				}
 				done <- resp
-				log.Debugf("push done channel %q", resp)
 			}
 			log.Debugf("workers outside for loop")
 		}()
