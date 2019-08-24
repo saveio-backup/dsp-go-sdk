@@ -10,14 +10,20 @@ import (
 	"testing"
 
 	"github.com/saveio/dsp-go-sdk/config"
+	"github.com/saveio/dsp-go-sdk/utils"
 	chain "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis-go-sdk/wallet"
+	"github.com/saveio/themis/common"
 )
 
 var testbigFile = "../testdata/testuploadbigfile.txt"
 var testsmallFile = "../testdata/testuploadfile.txt"
-var prefix = "ANPCCWJbCimJ2fsohgkrziUeQGikRpMuez"
-var testFile = "./南戴河之旅.7z"
+var walletAddress = "ANPCCWJbCimJ2fsohgkrziUeQGikRpMuez"
+var testFile = "./setup.exe"
+var testFileEncrypted = "./setup-encrypted.exe"
+var testFileDecrypted = "./setup-decrypted.exe"
+var testFileTemp = "./setup-temp.exe"
+var encryptPassword = "123456"
 
 func TestNodeFromFile(t *testing.T) {
 	cfg := &config.DspConfig{
@@ -28,7 +34,7 @@ func TestNodeFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, err := fs.NodesFromFile(testFile, prefix, false, "")
+	list, err := fs.NodesFromFile(testFile, walletAddress, false, "")
 	if err != nil {
 		return
 	}
@@ -40,32 +46,9 @@ func TestNodeFromFile(t *testing.T) {
 		_, ok := hashMap[l]
 		if ok {
 			fmt.Printf("duplicated %s", l)
-			panic("123")
-			continue
 		}
 		hashMap[l] = struct{}{}
 	}
-
-	// var downloadData []byte
-	// root := list[0]
-	// block := fs.GetBlock(root)
-	// links, _ := fs.GetBlockLinks(block)
-	// for i, l := range links {
-	// 	fmt.Printf("#%d = %s\n", i, l)
-	// 	block := fs.GetBlock(l)
-	// 	blockData := fs.BlockData(block)
-	// 	if len(blockData) == 0 {
-	// 		fmt.Printf("idx is 0 %d", i)
-	// 		continue
-	// 	}
-	// 	if string(blockData[:len(prefix)]) == prefix {
-	// 		downloadData = append(downloadData, blockData[len(prefix):]...)
-	// 		continue
-	// 	}
-	// 	downloadData = append(downloadData, blockData[:]...)
-	// }
-	// read, _ := ioutil.ReadFile(testFile)
-	// fmt.Printf("read: %x, download: %x\n", md5.Sum(read), md5.Sum(downloadData))
 }
 
 func TestBlockToBytes(t *testing.T) {
@@ -118,18 +101,6 @@ func TestEncodedToBlock(t *testing.T) {
 	fmt.Printf("blockDataLen:%d\n", len(fs.BlockData(rootBlock)))
 	rootBytes, _ := fs.BlockToBytes(root)
 	fmt.Printf("rootBlock cid:%s, len:%d, lenbtes :%d \n", rootBlock.Cid(), len(rootBlock.RawData()), len(rootBytes))
-	// for _, rootC := range root.Links() {
-	// 	fmt.Printf("rootC %s\n", rootC.Cid.String())
-	// }
-
-	// fmt.Printf("root:%s, child len:%d\n", root.Cid().String(), len(l))
-	// for _, item := range l {
-	// 	dagNode, _ := item.GetDagNode()
-	// 	rawData := fs.BlockDataOfAny(item)
-	// 	itemBytes, _ := fs.BlockToBytes(dagNode)
-	// 	block := fs.EncodedToBlockWithCid(rawData, dagNode.Cid().String())
-	// 	fmt.Printf("block type %s, rawData len:%d, data:%d, bytes:%d\n", block.Cid(), len(rawData), len(block.RawData()), len(itemBytes))
-	// }
 }
 
 func TestReadWithOffset(t *testing.T) {
@@ -237,12 +208,6 @@ func Test2GetBlockFromFileStore(t *testing.T) {
 	l0data = append(l0data, []byte("88")...)
 	l0Blk := fs2.EncodedToBlockWithCid(append([]byte(prefix), l0data...), "zb2rhfrCjaF8LnRoBC7VjLhyH34te5hxTKm4w4KUxrrYHFJnE")
 	fs2.SetFsFilePrefix(fullFilePath, prefix)
-	// file, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// defer file.Close()
-	// file.Write(l0data)
 
 	rootData, err := hex.DecodeString("122c0a240155122088c71c6403d98c01640fd69eb2e00dc3c7e8e718d722561627874983189990f3120018808010122c0a2401551220b12d156c4bb5e423c993466b9e22d011f2530c8981aa0aea93c771726f1d1471120018808010122c0a2401551220256df15f50add013e1e66475da6e0c91b01da378ac6e9ef898df10dc07d60ef912001882dd0a0a1208021882dd2a20808010208080102082dd0a")
 	if err != nil {
@@ -272,7 +237,7 @@ func TestDownloadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, err := fs.NodesFromFile(testFile, prefix, false, "")
+	list, err := fs.NodesFromFile(testFile, walletAddress, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,10 +263,129 @@ func TestDownloadFile(t *testing.T) {
 		if len(links) > 0 {
 			continue
 		}
-		if string(blockData[:len(prefix)]) == prefix {
-			file.Write(blockData[len(prefix):])
+		if string(blockData[:len(walletAddress)]) == walletAddress {
+			file.Write(blockData[len(walletAddress):])
 			continue
 		}
 		file.Write(blockData[:])
+	}
+}
+
+func TestEncryptFile(t *testing.T) {
+	cfg := &config.DspConfig{
+		FsRepoRoot: "./Repo",
+		FsFileRoot: "./Downloads",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fs.AESEncryptFile(testFile, encryptPassword, testFile+"-decrypted")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDecryptFile(t *testing.T) {
+	cfg := &config.DspConfig{
+		FsRepoRoot: "./Repo",
+		FsFileRoot: "./Downloads",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fs.AESDecryptFile(testFile+"-decrypted", "", encryptPassword, testFile+"-origin")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEncryptNodeToFiles(t *testing.T) {
+	cfg := &config.DspConfig{
+		FsRepoRoot: "./Repo",
+		FsFileRoot: "./Downloads",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	addr, err := common.AddressFromBase58(walletAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	prefix := &utils.FilePrefix{
+		Version:    1,
+		Encrypt:    true,
+		EncryptPwd: encryptPassword,
+		Owner:      addr,
+	}
+
+	prefixBytes := prefix.Serialize()
+	prefixStr := string(prefixBytes)
+	fmt.Printf("prefix :%v\n", prefixBytes)
+	list, err := fs.NodesFromFile(testFile, prefixStr, prefix.Encrypt, prefix.EncryptPwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newFile, err := os.OpenFile(testFileEncrypted, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer newFile.Close()
+
+	for _, l := range list {
+		block := fs.GetBlock(l)
+		links, _ := fs.GetBlockLinks(block)
+		if len(links) > 0 {
+			continue
+		}
+		data := fs.BlockDataOfAny(block)
+		if !prefix.Encrypt && string(data[:len(prefixBytes)]) == string(prefixBytes) {
+			newFile.Write(data[len(prefixBytes):])
+			continue
+		}
+		newFile.Write(data)
+	}
+}
+
+func TestDecryptPrefixedFile(t *testing.T) {
+	cfg := &config.DspConfig{
+		FsRepoRoot: "./Repo",
+		FsFileRoot: "./Downloads",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	encryptedFile, err := os.OpenFile(testFileEncrypted, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer encryptedFile.Close()
+	prefix := make([]byte, utils.PREFIX_LEN)
+	_, err = encryptedFile.ReadAt(prefix, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	filePrefix := &utils.FilePrefix{}
+	filePrefix.Deserialize(prefix)
+	fmt.Printf("new prefix: %v\n", prefix)
+	fmt.Printf("version: %d\n", filePrefix.Version)
+	fmt.Printf("encrypt: %t\n", filePrefix.Encrypt)
+	fmt.Printf("salt: %v\n", filePrefix.EncryptSalt)
+	fmt.Printf("hash: %v\n", filePrefix.EncryptHash)
+	fmt.Printf("owner: %s\n", filePrefix.Owner.ToBase58())
+	fmt.Printf("fileSize: %d\n", filePrefix.FileSize)
+	verify := utils.VerifyEncryptPassword(encryptPassword, filePrefix.EncryptSalt, filePrefix.EncryptHash)
+	fmt.Printf("verify : %t\n", verify)
+	fmt.Printf("len: %d\n", len(string(prefix)))
+	err = fs.AESDecryptFile(testFileEncrypted, string(prefix), encryptPassword, testFileDecrypted)
+	if err != nil {
+		t.Fatal(err)
 	}
 }

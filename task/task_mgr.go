@@ -688,10 +688,11 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	jobCh := make(chan *job, max)
 
 	type getBlocksResp struct {
-		worker    *Worker
-		flightKey []string
-		ret       []*BlockResp
-		err       error
+		worker          *Worker
+		flightKey       []string
+		failedFlightKey map[string]struct{}
+		ret             []*BlockResp
+		err             error
 	}
 	dropDoneCh := uint32(0)
 
@@ -777,6 +778,10 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("done channel has close")
 					break
 				}
+				// delete failed key
+				for k, _ := range resp.failedFlightKey {
+					flightMap.Delete(k)
+				}
 				for k, v := range resp.flightKey {
 
 					log.Debugf("receive response of flight %s, err %s", v, resp.err)
@@ -854,6 +859,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				flights := make([]*block.Block, 0)
 				sessionId, err := this.GetSessionId(taskId, job.worker.WalletAddr())
+
+				allFlightskey := make(map[string]struct{}, 0)
 				for _, v := range job.req {
 					log.Debugf("start request block %s from %s,peer wallet: %s", v.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
 					b := &block.Block{
@@ -868,6 +875,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						},
 					}
 					flights = append(flights, b)
+					allFlightskey[fmt.Sprintf("%s-%d", v.Hash, v.Index)] = struct{}{}
 				}
 				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(), job.worker.WalletAddr(), flights)
 				tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
@@ -888,12 +896,14 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					key := fmt.Sprintf("%s-%d", v.Hash, v.Index)
 					flightskey = append(flightskey, key)
 					log.Debugf("push flightskey %q", key)
+					delete(allFlightskey, key)
 				}
 				resp := &getBlocksResp{
-					worker:    job.worker,
-					flightKey: flightskey,
-					ret:       ret,
-					err:       err,
+					worker:          job.worker,
+					flightKey:       flightskey,
+					failedFlightKey: allFlightskey,
+					ret:             ret,
+					err:             err,
 				}
 				done <- resp
 			}
@@ -1073,7 +1083,7 @@ func (this *TaskMgr) TaskStateChange(taskId string) chan TaskState {
 	return v.stateChange
 }
 
-func (this *TaskMgr) BatchSetFileInfo(taskId string, fileHash, prefix, fileName, totalCount interface{}) error {
+func (this *TaskMgr) BatchSetFileInfo(taskId string, fileHash, prefixStr, fileName, totalCount interface{}) error {
 	log.Debugf("BatchSetFileInfo")
 	v, ok := this.GetTaskById(taskId)
 	m := make(map[int]interface{})
@@ -1083,8 +1093,8 @@ func (this *TaskMgr) BatchSetFileInfo(taskId string, fileHash, prefix, fileName,
 			v.SetFieldValue(FIELD_NAME_FILEHASH, fileHash)
 		}
 	}
-	if prefix != nil {
-		m[store.FILEINFO_FIELD_PREFIX] = prefix
+	if prefixStr != nil {
+		m[store.FILEINFO_FIELD_PREFIX] = prefixStr
 	}
 	if fileName != nil {
 		m[store.FILEINFO_FIELD_FILENAME] = fileName

@@ -26,6 +26,23 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
+// IsFileEncrypted. read prefix of file to check it's encrypted or not
+func (this *Dsp) IsFileEncrypted(fullFilePath string) bool {
+	sourceFile, err := os.Open(fullFilePath)
+	if err != nil {
+		return false
+	}
+	defer sourceFile.Close()
+	prefix := make([]byte, utils.PREFIX_LEN)
+	_, err = sourceFile.Read(prefix)
+	if err != nil {
+		return false
+	}
+	filePrefix := &utils.FilePrefix{}
+	filePrefix.Deserialize([]byte(prefix))
+	return filePrefix.Encrypt
+}
+
 // DownloadFile. download file, piece by piece from addrs.
 // inOrder: if true, the file will be downloaded block by block in order
 // free: if true, query nodes who can share file free
@@ -302,7 +319,7 @@ func (this *Dsp) DownloadFileByHash(fileHashStr string, asset int32, inOrder boo
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
-func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool, addrs []string) (map[string]*file.Payment, error) {
+func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int32, free bool, addrs []string) (map[string]*file.Payment, error) {
 	if len(addrs) == 0 {
 		return nil, errors.New("no peer for download")
 	}
@@ -341,9 +358,17 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 		if len(fileMsg.BlockHashes) < len(blockHashes) {
 			return
 		}
-		if len(prefix) > 0 && fileMsg.Prefix != prefix {
+		if len(prefix) > 0 && string(fileMsg.Prefix) != prefix {
 			return
 		}
+
+		filePrefix := &utils.FilePrefix{}
+		filePrefix.Deserialize([]byte(prefix))
+		if len(decryptPwd) > 0 && !utils.VerifyEncryptPassword(decryptPwd, filePrefix.EncryptSalt, filePrefix.EncryptHash) {
+			log.Warnf("encrypt password not match hash")
+			return
+		}
+
 		if free && (fileMsg.PayInfo != nil && fileMsg.PayInfo.UnitPrice != 0) {
 			return
 		}
@@ -351,7 +376,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr string, asset int32, free bool
 		defer replyLock.Unlock()
 		blockHashes = fileMsg.BlockHashes
 		peerPayInfos[addr] = fileMsg.PayInfo
-		prefix = fileMsg.Prefix
+		prefix = string(fileMsg.Prefix)
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 	}
 	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)
@@ -769,6 +794,8 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 		return serr.NewDetailError(serr.GET_UNDOWNLOAD_BLOCK_FAILED, err.Error())
 	}
 	hasCutPrefix := false
+	filePrefix := &utils.FilePrefix{}
+	filePrefix.Deserialize([]byte(prefix))
 	var file *os.File
 	if this.Config.FsType == config.FS_FILESTORE {
 		file, err = createDownloadFile(this.Config.FsFileRoot, fullFilePath)
@@ -819,20 +846,20 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				}
 				// cut prefix
 				// TEST: why not use filesize == 0
-				if !hasCutPrefix && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
+				if !filePrefix.Encrypt && !hasCutPrefix && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
 					log.Debugf("cut prefix data-len %d, prefix %s, prefix-len: %d, str %s", len(data), prefix, len(prefix), string(data[:len(prefix)]))
 					data = data[len(prefix):]
 					hasCutPrefix = true
 				}
 				// TEST: offset
-				writeAtPos := int64(0)
-				if value.Offset > 0 {
+				writeAtPos := value.Offset
+				if value.Offset > 0 && !filePrefix.Encrypt {
 					writeAtPos = value.Offset - int64(len(prefix))
 				}
 				log.Debugf("block %s filesize %d, block-len %d, offset %v prefix %v pos %d", block.Cid().String(), fileStat.Size(), len(data), value.Offset, len(prefix), writeAtPos)
 				_, err = file.WriteAt(data, writeAtPos)
-				fileStat2, _ := file.Stat()
-				log.Debugf("after write size %v, file %v", fileStat2.Size(), file)
+				// fileStat2, _ := file.Stat()
+				// log.Debugf("after write size %v, file %v", fileStat2.Size(), file)
 				if err != nil {
 					return serr.NewDetailError(serr.WRITE_FILE_DATA_FAILED, err.Error())
 				}
@@ -920,7 +947,23 @@ func (this *Dsp) decryptDownloadedFile(fullFilePath, decryptPwd string) *serr.SD
 	if len(decryptPwd) == 0 {
 		return serr.NewDetailError(serr.DECRYPT_FILE_FAILED, "no decrypt password")
 	}
-	err := this.Fs.AESDecryptFile(fullFilePath, decryptPwd, fullFilePath+"-decrypted")
+	filePrefix := &utils.FilePrefix{}
+	sourceFile, err := os.Open(fullFilePath)
+	if err != nil {
+		return serr.NewDetailError(serr.DECRYPT_FILE_FAILED, err.Error())
+	}
+	defer sourceFile.Close()
+	prefix := make([]byte, utils.PREFIX_LEN)
+	_, err = sourceFile.Read(prefix)
+	if err != nil {
+		return serr.NewDetailError(serr.DECRYPT_FILE_FAILED, err.Error())
+	}
+	log.Debugf("read first n prefix :%v", prefix)
+	filePrefix.Deserialize([]byte(prefix))
+	if !utils.VerifyEncryptPassword(decryptPwd, filePrefix.EncryptSalt, filePrefix.EncryptHash) {
+		return serr.NewDetailError(serr.DECRYPT_WRONG_PASSWORD, "wrong password")
+	}
+	err = this.Fs.AESDecryptFile(fullFilePath, string(prefix), decryptPwd, fullFilePath+"-decrypted")
 	if err != nil {
 		return serr.NewDetailError(serr.DECRYPT_FILE_FAILED, err.Error())
 	}
@@ -955,7 +998,7 @@ func (this *Dsp) addUndownloadReq(taskId, fileHashStr string) (int32, error) {
 
 // downloadFileFromPeers. downloadfile base methods. download file from peers.
 func (this *Dsp) downloadFileFromPeers(taskId, fileHashStr string, asset int32, inOrder bool, decryptPwd string, free, setFileName bool, maxPeerCnt int, addrs []string) *serr.SDKError {
-	quotation, err := this.GetDownloadQuotation(fileHashStr, asset, free, addrs)
+	quotation, err := this.GetDownloadQuotation(fileHashStr, decryptPwd, asset, free, addrs)
 	log.Debugf("downloadFileFromPeers :%v", quotation)
 	if err != nil {
 		return serr.NewDetailError(serr.GET_DOWNLOAD_INFO_FAILED_FROM_PEERS, err.Error())

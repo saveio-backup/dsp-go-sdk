@@ -132,7 +132,15 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	if pause {
 		return nil, nil
 	}
-	hashes, err := this.Fs.NodesFromFile(filePath, this.WalletAddress(), opt.Encrypt, string(opt.EncryptPassword))
+	filePrefix := &utils.FilePrefix{
+		Version:  utils.PREFIX_VERSION,
+		Encrypt:  opt.Encrypt,
+		Owner:    this.CurrentAccount().Address,
+		FileSize: opt.FileSize,
+	}
+	prefixStr := filePrefix.String()
+	log.Debugf("prefix str: %s", prefixStr)
+	hashes, err := this.Fs.NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword))
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
 		log.Errorf("node from file err: %s", err)
@@ -202,8 +210,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		return nil, sdkerr.Error
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileFindReceivers)
-	// receivers, err := this.waitFileReceivers(taskId, fileHashStr, nodeList, hashes, int(opt.CopyNum)+1, tx, uint64(payTxHeight))
-	receivers, err := this.waitFileReceivers(taskId, fileHashStr, nodeList, hashes, int(opt.CopyNum)+1)
+	receivers, err := this.waitFileReceivers(taskId, fileHashStr, prefixStr, nodeList, hashes, int(opt.CopyNum)+1)
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SEARCH_RECEIVERS_FAILED, err.Error())
 		return nil, err
@@ -827,7 +834,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, copyNum uint64) bool {
 // client -> fetch_ask -> peer.
 // client <- fetch_ack <- peer.
 // return receivers
-func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
+func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	var receiverLock sync.Mutex
 	receivers := make([]string, 0)
 	receiverBreakpoint := make(map[string]*file.Breakpoint, 0)
@@ -835,7 +842,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr string, nodeList, blockHa
 	if err != nil {
 		return nil, err
 	}
-	msg := message.NewFileFetchAsk(sessionId, fileHashStr, blockHashes, this.WalletAddress(), this.WalletAddress())
+	msg := message.NewFileFetchAsk(sessionId, fileHashStr, blockHashes, this.WalletAddress(), []byte(prefix))
 	type responseData struct {
 		res  proto.Message
 		addr string

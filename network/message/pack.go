@@ -149,7 +149,7 @@ func NewFileMsg(file *file.File, errorCode uint32, errorMsg string) *Message {
 }
 
 // NewFileFetchAsk
-func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr, prefix string) *Message {
+func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr string, prefix []byte) *Message {
 	f := &file.File{
 		SessionId:   sessionId,
 		Hash:        hash,
@@ -247,7 +247,7 @@ func NewFileDownloadAsk(hash, walletAddr string, asset int32) *Message {
 }
 
 // NewFileDownloadAck
-func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr, prefix string, uintPrice uint64, asset int32, errorCode uint32, errorMsg string) *Message {
+func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr string, prefix []byte, uintPrice uint64, asset int32, errorCode uint32, errorMsg string) *Message {
 	f := &file.File{
 		SessionId:   sessionId,
 		Hash:        hash,

@@ -263,8 +263,8 @@ func (this *Fs) DeleteFile(fileHashStr, filePath string) error {
 }
 
 // AESDecryptFile. descypt file
-func (this *Fs) AESDecryptFile(file, password, outputPath string) error {
-	return max.DecryptFile(file, password, outputPath)
+func (this *Fs) AESDecryptFile(file, prefix, password, outputPath string) error {
+	return max.DecryptFile(file, prefix, password, outputPath)
 }
 
 // AESEncryptFile. encrypt file
