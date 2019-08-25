@@ -141,7 +141,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			return
 		}
 		log.Debugf("save file prefix :%s", hex.EncodeToString(fileMsg.Prefix))
-		err = this.taskMgr.BatchSetFileInfo(taskId, nil, string(fileMsg.Prefix), nil, hashListLen)
+		err = this.taskMgr.BatchSetFileInfo(taskId, nil, fileMsg.Prefix, nil, hashListLen)
 		if err != nil {
 			log.Errorf("SetFileInfoFields failed:%s", err)
 			return
@@ -342,7 +342,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 			return
 		}
 		replyMsg := message.NewFileDownloadAck(sessionId, fileMsg.Hash, this.taskMgr.FileBlockHashes(downloadInfoId),
-			this.WalletAddress(), []byte(prefix),
+			this.WalletAddress(), prefix,
 			price, fileMsg.PayInfo.Asset, serr.SUCCESS, "")
 		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		if err != nil {

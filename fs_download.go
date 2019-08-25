@@ -395,7 +395,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 		if err != nil {
 			return nil, err
 		}
-		err = this.taskMgr.BatchSetFileInfo(taskId, nil, prefix, this.taskMgr.FileNameFromTask(taskId), uint64(len(blockHashes)))
+		err = this.taskMgr.BatchSetFileInfo(taskId, nil, []byte(prefix), this.taskMgr.FileNameFromTask(taskId), uint64(len(blockHashes)))
 		if err != nil {
 			return nil, err
 		}
@@ -567,10 +567,11 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	}
 	wg.Wait()
 	blockHashes := this.taskMgr.FileBlockHashes(taskId)
-	prefix, err := this.taskMgr.GetFilePrefix(taskId)
+	prefixBuf, err := this.taskMgr.GetFilePrefix(taskId)
 	if err != nil {
 		return serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 	}
+	prefix := string(prefixBuf)
 	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v", fileHashStr, len(blockHashes), prefix)
 	fileName, _ := this.taskMgr.GetFileName(taskId)
 	fullFilePath, err := this.taskMgr.GetFilePath(taskId)
@@ -1254,7 +1255,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 		if err != nil {
 			return err
 		}
-		err = this.taskMgr.BatchSetFileInfo(taskId, nil, prefix, nil, nil)
+		err = this.taskMgr.BatchSetFileInfo(taskId, nil, []byte(prefix), nil, nil)
 		if err != nil {
 			return err
 		}

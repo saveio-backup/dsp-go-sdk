@@ -1083,7 +1083,7 @@ func (this *TaskMgr) TaskStateChange(taskId string) chan TaskState {
 	return v.stateChange
 }
 
-func (this *TaskMgr) BatchSetFileInfo(taskId string, fileHash, prefixStr, fileName, totalCount interface{}) error {
+func (this *TaskMgr) BatchSetFileInfo(taskId string, fileHash, prefix, fileName, totalCount interface{}) error {
 	log.Debugf("BatchSetFileInfo")
 	v, ok := this.GetTaskById(taskId)
 	m := make(map[int]interface{})
@@ -1093,8 +1093,8 @@ func (this *TaskMgr) BatchSetFileInfo(taskId string, fileHash, prefixStr, fileNa
 			v.SetFieldValue(FIELD_NAME_FILEHASH, fileHash)
 		}
 	}
-	if prefixStr != nil {
-		m[store.FILEINFO_FIELD_PREFIX] = prefixStr
+	if prefix != nil {
+		m[store.FILEINFO_FIELD_PREFIX] = prefix
 	}
 	if fileName != nil {
 		m[store.FILEINFO_FIELD_FILENAME] = fileName
@@ -1135,8 +1135,8 @@ func (this *TaskMgr) GetFileTotalBlockCount(taskId string) uint64 {
 	return count
 }
 
-func (this *TaskMgr) GetFilePrefix(taskId string) (string, error) {
-	return this.db.GetFileInfoStringValue(taskId, store.FILEINFO_FIELD_PREFIX)
+func (this *TaskMgr) GetFilePrefix(taskId string) ([]byte, error) {
+	return this.db.GetFileInfoBytesValue(taskId, store.FILEINFO_FIELD_PREFIX)
 }
 
 func (this *TaskMgr) GetTaskUpdatedAt(taskId string) int64 {

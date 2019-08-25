@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -23,6 +24,20 @@ func TestGenPrefix(t *testing.T) {
 
 	bufStr := string(buf)
 	fmt.Printf("hex str: %s, len: %d\n", hex.EncodeToString(buf), len(bufStr))
+
+	type TestJSON struct {
+		Prefix string `json:"prefix"`
+	}
+	json1 := &TestJSON{
+		Prefix: string(buf),
+	}
+	json1Buf, _ := json.Marshal(json1)
+
+	json2 := &TestJSON{}
+	json.Unmarshal(json1Buf, json2)
+	fmt.Printf("json2.prefix :%s\n", json2.Prefix)
+	fmt.Printf("json2.prefix :%v\n", []byte(json2.Prefix))
+
 	fmt.Printf("prefix1: %v\n", buf)
 	fmt.Printf("prefix2: %v\n", []byte(bufStr))
 

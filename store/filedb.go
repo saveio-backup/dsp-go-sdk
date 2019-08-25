@@ -87,7 +87,7 @@ type FileInfo struct {
 	SaveBlockCountMap map[string]uint64 `json:"save_block_count_map"`
 	TaskState         uint64            `json:"task_state"`
 	ProvePrivKey      []byte            `json:"prove_private_key"`
-	Prefix            string            `json:"prefix"`
+	Prefix            []byte            `json:"prefix"`
 	EncryptHash       string            `json:"encrypt_hash"`
 	EncryptSalt       string            `json:"encrypt_salt"`
 	Url               string            `json:"url`
@@ -219,7 +219,7 @@ func (this *FileDB) SetFileInfoField(id string, field int, value interface{}) er
 	case FILEINFO_FIELD_PROVE_PRIVATEKEY:
 		fi.ProvePrivKey = value.([]byte)
 	case FILEINFO_FIELD_PREFIX:
-		fi.Prefix = value.(string)
+		fi.Prefix = value.([]byte)
 	case FILEINFO_FIELD_TOTALCOUNT:
 		fi.TotalBlockCount = value.(uint64)
 	case FILEINFO_FIELD_COPYNUM:
@@ -266,7 +266,7 @@ func (this *FileDB) SetFileInfoFields(id string, m map[int]interface{}) error {
 		case FILEINFO_FIELD_PROVE_PRIVATEKEY:
 			fi.ProvePrivKey = value.([]byte)
 		case FILEINFO_FIELD_PREFIX:
-			fi.Prefix = value.(string)
+			fi.Prefix = value.([]byte)
 		case FILEINFO_FIELD_TOTALCOUNT:
 			fi.TotalBlockCount = value.(uint64)
 		case FILEINFO_FIELD_COPYNUM:
@@ -310,8 +310,6 @@ func (this *FileDB) GetFileInfoStringValue(id string, field int) (string, error)
 		return fi.StoreTx, nil
 	case FILEINFO_FIELD_WHITELISTTX:
 		return fi.WhitelistTx, nil
-	case FILEINFO_FIELD_PREFIX:
-		return fi.Prefix, nil
 	case FILEINFO_FIELD_URL:
 		return fi.Url, nil
 	case FILEINFO_FIELD_LINK:
@@ -340,6 +338,8 @@ func (this *FileDB) GetFileInfoBytesValue(id string, field int) ([]byte, error) 
 	switch field {
 	case FILEINFO_FIELD_PROVE_PRIVATEKEY:
 		return fi.ProvePrivKey, nil
+	case FILEINFO_FIELD_PREFIX:
+		return fi.Prefix, nil
 	}
 	return nil, fmt.Errorf("fileinfo field not found %s %d", id, field)
 }
