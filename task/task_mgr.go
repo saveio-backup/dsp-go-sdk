@@ -123,7 +123,7 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 	for _, id := range taskIds {
 		info, err := this.db.GetFileInfo([]byte(id))
 		if err != nil {
-			return err
+			continue
 		}
 		if info == nil {
 			log.Warnf("recover task get file info is nil of %v", id)
