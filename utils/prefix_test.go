@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -21,7 +22,7 @@ func TestGenPrefix(t *testing.T) {
 	fmt.Printf("prefix-len: %v, size: %d\n", len(buf), fileSize)
 
 	bufStr := string(buf)
-	fmt.Printf("hex str: %s, len: %d\n", bufStr, len(bufStr))
+	fmt.Printf("hex str: %s, len: %d\n", hex.EncodeToString(buf), len(bufStr))
 	fmt.Printf("prefix1: %v\n", buf)
 	fmt.Printf("prefix2: %v\n", []byte(bufStr))
 

@@ -842,6 +842,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList,
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("waitFileReceivers prefix hex: %s", hex.EncodeToString([]byte(prefix)))
 	msg := message.NewFileFetchAsk(sessionId, fileHashStr, blockHashes, this.WalletAddress(), []byte(prefix))
 	type responseData struct {
 		res  proto.Message

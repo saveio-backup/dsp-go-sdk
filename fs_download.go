@@ -2,6 +2,7 @@ package dsp
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -377,6 +378,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 		blockHashes = fileMsg.BlockHashes
 		peerPayInfos[addr] = fileMsg.PayInfo
 		prefix = string(fileMsg.Prefix)
+		log.Debugf("prefix hex: %s", hex.EncodeToString(fileMsg.Prefix))
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 	}
 	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)
@@ -388,7 +390,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 
 	totalCount := this.taskMgr.GetFileTotalBlockCount(taskId)
 	if uint64(len(blockHashes)) > totalCount {
-		log.Debugf("AddFileBlockHashes id %v hashes %s-%s, prefix %s", taskId, blockHashes[0], blockHashes[len(blockHashes)-1], prefix)
+		log.Debugf("AddFileBlockHashes id %v hashes %s-%s, prefix %s, len: %d", taskId, blockHashes[0], blockHashes[len(blockHashes)-1], prefix, len(prefix))
 		err = this.taskMgr.AddFileBlockHashes(taskId, blockHashes)
 		if err != nil {
 			return nil, err
