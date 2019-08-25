@@ -133,10 +133,11 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		return nil, nil
 	}
 	filePrefix := &utils.FilePrefix{
-		Version:  utils.PREFIX_VERSION,
-		Encrypt:  opt.Encrypt,
-		Owner:    this.CurrentAccount().Address,
-		FileSize: opt.FileSize,
+		Version:    utils.PREFIX_VERSION,
+		Encrypt:    opt.Encrypt,
+		EncryptPwd: string(opt.EncryptPassword),
+		Owner:      this.CurrentAccount().Address,
+		FileSize:   opt.FileSize,
 	}
 	prefixStr := filePrefix.String()
 	log.Debugf("prefix str: %s", prefixStr)

@@ -7,6 +7,7 @@ import (
 	"hash/crc32"
 
 	"github.com/saveio/themis/common"
+	"github.com/saveio/themis/common/log"
 )
 
 const (
@@ -17,6 +18,7 @@ const (
 	REVERSED_LEN   = 4
 	CHECKSUM_LEN   = 4
 	PREFIX_LEN     = 74
+	PREFIX_OFFSET  = 32
 )
 
 type FilePrefix struct {
@@ -105,6 +107,15 @@ func (p *FilePrefix) Deserialize(buf []byte) {
 func (p *FilePrefix) String() string {
 	buf := p.Serialize()
 	return string(buf)
+}
+
+func (p *FilePrefix) Print() {
+	log.Debugf("Version: %d", p.Version)
+	log.Debugf("Encrypt: %t", p.Encrypt)
+	log.Debugf("FileSize: %d", p.FileSize)
+	log.Debugf("EncryptSalt: %v", p.EncryptSalt)
+	log.Debugf("EncryptHash: %v", p.EncryptHash)
+	log.Debugf("Owner: %s", p.Owner.ToBase58())
 }
 
 func VerifyEncryptPassword(password string, salt [4]byte, hash [32]byte) bool {
