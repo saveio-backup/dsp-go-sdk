@@ -649,7 +649,7 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 			return nil, err
 		}
 		txHash, err := this.Chain.Native.Fs.StoreFile(fileHashStr, blockNum, blockSizeInKB, opt.ProveInterval,
-			opt.ExpiredHeight, uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege), paramsBuf, uint64(opt.StorageType))
+			opt.ExpiredHeight, uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege), paramsBuf, uint64(opt.StorageType), opt.FileSize)
 		if err != nil {
 			log.Errorf("pay store file order failed:%s", err)
 			return nil, err
