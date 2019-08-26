@@ -40,6 +40,6 @@ func (this *Queue) PopAll() []interface{} {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	all := this.data
-	this.data = this.data[:]
+	this.data = this.data[:0]
 	return all
 }
