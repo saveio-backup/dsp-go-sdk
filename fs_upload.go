@@ -121,6 +121,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	this.taskMgr.SetTaskInfos(taskId, "", filePath, string(opt.FileDesc), this.WalletAddress())
 	this.taskMgr.SetCopyNum(taskId, uint64(opt.CopyNum))
 	this.taskMgr.BindTaskId(taskId)
+	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
 	var tx, fileHashStr string
 	var totalCount uint64
 	log.Debugf("upload task: %s, will split for file", taskId)

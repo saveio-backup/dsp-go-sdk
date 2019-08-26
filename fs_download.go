@@ -101,6 +101,7 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		sdkErr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return err
 	}
+	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileStart)
 	info, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	if info != nil {
 		this.taskMgr.SetFileOwner(taskId, info.FileOwner.ToBase58())
