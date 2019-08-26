@@ -30,6 +30,7 @@ type DeleteFileStatus struct {
 
 type DeleteUploadFileResp struct {
 	Tx       string
+	FileHash string
 	FileName string
 	Nodes    []DeleteFileStatus
 }
