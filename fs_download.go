@@ -2,7 +2,6 @@ package dsp
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -379,7 +378,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 		blockHashes = fileMsg.BlockHashes
 		peerPayInfos[addr] = fileMsg.PayInfo
 		prefix = string(fileMsg.Prefix)
-		log.Debugf("prefix hex: %s", hex.EncodeToString(fileMsg.Prefix))
+		log.Debugf("prefix hex: %s", fileMsg.Prefix)
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 	}
 	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)

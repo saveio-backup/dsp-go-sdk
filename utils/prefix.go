@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"hash/crc32"
 
@@ -17,8 +18,8 @@ const (
 	FILESIZE_LEN   = 8
 	REVERSED_LEN   = 4
 	CHECKSUM_LEN   = 4
-	PREFIX_LEN     = 74
-	PREFIX_OFFSET  = 32
+	PREFIX_LEN     = 100
+	PAYLOAD_LEN    = 74
 )
 
 type FilePrefix struct {
@@ -70,17 +71,26 @@ func (p *FilePrefix) Serialize() []byte {
 	binary.BigEndian.PutUint32(checkSumBuf, checkSum)
 
 	result = append(result, checkSumBuf...)
-	return result
+
+	base64Result := make([]byte, PREFIX_LEN)
+	base64.StdEncoding.Encode(base64Result, result)
+	return base64Result
 }
 
-func (p *FilePrefix) Deserialize(buf []byte) {
-	if len(buf) != PREFIX_LEN {
+func (p *FilePrefix) Deserialize(base64Buf []byte) {
+	if len(base64Buf) != PREFIX_LEN {
 		return
 	}
+	buf := make([]byte, PREFIX_LEN)
+	n, err := base64.StdEncoding.Decode(buf, base64Buf)
+	if err != nil {
+		return
+	}
+	buf = buf[:n]
 
-	payload := buf[:PREFIX_LEN-CHECKSUM_LEN]
+	payload := buf[:PAYLOAD_LEN-CHECKSUM_LEN]
 	checkSum := crc32.ChecksumIEEE(payload)
-	check := binary.BigEndian.Uint32(buf[PREFIX_LEN-CHECKSUM_LEN:])
+	check := binary.BigEndian.Uint32(buf[PAYLOAD_LEN-CHECKSUM_LEN:])
 	if checkSum != check {
 		return
 	}
@@ -107,6 +117,10 @@ func (p *FilePrefix) Deserialize(buf []byte) {
 func (p *FilePrefix) String() string {
 	buf := p.Serialize()
 	return string(buf)
+}
+
+func (p *FilePrefix) ParseFromString(base64Str string) {
+	p.Deserialize([]byte(base64Str))
 }
 
 func (p *FilePrefix) Print() {

@@ -32,7 +32,7 @@ func TestGenPrefix(t *testing.T) {
 	fmt.Printf("hash: %v\n", prefix2.EncryptHash)
 	fmt.Printf("owner: %s\n", prefix2.Owner.ToBase58())
 	fmt.Printf("fileSize: %d\n", prefix2.FileSize)
-	verify := VerifyEncryptPassword("456", prefix2.EncryptSalt, prefix2.EncryptHash)
+	verify := VerifyEncryptPassword("1234", prefix2.EncryptSalt, prefix2.EncryptHash)
 	fmt.Printf("verify : %t\n", verify)
 }
 
@@ -47,6 +47,8 @@ func TestBase64EncodePrefix(t *testing.T) {
 		FileSize:   fileSize,
 	}
 	buf := prefix.Serialize()
+	encodedLen := base64.StdEncoding.EncodedLen(74)
+	fmt.Printf("len: %d\n", encodedLen)
 	fmt.Printf("prefix-len: %v, size: %d\n", len(buf), fileSize)
 	base64Str := base64.StdEncoding.EncodeToString(buf)
 	fmt.Printf("str: %s, len: %d\n", base64Str, len(base64Str))
@@ -116,6 +118,7 @@ func TestBytesToBytesPrefix(t *testing.T) {
 	fmt.Printf("prefix-len: %v, size: %d\n", len(buf), fileSize)
 	base64Str := base64.StdEncoding.EncodeToString(buf)
 	fmt.Printf("str: %s, len: %d\n", base64Str, len(base64Str))
+	fmt.Printf("bytes: %v, len: %d\n", []byte(base64Str), len([]byte(base64Str)))
 	buf2, _ := base64.StdEncoding.DecodeString(base64Str)
 
 	prefix2 := &FilePrefix{}

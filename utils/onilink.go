@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -19,7 +20,8 @@ func GenOniLink(fileHashStr, fileName string, fileSize, blockNum uint64, tracker
 		link += fmt.Sprintf("&%s=%d", common.FILE_LINK_BLOCKNUM_KEY, blockNum)
 	}
 	for _, t := range trackers {
-		link += fmt.Sprintf("&%s=%s", common.FILE_LINK_TRACKERS_KEY, t)
+		trackerUrlEncoded := base64.URLEncoding.EncodeToString([]byte(t))
+		link += fmt.Sprintf("&%s=%s", common.FILE_LINK_TRACKERS_KEY, trackerUrlEncoded)
 	}
 	return link
 }

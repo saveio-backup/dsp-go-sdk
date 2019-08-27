@@ -2,7 +2,6 @@ package dsp
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -140,7 +139,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			log.Errorf("add fileblockhashes failed:%s", err)
 			return
 		}
-		log.Debugf("save file prefix :%s", hex.EncodeToString(fileMsg.Prefix))
+		log.Debugf("save file prefix :%s", string(fileMsg.Prefix))
 		err = this.taskMgr.BatchSetFileInfo(taskId, nil, fileMsg.Prefix, nil, hashListLen)
 		if err != nil {
 			log.Errorf("SetFileInfoFields failed:%s", err)
@@ -328,7 +327,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		return
 	}
 	prefix, err := this.taskMgr.GetFilePrefix(downloadInfoId)
-	log.Debugf("get prefix from local: %s", hex.EncodeToString([]byte(prefix)))
+	log.Debugf("get prefix from local: %s", prefix)
 	if err != nil {
 		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return

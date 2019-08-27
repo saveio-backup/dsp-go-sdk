@@ -141,8 +141,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		FileSize:   opt.FileSize,
 	}
 	prefixStr := filePrefix.String()
-	log.Debugf("node from file prefix: %v, len: %d, %d", []byte(prefixStr), len([]byte(prefixStr)), len(prefixStr))
-	log.Debugf("hex.EncodeToString([]byte(prefixStr)): %v", hex.EncodeToString([]byte(prefixStr)))
+	log.Debugf("node from file prefix: %v, len: %d", prefixStr, len(prefixStr))
 	hashes, err := this.Fs.NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword))
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
@@ -440,9 +439,9 @@ func (this *Dsp) RetryUpload(taskId string) error {
 	return this.checkIfResume(taskId)
 }
 
-func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string) (string, uint32, error) {
+func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string) (string, uint32, *serr.SDKError) {
 	if len(fileHashStrs) == 0 {
-		return "", 0, errors.New("delete file hash string is empty")
+		return "", 0, &serr.SDKError{Code: serr.DELETE_FILE_HASHES_EMPTY, Error: errors.New("delete file hash string is empty")}
 	}
 	needDeleteFile := false
 	for _, fileHashStr := range fileHashStrs {
@@ -450,33 +449,33 @@ func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string) (string, uint
 		log.Debugf("delete file get fileinfo %v, err %v", info, err)
 		if err != nil && !strings.Contains(err.Error(), "[FS Profit] FsGetFileInfo not found") {
 			log.Debugf("info:%v, other err:%s", info, err)
-			return "", 0, fmt.Errorf("file info not found, %s has deleted", fileHashStr)
+			return "", 0, &serr.SDKError{Code: serr.FILE_NOT_FOUND_FROM_CHAIN, Error: fmt.Errorf("file info not found, %s has deleted", fileHashStr)}
 		}
 		if info != nil && info.FileOwner.ToBase58() != this.WalletAddress() {
-			return "", 0, fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)
+			return "", 0, &serr.SDKError{Code: serr.DELETE_FILE_ACCESS_DENIED, Error: fmt.Errorf("file %s can't be deleted, you are not the owner", fileHashStr)}
 		}
 		if info != nil && err == nil {
 			needDeleteFile = true
 		}
 	}
 	if !needDeleteFile {
-		return "", 0, errors.New("no file to delete")
+		return "", 0, &serr.SDKError{Code: serr.NO_FILE_NEED_DELETED, Error: errors.New("no file to delete")}
 	}
 	txHash, err := this.Chain.Native.Fs.DeleteFiles(fileHashStrs)
 	log.Debugf("delete file tx %v, err %v", txHash, err)
 	if err != nil {
-		return "", 0, err
+		return "", 0, &serr.SDKError{Code: serr.CHAIN_ERROR, Error: err}
 	}
 	txHashStr := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	log.Debugf("delete file txHash %s", txHashStr)
 	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
 	if err != nil || !confirmed {
-		return "", 0, errors.New("wait for tx confirmed failed")
+		return "", 0, &serr.SDKError{Code: serr.CHAIN_ERROR, Error: errors.New("wait for tx confirmed failed")}
 	}
 	txHeight, err := this.Chain.GetBlockHeightByTxHash(txHashStr)
 	log.Debugf("delete file tx height %d, err %v", txHeight, err)
 	if err != nil {
-		return "", 0, err
+		return "", 0, &serr.SDKError{Code: serr.CHAIN_ERROR, Error: err}
 	}
 	return txHashStr, txHeight, nil
 }
@@ -486,9 +485,9 @@ func (this *Dsp) DeleteUploadedFiles(fileHashStrs []string) ([]*common.DeleteUpl
 	if len(fileHashStrs) == 0 {
 		return nil, errors.New("delete file hash string is empty")
 	}
-	txHashStr, txHeight, err := this.DeleteUploadFilesFromChain(fileHashStrs)
-	if err != nil {
-		return nil, err
+	txHashStr, txHeight, sdkErr := this.DeleteUploadFilesFromChain(fileHashStrs)
+	if sdkErr != nil && sdkErr.Code != serr.NO_FILE_NEED_DELETED {
+		return nil, sdkErr.Error
 	}
 	resps := make([]*common.DeleteUploadFileResp, 0, len(fileHashStrs))
 	log.Debugf("resps-len :%v", len(resps))
