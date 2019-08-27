@@ -141,7 +141,6 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		FileSize:   opt.FileSize,
 	}
 	prefixStr := filePrefix.String()
-	log.Debugf("prefix str: %s", prefixStr)
 	hashes, err := this.Fs.NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword))
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
@@ -916,7 +915,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList,
 			log.Debugf("continue....")
 		}
 	}()
-	log.Debugf("broadcast fetch_ask msg to %v", nodeList)
+	log.Debugf("broadcast fetch_ask msg of file: %s to %v", fileHashStr, nodeList)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, stop, action)
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err")

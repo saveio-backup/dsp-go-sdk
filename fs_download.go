@@ -967,14 +967,14 @@ func (this *Dsp) decryptDownloadedFile(fullFilePath, decryptPwd string) *serr.SD
 	if !utils.VerifyEncryptPassword(decryptPwd, filePrefix.EncryptSalt, filePrefix.EncryptHash) {
 		return serr.NewDetailError(serr.DECRYPT_WRONG_PASSWORD, "wrong password")
 	}
-	err = this.Fs.AESDecryptFile(fullFilePath, string(prefix), decryptPwd, fullFilePath+"-decrypted")
+	err = this.Fs.AESDecryptFile(fullFilePath, string(prefix), decryptPwd, utils.GetDecryptedFilePath(fullFilePath))
 	if err != nil {
 		return serr.NewDetailError(serr.DECRYPT_FILE_FAILED, err.Error())
 	}
-	err = os.Rename(fullFilePath+"-decrypted", fullFilePath)
-	if err != nil {
-		return serr.NewDetailError(serr.RENAME_FILED_FAILED, err.Error())
-	}
+	// err = os.Rename(fullFilePath+"-decrypted", fullFilePath)
+	// if err != nil {
+	// 	return serr.NewDetailError(serr.RENAME_FILED_FAILED, err.Error())
+	// }
 	return nil
 }
 
@@ -1313,7 +1313,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 // createDownloadFile. create file handler for write downloading file
 func createDownloadFile(dir, filePath string) (*os.File, error) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir, 0755)
+		err = os.MkdirAll(dir, 0766)
 		if err != nil {
 			return nil, err
 		}

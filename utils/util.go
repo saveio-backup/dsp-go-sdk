@@ -116,3 +116,13 @@ func StringToSha256Hex(str string) string {
 	hexStr := hex.EncodeToString(hash[:])
 	return hexStr
 }
+
+func GetDecryptedFilePath(filePath string) string {
+	i := strings.LastIndex(filePath, ".")
+	if i == -1 {
+		return filePath + "-decrypted"
+	}
+	name := filePath[:i]
+	ext := filePath[i:]
+	return name + "-decrypted" + ext
+}
