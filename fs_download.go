@@ -838,8 +838,11 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				return serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 			}
 			if block.Cid().String() == fileHashStr && this.Config.FsType == config.FS_FILESTORE {
-				log.Debugf("set file prefix %s %s", fullFilePath, prefix)
-				this.Fs.SetFsFilePrefix(fullFilePath, prefix)
+				if !filePrefix.Encrypt {
+					this.Fs.SetFsFilePrefix(fullFilePath, prefix)
+				} else {
+					this.Fs.SetFsFilePrefix(fullFilePath, "")
+				}
 			}
 			if len(links) == 0 && this.Config.FsType == config.FS_FILESTORE {
 				data := this.Fs.BlockData(block)

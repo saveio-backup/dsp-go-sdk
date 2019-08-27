@@ -389,3 +389,17 @@ func TestDecryptPrefixedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestReadBlock(t *testing.T) {
+	cfg := &config.DspConfig{
+		FsRepoRoot: "/Users/zhijie/Desktop/onchain/save-test/node5/FS/AFoUr6dKxGCAcx74nKfBBWavRCyNcengbJ",
+		FsType:     0,
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	block := fs.GetBlock("zb2rhZTC99p7TDkwcKLtoKNkzm16WwCfyAQekifTe6v2JLu4G")
+	fmt.Printf("block: %v\n", block)
+}

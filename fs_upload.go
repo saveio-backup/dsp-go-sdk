@@ -141,6 +141,8 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		FileSize:   opt.FileSize,
 	}
 	prefixStr := filePrefix.String()
+	log.Debugf("node from file prefix: %v, len: %d, %d", []byte(prefixStr), len([]byte(prefixStr)), len(prefixStr))
+	log.Debugf("hex.EncodeToString([]byte(prefixStr)): %v", hex.EncodeToString([]byte(prefixStr)))
 	hashes, err := this.Fs.NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword))
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())

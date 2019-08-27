@@ -46,10 +46,12 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 		GcPeriod:   cfg.FsGcPeriod,
 		MaxStorage: cfg.FsMaxStorage,
 	}
-	if _, err := os.Stat(cfg.FsFileRoot); os.IsNotExist(err) {
-		err = os.MkdirAll(cfg.FsFileRoot, 0755)
-		if err != nil {
-			return nil, err
+	if len(cfg.FsFileRoot) > 0 {
+		if _, err := os.Stat(cfg.FsFileRoot); os.IsNotExist(err) {
+			err = os.MkdirAll(cfg.FsFileRoot, 0755)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	fs, err := max.NewMaxService(fsConfig, chain)
@@ -211,6 +213,7 @@ func (this *Fs) PutBlock(block blocks.Block) error {
 }
 
 func (this *Fs) SetFsFilePrefix(fileName, prefix string) error {
+	log.Debugf("set file prefix %s %v", fileName, hex.EncodeToString([]byte(prefix)))
 	return this.fs.SetFilePrefix(fileName, prefix)
 }
 
