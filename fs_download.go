@@ -1103,6 +1103,13 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	if !this.taskMgr.IsFileDownloaded(taskId) {
 		return errors.New("break here, but file not be stored")
 	}
+
+	err = this.Fs.SetFsFileBlockHashes(fileHashStr, blockHashes)
+	if err != nil {
+		log.Errorf("set file blockhashes err %s", err)
+		return err
+	}
+
 	log.Infof("received all block, start pdp verify")
 	// all block is saved, prove it
 	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)

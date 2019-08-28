@@ -302,3 +302,7 @@ func (this *Fs) registerRemoveNotify() {
 		}
 	}
 }
+
+func (this *Fs) SetFsFileBlockHashes(fileHash string, blockHashes []string) error {
+	return this.fs.SetFileBlockHashes(fileHash, blockHashes)
+}
