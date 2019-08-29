@@ -486,6 +486,7 @@ func (this *Dsp) DeleteUploadedFiles(fileHashStrs []string) ([]*common.DeleteUpl
 		return nil, errors.New("delete file hash string is empty")
 	}
 	txHashStr, txHeight, sdkErr := this.DeleteUploadFilesFromChain(fileHashStrs)
+	log.Debugf("delete upload files from chain :%s, %d, %v", txHashStr, txHeight, sdkErr)
 	if sdkErr != nil && sdkErr.Code != serr.NO_FILE_NEED_DELETED {
 		return nil, sdkErr.Error
 	}
@@ -989,7 +990,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		return serr.NewDetailError(serr.PREPARE_UPLOAD_ERROR, err.Error())
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
-	timeout := time.NewTimer(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
+	timeout := time.NewTimer(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
 		return serr.NewDetailError(serr.GET_SESSION_ID_FAILED, err.Error())
@@ -1037,7 +1038,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 						log.Debugf("stop handle request because task is pause: %t, cancel: %t", pause, cancel)
 						return
 					}
-					timeout.Reset(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second)
+					timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 					key := keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))
 					log.Debugf("handle request key:%s, %s-%s-%d from peer: %s", key, fileHashStr, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
 					msgData := getMsgData(reqInfo.Hash, uint32(reqInfo.Index))

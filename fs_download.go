@@ -1108,6 +1108,11 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
 	if err != nil {
 		log.Errorf("start pdp verify err %s", err)
+		deleteErr := this.DeleteDownloadedFile(taskId)
+		if deleteErr != nil {
+			log.Errorf("delete download file err of PDP failed file %s", deleteErr)
+			return deleteErr
+		}
 		return err
 	}
 	this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
@@ -1158,7 +1163,7 @@ func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, ad
 			block = value
 			err = nil
 			return value, nil
-		case <-time.After(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second):
+		case <-time.After(time.Duration(common.DOWNLOAD_FILE_TIMEOUT/retry) * time.Second):
 			if received {
 				break
 			}
@@ -1211,7 +1216,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 			ret = value
 			err = nil
 			break
-		case <-time.After(time.Duration(common.BLOCK_FETCH_TIMEOUT) * time.Second):
+		case <-time.After(time.Duration(common.DOWNLOAD_FILE_TIMEOUT/retry) * time.Second):
 			if received {
 				break
 			}

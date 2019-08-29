@@ -85,6 +85,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	//TODO: verify & save info
 	// task exist at runtime
 	localId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
+	log.Debugf("handle file ask localId: %s", localId)
 	if len(localId) > 0 && this.taskMgr.TaskExist(localId) {
 		state := this.taskMgr.GetTaskState(localId)
 		log.Debugf("fetch_ask task exist localId %s, %s state: %d", localId, fileMsg.Hash, state)
@@ -115,7 +116,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	}
 	// my task. use my wallet address
 	taskId, err := this.taskMgr.NewTask(task.TaskTypeDownload)
-	log.Debugf("fetch_ask new task %s", taskId)
+	log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
 	if err != nil {
 		log.Errorf("new task failed %s", err)
 		return
@@ -242,7 +243,7 @@ func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext, peer *net
 	if !this.taskMgr.IsFileInfoExist(taskId) {
 		return
 	}
-	log.Debugf("receive fetch done msg, save task id:%s fileHash: %s done", taskId, fileMsg.Hash)
+	log.Debugf("receive fetch done msg, save task id:%s fileHash: %s, from %s done", taskId, fileMsg.Hash, peer.Address)
 	this.taskMgr.SetUploadProgressDone(taskId, peer.Address)
 }
 
