@@ -279,6 +279,11 @@ func (this *Fs) RemovedExpiredFiles() []interface{} {
 	return this.removeFileList.PopAll()
 }
 
+// SetBlockHashes. set block hashes for PDP. The hash list need including root hash
+func (this *Fs) SetBlockHashes(fileHashStr string, hash []string) error {
+	return this.fs.SetFileBlockHashes(fileHashStr, hash)
+}
+
 func (this *Fs) registerRemoveNotify() {
 	for {
 		select {
