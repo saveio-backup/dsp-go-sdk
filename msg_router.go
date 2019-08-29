@@ -140,11 +140,6 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			log.Errorf("add fileblockhashes failed:%s", err)
 			return
 		}
-		err = this.Fs.SetBlockHashes(fileMsg.Hash, fileMsg.BlockHashes)
-		if err != nil {
-			log.Errorf("setBlockHashes failed:%s", err)
-			return
-		}
 		log.Debugf("save file prefix :%s", string(fileMsg.Prefix))
 		err = this.taskMgr.BatchSetFileInfo(taskId, nil, fileMsg.Prefix, nil, hashListLen)
 		if err != nil {
