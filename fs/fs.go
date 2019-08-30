@@ -301,3 +301,7 @@ func (this *Fs) registerRemoveNotify() {
 func (this *Fs) SetFsFileBlockHashes(fileHash string, blockHashes []string) error {
 	return this.fs.SetFileBlockHashes(fileHash, blockHashes)
 }
+
+func (this *Fs) ReturnBuffer(buffer []byte) error {
+	return max.ReturnBuffer(buffer)
+}

@@ -38,6 +38,7 @@ type blockMsgData struct {
 	dataLen   uint64
 	tag       []byte
 	offset    uint64
+	refCnt    int
 }
 
 // CalculateUploadFee. pre-calculate upload cost by its upload options
@@ -1012,6 +1013,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		key := keyOfUnixNode(hash, index)
 		data, ok := blockMsgDataMap[key]
 		if ok {
+			data.refCnt++
 			return data
 		}
 		offset, _ := allOffset[hash]
@@ -1020,11 +1022,24 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		if err != nil {
 			return nil
 		}
+		data.refCnt = 1
 		blockMsgDataMap[key] = data
 		return data
 	}
 	cleanMsgData := func(hash string, index uint32) {
 		// TODO
+		getMsgDataLock.Lock()
+		defer getMsgDataLock.Unlock()
+
+		key := keyOfUnixNode(hash, index)
+		data, ok := blockMsgDataMap[key]
+		if ok {
+			data.refCnt--
+			if data.refCnt <= 0 {
+				delete(blockMsgDataMap, key)
+				this.Fs.ReturnBuffer(data.blockData)
+			}
+		}
 	}
 	cancelFetch := make(chan struct{})
 	log.Debugf("open %d go routines for fetched file %s, stateChange: %v", maxFetchRoutines, fileHashStr, stateChange)
