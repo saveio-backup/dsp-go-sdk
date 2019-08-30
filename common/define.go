@@ -37,6 +37,7 @@ type DeleteUploadFileResp struct {
 
 type DownloadOption struct {
 	FileName    string
+	FileOwner   string
 	Asset       int32
 	InOrder     bool
 	DecryptPwd  string

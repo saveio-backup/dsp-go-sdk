@@ -11,6 +11,8 @@ const (
 	DSP_NETWORK_PROTOCOL     = "tcp" // default dsp network protocol
 	TRACKER_PORT             = 6369  // tracker default port
 	TRACKER_NETWORK_PROTOCOL = "udp" // tracker network protocol
+
+	TASK_STATE_CHECK_DURATION = 1 // task state change check ticker duration
 )
 
 // oni link
@@ -21,6 +23,7 @@ const (
 	FILE_LINK_SIZE_KEY     = "size"         // size
 	FILE_LINK_BLOCKNUM_KEY = "blocknum"     // block count
 	FILE_LINK_TRACKERS_KEY = "tr"           // tr
+	FILE_LINK_OWNER_KEY    = "owner"        // owner
 )
 
 // timeout

@@ -22,6 +22,11 @@ const (
 	TaskUploadFileRegisterDNS
 	TaskUploadFileRegisterDNSDone
 	TaskDownloadFileStart
+	TaskDownloadSearchPeers
 	TaskDownloadFileDownloading
+	TaskDownloadRequestBlocks
+	TaskDownloadReceiveBlocks
+	TaskDownloadPayForBlocks
+	TaskDownloadPayForBlocksDone
 	TaskDownloadFileMakeSeed
 )

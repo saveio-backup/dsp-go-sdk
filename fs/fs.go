@@ -260,7 +260,10 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 // If a block is referenced to other file, ignore it.
 func (this *Fs) DeleteFile(fileHashStr, filePath string) error {
 	if this.fs.IsFileStore() && this.cfg.FsType == config.FS_FILESTORE && len(filePath) > 0 {
-		return os.Remove(filePath)
+		err := os.Remove(filePath)
+		if err != nil {
+			return err
+		}
 	}
 	return this.fs.DeleteFile(fileHashStr)
 }

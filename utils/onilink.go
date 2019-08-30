@@ -8,10 +8,13 @@ import (
 	"github.com/saveio/dsp-go-sdk/common"
 )
 
-func GenOniLink(fileHashStr, fileName string, fileSize, blockNum uint64, trackers []string) string {
+func GenOniLink(fileHashStr, fileName, owner string, fileSize, blockNum uint64, trackers []string) string {
 	link := fmt.Sprintf("%s%s", common.FILE_LINK_PREFIX, fileHashStr)
 	if len(fileName) > 0 {
 		link += fmt.Sprintf("&%s=%s", common.FILE_LINK_NAME_KEY, fileName)
+	}
+	if len(owner) > 0 {
+		link += fmt.Sprintf("&%s=%s", common.FILE_LINK_OWNER_KEY, owner)
 	}
 	if fileSize > 0 {
 		link += fmt.Sprintf("&%s=%d", common.FILE_LINK_SIZE_KEY, fileSize)

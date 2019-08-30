@@ -19,15 +19,17 @@ import (
 // FileDB. implement a db storage for save information of sending/downloading/downloaded files
 type FileDB struct {
 	db   *LevelDBStore
-	lock sync.RWMutex
+	lock *sync.RWMutex
 }
 
 type FileInfoType int
 
 const (
-	FileInfoTypeUpload FileInfoType = iota
+	FileInfoTypeNone FileInfoType = iota - 1
+	FileInfoTypeUpload
 	FileInfoTypeDownload
 	FileInfoTypeShare
+	FileInfoTypeBackup
 )
 
 // blockInfo record a block infomation of a file
@@ -71,31 +73,41 @@ const (
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type FileInfo struct {
-	Id                string            `json:"id"`
-	FileHash          string            `json:"file_hash"`
-	FileName          string            `json:"file_name"`
-	FilePath          string            `json:"file_path"`
-	FileOwner         string            `json:"file_owner"`
-	WalletAddress     string            `json:"wallet_address"`
-	CopyNum           uint64            `json:"copy_num"`
-	InfoType          FileInfoType      `json:"file_info_type"`
-	StoreTx           string            `json:"store_tx"`
-	RegisterDNSTx     string            `json:"register_dns_tx"`
-	BindDNSTx         string            `json:"bind_dns_tx"`
-	WhitelistTx       string            `json:"whitelist_tx"`
-	TotalBlockCount   uint64            `json:"total_block_count"`
-	SaveBlockCountMap map[string]uint64 `json:"save_block_count_map"`
-	TaskState         uint64            `json:"task_state"`
-	ProvePrivKey      []byte            `json:"prove_private_key"`
-	Prefix            []byte            `json:"prefix"`
-	EncryptHash       string            `json:"encrypt_hash"`
-	EncryptSalt       string            `json:"encrypt_salt"`
-	Url               string            `json:"url`
-	Link              string            `json:"link"`
-	CurrentBlock      string            `json:"current_block_hash"`
-	CurrentIndex      uint64            `json:"current_block_index"`
-	CreatedAt         uint64            `json:"createdAt"`
-	UpdatedAt         uint64            `json:"updatedAt"`
+	Id                string            `json:"id"`                     // task id
+	FileHash          string            `json:"file_hash"`              // file hash
+	FileName          string            `json:"file_name"`              // file name
+	FilePath          string            `json:"file_path"`              // file absolute path
+	FileOwner         string            `json:"file_owner"`             // file owner wallet address
+	WalletAddress     string            `json:"wallet_address"`         // task belong to
+	CopyNum           uint64            `json:"copy_num"`               // copy num
+	InfoType          FileInfoType      `json:"file_info_type"`         // task type
+	StoreTx           string            `json:"store_tx"`               // store tx hash
+	RegisterDNSTx     string            `json:"register_dns_tx"`        // register dns tx
+	BindDNSTx         string            `json:"bind_dns_tx"`            // bind dns tx
+	WhitelistTx       string            `json:"whitelist_tx"`           // first op whitelist tx
+	TotalBlockCount   uint64            `json:"total_block_count"`      // total block count
+	SaveBlockCountMap map[string]uint64 `json:"save_block_count_map"`   // receivers block count map
+	TaskState         uint64            `json:"task_state"`             // task state
+	ProvePrivKey      []byte            `json:"prove_private_key"`      // prove private key params
+	Prefix            []byte            `json:"prefix"`                 // file prefix
+	EncryptHash       string            `json:"encrypt_hash"`           // encrypt hash
+	EncryptSalt       string            `json:"encrypt_salt"`           // encrypt salt
+	Url               string            `json:"url"`                    // url
+	Link              string            `json:"link"`                   // link
+	CurrentBlock      string            `json:"current_block_hash"`     // current transferred block
+	CurrentIndex      uint64            `json:"current_block_index"`    // current transferred block index
+	StoreType         uint64            `json:"store_type"`             // store type
+	InOrder           bool              `json:"in_order"`               // is in order
+	OnlyBlock         bool              `json:"only_block"`             // send only raw block data
+	TranferState      uint64            `json:"transfer_state"`         // transfer state
+	CreatedAt         uint64            `json:"createdAt"`              // createAt
+	CreatedAtHeight   uint64            `json:"createdAt_block_height"` // created at block height
+	UpdatedAt         uint64            `json:"updatedAt"`              // updatedAt
+	UpdatedAtHeight   uint64            `json:"updatedAt_block_height"` // updatedAt block height
+	ExpiredHeight     uint64            `json:"expired_block_height"`   // expiredAt block height
+	ErrorCode         uint32            `json:"error_code"`             // error code
+	ErrorMsg          string            `json:"error_msg"`              // error msg
+	Result            interface{}       `json:"result"`                 // task complete result
 }
 
 type FileProgress struct {
@@ -121,7 +133,8 @@ type Session struct {
 
 func NewFileDB(db *LevelDBStore) *FileDB {
 	return &FileDB{
-		db: db,
+		db:   db,
+		lock: new(sync.RWMutex),
 	}
 }
 
@@ -129,7 +142,7 @@ func (this *FileDB) Close() error {
 	return this.db.Close()
 }
 
-func (this *FileDB) NewFileInfo(id string, ft FileInfoType) error {
+func (this *FileDB) NewFileInfo(id string, ft FileInfoType) (*FileInfo, error) {
 	fi := &FileInfo{
 		Id:                id,
 		InfoType:          ft,
@@ -138,9 +151,13 @@ func (this *FileDB) NewFileInfo(id string, ft FileInfoType) error {
 	}
 	err := this.AddToUndoneList(id, ft)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return this.saveFileInfo(fi)
+	err = this.saveFileInfo(fi)
+	if err != nil {
+		return nil, err
+	}
+	return fi, nil
 }
 
 func (this *FileDB) AddToUndoneList(id string, ft FileInfoType) error {
@@ -243,6 +260,19 @@ func (this *FileDB) SetFileInfoField(id string, field int, value interface{}) er
 	case FILEINFO_FIELD_OWNER:
 		fi.FileOwner = value.(string)
 	}
+	return this.saveFileInfo(fi)
+}
+
+func (this *FileDB) SetFileName(id string, fileName string) error {
+	key := []byte(id)
+	fi, err := this.GetFileInfo(key)
+	if err != nil {
+		return err
+	}
+	if fi == nil {
+		return fmt.Errorf("fileinfo not found of %s", id)
+	}
+	fi.FileName = fileName
 	return this.saveFileInfo(fi)
 }
 
@@ -480,12 +510,11 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 	if err != nil {
 		return err
 	}
-
 	batch := this.db.NewBatch()
 	this.db.BatchPut(batch, []byte(blockKey), blockBuf)
 	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
 	this.db.BatchPut(batch, []byte(fi.Id), fiBuf)
-	log.Debugf("nodeAddr %s increase sent %v, reqTime %v", nodeAddr, fi.SaveBlockCountMap, block.ReqTimes[nodeAddr])
+	log.Debugf("%s, nodeAddr %s increase sent %v, reqTime %v", fi.Id, nodeAddr, fi.SaveBlockCountMap, block.ReqTimes[nodeAddr])
 	return this.db.BatchCommit(batch)
 }
 
@@ -1172,6 +1201,11 @@ func (this *FileDB) GetFileSessions(fileInfoId string) (map[string]*Session, err
 		res[session.HostAddr] = session
 	}
 	return res, nil
+}
+
+// saveFileInfo. helper function, put fileinfo to db
+func (this *FileDB) SaveFileInfo(info *FileInfo) error {
+	return this.saveFileInfo(info)
 }
 
 // saveFileInfo. helper function, put fileinfo to db

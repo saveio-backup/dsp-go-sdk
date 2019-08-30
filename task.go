@@ -1,8 +1,6 @@
 package dsp
 
 import (
-	"fmt"
-
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
 )
@@ -15,11 +13,7 @@ func (this *Dsp) GetTaskState(taskId string) (task.TaskState, error) {
 	if this.taskMgr == nil {
 		return task.TaskStateNone, nil
 	}
-	s := this.taskMgr.GetTaskState(taskId)
-	if s == task.TaskStateNone {
-		return 0, fmt.Errorf("get task state is none %s", taskId)
-	}
-	return s, nil
+	return this.taskMgr.GetTaskState(taskId)
 }
 
 func (this *Dsp) IsTaskExist(taskId string) bool {
@@ -64,9 +58,11 @@ func (this *Dsp) CloseProgressChannel() {
 }
 
 func (this *Dsp) GetTaskFileName(id string) string {
-	return this.taskMgr.FileNameFromTask(id)
+	fileName, _ := this.taskMgr.FileNameFromTask(id)
+	return fileName
 }
 
 func (this *Dsp) GetTaskFileHash(id string) string {
-	return this.taskMgr.TaskFileHash(id)
+	fileHash, _ := this.taskMgr.TaskFileHash(id)
+	return fileHash
 }

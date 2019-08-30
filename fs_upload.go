@@ -64,12 +64,12 @@ func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
 	if opt.ExpiredHeight > uint64(now) {
 		return true, nil
 	}
-	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	fileHashStr, _ := this.taskMgr.TaskFileHash(taskId)
 	if len(fileHashStr) == 0 {
 		return true, fmt.Errorf("file hash not found for %s", taskId)
 	}
 	log.Debugf("upload task exist, but expired, delete it")
-	err = this.taskMgr.DeleteTask(taskId, true)
+	err = this.taskMgr.CleanTask(taskId)
 	if err != nil {
 		return true, err
 	}
@@ -97,7 +97,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		}
 		// delete task from cache in the end when success
 		if uploadRet != nil && sdkerr == nil {
-			this.taskMgr.DeleteTask(taskId, false)
+			this.taskMgr.DeleteTask(taskId)
 		}
 	}()
 	if err != nil {
@@ -119,8 +119,16 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
-	this.taskMgr.SetTaskInfos(taskId, "", filePath, string(opt.FileDesc), this.WalletAddress())
+	this.taskMgr.NewBatchSet(taskId)
+	this.taskMgr.SetFilePath(taskId, filePath)
+	this.taskMgr.SetFileName(taskId, string(opt.FileDesc))
+	this.taskMgr.SetWalletAddr(taskId, this.WalletAddress())
 	this.taskMgr.SetCopyNum(taskId, uint64(opt.CopyNum))
+	err = this.taskMgr.BatchCommit(taskId)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
+		return nil, err
+	}
 	this.taskMgr.BindTaskId(taskId)
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
 	var tx, fileHashStr string
@@ -161,7 +169,10 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSliceDone)
 	fileHashStr = hashes[0]
 	log.Debugf("after bind task id")
-	err = this.taskMgr.BatchSetFileInfo(taskId, fileHashStr, nil, nil, totalCount)
+	this.taskMgr.NewBatchSet(taskId)
+	this.taskMgr.SetFileHash(taskId, fileHashStr)
+	this.taskMgr.SetTotalBlockCount(taskId, totalCount)
+	err = this.taskMgr.BatchCommit(taskId)
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
@@ -321,7 +332,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 
 // PauseUpload. pause a task
 func (this *Dsp) PauseUpload(taskId string) error {
-	taskType := this.taskMgr.TaskType(taskId)
+	taskType, _ := this.taskMgr.TaskType(taskId)
 	if taskType != task.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
@@ -343,7 +354,7 @@ func (this *Dsp) PauseUpload(taskId string) error {
 }
 
 func (this *Dsp) ResumeUpload(taskId string) error {
-	taskType := this.taskMgr.TaskType(taskId)
+	taskType, _ := this.taskMgr.TaskType(taskId)
 	if taskType != task.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
@@ -366,7 +377,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 }
 
 func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, error) {
-	taskType := this.taskMgr.TaskType(taskId)
+	taskType, _ := this.taskMgr.TaskType(taskId)
 	if taskType != task.TaskTypeUpload {
 		return nil, fmt.Errorf("task %s is not a upload task", taskId)
 	}
@@ -377,15 +388,15 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	if cancel {
 		return nil, fmt.Errorf("task is cancelling: %s", taskId)
 	}
-	fileHashStr := this.taskMgr.TaskFileHash(taskId)
-	oldState := this.taskMgr.GetTaskState(taskId)
+	fileHashStr, _ := this.taskMgr.TaskFileHash(taskId)
+	oldState, _ := this.taskMgr.GetTaskState(taskId)
 	err = this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
 	if err != nil {
 		return nil, err
 	}
 	log.Debugf("fileHashStr :%v", fileHashStr)
 	if len(fileHashStr) == 0 {
-		err = this.taskMgr.DeleteTask(taskId, true)
+		err = this.taskMgr.CleanTask(taskId)
 		if err == nil {
 			return nil, nil
 		}
@@ -421,7 +432,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 }
 
 func (this *Dsp) RetryUpload(taskId string) error {
-	taskType := this.taskMgr.TaskType(taskId)
+	taskType, _ := this.taskMgr.TaskType(taskId)
 	if taskType != task.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
@@ -503,13 +514,14 @@ func (this *Dsp) DeleteUploadedFiles(fileHashStrs []string) ([]*common.DeleteUpl
 			log.Debugf("storingNode: %v", storingNode)
 		}
 		log.Debugf("will broadcast delete msg to %v", storingNode)
+		fileName, _ := this.taskMgr.FileNameFromTask(taskId)
 		resp := &common.DeleteUploadFileResp{
 			Tx:       txHashStr,
 			FileHash: fileHashStr,
-			FileName: this.taskMgr.FileNameFromTask(taskId),
+			FileName: fileName,
 		}
 		if len(storingNode) == 0 {
-			err := this.taskMgr.DeleteTask(taskId, true)
+			err := this.taskMgr.CleanTask(taskId)
 			log.Debugf("delete task donne ")
 			if err != nil {
 				log.Errorf("delete upload info from db err: %s", err)
@@ -543,7 +555,7 @@ func (this *Dsp) DeleteUploadedFiles(fileHashStrs []string) ([]*common.DeleteUpl
 		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, reply)
 		resp.Nodes = nodeStatus
 		log.Debugf("send delete msg done ret: %v, nodeStatus: %v, err: %s", m, nodeStatus, err)
-		err = this.taskMgr.DeleteTask(taskId, true)
+		err = this.taskMgr.CleanTask(taskId)
 		if err != nil {
 			log.Errorf("delete upload info from db err: %s", err)
 			return nil, err
@@ -594,7 +606,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		return errors.New("can't find download options, please retry")
 	}
 	log.Debugf("get upload options : %v", opt)
-	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	fileHashStr, _ := this.taskMgr.TaskFileHash(taskId)
 	// send resume msg
 	if len(fileHashStr) == 0 {
 		go this.UploadFile(taskId, filePath, opt)
@@ -621,7 +633,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 			}
 			// delete task from cache in the end when success
 			if uploadRet != nil && sdkerr == nil {
-				this.taskMgr.DeleteTask(taskId, false)
+				this.taskMgr.DeleteTask(taskId)
 			}
 			return nil
 		}
@@ -945,17 +957,14 @@ func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string
 	}
 	log.Debugf("send ready msg %s %d", tx, txHeight)
 	msg := message.NewFileFetchRdy(sessionId, fileHashStr, this.WalletAddress(), tx, txHeight)
-	this.taskMgr.SetTaskTransferring(taskId, true)
 	ret, err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil, nil)
 	if err != nil {
 		log.Errorf("notify err %s", err)
-		this.taskMgr.SetTaskTransferring(taskId, false)
 		return err
 	}
 	for _, e := range ret {
 		if e != nil {
 			log.Errorf("notify err %s", err)
-			this.taskMgr.SetTaskTransferring(taskId, false)
 			return e
 		}
 	}
@@ -996,15 +1005,10 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 	if err != nil {
 		return serr.NewDetailError(serr.GET_SESSION_ID_FAILED, err.Error())
 	}
-	fileHashStr := this.taskMgr.TaskFileHash(taskId)
+	fileHashStr, _ := this.taskMgr.TaskFileHash(taskId)
 	totalCount := uint64(len(hashes))
-	stateChange := this.taskMgr.TaskStateChange(taskId)
 	doneCh := make(chan *fetchedDone)
 	closeDoneChannel := uint32(0)
-	defer func() {
-		log.Debugf("close doneCh")
-		// close(doneCh)
-	}()
 	var getMsgDataLock sync.Mutex
 	blockMsgDataMap := make(map[string]*blockMsgData)
 	getMsgData := func(hash string, index uint32) *blockMsgData {
@@ -1042,15 +1046,15 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		}
 	}
 	cancelFetch := make(chan struct{})
-	log.Debugf("open %d go routines for fetched file %s, stateChange: %v", maxFetchRoutines, fileHashStr, stateChange)
+	log.Debugf("open %d go routines for fetched file taskId: %s, %s", maxFetchRoutines, taskId, fileHashStr)
 	for i := 0; i < maxFetchRoutines; i++ {
 		go func() {
 			for {
 				select {
 				case reqInfo := <-req:
-					pause, cancel, _ := this.taskMgr.IsTaskPauseOrCancel(taskId)
-					if pause || cancel {
-						log.Debugf("stop handle request because task is pause: %t, cancel: %t", pause, cancel)
+					stop, _ := this.stopUpload(taskId)
+					if stop {
+						log.Debugf("stop handle request because task is stop: %t", stop)
 						return
 					}
 					timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
@@ -1059,9 +1063,9 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 					msgData := getMsgData(reqInfo.Hash, uint32(reqInfo.Index))
 					// handle fetch request async
 					done, err := this.handleFetchBlockRequest(taskId, sessionId, fileHashStr, reqInfo, copyNum, totalCount, msgData)
-					pause, cancel, _ = this.taskMgr.IsTaskPauseOrCancel(taskId)
-					if pause || cancel {
-						log.Debugf("stop handle request because task is pause: %t, cancel: %t", pause, cancel)
+					stop, _ = this.stopUpload(taskId)
+					if stop {
+						log.Debugf("stop handle request because task is stop: %t", stop)
 						return
 					}
 					if err != nil {
@@ -1080,29 +1084,27 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 					doneCh <- &fetchedDone{done: done, err: err}
 					log.Debugf("stop because fetching has finish %t, err %s", done, err)
 					return
-				case _, ok := <-doneCh:
-					if !ok {
-						log.Debugf("stop rotines")
-						return
-					}
-				case _, ok := <-cancelFetch:
-					if !ok {
-						log.Debugf("fetch cancel")
-						return
-					}
+				case <-cancelFetch:
+					log.Debugf("fetch cancel")
+					return
 				}
 			}
 		}()
 	}
+	checkStopTimer := time.NewTicker(time.Duration(common.TASK_STATE_CHECK_DURATION) * time.Second)
+	closeCancelFetch := false
 	for {
 		select {
 		case ret, ok := <-doneCh:
+			log.Debugf("receive fetch file done channel: %v, ok: %t", ret, ok)
 			if !ok {
 				log.Debugf("done channel has close")
 			}
-			log.Debugf("receive fetch file done channel done: %v, err: %s", ret.done, ret.err)
 			if ret.err != nil {
-				close(cancelFetch)
+				if !closeCancelFetch {
+					closeCancelFetch = true
+					close(cancelFetch)
+				}
 				return serr.NewDetailError(serr.TASK_INTERNAL_ERROR, ret.err.Error())
 			}
 			if !ret.done {
@@ -1114,7 +1116,10 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 			this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocksDone)
 			return nil
 		case <-timeout.C:
-			close(cancelFetch)
+			if !closeCancelFetch {
+				closeCancelFetch = true
+				close(cancelFetch)
+			}
 			sent := uint64(this.taskMgr.UploadedBlockCount(taskId) / (uint64(copyNum) + 1))
 			log.Debugf("timeout check totalCount %d != sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))
 			if totalCount != sent {
@@ -1122,11 +1127,14 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 				return serr.NewDetailError(serr.TASK_WAIT_TIMEOUT, err.Error())
 			}
 			return nil
-		case newState := <-stateChange:
-			log.Debugf("receive stateChange newState: %d", newState)
-			switch newState {
-			case task.TaskStatePause, task.TaskStateCancel:
-				close(cancelFetch)
+		case <-checkStopTimer.C:
+			stop, _ := this.stopUpload(taskId)
+			if stop {
+				log.Debugf("stop wait for fetch because task is stop: %t", stop)
+				if !closeCancelFetch {
+					closeCancelFetch = true
+					close(cancelFetch)
+				}
 				return nil
 			}
 		}
@@ -1200,7 +1208,7 @@ func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, 
 		sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 		return nil, sdkerr
 	}
-	saveLink := utils.GenOniLink(fileHashStr, string(opt.FileDesc), opt.FileSize, totalCount, this.DNS.TrackerUrls)
+	saveLink := utils.GenOniLink(fileHashStr, string(opt.FileDesc), this.WalletAddress(), opt.FileSize, totalCount, this.DNS.TrackerUrls)
 	if len(dnsRegTx) == 0 || len(dnsBindTx) == 0 {
 		dnsRegTx, dnsBindTx = this.registerUrls(taskId, fileHashStr, saveLink, opt, totalCount)
 	}
@@ -1223,12 +1231,24 @@ func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, 
 		BindDnsTx:      dnsBindTx,
 		AddWhiteListTx: addWhiteListTx,
 	}
-	err = this.taskMgr.SetRegAndBindUrlTx(taskId, dnsRegTx, dnsBindTx)
+	this.taskMgr.NewBatchSet(taskId)
+	this.taskMgr.SetRegUrlTx(taskId, dnsRegTx)
+	this.taskMgr.SetBindUrlTx(taskId, dnsBindTx)
+	err = this.taskMgr.BatchCommit(taskId)
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, sdkerr
 	}
 	return uploadRet, nil
+}
+
+func (this *Dsp) stopUpload(taskId string) (bool, *serr.SDKError) {
+	stop, err := this.taskMgr.IsTaskStop(taskId)
+	if err != nil {
+		sdkerr := serr.NewDetailError(serr.TASK_INTERNAL_ERROR, err.Error())
+		return false, sdkerr
+	}
+	return stop, nil
 }
 
 // uploadOptValid check upload opt valid

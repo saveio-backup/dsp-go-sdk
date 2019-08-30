@@ -87,7 +87,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	localId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 	log.Debugf("handle file ask localId: %s", localId)
 	if len(localId) > 0 && this.taskMgr.TaskExist(localId) {
-		state := this.taskMgr.GetTaskState(localId)
+		state, _ := this.taskMgr.GetTaskState(localId)
 		log.Debugf("fetch_ask task exist localId %s, %s state: %d", localId, fileMsg.Hash, state)
 		if state == task.TaskStateCancel || state == task.TaskStateFailed || state == task.TaskStateDone {
 			log.Warnf("the task has a wrong state of file_ask %s", state)
@@ -121,7 +121,14 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		log.Errorf("new task failed %s", err)
 		return
 	}
-	this.taskMgr.SetTaskInfos(taskId, fileMsg.Hash, "", "", this.WalletAddress())
+	this.taskMgr.NewBatchSet(taskId)
+	this.taskMgr.SetFileHash(taskId, fileMsg.Hash)
+	this.taskMgr.SetWalletAddr(taskId, this.WalletAddress())
+	err = this.taskMgr.BatchCommit(taskId)
+	if err != nil {
+		log.Errorf("batch set file info fetch ask %s", err)
+		return
+	}
 	err = this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 	if err != nil {
 		log.Errorf("add session err in file fetch ask %s", err)
@@ -132,7 +139,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		log.Errorf("set task info err in file fetch ask %s", err)
 		return
 	}
-	totalCount := this.taskMgr.GetFileTotalBlockCount(taskId)
+	totalCount, _ := this.taskMgr.GetFileTotalBlockCount(taskId)
 	hashListLen := uint64(len(fileMsg.BlockHashes))
 	if totalCount < hashListLen {
 		err := this.taskMgr.AddFileBlockHashes(taskId, fileMsg.BlockHashes)
@@ -141,7 +148,10 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			return
 		}
 		log.Debugf("save file prefix :%s", string(fileMsg.Prefix))
-		err = this.taskMgr.BatchSetFileInfo(taskId, nil, fileMsg.Prefix, nil, hashListLen)
+		this.taskMgr.NewBatchSet(taskId)
+		this.taskMgr.SetPrefix(taskId, string(fileMsg.Prefix))
+		this.taskMgr.SetTotalBlockCount(taskId, hashListLen)
+		err = this.taskMgr.BatchCommit(taskId)
 		if err != nil {
 			log.Errorf("SetFileInfoFields failed:%s", err)
 			return
@@ -166,25 +176,25 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 	err := this.waitForTxConfirmed(fileMsg.Tx.Height)
 	if err != nil {
 		log.Errorf("get block height err %s", err)
-		this.taskMgr.DeleteTask(taskId, false)
+		this.taskMgr.DeleteTask(taskId)
 		return
 	}
 	info, _ := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
 	if info == nil {
 		log.Errorf("fetch ask file info is nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
-		this.taskMgr.DeleteTask(taskId, false)
+		this.taskMgr.DeleteTask(taskId)
 		return
 	}
 	log.Debugf("get file info %s success", fileMsg.Hash)
 	if info.FileOwner.ToBase58() != fileMsg.PayInfo.WalletAddress {
 		log.Errorf("receive fetch ask msg from wrong account %s", fileMsg.PayInfo.WalletAddress)
-		this.taskMgr.DeleteTask(taskId, false)
+		this.taskMgr.DeleteTask(taskId)
 		return
 	}
-	totalCount := this.taskMgr.GetFileTotalBlockCount(taskId)
+	totalCount, _ := this.taskMgr.GetFileTotalBlockCount(taskId)
 	if totalCount != info.FileBlockNum {
 		log.Errorf("block number is unmatched %d, %d", len(fileMsg.BlockHashes), info.FileBlockNum)
-		this.taskMgr.DeleteTask(taskId, false)
+		this.taskMgr.DeleteTask(taskId)
 		return
 	}
 	if !this.taskMgr.IsFileInfoExist(taskId) {
@@ -394,7 +404,13 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		log.Errorf("reply download ack  msg failed", err)
 	}
 	log.Debugf("reply download ack success new share task %s, key %s", fileMsg.Hash, taskId)
-	this.taskMgr.SetTaskInfos(taskId, fileMsg.Hash, "", "", fileMsg.PayInfo.WalletAddress)
+	this.taskMgr.NewBatchSet(taskId)
+	this.taskMgr.SetFileHash(taskId, fileMsg.Hash)
+	this.taskMgr.SetWalletAddr(taskId, fileMsg.PayInfo.WalletAddress)
+	err = this.taskMgr.BatchCommit(taskId)
+	if err != nil {
+		log.Errorf("[DSP handleFileDownloadAskMsg] batch commit file info failed, err: %s", err)
+	}
 	this.taskMgr.BindTaskId(taskId)
 }
 
@@ -429,7 +445,7 @@ func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer
 		return
 	}
 	// TODO: check unpaid amount
-	this.taskMgr.DeleteTask(taskId, true)
+	this.taskMgr.CleanTask(taskId)
 	log.Debugf("delete share task of %s", taskId)
 	err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 	if err != nil {
@@ -451,7 +467,7 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *ne
 		return
 	}
 	// TODO: check unpaid amount
-	this.taskMgr.DeleteTask(taskId, true)
+	this.taskMgr.CleanTask(taskId)
 	log.Debugf("delete share task of %s", taskId)
 	err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 	if err != nil {
@@ -527,7 +543,7 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 				return
 			}
 		}
-		taskType := this.taskMgr.TaskType(sessionId)
+		taskType, _ := this.taskMgr.TaskType(sessionId)
 		log.Debugf("task key:%s type %d", sessionId, taskType)
 		switch taskType {
 		case task.TaskTypeDownload, task.TaskTypeShare:
@@ -601,7 +617,10 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 			log.Debugf("task %s not exist", blockMsg.FileHash)
 			return
 		}
-		taskType := this.taskMgr.TaskType(sessionId)
+		taskType, err := this.taskMgr.TaskType(sessionId)
+		if err != nil {
+			log.Errorf("[dsp handleBlockMsg] get task type failed id: %s, err: %s", sessionId, err)
+		}
 		log.Debugf("task key:%s type %d", sessionId, taskType)
 		switch taskType {
 		case task.TaskTypeUpload:
