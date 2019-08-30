@@ -1064,6 +1064,10 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 						log.Debugf("stop handle request because task is pause: %t, cancel: %t", pause, cancel)
 						return
 					}
+					if err != nil {
+						log.Errorf("handle fetch block err %s", err)
+						continue
+					}
 					if done == false && err == nil {
 						cleanMsgData(reqInfo.Hash, uint32(reqInfo.Index))
 						continue
