@@ -3,6 +3,7 @@ package dsp
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/themis/account"
@@ -175,4 +176,11 @@ func (this *Dsp) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blo
 		Type:  countOpType,
 		Value: blockCount,
 	})
+}
+
+func (this *Dsp) IsFileInfoDeleted(err error) bool {
+	if err != nil && strings.Contains(err.Error(), "[FS Profit] FsGetFileInfo not found") {
+		return true
+	}
+	return false
 }

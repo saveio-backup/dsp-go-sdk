@@ -261,7 +261,7 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	var hashBytes [46]byte
 	copy(hashBytes[:], []byte(hash)[:])
 	for _, trackerUrl := range trackerUrls {
-		log.Debugf("trackerurl %s hashBytes: %v netIp:%v netPort:%v", trackerUrl, hashBytes, netIp, netPort)
+		log.Debugf("trackerurl %s hash: %s netIp:%v netPort:%v", trackerUrl, string(hashBytes[:]), netIp, netPort)
 		tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
 	}
 	return nil

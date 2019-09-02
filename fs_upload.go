@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -459,7 +458,7 @@ func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string) (string, uint
 	for _, fileHashStr := range fileHashStrs {
 		info, err := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 		log.Debugf("delete file get fileinfo %v, err %v", info, err)
-		if err != nil && !strings.Contains(err.Error(), "[FS Profit] FsGetFileInfo not found") {
+		if err != nil && !this.IsFileInfoDeleted(err) {
 			log.Debugf("info:%v, other err:%s", info, err)
 			return "", 0, &serr.SDKError{Code: serr.FILE_NOT_FOUND_FROM_CHAIN, Error: fmt.Errorf("file info not found, %s has deleted", fileHashStr)}
 		}

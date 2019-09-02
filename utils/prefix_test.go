@@ -132,3 +132,15 @@ func TestBytesToBytesPrefix(t *testing.T) {
 	verify := VerifyEncryptPassword("456", prefix2.EncryptSalt, prefix2.EncryptHash)
 	fmt.Printf("verify : %t\n", verify)
 }
+
+func TestBase64DecodePrefix(t *testing.T) {
+	base64Str := "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8P9HvFbX3d+MEelX7CpMqnnwMqwAAAAAAAUocAAAAAPMabLU="
+	prefix := &FilePrefix{}
+	prefix.ParseFromString(base64Str)
+	fmt.Printf("version: %d\n", prefix.Version)
+	fmt.Printf("encrypt: %t\n", prefix.Encrypt)
+	fmt.Printf("salt: %v\n", prefix.EncryptSalt)
+	fmt.Printf("hash: %v\n", prefix.EncryptHash)
+	fmt.Printf("owner: %s\n", prefix.Owner.ToBase58())
+	fmt.Printf("fileSize: %d\n", prefix.FileSize)
+}
