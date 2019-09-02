@@ -972,7 +972,7 @@ func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string
 }
 
 // generateBlockMsgData. generate blockdata, blockEncodedData, tagData with prove params
-func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64, fileID, g0, privateKey []byte) (*blockMsgData, error) {
+func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64, copyNum int, fileID, g0, privateKey []byte) (*blockMsgData, error) {
 	// TODO: use disk fetch rather then memory access
 	block := this.Fs.GetBlock(hash)
 	blockData := this.Fs.BlockDataOfAny(block)
@@ -984,6 +984,7 @@ func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64, 
 		blockData: blockData,
 		tag:       tag,
 		offset:    offset,
+		refCnt:    copyNum + 1,
 	}
 	return msgData, nil
 }
@@ -1017,16 +1018,14 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		key := keyOfUnixNode(hash, index)
 		data, ok := blockMsgDataMap[key]
 		if ok {
-			data.refCnt++
 			return data
 		}
 		offset, _ := allOffset[hash]
 		var err error
-		data, err = this.generateBlockMsgData(hash, index, offset, fileID, g0, privateKey)
+		data, err = this.generateBlockMsgData(hash, index, offset, copyNum, fileID, g0, privateKey)
 		if err != nil {
 			return nil
 		}
-		data.refCnt = 1
 		blockMsgDataMap[key] = data
 		return data
 	}
@@ -1037,12 +1036,14 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 
 		key := keyOfUnixNode(hash, index)
 		data, ok := blockMsgDataMap[key]
-		if ok {
-			data.refCnt--
-			if data.refCnt <= 0 {
-				delete(blockMsgDataMap, key)
-				this.Fs.ReturnBuffer(data.blockData)
-			}
+		if !ok {
+			return
+		}
+		data.refCnt--
+		if data.refCnt <= 0 {
+			log.Debugf("delete block msg data of key: %s", key)
+			delete(blockMsgDataMap, key)
+			this.Fs.ReturnBuffer(data.blockData)
 		}
 	}
 	cancelFetch := make(chan struct{})
