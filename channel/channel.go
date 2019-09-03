@@ -151,14 +151,10 @@ func (this *Channel) GetCurrentFilterBlockHeight() uint32 {
 
 func (this *Channel) StopService() {
 	log.Debug("[dsp-go-sdk-channel] StopService")
-	if this.isStart {
-		err := ch_actor.StopPylons()
-		if err != nil {
-			log.Errorf("stop pylons err %s", err)
-			return
-		}
-	} else {
-		this.chActor.GetChannelService().Service.Wal.Storage.Close()
+	err := ch_actor.StopPylons()
+	if err != nil {
+		log.Errorf("stop pylons err %s", err)
+		return
 	}
 	this.channelDB.Close()
 	this.chActorId.Stop()
