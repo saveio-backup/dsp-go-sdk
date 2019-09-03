@@ -31,7 +31,7 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 		log.Debugf("unrecognized msg version %s", msg.Header.Version)
 		return
 	}
-	log.Debugf("receive msg.Header.Type %s", msg.Header.Type)
+	log.Debugf("receive msg.Header.Type %s, len: %d", msg.Header.Type, msg.Header.MsgLength)
 	switch msg.Header.Type {
 	case netcom.MSG_TYPE_FILE:
 		this.handleFileMsg(ctx, peer, msg)

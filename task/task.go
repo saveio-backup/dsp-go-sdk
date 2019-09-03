@@ -175,7 +175,7 @@ func NewTaskFromDB(id string, db *store.FileDB) *Task {
 		log.Warnf("[Task NewTaskFromDB] recover task get file info is nil, id: %v", id)
 		return nil
 	}
-	if info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT < uint64(time.Now().Unix()) {
+	if (TaskState(info.TaskState) == TaskStatePause || TaskState(info.TaskState) == TaskStateDoing) && info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT < uint64(time.Now().Unix()) {
 		log.Warnf("[Task NewTaskFromDB] task is expired, updatedAt: %d", info.UpdatedAt)
 	}
 	sessions, err := db.GetFileSessions(id)
