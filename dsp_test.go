@@ -17,9 +17,10 @@ import (
 	"github.com/saveio/themis/account"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
+	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
-var rpcAddr = "http://127.0.0.1:20336"
+var rpcAddr = "http://139.219.136.38:20336"
 var node1ListAddr = "tcp://127.0.0.1:14001"
 var node2ListAddr = "tcp://127.0.0.1:14002"
 var node3ListAddr = "tcp://127.0.0.1:14003"
@@ -30,7 +31,7 @@ var uploadTestFile = "./testdata/testuploadbigfile.txt"
 
 // var uploadTestFile = "./testdata/testuploadfile.txt"
 
-var walletFile = "./testdata/wallet.dat"
+var walletFile = "/Users/zhijie/Desktop/onchain/save-test/node4/wallet.dat"
 var wallet2File = "./testdata/wallet2.dat"
 var wallet3File = "./testdata/wallet3.dat"
 var wallet4File = "./testdata/wallet4.dat"
@@ -296,17 +297,13 @@ func TestUploadFile(t *testing.T) {
 	d := NewDsp(dspCfg, acc, nil)
 	d.Start()
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	opt := &common.UploadOption{
-		FileDesc:        "file",
-		ProveInterval:   100,
-		ProveTimes:      8,
-		Privilege:       1,
-		CopyNum:         0,
-		Encrypt:         false,
-		EncryptPassword: "",
-		RegisterDns:     true,
-		BindDns:         true,
-		DnsUrl:          fmt.Sprintf("dsp://file%d", time.Now().Unix()),
+	opt := &fs.UploadOption{
+		FileDesc:      []byte("file"),
+		ProveInterval: 100,
+		Privilege:     1,
+		CopyNum:       0,
+		Encrypt:       false,
+		DnsURL:        []byte(fmt.Sprintf("dsp://file%d", time.Now().Unix())),
 	}
 	d.RegProgressChannel()
 	go func() {
@@ -324,7 +321,7 @@ func TestUploadFile(t *testing.T) {
 		// TODO: why need close
 		d.CloseProgressChannel()
 	}()
-	ret, err := d.UploadFile(uploadTestFile, opt)
+	ret, err := d.UploadFile("", uploadTestFile, opt)
 	log.Debugf("upload file ret %v", ret)
 	if err != nil {
 		log.Errorf("upload file failed, err:%s", err)
@@ -359,7 +356,7 @@ func TestDeleteFileFromUploader(t *testing.T) {
 	}
 	d := NewDsp(dspCfg, acc, nil)
 	d.Start()
-	ret, err := d.DeleteUploadedFile("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib")
+	ret, err := d.DeleteUploadedFiles([]string{"QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"})
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
 		return
@@ -396,8 +393,8 @@ func TestGetFileProveNode(t *testing.T) {
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg, nil, nil)
-	n1, n2 := d.getFileProveNode("zb2rhkaiU6xcVbt1TtJeLDMJGPb94WxxQho1bBLvMH57Rww8b", 8)
-	fmt.Printf("n1:%v, n2:%v\n", n1, n2)
+	n1 := d.getFileProvedNode("zb2rhkaiU6xcVbt1TtJeLDMJGPb94WxxQho1bBLvMH57Rww8b")
+	fmt.Printf("n1:%v\n", n1)
 }
 
 func TestGetExpiredTaskList(t *testing.T) {
@@ -467,7 +464,7 @@ func TestDownloadFile(t *testing.T) {
 		}
 	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	err = d.DownloadFile(fileHashStr, "", common.ASSET_USDT, true, "", false, false, 100)
+	err = d.DownloadFile("", fileHashStr, nil)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}
@@ -552,7 +549,7 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	// set use free peers
 	useFree := false
 	addrs := d.GetPeerFromTracker(fileHashStr, d.DNS.TrackerUrls)
-	quotation, err := d.GetDownloadQuotation(fileHashStr, common.ASSET_USDT, useFree, addrs)
+	quotation, err := d.GetDownloadQuotation(fileHashStr, "", common.ASSET_USDT, useFree, addrs)
 	if len(quotation) == 0 {
 		log.Errorf("no peer to download")
 		return
@@ -568,10 +565,8 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = d.DownloadFileWithQuotation(fileHashStr, common.ASSET_USDT, true, false, quotation, "")
-	if err != nil {
-		log.Errorf("download err %s\n", err)
-	}
+	d.DownloadFileWithQuotation(fileHashStr, common.ASSET_USDT, true, false, quotation, "")
+
 	// use for testing go routines for tasks are released or not
 	time.Sleep(time.Duration(5) * time.Second)
 }
@@ -793,9 +788,9 @@ func TestRegisterHeader(t *testing.T) {
 	fmt.Printf("hash: %s\n", hash)
 }
 
-func TestRegisterDns(t *testing.T) {
+func TestRegisterDnsHeader(t *testing.T) {
 	dspCfg := &config.DspConfig{
-		ChainRpcAddr: rpcAddr,
+		ChainRpcAddrs: []string{rpcAddr},
 	}
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
@@ -810,16 +805,40 @@ func TestRegisterDns(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	hash, err := d.RegisterFileUrl("save://share/123123", "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123")
+	hash, err := d.Chain.Native.Dns.RegisterHeader("save", "save", 100000)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("hash: %s\n", hash)
+	fmt.Printf("hash: %v\n", hash)
+}
+
+func TestRegisterDns(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddrs: []string{rpcAddr},
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc, nil)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	hash, err := d.RegisterFileUrl("save://share/a93ed0c4", "save-link://QmT6hfgtvkyPpLr7aUNhy1MfPEDbbwzwyX2zmW5on4X3Mq&name=2019-08-22_12.58.49_LOG.log&owner=AY46Kes2ayy8c38hKBqictG9F9ar73mqhD&size=20514&blocknum=82&tr=dWRwOi8vMTY4LjYzLjI1My4yMzE6NjM2OS9hbm5vdW5jZQ==&tr=dWRwOi8vMTY4LjYzLjI1My4yMzE6NjM2OS9hbm5vdW5jZQ==")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("hash: %v\n", hash)
 }
 
 func TestBindDns(t *testing.T) {
 	dspCfg := &config.DspConfig{
-		ChainRpcAddr: rpcAddr,
+		ChainRpcAddrs: []string{rpcAddr},
 	}
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
@@ -834,7 +853,7 @@ func TestBindDns(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	hash, err := d.BindFileUrl("save://share/123123", "oni://QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib&name=123")
+	hash, err := d.BindFileUrl("save://share/a93ed0c4", "save-link://QmT6hfgtvkyPpLr7aUNhy1MfPEDbbwzwyX2zmW5on4X3Mq&name=2019-08-22_12.58.49_LOG.log&owner=AY46Kes2ayy8c38hKBqictG9F9ar73mqhD&size=20514&blocknum=82&tr=dWRwOi8vMTY4LjYzLjI1My4yMzE6NjM2OS9hbm5vdW5jZQ==&tr=dWRwOi8vMTY4LjYzLjI1My4yMzE6NjM2OS9hbm5vdW5jZQ==")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -843,7 +862,7 @@ func TestBindDns(t *testing.T) {
 
 func TestQueryDns(t *testing.T) {
 	dspCfg := &config.DspConfig{
-		ChainRpcAddr: rpcAddr,
+		ChainRpcAddrs: []string{rpcAddr},
 	}
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
@@ -858,7 +877,7 @@ func TestQueryDns(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	link := d.GetLinkFromUrl("dsp://ok.com")
+	link := d.GetLinkFromUrl("save://share/a93ed0c4")
 	fmt.Printf("link: %s\n", link)
 }
 

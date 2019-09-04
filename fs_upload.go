@@ -401,7 +401,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 		}
 		log.Errorf("delete task err %s", err)
 		this.taskMgr.SetTaskState(taskId, oldState)
-		return nil, fmt.Errorf("delete task failed %v", fileHashStr, err)
+		return nil, fmt.Errorf("delete task failed %s, err: %v", fileHashStr, err)
 	}
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
@@ -417,7 +417,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	}
 	// send pause msg
 	msg := message.NewFileFetchCancel(taskId, fileHashStr)
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil, nil)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
 	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
 	resps, err := this.DeleteUploadedFiles([]string{fileHashStr})
 	if err != nil {
@@ -535,7 +535,7 @@ func (this *Dsp) DeleteUploadedFiles(fileHashStrs []string) ([]*common.DeleteUpl
 		msg := message.NewFileDelete(taskId, fileHashStr, this.WalletAddress(), txHashStr, uint64(txHeight))
 		nodeStatusLock := new(sync.Mutex)
 		nodeStatus := make([]common.DeleteFileStatus, 0, len(storingNode))
-		reply := func(msg proto.Message, addr string) {
+		reply := func(msg proto.Message, addr string) bool {
 			ackMsg := message.ReadMessage(msg)
 			nodeStatusLock.Lock()
 			defer nodeStatusLock.Unlock()
@@ -550,8 +550,9 @@ func (this *Dsp) DeleteUploadedFiles(fileHashStrs []string) ([]*common.DeleteUpl
 				Code:     errCode,
 				Error:    errMsg,
 			})
+			return false
 		}
-		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, nil, reply)
+		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, reply)
 		resp.Nodes = nodeStatus
 		log.Debugf("send delete msg done ret: %v, nodeStatus: %v, err: %s", m, nodeStatus, err)
 		err = this.taskMgr.CleanTask(taskId)
@@ -583,7 +584,7 @@ func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, *serr.SDKError)
 	}
 	// send pause msg
 	msg := message.NewFileFetchPause(taskId, fileHashStr)
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil, nil)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
 	if err != nil {
 		sdkerr := serr.NewDetailError(serr.TASK_PAUSE_ERROR, err.Error())
 		return false, sdkerr
@@ -652,7 +653,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		log.Warnf("drain request len: %d", len(req))
 	}
 	msg := message.NewFileFetchResume(taskId, fileHashStr)
-	_, err = client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil, nil)
+	_, err = client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
 	if err != nil {
 		return err
 	}
@@ -876,7 +877,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, copyNum uint64) bool {
 // client <- fetch_ack <- peer.
 // return receivers
 func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
-	var receiverLock sync.Mutex
+	receiverLock := new(sync.Mutex)
 	receivers := make([]string, 0)
 	receiverBreakpoint := make(map[string]*file.Breakpoint, 0)
 	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
@@ -890,21 +891,20 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList,
 		addr string
 	}
 	responseCh := make(chan *responseData, 0)
-	action := func(res proto.Message, addr string) {
-		log.Debugf("send file ask msg success %s", addr)
+	action := func(res proto.Message, addr string) bool {
+		cnt := 0
+		receiverLock.Lock()
+		cnt = len(receivers)
+		receiverLock.Unlock()
+		if cnt >= receiverCount {
+			return true
+		}
+		log.Debugf("send file ask msg success %s %s", addr, fileHashStr)
 		responseCh <- &responseData{
 			res:  res,
 			addr: addr,
 		}
-	}
-	// TODO: make stop func sense in parallel mode
-	stop := func() bool {
-		isStop := false
-		receiverLock.Lock()
-		isStop = int32(len(receivers)) >= int32(receiverCount)
-		receiverLock.Unlock()
-		log.Debugf("stop :%t\n", isStop)
-		return isStop
+		return false
 	}
 	go func() {
 		for {
@@ -930,7 +930,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList,
 		}
 	}()
 	log.Debugf("broadcast fetch_ask msg of file: %s to %v", fileHashStr, nodeList)
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, stop, action)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, action)
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err")
 		return nil, err
@@ -956,7 +956,7 @@ func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string
 	}
 	log.Debugf("send ready msg %s %d", tx, txHeight)
 	msg := message.NewFileFetchRdy(sessionId, fileHashStr, this.WalletAddress(), tx, txHeight)
-	ret, err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil, nil)
+	ret, err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil)
 	if err != nil {
 		log.Errorf("notify err %s", err)
 		return err

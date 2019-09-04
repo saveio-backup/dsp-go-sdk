@@ -368,29 +368,29 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 	prefix := ""
 	replyLock := &sync.Mutex{}
 	log.Debugf("will broadcast file download ask msg to %v", addrs)
-	reply := func(msg proto.Message, addr string) {
+	reply := func(msg proto.Message, addr string) bool {
 		p2pMsg := message.ReadMessage(msg)
 		if p2pMsg.Error != nil {
 			log.Errorf("get download ask err %s", p2pMsg.Error.Message)
-			return
+			return false
 		}
 		fileMsg := p2pMsg.Payload.(*file.File)
 		if len(fileMsg.BlockHashes) < len(blockHashes) {
-			return
+			return false
 		}
 		if len(prefix) > 0 && string(fileMsg.Prefix) != prefix {
-			return
+			return false
 		}
 
 		filePrefix := &utils.FilePrefix{}
 		filePrefix.Deserialize([]byte(prefix))
 		if len(decryptPwd) > 0 && !utils.VerifyEncryptPassword(decryptPwd, filePrefix.EncryptSalt, filePrefix.EncryptHash) {
 			log.Warnf("encrypt password not match hash")
-			return
+			return false
 		}
 
 		if free && (fileMsg.PayInfo != nil && fileMsg.PayInfo.UnitPrice != 0) {
-			return
+			return false
 		}
 		replyLock.Lock()
 		defer replyLock.Unlock()
@@ -399,8 +399,9 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 		prefix = string(fileMsg.Prefix)
 		log.Debugf("prefix hex: %s", fileMsg.Prefix)
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
+		return false
 	}
-	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, nil, reply)
+	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, reply)
 	log.Debugf("broadcast file download msg result %v err %s", ret, err)
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {
@@ -583,7 +584,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		go func(a string) {
 			msg := message.NewFileDownload(sessionId, fileHashStr, this.WalletAddress(), asset)
 			log.Debugf("broadcast file_download msg to %v", a)
-			broadcastRet, err := client.P2pBroadcast([]string{a}, msg.ToProtoMsg(), true, nil, nil)
+			broadcastRet, err := client.P2pBroadcast([]string{a}, msg.ToProtoMsg(), true, nil)
 			log.Debugf("brocast file download msg %v err %v", broadcastRet, err)
 			wg.Done()
 		}(addr)
@@ -974,7 +975,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 		}
 		go func(a, w, sid string) {
 			fileDownloadOkMsg := message.NewFileDownloadOk(sid, fileHashStr, this.WalletAddress(), asset)
-			client.P2pBroadcast([]string{a}, fileDownloadOkMsg.ToProtoMsg(), true, nil, nil)
+			client.P2pBroadcast([]string{a}, fileDownloadOkMsg.ToProtoMsg(), true, nil)
 		}(addr, walletAddr, sessionId)
 	}
 	return nil

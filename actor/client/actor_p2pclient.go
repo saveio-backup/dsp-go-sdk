@@ -46,8 +46,7 @@ type BroadcastReq struct {
 	Addresses []string
 	Data      proto.Message
 	NeedReply bool
-	Stop      func() bool
-	Action    func(proto.Message, string)
+	Action    func(proto.Message, string) bool
 	Response  chan *BroadcastResp
 }
 
@@ -189,12 +188,11 @@ func P2pSend(address string, data proto.Message) error {
 }
 
 // P2pBroadcast. broadcast one msg to different addresses
-func P2pBroadcast(addresses []string, data proto.Message, needReply bool, stop func() bool, action func(proto.Message, string)) (map[string]error, error) {
+func P2pBroadcast(addresses []string, data proto.Message, needReply bool, action func(proto.Message, string) bool) (map[string]error, error) {
 	chReq := &BroadcastReq{
 		Addresses: addresses,
 		Data:      data,
 		NeedReply: needReply,
-		Stop:      stop,
 		Action:    action,
 		Response:  make(chan *BroadcastResp, 1),
 	}

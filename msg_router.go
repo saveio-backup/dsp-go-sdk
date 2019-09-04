@@ -703,7 +703,11 @@ func (this *Dsp) waitForTxConfirmed(blockHeight uint64) error {
 		return nil
 	}
 
-	waitSuccess, err := this.Chain.WaitForGenerateBlock(time.Duration(common.WAIT_FOR_GENERATEBLOCK_TIMEOUT)*time.Second, uint32(blockHeight-uint64(currentBlockHeight)))
+	timeout := common.WAIT_FOR_GENERATEBLOCK_TIMEOUT * uint32(blockHeight-uint64(currentBlockHeight))
+	if timeout > common.DOWNLOAD_FILE_TIMEOUT {
+		timeout = common.DOWNLOAD_FILE_TIMEOUT
+	}
+	waitSuccess, err := this.Chain.WaitForGenerateBlock(time.Duration(timeout)*time.Second, uint32(blockHeight-uint64(currentBlockHeight)))
 	if err != nil || !waitSuccess {
 		log.Errorf("get block height err %s %d %d", err, currentBlockHeight, blockHeight)
 		return fmt.Errorf("get block height err %d %d", currentBlockHeight, blockHeight)
