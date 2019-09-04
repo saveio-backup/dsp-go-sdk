@@ -142,6 +142,9 @@ func (this *Channel) StartService() error {
 }
 
 func (this *Channel) GetCurrentFilterBlockHeight() uint32 {
+	if !this.isStart {
+		return 0
+	}
 	height, err := ch_actor.GetLastFilterBlockHeight()
 	if err != nil {
 		log.Errorf("request err %s", err)
