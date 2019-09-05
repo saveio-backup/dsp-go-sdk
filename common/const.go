@@ -1,11 +1,11 @@
 package common
 
 const (
-	CHUNK_SIZE                  = 256 * 1024      // chunk size
-	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"        // download temp file path
-	PROTO_NODE_FILE_HASH_LEN    = 46              // proto node file hash length
-	RAW_NODE_FILE_HASH_LEN      = 49              // raw node file hash length
-	FILE_URL_CUSTOM_HEADER      = "save://share/" // file url custom header
+	CHUNK_SIZE                  = 256 * 1024     // chunk size
+	DOWNLOAD_FILE_TEMP_DIR_PATH = "./temp"       // download temp file path
+	PROTO_NODE_FILE_HASH_LEN    = 46             // proto node file hash length
+	RAW_NODE_FILE_HASH_LEN      = 49             // raw node file hash length
+	FILE_URL_CUSTOM_HEADER      = "oni://share/" // file url custom header
 
 	FILE_DOWNLOAD_UNIT_PRICE = 1     // unit price for all file
 	DSP_NETWORK_PROTOCOL     = "tcp" // default dsp network protocol
@@ -17,13 +17,13 @@ const (
 
 // oni link
 const (
-	FILE_LINK_PREFIX       = "save-link://" // save link header
-	FILE_LINK_HASH_KEY     = "hash"         // hash
-	FILE_LINK_NAME_KEY     = "name"         // filename
-	FILE_LINK_SIZE_KEY     = "size"         // size
-	FILE_LINK_BLOCKNUM_KEY = "blocknum"     // block count
-	FILE_LINK_TRACKERS_KEY = "tr"           // tr
-	FILE_LINK_OWNER_KEY    = "owner"        // owner
+	FILE_LINK_PREFIX       = "oni-link://" // save link header
+	FILE_LINK_HASH_KEY     = "hash"        // hash
+	FILE_LINK_NAME_KEY     = "name"        // filename
+	FILE_LINK_SIZE_KEY     = "size"        // size
+	FILE_LINK_BLOCKNUM_KEY = "blocknum"    // block count
+	FILE_LINK_TRACKERS_KEY = "tr"          // tr
+	FILE_LINK_OWNER_KEY    = "owner"       // owner
 )
 
 // timeout

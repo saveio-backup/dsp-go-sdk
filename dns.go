@@ -333,7 +333,7 @@ func (this *Dsp) PushLocalFilesToTrackers() {
 }
 
 func (this *Dsp) RegisterFileUrl(url, link string) (string, error) {
-	urlPrefix := this.Chain.Native.Dns.GetCustomUrlHeader()
+	urlPrefix := common.FILE_URL_CUSTOM_HEADER
 	if !strings.HasPrefix(url, urlPrefix) {
 		return "", fmt.Errorf("url should start with %s", urlPrefix)
 	}
