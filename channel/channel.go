@@ -518,6 +518,23 @@ func (this *Channel) ChannelExist(walletAddr string) bool {
 	return true
 }
 
+func (this *Channel) GetChannelInfo(walletAddr string) (*ch_actor.ChannelInfo, error) {
+	if !this.isStart {
+		return nil, nil
+	}
+	all, _ := ch_actor.GetAllChannels()
+	if all == nil {
+		return nil, errors.New("allchannels nil")
+	}
+
+	for _, ch := range all.Channels {
+		if ch.Address == walletAddr {
+			return ch, nil
+		}
+	}
+	return nil, errors.New("channel not exists")
+}
+
 func (this *Channel) AllChannels() (*ch_actor.ChannelsInfoResp, error) {
 	log.Debugf("[dsp-go-sdk-channel] AllChannels")
 	if !this.isStart {
