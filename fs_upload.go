@@ -304,12 +304,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileFindReceiversDone)
 
-	// TODO: set max count
-	maxFetchRoutines := len(receivers)
-	if maxFetchRoutines > common.MAX_UPLOAD_ROUTINES {
-		maxFetchRoutines = common.MAX_UPLOAD_ROUTINES
-	}
-	sdkerr = this.waitForFetchBlock(taskId, hashes, maxFetchRoutines, int(opt.CopyNum), p.G0, p.FileId, payRet.PrivateKey)
+	sdkerr = this.waitForFetchBlock(taskId, hashes, receivers, int(opt.CopyNum), p.G0, p.FileId, payRet.PrivateKey)
 	log.Debugf("waitForFetchBlock finish id: %s, %v ", taskId, sdkerr)
 	if sdkerr != nil {
 		return nil, errors.New(sdkerr.Error.Error())
@@ -966,7 +961,7 @@ func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64, 
 }
 
 // waitForFetchBlock. wait for fetched blocks concurrent
-func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRoutines, copyNum int, g0, fileID, privateKey []byte) *serr.SDKError {
+func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNum int, g0, fileID, privateKey []byte) *serr.SDKError {
 	req, err := this.taskMgr.TaskBlockReq(taskId)
 	if err != nil {
 		return serr.NewDetailError(serr.PREPARE_UPLOAD_ERROR, err.Error())
@@ -1023,9 +1018,30 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 		}
 	}
 	cancelFetch := make(chan struct{})
-	log.Debugf("open %d go routines for fetched file taskId: %s, %s", maxFetchRoutines, taskId, fileHashStr)
-	for i := 0; i < maxFetchRoutines; i++ {
-		go func() {
+	log.Debugf("open %d go routines for fetched file taskId: %s, %s", len(addrs), taskId, fileHashStr)
+
+	reqForPeers := make(map[string]chan *task.GetBlockReq)
+	for _, p := range addrs {
+		reqForPeers[p] = make(chan *task.GetBlockReq, 1)
+	}
+	go func() {
+		for {
+			select {
+			case reqInfo := <-req:
+				timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
+				ch := reqForPeers[reqInfo.PeerAddr]
+				go func() {
+					ch <- reqInfo
+				}()
+			case <-cancelFetch:
+				log.Debugf("fetch cancel")
+				return
+			}
+		}
+	}()
+	// TODO: add max go routines check
+	for _, ch := range reqForPeers {
+		go func(req chan *task.GetBlockReq) {
 			for {
 				select {
 				case reqInfo := <-req:
@@ -1066,7 +1082,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 					return
 				}
 			}
-		}()
+		}(ch)
 	}
 	checkStopTimer := time.NewTicker(time.Duration(common.TASK_STATE_CHECK_DURATION) * time.Second)
 	closeCancelFetch := false
@@ -1116,7 +1132,6 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes []string, maxFetchRouti
 			}
 		}
 	}
-	return nil
 }
 
 // handleFetchBlockRequest. handle fetch request and send block

@@ -43,7 +43,7 @@ const (
 
 const (
 	MAX_GOROUTINES_IN_LOOP = 10
-	REQUEST_MSG_TIMEOUT    = 20   // 20s
+	REQUEST_MSG_TIMEOUT    = 30   // 20s
 	MSG_OP_CODE            = 2000 // msg op code
 )
 
