@@ -1,8 +1,11 @@
 package message
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	netcom "github.com/saveio/dsp-go-sdk/network/common"
@@ -12,7 +15,7 @@ import (
 )
 
 func TestReadMsg(t *testing.T) {
-	msg1 := NewFileFetchAsk("1", "132245457678789", []string{"1", "2"}, "wallet", "")
+	msg1 := NewFileFetchAsk("1", "132245457678789", []string{"1", "2"}, "wallet", []byte{24, 123})
 	fmt.Printf("msg1.header:%v, payload:%v\n", msg1.Header, msg1.Payload)
 	msg1Proto := msg1.ToProtoMsg()
 	msg2 := ReadMessage(msg1Proto)
@@ -66,4 +69,53 @@ func TestReadBlockFlightsMsg(t *testing.T) {
 	fmt.Printf("msg2.header:%v, payload:%q\n", msg2.Header, msg2.Payload)
 	msg2payload := msg2.Payload.(*block.BlockFlights)
 	fmt.Printf("msg2.payload:%q\n", msg2payload)
+}
+
+func TestBuildBlockFlightsMsg(t *testing.T) {
+	blocks := make([]*block.Block, 0)
+	for index := 0; index < 16; index++ {
+		b := &block.Block{
+			SessionId: "12345678",
+			Index:     0,
+			FileHash:  "QmdadwjioeLALA",
+			Hash:      "QmdadwjioeLALA",
+			Operation: netcom.BLOCK_OP_GET,
+			Payment: &payment.Payment{
+				Sender: "AKuNEKrUcaLpmZNc2nEXCk3JSDHwKrQYJH",
+				Asset:  1,
+			},
+			Data: make([]byte, 1024*256),
+		}
+		blocks = append(blocks, b)
+	}
+	flight := &block.BlockFlights{
+		TimeStamp: time.Now().UnixNano(),
+		Blocks:    blocks,
+	}
+	msg1 := NewBlockFlightsMsg(flight)
+
+	buf1, _ := proto.Marshal(msg1.ToProtoMsg())
+	fmt.Printf("after proto & before gzip,buf1 len:%v\n", len(buf1))
+	buf2, _ := GzipEncode(buf1)
+	fmt.Printf("after gzip,buf2 len:%v\n", len(buf2))
+}
+
+func GzipEncode(in []byte) ([]byte, error) {
+	var (
+		buffer bytes.Buffer
+		out    []byte
+		err    error
+	)
+	writer := gzip.NewWriter(&buffer)
+	_, err = writer.Write(in)
+	if err != nil {
+		writer.Close()
+		return out, err
+	}
+	err = writer.Close()
+	if err != nil {
+		return out, err
+	}
+
+	return buffer.Bytes(), nil
 }
