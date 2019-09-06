@@ -221,8 +221,6 @@ func (this *Task) GetSessionId(peerWalletAddr string) string {
 }
 
 func (this *Task) GetBlockReq() chan *GetBlockReq {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
 	return this.blockReq
 }
 
@@ -830,8 +828,6 @@ func (this *Task) SetWorkerUnPaid(remoteAddr string, unpaid bool) {
 }
 
 func (this *Task) GetTaskNotify() chan *BlockResp {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
 	return this.notify
 }
 
@@ -934,8 +930,6 @@ func (this *Task) GetIdleWorker(addrs []string, fileHash, reqHash string) *Worke
 }
 
 func (this *Task) NotifyBlock(blk *BlockResp) {
-	this.lock.Lock()
-	defer this.lock.Unlock()
 	log.Debugf("notify block %s-%d-%d-%s", blk.Hash, blk.Index, blk.Offset, blk.PeerAddr)
 	this.notify <- blk
 }
