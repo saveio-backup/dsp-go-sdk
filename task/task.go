@@ -449,9 +449,9 @@ func (this *Task) SetStoreTx(tx string) error {
 func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
+	this.info.ErrorCode = errorCode
+	this.info.ErrorMsg = errorMsg
 	if errorCode != 0 {
-		this.info.ErrorCode = errorCode
-		this.info.ErrorMsg = errorMsg
 		this.info.TaskState = uint64(TaskStateFailed)
 	} else if result != nil {
 		this.info.Result = result
