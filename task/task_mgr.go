@@ -91,6 +91,10 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 		if t == nil {
 			continue
 		}
+		if t.State() == TaskStateDone {
+			log.Warnf("task is done %s", id)
+			continue
+		}
 		this.tasks[id] = t
 	}
 	return nil

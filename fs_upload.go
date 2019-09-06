@@ -210,7 +210,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	log.Debugf("root:%s, list.len:%d", fileHashStr, totalCount)
 	// get nodeList
 	nodeList := this.getUploadNodeFromDB(taskId, fileHashStr)
-	if len(nodeList) == 0 {
+	if len(nodeList) != int(opt.CopyNum)+1 {
 		nodeList, err = this.getUploadNodeFromChain(filePath, taskId, fileHashStr, int((opt.CopyNum+1)*10))
 		if err != nil {
 			sdkerr = serr.NewDetailError(serr.GET_STORAGE_NODES_FAILED, err.Error())

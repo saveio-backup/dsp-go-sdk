@@ -184,28 +184,21 @@ func NewTaskFromDB(id string, db *store.FileDB) *Task {
 		return nil
 	}
 	state := TaskState(info.TaskState)
-	if state == TaskStateDoing || state == TaskStateCancel {
+	if state == TaskStatePrepare || state == TaskStateDoing || state == TaskStateCancel {
 		state = TaskStatePause
 	}
 	t := newTask(id, info, db)
-
+	t.info.TaskState = uint64(state)
+	err = db.SaveFileInfo(t.info)
+	if err != nil {
+		log.Errorf("[Task NewTaskFromDB] set file info failed: %s", err)
+		return nil
+	}
 	for _, session := range sessions {
 		log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
 		t.peerSenIds[session.WalletAddr] = session.SessionId
 	}
 	log.Debugf("recover task store type: %d", t.info.StoreType)
-	// switch info.InfoType {
-	// case store.FileInfoTypeUpload:
-	// 	opt, err := db.GetFileUploadOptions(id)
-	// 	if err != nil {
-	// 		log.Errorf("[Task NewTaskFromDB] get upload option failed: %s", err)
-	// 		return nil
-	// 	}
-	// 	if opt != nil {
-	// 		t.info.StoreType = opt.StorageType
-	// 	}
-	// default:
-	// }
 	return t
 }
 

@@ -1234,7 +1234,6 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	}()
 	msg := message.NewBlockFlightsReqMsg(blocks, timeStamp)
 
-	var ret []*task.BlockResp
 	for i := uint32(0); i < retry; i++ {
 		err = client.P2pSend(ipAddr, msg.ToProtoMsg())
 		log.Debugf("send download blockflights msg sessionId %s of %s from %s, err %s, retry: %d", sessionId, fileHashStr, ipAddr, err, i)
@@ -1254,9 +1253,8 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 				err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
 				continue
 			}
-			ret = value
-			err = nil
-			break
+			log.Debugf("receive blocks len: %d", len(value))
+			return value, nil
 		case <-time.After(time.Duration(common.DOWNLOAD_FILE_TIMEOUT/retry) * time.Second):
 			if received {
 				break
@@ -1266,7 +1264,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 			continue
 		}
 	}
-	return ret, err
+	return nil, err
 }
 
 func (this *Dsp) stopDownload(taskId string) (bool, *serr.SDKError) {
