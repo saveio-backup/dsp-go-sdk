@@ -30,12 +30,16 @@ func NewWorker(addr, walletAddr string, j jobFunc) *Worker {
 func (w *Worker) Do(taskId, fileHash, peerAddr, walletAddr string, blocks []*block.Block) ([]*BlockResp, error) {
 	w.working = true
 	resp, err := w.job(taskId, fileHash, peerAddr, walletAddr, blocks)
-	//if err != nil {
-	//cnt := w.failed[blockHash]
-	//w.failed[blockHash] = cnt + 1
-	//totalF := w.totalFailed[fileHash]
-	//w.totalFailed[fileHash] = totalF + 1
-	//}
+	if err != nil {
+		if len(blocks) > 0 {
+			blockHash := blocks[0].Hash
+			cnt := w.failed[blockHash]
+			w.failed[blockHash] = cnt + 1
+		}
+
+		totalF := w.totalFailed[fileHash]
+		w.totalFailed[fileHash] = totalF + 1
+	}
 	w.working = false
 	return resp, err
 }
@@ -53,13 +57,13 @@ func (w *Worker) Working() bool {
 }
 
 func (w *Worker) WorkFailed(hash string) bool {
-	// cnt, ok := w.failed[hash]
-	// if !ok {
-	// 	return false
-	// }
-	// if cnt >= common.MAX_WORKER_BLOCK_FAILED_NUM {
-	// 	return true
-	// }
+	cnt, ok := w.failed[hash]
+	if !ok {
+		return false
+	}
+	if cnt >= common.MAX_WORKER_BLOCK_FAILED_NUM {
+		return true
+	}
 	return false
 }
 
