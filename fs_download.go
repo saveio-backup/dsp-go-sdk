@@ -629,7 +629,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	// declare job for workers
 	job := func(tId, fHash, pAddr, walletAddr string, blocks []*block.Block) ([]*task.BlockResp, error) {
 		this.taskMgr.EmitProgress(taskId, task.TaskDownloadRequestBlocks)
-		resp, err := this.downloadBlockFlights(tId, fHash, pAddr, walletAddr, blocks, 1)
+		resp, err := this.downloadBlockFlights(tId, fHash, pAddr, walletAddr, blocks, 1, common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT)
 		if err != nil {
 			return nil, err
 		}
@@ -1112,7 +1112,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {
 			continue
 		}
-		value, err := this.downloadBlock(taskId, fileHashStr, hash, int32(index), addr, walletAddr, common.MAX_BLOCK_FETCHED_RETRY)
+		value, err := this.downloadBlock(taskId, fileHashStr, hash, int32(index), addr, walletAddr, common.MAX_BLOCK_FETCHED_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
 		if err != nil {
 			return err
 		}
@@ -1167,7 +1167,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 }
 
 // downloadBlock. download block helper function.
-func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, addr, peerWalletAddr string, retry uint32) (*task.BlockResp, error) {
+func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, addr, peerWalletAddr string, retry, timeout uint32) (*task.BlockResp, error) {
 	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
 	if err != nil {
 		return nil, err
@@ -1189,7 +1189,7 @@ func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, ad
 			continue
 		}
 		received := false
-		timeout := false
+		isTimeout := false
 		select {
 		case value, ok := <-ch:
 			received = true
@@ -1197,18 +1197,18 @@ func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, ad
 				err = fmt.Errorf("receiving block none from channel")
 				continue
 			}
-			if timeout {
+			if isTimeout {
 				err = fmt.Errorf("receiving block %s timeout", hash)
 				continue
 			}
 			block = value
 			err = nil
 			return value, nil
-		case <-time.After(time.Duration(common.DOWNLOAD_FILE_TIMEOUT/retry) * time.Second):
+		case <-time.After(time.Duration(timeout/retry) * time.Second):
 			if received {
 				break
 			}
-			timeout = true
+			isTimeout = true
 			err = fmt.Errorf("receiving block %s timeout", hash)
 			continue
 		}
@@ -1217,7 +1217,7 @@ func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, ad
 }
 
 // downloadBlockUnits. download block helper function for client.
-func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAddr string, blocks []*block.Block, retry uint32) ([]*task.BlockResp, error) {
+func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAddr string, blocks []*block.Block, retry, timeout uint32) ([]*task.BlockResp, error) {
 	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
 	if err != nil {
 		return nil, err
@@ -1241,7 +1241,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 			continue
 		}
 		received := false
-		timeout := false
+		isTimeout := false
 		select {
 		case value, ok := <-ch:
 			received = true
@@ -1249,17 +1249,17 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 				err = fmt.Errorf("receiving block channel close")
 				continue
 			}
-			if timeout {
+			if isTimeout {
 				err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
 				continue
 			}
 			log.Debugf("receive blocks len: %d", len(value))
 			return value, nil
-		case <-time.After(time.Duration(common.DOWNLOAD_FILE_TIMEOUT/retry) * time.Second):
+		case <-time.After(time.Duration(timeout/retry) * time.Second):
 			if received {
 				break
 			}
-			timeout = true
+			isTimeout = true
 			err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
 			continue
 		}

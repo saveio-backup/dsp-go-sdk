@@ -31,6 +31,7 @@ const (
 	TX_CONFIRM_TIMEOUT                  = 60      // wait for tx confirmed timeout
 	FILE_FETCH_ACK_TIMEOUT              = 60      // wait for file fetch ack timeout
 	DOWNLOAD_FILE_TIMEOUT               = 60      // download file time out
+	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT       = 25      // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2
 	CHECK_PROVE_TIMEOUT                 = 60      // client upload file and check prove timeout
 	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval
 	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1       // check channel can transfer interval
