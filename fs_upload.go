@@ -696,6 +696,12 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 		if err != nil || !confirmed {
 			return nil, errors.New("tx is not confirmed")
 		}
+		if this.Config.BlockConfirm > 0 {
+			_, err := this.Chain.WaitForGenerateBlock(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, this.Config.BlockConfirm)
+			if err != nil {
+				return nil, fmt.Errorf("wait for generate block failed, err %s", err)
+			}
+		}
 		err = this.taskMgr.SetStoreTx(taskId, tx)
 		if err != nil {
 			return nil, err
@@ -775,6 +781,14 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.Uplo
 			log.Errorf("bind url err: %s", err)
 		}
 		log.Debugf("bind dns %s", dnsBindTx)
+	}
+
+	if this.Config.BlockConfirm > 0 && (len(dnsRegTx) > 0 || len(dnsBindTx) > 0) {
+		_, err := this.Chain.WaitForGenerateBlock(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, this.Config.BlockConfirm)
+		if err != nil {
+			log.Errorf("[Dsp registerUrls] wait for generate block failed, err %s", err)
+			return "", ""
+		}
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileRegisterDNSDone)
 	return dnsRegTx, dnsBindTx

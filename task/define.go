@@ -8,8 +8,8 @@ const (
 	TaskDoing
 	TaskUploadFileMakeSlice
 	TaskUploadFileMakeSliceDone
-	TaskUploadFilePaying
-	TaskUploadFilePayingDone
+	TaskUploadFilePaying     // 5
+	TaskUploadFilePayingDone // 6
 	TaskUploadFileCommitWhitelist
 	TaskUploadFileCommitWhitelistDone
 	TaskUploadFileFindReceivers

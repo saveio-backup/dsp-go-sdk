@@ -12,6 +12,7 @@ type DspConfig struct {
 	ChainRpcAddr       string   // chain rpc address
 	ChainRpcAddrs      []string // chain rpc addresses
 	CheckDepositBlkNum uint64   // check deposit price of block num. if it is 0, no checking
+	BlockConfirm       uint32   // block confirmation of tx
 
 	FsRepoRoot   string // fs block store repo root path
 	FsFileRoot   string // fs file store root path
