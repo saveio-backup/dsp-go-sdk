@@ -86,6 +86,7 @@ const (
 // go routine
 const (
 	MAX_UPLOAD_ROUTINES = 15 // max upload go routines
+	MAX_ASYNC_ROUTINES  = 15 // max request go routinues
 )
 
 const (
