@@ -507,7 +507,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				continue
 			}
 			for _, v := range flights {
-				log.Debugf("add flight %s, worker %s", v, worker.RemoteAddress())
+				log.Debugf("add flight %s-%s, worker %s", fileHash, v, worker.RemoteAddress())
 				flightMap.Store(v, struct{}{})
 			}
 
