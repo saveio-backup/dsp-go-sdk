@@ -240,7 +240,7 @@ func (this *Dsp) CancelDownload(taskId string) error {
 		wg.Add(1)
 		go func(a string, ses *store.Session) {
 			msg := message.NewFileDownloadCancel(ses.SessionId, fileHashStr, this.WalletAddress(), int32(ses.Asset))
-			client.P2pRequestWithRetry(msg.ToProtoMsg(), a, common.MAX_NETWORK_REQUEST_RETRY)
+			client.P2pRequestWithRetry(msg.ToProtoMsg(), a, common.MAX_NETWORK_REQUEST_RETRY, common.P2P_REQUEST_TIMEOUT*common.MAX_NETWORK_REQUEST_RETRY)
 			wg.Done()
 		}(hostAddr, session)
 	}
@@ -528,7 +528,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	msg := message.NewPayment(this.WalletAddress(), payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
 	// TODO: wait for receiver received notification (need optimized)
-	_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), addr, common.MAX_NETWORK_REQUEST_RETRY)
+	_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), addr, common.MAX_NETWORK_REQUEST_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
 	log.Debugf("payment msg response :%d, err:%s", paymentId, err)
 	if err != nil {
 		return 0, err

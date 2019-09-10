@@ -489,7 +489,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					continue
 				}
 				req = append(req, r)
-				log.Debugf("add block req to flights %v", r)
 				flights = append(flights, flightKey)
 				if len(req) == common.MAX_REQ_BLOCK_COUNT {
 					break
@@ -502,13 +501,15 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			worker := tsk.GetIdleWorker(addrs, fileHash, req[0].Hash)
 			if worker == nil {
 				// can't find a valid worker
-				log.Debugf("no worker...")
+				log.Debugf("no worker... of flights %s-%s to %s-%s", fileHash, flights[0], fileHash, flights[len(flights)-1])
 				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}
 			for _, v := range flights {
-				log.Debugf("add flight %s-%s, worker %s", fileHash, v, worker.RemoteAddress())
 				flightMap.Store(v, struct{}{})
+			}
+			if len(flights) > 0 {
+				log.Debugf("add flight %s-%s to %s-%s, worker %s", fileHash, flights[0], fileHash, flights[len(flights)-1], worker.RemoteAddress())
 			}
 
 			tsk.SetWorkerUnPaid(worker.remoteAddr, true)
@@ -617,7 +618,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 
 				allFlightskey := make(map[string]struct{}, 0)
 				for _, v := range job.req {
-					log.Debugf("start request block %s from %s,peer wallet: %s", v.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
+					log.Debugf("start request block %s-%s from %s, peer wallet: %s", fileHash, v.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
 					b := &block.Block{
 						SessionId: sessionId,
 						Index:     v.Index,
@@ -635,10 +636,14 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(), job.worker.WalletAddr(), flights)
 				tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 				if err != nil {
-					log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
+					if len(job.req) > 0 {
+						log.Errorf("request blocks %s of %s to %s from %s, err %s", fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.remoteAddr, err)
+					} else {
+						log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
+					}
 				} else {
 					for _, v := range ret {
-						log.Debugf("request block %s from %s success", v.Hash, job.worker.remoteAddr)
+						log.Debugf("request block %s-%s from %s success", fileHash, v.Hash, job.worker.remoteAddr)
 					}
 				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0

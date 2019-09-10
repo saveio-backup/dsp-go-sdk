@@ -103,7 +103,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		Blocks:    blocks,
 	}
 	msg := message.NewBlockFlightsMsg(flights)
-	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), req[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY)
+	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), req[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT)
 	if err != nil {
 		log.Errorf("share send block, err: %s", err)
 		// TODO: delete unpaid msg if need

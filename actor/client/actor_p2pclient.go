@@ -7,7 +7,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/ontio/ontology-eventbus/actor"
 	"github.com/saveio/dsp-go-sdk/common"
-	netCom "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -72,6 +71,7 @@ type RequestWithRetryReq struct {
 	Address  string
 	Data     proto.Message
 	Retry    int
+	Timeout  int
 	Response chan *RequestWithRetryResp
 }
 
@@ -226,11 +226,12 @@ func P2pGetPublicAddr() string {
 	}
 }
 
-func P2pRequestWithRetry(msg proto.Message, peer string, retry int) (proto.Message, error) {
+func P2pRequestWithRetry(msg proto.Message, peer string, retry, timeout int) (proto.Message, error) {
 	chReq := &RequestWithRetryReq{
 		Address:  peer,
 		Data:     msg,
 		Retry:    retry,
+		Timeout:  timeout,
 		Response: make(chan *RequestWithRetryResp, 1),
 	}
 	P2pServerPid.Tell(chReq)
@@ -241,7 +242,7 @@ func P2pRequestWithRetry(msg proto.Message, peer string, retry int) (proto.Messa
 			return nil, resp.Error
 		}
 		return resp.Data, nil
-	case <-time.After(time.Duration((netCom.REQUEST_MSG_TIMEOUT+1)*retry) * time.Second):
+	case <-time.After(time.Duration(timeout+1) * time.Second):
 		return nil, fmt.Errorf("[P2pRequestWithRetry] timeout")
 	}
 }

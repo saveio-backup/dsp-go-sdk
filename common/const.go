@@ -30,8 +30,8 @@ const (
 const (
 	TX_CONFIRM_TIMEOUT                  = 60      // wait for tx confirmed timeout
 	FILE_FETCH_ACK_TIMEOUT              = 60      // wait for file fetch ack timeout
-	DOWNLOAD_FILE_TIMEOUT               = 60      // download file time out
-	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT       = 25      // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2
+	DOWNLOAD_FILE_TIMEOUT               = 120     // download file time out
+	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT       = 40      // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2
 	CHECK_PROVE_TIMEOUT                 = 60      // client upload file and check prove timeout
 	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval
 	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1       // check channel can transfer interval
@@ -43,6 +43,7 @@ const (
 	CHANNEL_WITHDRAW_TIMEOUT       = 60 // 60s
 	P2P_REQ_TIMEOUT                = 15 // 15s
 	P2P_BROADCAST_TIMEOUT          = 10 // 30s
+	P2P_REQUEST_TIMEOUT            = 30 // 30s
 	TRACKER_SERVICE_TIMEOUT        = 15 // 15s
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT = 10 // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT         = 20 // media transfer timeout
@@ -62,7 +63,7 @@ const (
 	MAX_WORKER_BLOCK_FAILED_NUM  = 1      // max failed count from a worker to request block
 	MAX_WORKER_FILE_FAILED_NUM   = 5      // max failed count from a worker to request file
 	MAX_DOWNLOAD_PEERS_NUM       = 50     // max peers for download file
-	MAX_NETWORK_REQUEST_RETRY    = 5      // max network request retry
+	MAX_NETWORK_REQUEST_RETRY    = 4      // max network request retry
 	MAX_BACKUP_FILE_FAILED       = 3      // max backup file failed times
 	MAX_TRACKERS_NUM             = 100    // max tracker num
 	MAX_DNS_NUM                  = 100    // max dns num
