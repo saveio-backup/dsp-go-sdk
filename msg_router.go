@@ -516,7 +516,7 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 				blocks = append(blocks, b)
 				log.Debugf("append block %s finished", blockMsg.Hash)
 			} else {
-				log.Debugf("the block has downloaded")
+				log.Debugf("the block %s has downloaded", blockMsg.Hash)
 			}
 		}
 		if len(blocks) == 0 {
@@ -679,7 +679,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.P
 	}
 	// delete record
 	taskKey := this.taskMgr.TaskId(paymentMsg.FileHash, paymentMsg.Sender, task.TaskTypeShare)
-	log.Debugf("delete payment success, taskId:%s, paymentId:%s", taskKey, paymentMsg.PaymentId)
+	log.Debugf("delete payment success, taskId:%s, paymentId:%v", taskKey, paymentMsg.PaymentId)
 	err = this.taskMgr.DeleteFileUnpaid(taskKey, paymentMsg.Sender, paymentMsg.Asset, paymentMsg.Amount)
 	if err != nil {
 		log.Errorf("delete share file info %s", err)
