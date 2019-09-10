@@ -26,7 +26,7 @@ const (
 	TaskDownloadFileDownloading
 	TaskDownloadRequestBlocks
 	TaskDownloadReceiveBlocks
-	TaskDownloadPayForBlocks
+	TaskDownloadPayForBlocks // 23
 	TaskDownloadPayForBlocksDone
 	TaskDownloadFileMakeSeed
 )

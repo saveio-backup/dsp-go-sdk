@@ -21,10 +21,15 @@ func (this *Dsp) StartShareServices() {
 				break
 			}
 			blocks := make([]*block.Block, 0)
-
+			totalAmount := uint64(0)
+			taskId := ""
+			reqWalletAddr := ""
+			reqAsset := int32(0)
 			for _, blockmsg := range req {
 				log.Debugf("share block req: %s-%s-%d from %s-%s", blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, blockmsg.WalletAddress, blockmsg.PeerAddr)
-				taskId := this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, task.TaskTypeShare)
+				taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, task.TaskTypeShare)
+				reqWalletAddr = blockmsg.WalletAddress
+				reqAsset = blockmsg.Asset
 				log.Debugf("share task taskId %s", taskId)
 				// check if has unpaid block request
 				canShare, err := this.taskMgr.CanShareTo(taskId, blockmsg.WalletAddress, blockmsg.Asset)
@@ -65,6 +70,7 @@ func (this *Dsp) StartShareServices() {
 					break
 				} else {
 					log.Debugf("add file unpaid success")
+					totalAmount += uint64(len(blockData)) * up
 				}
 				b := &block.Block{
 					SessionId: sessionId,
@@ -91,6 +97,7 @@ func (this *Dsp) StartShareServices() {
 			if err != nil {
 				log.Errorf("share send block, err: %s", err)
 				// TODO: delete unpaid msg if need
+				this.taskMgr.DeleteFileUnpaid(taskId, reqWalletAddr, reqAsset, totalAmount)
 			}
 		}
 	}

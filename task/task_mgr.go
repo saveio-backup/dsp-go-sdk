@@ -755,6 +755,15 @@ func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
 	return v.State() == TaskStateCancel, nil
 }
 
+func (this *TaskMgr) IsTaskPaying(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, fmt.Errorf("task: %s, not exist", taskId)
+	}
+	log.Debugf("task detail state %s, %d", taskId, v.DetailState())
+	return v.DetailState() == TaskUploadFilePaying || v.DetailState() == TaskDownloadPayForBlocks, nil
+}
+
 func (this *TaskMgr) IsTaskPauseOrCancel(taskId string) (bool, bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

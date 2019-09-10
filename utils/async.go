@@ -1,6 +1,10 @@
 package utils
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/saveio/dsp-go-sdk/common"
+)
 
 type RequestResponse struct {
 	Result interface{}

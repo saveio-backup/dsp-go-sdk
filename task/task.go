@@ -628,6 +628,12 @@ func (this *Task) State() TaskState {
 	return TaskState(this.info.TaskState)
 }
 
+func (this *Task) DetailState() TaskProgressState {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return TaskProgressState(this.info.TranferState)
+}
+
 func (this *Task) GetPrivateKey() []byte {
 	this.lock.RLock()
 	defer this.lock.RUnlock()

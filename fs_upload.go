@@ -382,6 +382,13 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	if cancel {
 		return nil, fmt.Errorf("task is cancelling: %s", taskId)
 	}
+	paying, err := this.taskMgr.IsTaskPaying(taskId)
+	if err != nil {
+		return nil, err
+	}
+	if paying {
+		return nil, fmt.Errorf("task is paying: %s", taskId)
+	}
 	fileHashStr, _ := this.taskMgr.TaskFileHash(taskId)
 	oldState, _ := this.taskMgr.GetTaskState(taskId)
 	err = this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
