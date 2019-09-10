@@ -2,7 +2,6 @@ package dsp
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -15,7 +14,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/scan/tracker"
-	dnscom "github.com/saveio/scan/tracker/common"
 	chainsdk "github.com/saveio/themis-go-sdk/utils"
 	chaincom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
@@ -262,7 +260,13 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	copy(hashBytes[:], []byte(hash)[:])
 	for _, trackerUrl := range trackerUrls {
 		log.Debugf("trackerurl %s hash: %s netIp:%v netPort:%v", trackerUrl, string(hashBytes[:]), netIp, netPort)
-		tracker.CompleteTorrent(hashBytes, trackerUrl, netIp, uint16(netPort))
+		tracker.CompleteTorrent(trackerUrl, tracker.ActionTorrentCompleteParams{
+			InfoHash: hashBytes,
+			IP:       netIp,
+			Port:     uint16(netPort),
+		}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
+			return chainsdk.Sign(this.CurrentAccount(), rawData)
+		})
 	}
 	return nil
 }
@@ -275,10 +279,16 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 	protocol := selfAddr[:strings.Index(selfAddr, "://")]
 	for _, trackerUrl := range trackerUrls {
 		request := func(resp chan *trackerResp) {
-			peers := tracker.GetTorrentPeers(hashBytes, trackerUrl, -1, 1)
+			peers, err := tracker.GetTorrentPeers(trackerUrl, tracker.ActionGetTorrentPeersParams{
+				InfoHash: hashBytes,
+				NumWant:  -1,
+				Left:     1,
+			}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
+				return chainsdk.Sign(this.CurrentAccount(), rawData)
+			})
 			resp <- &trackerResp{
 				ret: peers,
-				err: nil,
+				err: err,
 			}
 		}
 		ret, err := this.trackerReq(trackerUrl, request)
@@ -417,24 +427,16 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 	hasRegister := false
 	for _, trackerUrl := range this.DNS.TrackerUrls {
 		log.Debugf("trackerurl %s walletAddr: %v netIp:%v netPort:%v", trackerUrl, wallet, netIp, netPort)
-		params := dnscom.ApiParams{
-			TrackerUrl: trackerUrl,
-			Wallet:     wallet,
-			IP:         netIp,
-			Port:       uint16(netPort),
-		}
-		rawData, err := json.Marshal(params)
-		if err != nil {
-			continue
-		}
 
-		sigData, err := chainsdk.Sign(this.CurrentAccount(), rawData)
-		if err != nil {
-			continue
-		}
 		request := func(resp chan *trackerResp) {
 			log.Debugf("start RegEndPoint %s ipport %v:%v", trackerUrl, netIp, netPort)
-			err := tracker.RegEndPoint(trackerUrl, sigData, this.CurrentAccount().PublicKey, wallet, netIp, uint16(netPort))
+			err := tracker.RegEndPoint(trackerUrl, tracker.ActionEndpointRegParams{
+				Wallet: wallet,
+				IP:     netIp,
+				Port:   uint16(netPort),
+			}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
+				return chainsdk.Sign(this.CurrentAccount(), rawData)
+			})
 			log.Debugf("start RegEndPoint end")
 			if err != nil {
 				log.Errorf("req endpoint failed, err %s", err)
