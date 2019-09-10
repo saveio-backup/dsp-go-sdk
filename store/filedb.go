@@ -622,6 +622,8 @@ func (this *FileDB) AddFileBlockHashes(id string, blocks []string) error {
 }
 
 func (this *FileDB) AddFileUnpaid(id, walletAddress string, asset int32, amount uint64) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	unpaidKey := FileUnpaidKey(id, walletAddress, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {
@@ -641,6 +643,8 @@ func (this *FileDB) AddFileUnpaid(id, walletAddress string, asset int32, amount 
 }
 
 func (this *FileDB) DeleteFileUnpaid(id, walletAddress string, asset int32, amount uint64) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	unpaidKey := FileUnpaidKey(id, walletAddress, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {

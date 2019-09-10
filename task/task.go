@@ -692,9 +692,6 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 		ErrorCode:     this.info.ErrorCode,
 		ErrorMsg:      this.info.ErrorMsg,
 	}
-	log.Debugf("result: %v", this.info.Result)
-	log.Debugf("errorCode: %v, errorMsg: %s", this.info.ErrorCode, this.info.ErrorMsg)
-	log.Debugf("info.infotype: %d, task() : %d", this.info.InfoType, convertToTaskType(this.info.InfoType))
 	return pInfo
 }
 

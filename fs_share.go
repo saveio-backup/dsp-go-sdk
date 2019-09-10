@@ -35,31 +35,30 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	taskId := ""
 	reqWalletAddr := ""
 	reqAsset := int32(0)
+	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s", taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[0].WalletAddress, req[0].PeerAddr,
+		req[len(req)-1].FileHash, req[len(req)-1].Hash, req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
 	for _, blockmsg := range req {
-		log.Debugf("share block req: %s-%s-%d from %s-%s", blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, blockmsg.WalletAddress, blockmsg.PeerAddr)
 		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, task.TaskTypeShare)
 		reqWalletAddr = blockmsg.WalletAddress
 		reqAsset = blockmsg.Asset
-		log.Debugf("share task taskId %s", taskId)
 		// check if has unpaid block request
 		canShare, err := this.taskMgr.CanShareTo(taskId, blockmsg.WalletAddress, blockmsg.Asset)
 		if err != nil || !canShare {
 			log.Errorf("cant share to %s for file %s, can:%t err %s", blockmsg.WalletAddress, blockmsg.FileHash, canShare, err)
-			break
+			return
 		}
 		// send block if requester has paid all block
 		blk := this.Fs.GetBlock(blockmsg.Hash)
 		blockData := this.Fs.BlockDataOfAny(blk)
 		if len(blockData) == 0 {
 			log.Errorf("get block data empty %s", blockmsg.Hash)
-			break
+			return
 		}
 		downloadTaskKey := this.taskMgr.TaskId(blockmsg.FileHash, this.WalletAddress(), task.TaskTypeDownload)
 		offset, err := this.taskMgr.GetBlockOffset(downloadTaskKey, blockmsg.Hash, uint32(blockmsg.Index))
-		log.Debugf("share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s", taskId, downloadTaskKey, blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, offset, blockmsg.PeerAddr, err)
 		if err != nil {
-			log.Errorf("get block offset, err: %s", err)
-			break
+			log.Errorf("share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s", taskId, downloadTaskKey, blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, offset, blockmsg.PeerAddr, err)
+			return
 		}
 		// TODO: only send tag with tagflag enabled
 		// TEST: client get tag
@@ -71,17 +70,16 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		up, err := this.GetFileUnitPrice(blockmsg.Asset)
 		if err != nil {
 			log.Errorf("get file unit price err after send block, err: %s", err)
-			break
+			return
 		}
 		// add new unpaid block request to store
 		err = this.taskMgr.AddFileUnpaid(taskId, blockmsg.WalletAddress, blockmsg.Asset, uint64(len(blockData))*up)
 		if err != nil {
 			log.Errorf("add file unpaid failed err : %s", err)
-			break
-		} else {
-			log.Debugf("add file unpaid success")
-			totalAmount += uint64(len(blockData)) * up
+			return
 		}
+		totalAmount += uint64(len(blockData)) * up
+		log.Debugf("add file unpaid success %d", totalAmount)
 		b := &block.Block{
 			SessionId: sessionId,
 			Index:     blockmsg.Index,
@@ -107,7 +105,9 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	if err != nil {
 		log.Errorf("share send block, err: %s", err)
 		// TODO: delete unpaid msg if need
-		this.taskMgr.DeleteFileUnpaid(taskId, reqWalletAddr, reqAsset, totalAmount)
+		if !common.ConntextTimeoutErr(err) {
+			this.taskMgr.DeleteFileUnpaid(taskId, reqWalletAddr, reqAsset, totalAmount)
+		}
 	}
 }
 
