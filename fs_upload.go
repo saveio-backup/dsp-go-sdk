@@ -407,7 +407,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	}
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
-		resps, err := this.DeleteUploadedFiles([]string{fileHashStr})
+		resps, err := this.DeleteUploadedFileByIds([]string{taskId})
 		if err != nil {
 			this.taskMgr.SetTaskState(taskId, oldState)
 			return nil, err
@@ -421,7 +421,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	msg := message.NewFileFetchCancel(taskId, fileHashStr)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
 	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
-	resps, err := this.DeleteUploadedFiles([]string{fileHashStr})
+	resps, err := this.DeleteUploadedFileByIds([]string{taskId})
 	if err != nil {
 		this.taskMgr.SetTaskState(taskId, oldState)
 		return nil, err
@@ -493,21 +493,44 @@ func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string) (string, uint
 	return txHashStr, txHeight, nil
 }
 
-// DeleteUploadedFile. Delete uploaded file from remote nodes. it is called by the owner
-func (this *Dsp) DeleteUploadedFiles(fileHashStrs []string) ([]*common.DeleteUploadFileResp, error) {
-	if len(fileHashStrs) == 0 {
-		return nil, errors.New("delete file hash string is empty")
+// DeleteUploadedFileByIds. Delete uploaded file from remote nodes. it is called by the owner
+func (this *Dsp) DeleteUploadedFileByIds(ids []string) ([]*common.DeleteUploadFileResp, error) {
+	if len(ids) == 0 {
+		return nil, errors.New("delete file ids is empty")
 	}
+	fileHashStrs := make([]string, 0, len(ids))
+	taskIds := make([]string, 0, len(ids))
+	taskIdM := make(map[string]struct{}, 0)
+	hashM := make(map[string]struct{}, 0)
+	for _, id := range ids {
+		if _, ok := taskIdM[id]; ok {
+			continue
+		}
+		taskIdM[id] = struct{}{}
+		taskIds = append(taskIds, id)
+		hash, _ := this.taskMgr.TaskFileHash(id)
+		if len(hash) == 0 {
+			continue
+		}
+		if _, ok := hashM[hash]; ok {
+			continue
+		}
+		hashM[hash] = struct{}{}
+		fileHashStrs = append(fileHashStrs, hash)
+	}
+
 	txHashStr, txHeight, sdkErr := this.DeleteUploadFilesFromChain(fileHashStrs)
 	log.Debugf("delete upload files from chain :%s, %d, %v", txHashStr, txHeight, sdkErr)
 	if sdkErr != nil && sdkErr.Code != serr.NO_FILE_NEED_DELETED {
 		return nil, sdkErr.Error
 	}
 	resps := make([]*common.DeleteUploadFileResp, 0, len(fileHashStrs))
-	log.Debugf("resps-len :%v", len(resps))
-	for _, fileHashStr := range fileHashStrs {
+	for _, taskId := range taskIds {
+		fileHashStr, err := this.taskMgr.TaskFileHash(taskId)
+		if err != nil {
+			continue
+		}
 		storingNode := this.getFileProvedNode(fileHashStr)
-		taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
 		log.Debugf("taskId of to delete file %v", taskId)
 		if len(storingNode) == 0 {
 			// find breakpoint keep nodelist

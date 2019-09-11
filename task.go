@@ -66,3 +66,7 @@ func (this *Dsp) GetTaskFileHash(id string) string {
 	fileHash, _ := this.taskMgr.TaskFileHash(id)
 	return fileHash
 }
+
+func (this *Dsp) GetUploadTaskId(fileHashStr string) string {
+	return this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
+}
