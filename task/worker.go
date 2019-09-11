@@ -8,13 +8,13 @@ import (
 type jobFunc func(string, string, string, string, []*block.Block) ([]*BlockResp, error)
 
 type Worker struct {
-	remoteAddr  string
-	walletAddr  string
-	working     bool
-	job         jobFunc
-	failed      map[string]int
-	unpaid      bool
-	totalFailed map[string]uint32
+	remoteAddr  string            // worker remote host addr
+	walletAddr  string            // worker wallet addr
+	working     bool              // flag of working or not of worker
+	job         jobFunc           // job callback function
+	failed      map[string]int    // map nodeAddr <=> request failed count
+	unpaid      bool              // flag of unpaid or not of worker
+	totalFailed map[string]uint32 // map fileHash <=> all request failed count
 }
 
 func NewWorker(addr, walletAddr string, j jobFunc) *Worker {

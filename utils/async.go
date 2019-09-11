@@ -35,7 +35,7 @@ func CallRequestWithArgs(request func([]interface{}, chan *RequestResponse), arg
 		wg.Wait()
 		return result
 	}
-	jobCh := make(chan []interface{}, max)
+	jobCh := make(chan []interface{}, 1)
 	jobDone := make(chan struct{}, 1)
 	// use dispatch job model
 	go func() {
@@ -44,20 +44,25 @@ func CallRequestWithArgs(request func([]interface{}, chan *RequestResponse), arg
 			jobCh <- args
 		}
 		close(jobCh)
-		close(jobDone)
 	}()
+
 	for i := 0; i < max; i++ {
 		go func() {
-			args, ok := <-jobCh
-			if !ok {
-				return
+			for {
+				args, ok := <-jobCh
+				if !ok {
+					return
+				}
+				done := make(chan *RequestResponse, 1)
+				request(args, done)
+				resp := <-done
+				lock.Lock()
+				result = append(result, resp)
+				if len(result) == len(argsOfRequests) {
+					jobDone <- struct{}{}
+				}
+				lock.Unlock()
 			}
-			done := make(chan *RequestResponse, 1)
-			request(args, done)
-			resp := <-done
-			lock.Lock()
-			defer lock.Unlock()
-			result = append(result, resp)
 		}()
 	}
 	<-jobDone
