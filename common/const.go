@@ -69,7 +69,7 @@ const (
 	MAX_DNS_NUM                  = 100    // max dns num
 	MAX_PUBLICADDR_CACHE_LEN     = 100    // cache len
 	MAX_PROGRESS_CHANNEL_SIZE    = 100    // progress channel size
-	MAX_SEND_BLOCK_RETRY         = 5      // max send block retry
+	MAX_SEND_BLOCK_RETRY         = 3      // max send block retry
 	MAX_SAME_UPLOAD_BLOCK_NUM    = 3      // max enable upload same block for same node
 	MAX_TRACKER_REQ_TIMEOUT_NUM  = 10     // max tracker request timeout num
 	MAX_PUBLIC_IP_UPDATE_SECOND  = 5 * 60 // max update second to update peer host addr cache

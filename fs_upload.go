@@ -290,18 +290,12 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		return nil, nil
 	}
 	// notify fetch ready to all receivers
-	err = this.notifyFetchReady(taskId, fileHashStr, receivers, tx, uint64(payTxHeight))
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.RECEIVERS_REJECTED, err.Error())
-		return nil, err
-	}
-	pause, sdkerr = this.checkIfPause(taskId, fileHashStr)
-	if sdkerr != nil {
-		return nil, errors.New(sdkerr.Error.Error())
-	}
-	if pause {
-		return nil, nil
-	}
+	go func() {
+		err := this.notifyFetchReady(taskId, fileHashStr, receivers, tx, uint64(payTxHeight))
+		if err != nil {
+			log.Errorf("notify fetch ready msg failed, err %s", err)
+		}
+	}()
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileFindReceiversDone)
 
 	sdkerr = this.waitForFetchBlock(taskId, hashes, receivers, int(opt.CopyNum), p.G0, p.FileId, payRet.PrivateKey)
@@ -930,6 +924,7 @@ func (this *Dsp) checkFileBeProved(fileHashStr string, copyNum uint64) bool {
 func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList, blockHashes []string, receiverCount int) ([]string, error) {
 	receiverLock := new(sync.Mutex)
 	receivers := make([]string, 0)
+	stop := false
 	receiverBreakpoint := make(map[string]*file.Breakpoint, 0)
 	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
@@ -945,13 +940,17 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList,
 		}
 		receiverLock.Lock()
 		defer receiverLock.Unlock()
-
+		if stop {
+			log.Debugf("break here after stop is true")
+			return true
+		}
 		fileMsg := p2pMsg.Payload.(*file.File)
 		receivers = append(receivers, addr)
 		receiverBreakpoint[addr] = fileMsg.Breakpoint
 		log.Debugf("send file_ask msg success of file: %s, to: %s, receivers: %v", fileMsg.Hash, addr, receivers)
 		if len(receivers) >= receiverCount || len(receivers) >= len(nodeList) {
 			log.Debugf("break receiver goroutine")
+			stop = true
 			return true
 		}
 		log.Debugf("continue....")
@@ -1118,7 +1117,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 						return
 					}
 					if err != nil {
-						log.Errorf("handle fetch block err %s", err)
+						log.Errorf("handle fetch file %s err %s", fileHashStr, err)
 						continue
 					}
 					if done == false && err == nil {
@@ -1172,7 +1171,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 			sent := uint64(this.taskMgr.UploadedBlockCount(taskId) / (uint64(copyNum) + 1))
 			log.Debugf("timeout check totalCount %d != sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))
 			if totalCount != sent {
-				err = errors.New("wait for fetch block timeout")
+				err = fmt.Errorf("wait for fetch file: %s timeout", fileHashStr)
 				return serr.NewDetailError(serr.TASK_WAIT_TIMEOUT, err.Error())
 			}
 			return nil
