@@ -53,13 +53,6 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 	var err error
 	if len(taskId) == 0 {
 		taskId, err = this.taskMgr.NewTask(task.TaskTypeDownload)
-	} else {
-		log.Warnf("download task has exists %s", taskId)
-		preparing, doing, _ := this.taskMgr.IsTaskPreparingOrDoing(taskId)
-		if preparing || doing {
-			log.Warnf("download task is doing")
-			return nil
-		}
 	}
 	log.Debugf("download file id: %s, fileHash: %s, option: %v", taskId, fileHashStr, opt)
 	defer func() {
@@ -403,6 +396,9 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 	}
 	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, reply)
 	log.Debugf("broadcast file download msg result %v err %s", ret, err)
+	if err != nil {
+		return nil, err
+	}
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {
 		return nil, errors.New("remote peer has deleted the file")

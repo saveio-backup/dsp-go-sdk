@@ -61,7 +61,7 @@ const (
 	REMOVE_FILES_DURATION        = 10     // 10s for remove files check
 	MAX_EXPIRED_PROVE_TASK_NUM   = 10     // max backup tasks one time
 	MAX_WORKER_BLOCK_FAILED_NUM  = 1      // max failed count from a worker to request block
-	MAX_WORKER_FILE_FAILED_NUM   = 5      // max failed count from a worker to request file
+	MAX_WORKER_FILE_FAILED_NUM   = 10     // max failed count from a worker to request file
 	MAX_DOWNLOAD_PEERS_NUM       = 50     // max peers for download file
 	MAX_NETWORK_REQUEST_RETRY    = 4      // max network request retry
 	MAX_BACKUP_FILE_FAILED       = 3      // max backup file failed times
