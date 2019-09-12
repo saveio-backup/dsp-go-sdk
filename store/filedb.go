@@ -518,6 +518,97 @@ func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index ui
 	return this.db.BatchCommit(batch)
 }
 
+func (this *FileDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockInfo) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	fi, err := this.GetFileInfo([]byte(id))
+	if err != nil {
+		log.Errorf("get info err %s", err)
+		return err
+	}
+	if fi == nil {
+		log.Errorf("file info not found %d", id)
+		return errors.New("file info not found")
+	}
+	batch := this.db.NewBatch()
+	// save upload progress info
+	progressKey := FileProgressKey(fi.Id, nodeAddr)
+	progress, _ := this.getProgressInfo(progressKey)
+	if progress == nil {
+		progress = &FileProgress{
+			FileInfoId:   fi.Id,
+			NodeHostAddr: nodeAddr,
+		}
+	}
+	for _, bi := range blockInfos {
+		index := bi.Index
+		blockHashStr := bi.Hash
+		// save block info
+		blockKey := BlockInfoKey(id, index, blockHashStr)
+		block, _ := this.getBlockInfo(blockKey)
+		if block == nil {
+			block = &BlockInfo{
+				FileInfoId: id,
+				FileHash:   fi.FileHash,
+				Hash:       blockHashStr,
+				Index:      index,
+				NodeList:   make([]string, 0),
+				ReqTimes:   make(map[string]uint64),
+			}
+		}
+		reqTime := block.ReqTimes[nodeAddr]
+		if reqTime > 0 {
+			block.ReqTimes[nodeAddr] = reqTime + 1
+			log.Debugf("the node has request this block: %s, times: %d", blockHashStr, reqTime)
+			blockBuf, err := json.Marshal(block)
+			if err != nil {
+				return err
+			}
+			err = this.db.Put([]byte(blockKey), blockBuf)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		block.ReqTimes[nodeAddr] = reqTime + 1
+		block.NodeList = append(block.NodeList, nodeAddr)
+		offset := bi.DataOffset
+		if block.DataOffset < offset {
+			block.DataOffset = offset
+			log.Debugf("set offset for %d %d, old %v", index, offset, block.DataOffset)
+		}
+		if block.DataSize < bi.DataSize {
+			block.DataSize = bi.DataSize
+		}
+		blockBuf, err := json.Marshal(block)
+		if err != nil {
+			return err
+		}
+		if progress.Progress == fi.TotalBlockCount && fi.SaveBlockCountMap[nodeAddr] == fi.TotalBlockCount && fi.TotalBlockCount > 0 {
+			// has done
+			log.Debugf("block has added: %d, %v, %v, %s", progress.Progress, fi.TotalBlockCount, fi.SaveBlockCountMap, nodeAddr)
+			return nil
+		}
+		progress.Progress++
+		fi.SaveBlockCountMap[nodeAddr] = fi.SaveBlockCountMap[nodeAddr] + 1
+		fi.CurrentBlock = blockHashStr
+		fi.CurrentIndex = uint64(index)
+		this.db.BatchPut(batch, []byte(blockKey), blockBuf)
+	}
+	log.Debugf("%s, nodeAddr %s increase sent %v, progress %v", fi.Id, nodeAddr, fi.SaveBlockCountMap, progress)
+	progressBuf, err := json.Marshal(progress)
+	if err != nil {
+		return err
+	}
+	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
+	fiBuf, err := json.Marshal(fi)
+	if err != nil {
+		return err
+	}
+	this.db.BatchPut(batch, []byte(fi.Id), fiBuf)
+	return this.db.BatchCommit(batch)
+}
+
 // GetCurrentSetBlock.
 func (this *FileDB) GetCurrentSetBlock(id string) (string, uint64, error) {
 	fi, err := this.GetFileInfo([]byte(id))

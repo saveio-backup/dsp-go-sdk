@@ -244,7 +244,7 @@ func (this *TaskMgr) UploadingFileExist(taskId, fileHashStr string) bool {
 	return false
 }
 
-func (this *TaskMgr) TaskBlockReq(taskId string) (chan *GetBlockReq, error) {
+func (this *TaskMgr) TaskBlockReq(taskId string) (chan []*GetBlockReq, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return nil, errors.New("task not found")
@@ -326,9 +326,8 @@ func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 		return
 	}
 	v.SetTransferState(uint64(state))
-	log.Debugf("EmitProgress taskId: %s, state: %v path %v", taskId, state, v.GetFilePath())
 	pInfo := v.GetProgressInfo()
-	log.Debugf("pInfo %v", pInfo)
+	log.Debugf("EmitProgress taskId: %s, state: %v pInfo: %v", taskId, state, pInfo)
 	this.progress <- pInfo
 }
 

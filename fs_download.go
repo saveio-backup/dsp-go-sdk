@@ -19,6 +19,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
+	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/dsp-go-sdk/utils"
@@ -1076,12 +1077,16 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	// my task. use my wallet address
 	log.Debugf("startFetchBlocks: %s", fileHashStr)
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
+	sessionId, err := this.taskMgr.GetSessionId(taskId, walletAddr)
+	if err != nil {
+		return err
+	}
 	blockHashes := this.taskMgr.FileBlockHashes(taskId)
 	if len(blockHashes) == 0 {
 		log.Errorf("block hashes is empty for file :%s", fileHashStr)
 		return errors.New("block hashes is empty")
 	}
-	err := client.P2pConnect(addr)
+	err = client.P2pConnect(addr)
 	if err != nil {
 		return err
 	}
@@ -1096,6 +1101,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 		}
 	}()
 	// TODO: optimize this with one hash once time
+	blocks := make([]*block.Block, 0, common.MAX_REQ_BLOCK_COUNT)
 	for index, hash := range blockHashes {
 		pause, cancel, err = this.taskMgr.IsTaskPauseOrCancel(taskId)
 		if err != nil {
@@ -1106,28 +1112,49 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 			break
 		}
 		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {
+			log.Debugf("block has downloaded %s %d", hash, index)
 			continue
 		}
-		value, err := this.downloadBlock(taskId, fileHashStr, hash, int32(index), addr, walletAddr, common.MAX_BLOCK_FETCHED_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
+		blocks = append(blocks, &block.Block{
+			SessionId: sessionId,
+			Index:     int32(index),
+			FileHash:  fileHashStr,
+			Hash:      hash,
+			Operation: netcom.BLOCK_OP_GET,
+			Payment: &payment.Payment{
+				Sender: walletAddr,
+				Asset:  common.ASSET_USDT,
+			},
+		})
+		if index != len(blockHashes)-1 && len(blocks) < common.MAX_REQ_BLOCK_COUNT {
+			continue
+		}
+		var resps []*task.BlockResp
+		resps, err = this.downloadBlockFlights(taskId, fileHashStr, addr, walletAddr, blocks, common.MAX_BLOCK_FETCHED_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
 		if err != nil {
 			return err
 		}
-		block := this.Fs.EncodedToBlockWithCid(value.Block, hash)
-		if block.Cid().String() != hash {
-			return fmt.Errorf("receive a wrong block: %s, expected: %s", block.Cid().String(), hash)
-		}
-		err = this.Fs.PutBlock(block)
-		if err != nil {
-			return err
-		}
-		err = this.Fs.PutTag(hash, fileHashStr, uint64(value.Index), value.Tag)
-		if err != nil {
-			return err
-		}
-		err = this.taskMgr.SetBlockDownloaded(taskId, value.Hash, value.PeerAddr, uint32(index), value.Offset, nil)
-		log.Debugf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d, err: %s", taskId, fileHashStr, value.Hash, index, value.Offset, err)
-		if err != nil {
-			return err
+		blocks = blocks[:0]
+
+		for _, value := range resps {
+			blk := this.Fs.EncodedToBlockWithCid(value.Block, value.Hash)
+			if blk.Cid().String() != value.Hash {
+				return fmt.Errorf("receive a wrong block: %s, expected: %s", blk.Cid().String(), value.Hash)
+			}
+			err = this.Fs.PutBlock(blk)
+			if err != nil {
+				return err
+			}
+			err = this.Fs.PutTag(value.Hash, fileHashStr, uint64(value.Index), value.Tag)
+			if err != nil {
+				return err
+			}
+			err = this.taskMgr.SetBlockDownloaded(taskId, value.Hash, value.PeerAddr, uint32(value.Index), value.Offset, nil)
+			if err != nil {
+				log.Errorf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d, err: %s", taskId, fileHashStr, value.Hash, value.Index, value.Offset, err)
+				return err
+			}
+			log.Debugf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d", taskId, fileHashStr, value.Hash, value.Index, value.Offset)
 		}
 	}
 	if !this.taskMgr.IsFileDownloaded(taskId) {
@@ -1231,9 +1258,10 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	msg := message.NewBlockFlightsReqMsg(blocks, timeStamp)
 
 	for i := uint32(0); i < retry; i++ {
+		log.Debugf("send download blockflights msg sessionId %s of %s from %s,  retry: %d", sessionId, fileHashStr, ipAddr, i)
 		err = client.P2pSend(ipAddr, msg.ToProtoMsg())
-		log.Debugf("send download blockflights msg sessionId %s of %s from %s, err %s, retry: %d", sessionId, fileHashStr, ipAddr, err, i)
 		if err != nil {
+			log.Errorf("send download blockflights err: %s", err)
 			continue
 		}
 		received := false

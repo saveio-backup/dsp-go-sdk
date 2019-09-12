@@ -105,38 +105,22 @@ const (
 )
 
 type Task struct {
-	id         string // id
-	info       *store.FileInfo
-	peerSenIds map[string]string // request peerAddr <=> session id
-	// fileHash     string            // task file hash
-	// fileName     string            // file name
-	// fileOwner    string            // file owner
-	// total        uint64            // total blocks count
-	// filePath     string            // file path
-	// walletAddr   string            // operator wallet address
-	// taskType     TaskType // task type
-	transferring bool // fetch is transferring flag
+	id           string // id
+	info         *store.FileInfo
+	peerSenIds   map[string]string // request peerAddr <=> session id
+	transferring bool              // fetch is transferring flag
 	// TODO: refactor, delete below two channels, use request and reply
-	blockReq            chan *GetBlockReq            // fetch block request channel
+	blockReq            chan []*GetBlockReq          // fetch block request channel
 	blockRespsMap       map[string]chan *BlockResp   // map key <=> *BlockResp
 	blockFlightRespsMap map[string]chan []*BlockResp // map key <=> []*BlockResp
 	blockReqPool        []*GetBlockReq               // get block request pool
 	workers             map[string]*Worker           // workers to request block
-	// inOrder             bool                         // keep work in order
-	// onlyBlock           bool                         // only send block data, without tag data
-	notify chan *BlockResp // notify download block
-	// state               TaskState                    // task state
-	// transferingState TaskProgressState // transfering state
-	// stateChange   chan TaskState // state change between pause and resume
-	backupOpt     *BackupFileOpt // backup file options
-	lock          *sync.RWMutex  // lock
-	lastWorkerIdx int            // last worker index
-	// storeType           uint64                       // store file type
-	// copyNum             uint64                       // copyNum
-	// createdAt           int64                        // createdAt
-	// updatedAt           int64                        // updatedAt
-	batch bool          // flag of batch set
-	db    *store.FileDB // db
+	notify              chan *BlockResp              // notify download block
+	backupOpt           *BackupFileOpt               // backup file options
+	lock                *sync.RWMutex                // lock
+	lastWorkerIdx       int                          // last worker index
+	batch               bool                         // flag of batch set
+	db                  *store.FileDB                // db
 }
 
 // NewTask. new task for file, and set the task info to DB.
@@ -194,6 +178,8 @@ func NewTaskFromDB(id string, db *store.FileDB) *Task {
 		log.Errorf("[Task NewTaskFromDB] set file info failed: %s", err)
 		return nil
 	}
+	log.Debugf("task name: %s, state: %d", t.info.FileName, state)
+
 	for _, session := range sessions {
 		log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
 		t.peerSenIds[session.WalletAddr] = session.SessionId
@@ -220,7 +206,7 @@ func (this *Task) GetSessionId(peerWalletAddr string) string {
 	return this.peerSenIds[peerWalletAddr]
 }
 
-func (this *Task) GetBlockReq() chan *GetBlockReq {
+func (this *Task) GetBlockReq() chan []*GetBlockReq {
 	return this.blockReq
 }
 
@@ -526,6 +512,21 @@ func (this *Task) AddUploadedBlock(id, blockHashStr, nodeAddr string, index uint
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	err := this.db.AddUploadedBlock(id, blockHashStr, nodeAddr, index, dataSize, offset)
+	if err != nil {
+		return err
+	}
+	newInfo, err := this.db.GetFileInfo([]byte(id))
+	if err != nil {
+		return err
+	}
+	this.info = newInfo
+	return nil
+}
+
+func (this *Task) SetBlocksUploaded(id, nodeAddr string, blockInfos []*store.BlockInfo) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	err := this.db.SetBlocksUploaded(id, nodeAddr, blockInfos)
 	if err != nil {
 		return err
 	}
@@ -953,7 +954,7 @@ func newTask(id string, info *store.FileInfo, db *store.FileDB) *Task {
 	t := &Task{
 		id:            id,
 		info:          info,
-		blockReq:      make(chan *GetBlockReq, common.MAX_TASK_BLOCK_REQ),
+		blockReq:      make(chan []*GetBlockReq, common.MAX_TASK_BLOCK_REQ),
 		notify:        make(chan *BlockResp, common.MAX_TASK_BLOCK_NOTIFY),
 		lastWorkerIdx: -1,
 		peerSenIds:    make(map[string]string, common.MAX_TASK_SESSION_NUM),

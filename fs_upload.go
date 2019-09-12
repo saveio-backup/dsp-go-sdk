@@ -14,8 +14,11 @@ import (
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	serr "github.com/saveio/dsp-go-sdk/error"
+	netcomm "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
+	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
+	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/dsp-go-sdk/utils"
 	chainCom "github.com/saveio/themis/common"
@@ -1055,18 +1058,21 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 		blockMsgDataMap[key] = data
 		return data
 	}
-	cleanMsgData := func(hash string, index uint32) {
-		// TODO
+	cleanMsgData := func(reqInfos []*task.GetBlockReq) {
 		getMsgDataLock.Lock()
 		defer getMsgDataLock.Unlock()
-
-		key := keyOfUnixNode(hash, index)
-		data, ok := blockMsgDataMap[key]
-		if !ok {
-			return
-		}
-		data.refCnt--
-		if data.refCnt <= 0 {
+		for _, reqInfo := range reqInfos {
+			hash := reqInfo.Hash
+			index := uint32(reqInfo.Index)
+			key := keyOfUnixNode(hash, index)
+			data, ok := blockMsgDataMap[key]
+			if !ok {
+				continue
+			}
+			data.refCnt--
+			if data.refCnt > 0 {
+				continue
+			}
 			log.Debugf("delete block msg data of key: %s", key)
 			delete(blockMsgDataMap, key)
 			this.Fs.ReturnBuffer(data.blockData)
@@ -1075,16 +1081,19 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 	cancelFetch := make(chan struct{})
 	log.Debugf("open %d go routines for fetched file taskId: %s, %s", len(addrs), taskId, fileHashStr)
 
-	reqForPeers := make(map[string]chan *task.GetBlockReq)
+	reqForPeers := make(map[string]chan []*task.GetBlockReq)
 	for _, p := range addrs {
-		reqForPeers[p] = make(chan *task.GetBlockReq, 1)
+		reqForPeers[p] = make(chan []*task.GetBlockReq, 1)
 	}
 	go func() {
 		for {
 			select {
 			case reqInfo := <-req:
+				if len(reqInfo) == 0 {
+					continue
+				}
 				timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
-				ch := reqForPeers[reqInfo.PeerAddr]
+				ch := reqForPeers[reqInfo[0].PeerAddr]
 				go func() {
 					ch <- reqInfo
 				}()
@@ -1096,21 +1105,25 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 	}()
 	// TODO: add max go routines check
 	for _, ch := range reqForPeers {
-		go func(req chan *task.GetBlockReq) {
+		go func(req chan []*task.GetBlockReq) {
 			for {
 				select {
-				case reqInfo := <-req:
+				case reqInfos := <-req:
 					stop, _ := this.stopUpload(taskId)
 					if stop {
 						log.Debugf("stop handle request because task is stop: %t", stop)
 						return
 					}
 					timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
-					key := keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))
-					log.Debugf("handle request key:%s, %s-%s-%d from peer: %s", key, fileHashStr, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
-					msgData := getMsgData(reqInfo.Hash, uint32(reqInfo.Index))
+					msgDataM := make(map[string]*blockMsgData, 0)
+					for _, reqInfo := range reqInfos {
+						key := keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))
+						log.Debugf("handle request key:%s, %s-%s-%d from peer: %s", key, fileHashStr, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
+						msgData := getMsgData(reqInfo.Hash, uint32(reqInfo.Index))
+						msgDataM[key] = msgData
+					}
 					// handle fetch request async
-					done, err := this.handleFetchBlockRequest(taskId, sessionId, fileHashStr, reqInfo, copyNum, totalCount, msgData)
+					done, err := this.handleFetchBlockRequests(taskId, sessionId, fileHashStr, reqInfos, copyNum, totalCount, msgDataM)
 					stop, _ = this.stopUpload(taskId)
 					if stop {
 						log.Debugf("stop handle request because task is stop: %t", stop)
@@ -1121,7 +1134,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 						continue
 					}
 					if done == false && err == nil {
-						cleanMsgData(reqInfo.Hash, uint32(reqInfo.Index))
+						cleanMsgData(reqInfos)
 						continue
 					}
 					swapped := atomic.CompareAndSwapUint32(&closeDoneChannel, 0, 1)
@@ -1190,41 +1203,77 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 }
 
 // handleFetchBlockRequest. handle fetch request and send block
-func (this *Dsp) handleFetchBlockRequest(taskId, sessionId, fileHashStr string,
-	reqInfo *task.GetBlockReq,
+func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
+	reqInfos []*task.GetBlockReq,
 	copyNum int,
 	totalCount uint64,
-	blockMsgData *blockMsgData) (bool, error) {
+	blockMsgDatas map[string]*blockMsgData) (bool, error) {
 	// send block
-	log.Debugf("receive fetch block msg of %s-%s-%d-%d from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.Index, totalCount, reqInfo.PeerAddr)
-	if len(blockMsgData.blockData) == 0 || len(blockMsgData.tag) == 0 {
-		err := fmt.Errorf("block len %d, tag len %d hash %s, peer %s failed", len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
-		return false, err
+	if len(reqInfos) == 0 {
+		log.Warnf("no request to handle of file: %s", fileHashStr)
+		return true, nil
 	}
-	isStored := this.taskMgr.IsBlockUploaded(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
-	if isStored {
-		log.Debugf("block has stored %s", reqInfo.Hash)
-		return false, nil
+	blocks := make([]*block.Block, 0, len(reqInfos))
+	blockInfos := make([]*store.BlockInfo, 0, len(reqInfos))
+	nodeAddr := reqInfos[0].PeerAddr
+	for _, reqInfo := range reqInfos {
+		log.Debugf("receive fetch block msg of %s-%s-%d-%d from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.Index, totalCount, reqInfo.PeerAddr)
+		blockMsgData := blockMsgDatas[keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))]
+		if len(blockMsgData.blockData) == 0 || len(blockMsgData.tag) == 0 {
+			log.Errorf("block len %d, tag len %d hash %s, peer %s failed", len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
+			continue
+		}
+		isStored := this.taskMgr.IsBlockUploaded(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
+		if !isStored {
+			log.Debugf("block has stored %s", reqInfo.Hash)
+			bi := &store.BlockInfo{
+				Hash:       reqInfo.Hash,
+				Index:      uint32(reqInfo.Index),
+				DataSize:   blockMsgData.dataLen,
+				DataOffset: blockMsgData.offset,
+			}
+			blockInfos = append(blockInfos, bi)
+		}
+		b := &block.Block{
+			SessionId: taskId,
+			Index:     reqInfo.Index,
+			FileHash:  fileHashStr,
+			Hash:      reqInfo.Hash,
+			Data:      blockMsgData.blockData,
+			Tag:       blockMsgData.tag,
+			Operation: netcomm.BLOCK_OP_NONE,
+			Offset:    int64(blockMsgData.offset),
+		}
+		blocks = append(blocks, b)
 	}
-	msg := message.NewBlockMsg(sessionId, int32(reqInfo.Index), fileHashStr, reqInfo.Hash, blockMsgData.blockData, blockMsgData.tag, int64(blockMsgData.offset))
-	log.Debugf("sending block %s, index:%d, taglen:%d, offset:%d to %s", reqInfo.Hash, reqInfo.Index, len(blockMsgData.tag), blockMsgData.offset, reqInfo.PeerAddr)
-	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), reqInfo.PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
+	if len(blocks) == 0 {
+		return false, fmt.Errorf("no block to send of file: %s", fileHashStr)
+	}
+	flights := &block.BlockFlights{
+		TimeStamp: reqInfos[0].TimeStamp,
+		Blocks:    blocks,
+	}
+	msg := message.NewBlockFlightsMsg(flights)
+	sendLogMsg := fmt.Sprintf("file: %s, block %s-%s, index:%d-%d to %s", fileHashStr, reqInfos[0].Hash, reqInfos[len(reqInfos)-1].Hash, reqInfos[0].Index, reqInfos[len(reqInfos)-1].Index, reqInfos[0].PeerAddr)
+	log.Debugf("sending %s", sendLogMsg)
+	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), reqInfos[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
 	if err != nil {
-		log.Errorf("send block msg hash %s to peer %s failed, err %s", reqInfo.Hash, reqInfo.PeerAddr, err)
+		log.Errorf("%v, err %s", sendLogMsg, err)
 		return false, err
 	}
-	log.Debugf("send block success %s-%s-%d, taglen:%d, offset:%d to %s", fileHashStr, reqInfo.Hash, reqInfo.Index, len(blockMsgData.tag), blockMsgData.offset, reqInfo.PeerAddr)
+	log.Debugf("send block success %s", sendLogMsg)
+
 	// stored
-	this.taskMgr.AddUploadedBlock(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index), blockMsgData.dataLen, blockMsgData.offset)
+	this.taskMgr.SetBlocksUploaded(taskId, nodeAddr, blockInfos)
 	// update progress
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
-	log.Debugf("upload node list len %d, taskkey %s, hash %s, index %d", len(this.taskMgr.GetUploadedBlockNodeList(taskId, reqInfo.Hash, uint32(reqInfo.Index))), taskId, reqInfo.Hash, reqInfo.Index)
+	// log.Debugf("upload node list len %d, taskkey %s, hash %s, index %d", len(this.taskMgr.GetUploadedBlockNodeList(taskId, reqInfo.Hash, uint32(reqInfo.Index))), taskId, reqInfo.Hash, reqInfo.Index)
 	sent := uint64(this.taskMgr.UploadedBlockCount(taskId) / (uint64(copyNum) + 1))
 	if totalCount != sent {
 		log.Debugf("totalCount %d != sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))
 		return false, nil
 	}
-	log.Debugf("fetched job done of id %s hash %s index %d peer %s", taskId, fileHashStr, reqInfo.Index, reqInfo.PeerAddr)
+	log.Debugf("fetched job done of id %s  %s", taskId, sendLogMsg)
 	return true, nil
 }
 

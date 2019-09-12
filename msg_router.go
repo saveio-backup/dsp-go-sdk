@@ -31,7 +31,7 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 		log.Debugf("unrecognized msg version %s", msg.Header.Version)
 		return
 	}
-	log.Debugf("receive msg.Header.Type %s, len: %d", msg.Header.Type, msg.Header.MsgLength)
+	log.Debugf("receive msg version:%s, type %s, len: %d", msg.Header.Version, msg.Header.Type, msg.Header.MsgLength)
 	switch msg.Header.Type {
 	case netcom.MSG_TYPE_FILE:
 		this.handleFileMsg(ctx, peer, msg)
@@ -570,6 +570,41 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 
 			reqCh <- req
 			log.Debugf("push get block flights req done")
+		case task.TaskTypeUpload:
+			if len(blockFlightsMsg.Blocks) == 0 {
+				log.Warnf("receive get blocks msg empty")
+				return
+			}
+			pause, sdkerr := this.checkIfPause(sessionId, blockFlightsMsg.Blocks[0].FileHash)
+			if sdkerr != nil {
+				log.Debugf("handle get block pause %v %t", sdkerr, pause)
+				return
+			}
+			if pause {
+				log.Debugf("handle get block pause %v %t", sdkerr, pause)
+				return
+			}
+			reqCh, err := this.taskMgr.TaskBlockReq(sessionId)
+			if err != nil {
+				log.Errorf("get task block reqCh err: %s", err)
+				return
+			}
+			req := make([]*task.GetBlockReq, 0)
+			for _, v := range blockFlightsMsg.Blocks {
+				log.Debugf("push get block req: %s-%s-%d from %s - %s", v.GetSessionId(), v.GetFileHash(), blockFlightsMsg.TimeStamp, v.Payment.Sender, peer.Address)
+				r := &task.GetBlockReq{
+					TimeStamp:     blockFlightsMsg.TimeStamp,
+					FileHash:      v.FileHash,
+					Hash:          v.Hash,
+					Index:         v.Index,
+					PeerAddr:      peer.Address,
+					WalletAddress: v.Payment.Sender,
+					Asset:         v.Payment.Asset,
+				}
+				req = append(req, r)
+			}
+			log.Debugf("push get block to request")
+			reqCh <- req
 		default:
 			log.Debugf("handle block flights get msg, tasktype not support")
 		}
@@ -644,12 +679,14 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				return
 			}
 			log.Debugf("push get block to request")
-			reqCh <- &task.GetBlockReq{
+			reqs := make([]*task.GetBlockReq, 0, 1)
+			reqs = append(reqs, &task.GetBlockReq{
 				FileHash: blockMsg.FileHash,
 				Hash:     blockMsg.Hash,
 				Index:    blockMsg.Index,
 				PeerAddr: peer.Address,
-			}
+			})
+			reqCh <- reqs
 			return
 		default:
 			log.Debugf("handle block get msg, tasktype not found %v", taskType)

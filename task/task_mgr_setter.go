@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/saveio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/themis/common/log"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
@@ -165,6 +166,14 @@ func (this *TaskMgr) AddUploadedBlock(taskId, blockHashStr, nodeAddr string, ind
 		return fmt.Errorf("task: %s, not exist", taskId)
 	}
 	return v.AddUploadedBlock(taskId, blockHashStr, nodeAddr, index, dataSize, offset)
+}
+
+func (this *TaskMgr) SetBlocksUploaded(taskId, nodeAddr string, blockInfos []*store.BlockInfo) error {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return fmt.Errorf("task: %s, not exist", taskId)
+	}
+	return v.SetBlocksUploaded(taskId, nodeAddr, blockInfos)
 }
 
 func (this *TaskMgr) SetFileUploadOptions(taskId string, opt *fs.UploadOption) error {
