@@ -306,7 +306,9 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 			}
 			peerAddrs = append(peerAddrs, addr)
 		}
-		break
+		if len(peerAddrs) != 0 {
+			break
+		}
 	}
 	this.removeLowQoSTracker()
 	return peerAddrs
