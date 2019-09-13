@@ -1225,7 +1225,6 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 		}
 		isStored := this.taskMgr.IsBlockUploaded(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 		if !isStored {
-			log.Debugf("block has stored %s", reqInfo.Hash)
 			bi := &store.BlockInfo{
 				Hash:       reqInfo.Hash,
 				Index:      uint32(reqInfo.Index),
@@ -1255,13 +1254,14 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 	}
 	msg := message.NewBlockFlightsMsg(flights)
 	sendLogMsg := fmt.Sprintf("file: %s, block %s-%s, index:%d-%d to %s", fileHashStr, reqInfos[0].Hash, reqInfos[len(reqInfos)-1].Hash, reqInfos[0].Index, reqInfos[len(reqInfos)-1].Index, reqInfos[0].PeerAddr)
+	sendingTime := time.Now().Unix()
 	log.Debugf("sending %s", sendLogMsg)
 	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), reqInfos[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
 	if err != nil {
 		log.Errorf("%v, err %s", sendLogMsg, err)
 		return false, err
 	}
-	log.Debugf("send block success %s", sendLogMsg)
+	log.Debugf("send block success %s, used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
 
 	// stored
 	this.taskMgr.SetBlocksUploaded(taskId, nodeAddr, blockInfos)

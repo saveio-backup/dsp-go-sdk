@@ -1189,56 +1189,6 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 	return nil
 }
 
-// downloadBlock. download block helper function.
-func (this *Dsp) downloadBlock(taskId, fileHashStr, hash string, index int32, addr, peerWalletAddr string, retry, timeout uint32) (*task.BlockResp, error) {
-	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
-	if err != nil {
-		return nil, err
-	}
-	walletAddress := this.WalletAddress()
-	// TODO: refactor to request - reply model
-	log.Debugf("download block of task: %s %s-%s-%d to %s", taskId, fileHashStr, hash, index, addr)
-	ch := this.taskMgr.NewBlockRespCh(taskId, sessionId, hash, index)
-	defer func() {
-		log.Debugf("drop block resp channel: %s-%s-%s-%d", taskId, sessionId, hash, index)
-		this.taskMgr.DropBlockRespCh(taskId, sessionId, hash, index)
-	}()
-	msg := message.NewBlockReqMsg(sessionId, fileHashStr, hash, index, walletAddress, common.ASSET_USDT)
-	var block *task.BlockResp
-	for i := uint32(0); i < retry; i++ {
-		err = client.P2pSend(addr, msg.ToProtoMsg())
-		log.Debugf("send download block msg sessionId %s of %s-%s-%d to %s, err %s, retry: %d", sessionId, fileHashStr, hash, index, addr, err, i)
-		if err != nil {
-			continue
-		}
-		received := false
-		isTimeout := false
-		select {
-		case value, ok := <-ch:
-			received = true
-			if !ok {
-				err = fmt.Errorf("receiving block none from channel")
-				continue
-			}
-			if isTimeout {
-				err = fmt.Errorf("receiving block %s timeout", hash)
-				continue
-			}
-			block = value
-			err = nil
-			return value, nil
-		case <-time.After(time.Duration(timeout/retry) * time.Second):
-			if received {
-				break
-			}
-			isTimeout = true
-			err = fmt.Errorf("receiving block %s timeout", hash)
-			continue
-		}
-	}
-	return block, err
-}
-
 // downloadBlockUnits. download block helper function for client.
 func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAddr string, blocks []*block.Block, retry, timeout uint32) ([]*task.BlockResp, error) {
 	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
@@ -1259,31 +1209,20 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 
 	for i := uint32(0); i < retry; i++ {
 		log.Debugf("send download blockflights msg sessionId %s of %s from %s,  retry: %d", sessionId, fileHashStr, ipAddr, i)
+		// TODO: refactor send msg with request-reply model
 		err = client.P2pSend(ipAddr, msg.ToProtoMsg())
 		if err != nil {
-			log.Errorf("send download blockflights err: %s", err)
-			continue
+			log.Errorf("send download blockflights msg err: %s", err)
 		}
-		received := false
-		isTimeout := false
 		select {
 		case value, ok := <-ch:
-			received = true
 			if !ok {
 				err = fmt.Errorf("receiving block channel close")
-				continue
-			}
-			if isTimeout {
-				err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
 				continue
 			}
 			log.Debugf("receive blocks len: %d", len(value))
 			return value, nil
 		case <-time.After(time.Duration(timeout/retry) * time.Second):
-			if received {
-				break
-			}
-			isTimeout = true
 			err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
 			continue
 		}
