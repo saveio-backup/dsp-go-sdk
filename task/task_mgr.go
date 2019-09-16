@@ -80,19 +80,25 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 	if err != nil {
 		return err
 	}
+	unloadTaskLen := len(taskIds)
 	downloadTaskIds, err := this.db.UndoneList(store.FileInfoTypeDownload)
 	if err != nil {
 		return err
 	}
 	taskIds = append(taskIds, downloadTaskIds...)
 	log.Debugf("total recover task len: %d", len(taskIds))
-	for _, id := range taskIds {
+	for i, id := range taskIds {
 		t := NewTaskFromDB(id, this.db)
 		if t == nil {
 			continue
 		}
 		if t.State() == TaskStateDone {
 			log.Warnf("task is done %s", id)
+			if i < unloadTaskLen {
+				this.db.RemoveFromUndoneList(nil, id, store.FileInfoTypeUpload)
+			} else {
+				this.db.RemoveFromUndoneList(nil, id, store.FileInfoTypeDownload)
+			}
 			continue
 		}
 		this.tasks[id] = t
@@ -348,9 +354,13 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *sdkErr.S
 			log.Errorf("set task state err %s, %s", taskId, err)
 		}
 		log.Debugf("EmitResult, err %v, %v", err, sdkErr)
-	} else if ret != nil {
+	} else {
 		log.Debugf("EmitResult ret %v ret == nil %t", ret, ret == nil)
 		err := v.SetResult(ret, 0, "")
+		if err != nil {
+			log.Errorf("set task result err %s, %s", taskId, err)
+		}
+		err = v.SetTaskState(TaskStateDone)
 		if err != nil {
 			log.Errorf("set task state err %s, %s", taskId, err)
 		}

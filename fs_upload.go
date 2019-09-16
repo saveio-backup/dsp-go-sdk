@@ -857,7 +857,7 @@ func (this *Dsp) getFileProvedNode(fileHashStr string) []string {
 	nodes := make([]string, 0)
 	log.Debugf("details :%v, err:%s", len(proveDetails.ProveDetails), err)
 	for _, detail := range proveDetails.ProveDetails {
-		log.Debugf("node:%s, prove times %d", string(detail.NodeAddr), detail.ProveTimes)
+		log.Debugf("%s, node:%s, prove times %d", fileHashStr, string(detail.NodeAddr), detail.ProveTimes)
 		if detail.ProveTimes == 0 {
 			continue
 		}
@@ -933,7 +933,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList,
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("waitFileReceivers prefix hex: %s", hex.EncodeToString([]byte(prefix)))
+	log.Debugf("waitFileReceivers sessionId: %s prefix hex: %s", sessionId, hex.EncodeToString([]byte(prefix)))
 	msg := message.NewFileFetchAsk(sessionId, fileHashStr, blockHashes, this.WalletAddress(), []byte(prefix))
 	action := func(res proto.Message, addr string) bool {
 		p2pMsg := message.ReadMessage(res)
@@ -950,7 +950,7 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList,
 		fileMsg := p2pMsg.Payload.(*file.File)
 		receivers = append(receivers, addr)
 		receiverBreakpoint[addr] = fileMsg.Breakpoint
-		log.Debugf("send file_ask msg success of file: %s, to: %s, receivers: %v", fileMsg.Hash, addr, receivers)
+		log.Debugf("send file_ask msg success of file: %s, to: %s  receivers: %v", fileMsg.Hash, addr, receivers)
 		if len(receivers) >= receiverCount || len(receivers) >= len(nodeList) {
 			log.Debugf("break receiver goroutine")
 			stop = true

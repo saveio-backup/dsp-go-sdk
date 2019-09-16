@@ -1073,11 +1073,11 @@ func (this *Dsp) downloadFileFromPeers(taskId, fileHashStr string, asset int32, 
 }
 
 // startFetchBlocks for store node, fetch blocks one by one after receive fetch_rdy msg
-func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) error {
+func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr string) error {
 	// my task. use my wallet address
 	log.Debugf("startFetchBlocks: %s", fileHashStr)
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
-	sessionId, err := this.taskMgr.GetSessionId(taskId, walletAddr)
+	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
 	if err != nil {
 		return err
 	}
@@ -1122,7 +1122,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 			Hash:      hash,
 			Operation: netcom.BLOCK_OP_GET,
 			Payment: &payment.Payment{
-				Sender: walletAddr,
+				Sender: this.WalletAddress(),
 				Asset:  common.ASSET_USDT,
 			},
 		})
@@ -1130,7 +1130,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 			continue
 		}
 		var resps []*task.BlockResp
-		resps, err = this.downloadBlockFlights(taskId, fileHashStr, addr, walletAddr, blocks, common.MAX_BLOCK_FETCHED_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
+		resps, err = this.downloadBlockFlights(taskId, fileHashStr, addr, peerWalletAddr, blocks, common.MAX_BLOCK_FETCHED_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
 		if err != nil {
 			return err
 		}
@@ -1167,7 +1167,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, walletAddr string) e
 		return err
 	}
 
-	log.Infof("received all block, start pdp verify")
+	log.Infof("received all block, start pdp verify %s", fileHashStr)
 	// all block is saved, prove it
 	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
 	if err != nil {

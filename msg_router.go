@@ -102,6 +102,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			log.Errorf("add session err in file fetch ask %s", err)
 			return
 		}
+		log.Debugf("add file session success %s-%s-%s", localId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress)
 		newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash(), currentBlockHash, currentBlockIndex)
 		log.Debugf("fetch task is exist send file_ack msg %v", peer)
 		err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
@@ -261,9 +262,6 @@ func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *n
 	// my task. use my wallet address
 	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), task.TaskTypeDownload)
 	log.Debugf("handleFileFetchCancelMsg: of %s, taskId: %s from", fileMsg.Hash, taskId, peer.Address)
-	if !this.taskMgr.IsFileInfoExist(taskId) {
-		return
-	}
 	replyMsg := message.NewEmptyMsg()
 	err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 	if err != nil {
@@ -271,6 +269,10 @@ func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *n
 		return
 	}
 	log.Debugf("reply cancel msg success, cancel fetching blocks")
+	if !this.taskMgr.IsFileInfoExist(taskId) {
+		log.Debugf("file info not exist of canceling file %s", fileMsg.Hash)
+		return
+	}
 	this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
 }
 
@@ -538,7 +540,6 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 		sessionId := blockMsg.SessionId
 		for _, block := range blockFlightsMsg.Blocks {
 			log.Debugf("session: %s handle get block %s-%s-%d from %s", sessionId, block.FileHash, block.Hash, block.Index, peer.Address)
-
 			if len(sessionId) == 0 {
 				return
 			}
@@ -612,7 +613,7 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 	}
 }
 
-// handleBlockMsg handle all file msg
+// handleBlockMsg[Deprecated].  handle all file msg
 func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	blockMsg := msg.Payload.(*block.Block)
 
