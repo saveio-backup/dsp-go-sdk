@@ -514,7 +514,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		return 0, err
 	}
 	log.Debugf("paying to %s, id %v, err:%s", payInfo.WalletAddress, paymentId, err)
-	err = this.Channel.MediaTransfer(paymentId, amount, payInfo.WalletAddress)
+	err = this.Channel.MediaTransfer(paymentId, amount, this.DNS.DNSNode.WalletAddr, payInfo.WalletAddress)
 	if err != nil {
 		log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s", paymentId, payInfo.WalletAddress, err)
 		return 0, err

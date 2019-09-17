@@ -339,7 +339,7 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 		return err
 	}
 
-	success, err := ch_actor.DirectTransferAsync(common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
+	success, err := ch_actor.DirectTransferAsync(common.Address(target), common.TokenAmount(amount), common.PaymentID(paymentId))
 	log.Debugf("media transfer success: %t, err: %s", success, err)
 	if success && err == nil {
 		return nil
@@ -361,7 +361,7 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 	return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t", resp.Reason, resp.Result)
 }
 
-func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) error {
+func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to string) error {
 	log.Debugf("[dsp-go-sdk-channel] MediaTransfer %s", to)
 	if !this.isStart {
 		return errors.New("channel service is not start")
@@ -377,7 +377,11 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, to string) er
 	if err != nil {
 		return err
 	}
-	success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.TokenAmount(amount), common.Address(target), common.PaymentID(paymentId))
+	mediaAddr, err := chaincomm.AddressFromBase58(media)
+	if err != nil {
+		return err
+	}
+	success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.Address(mediaAddr), common.Address(target), common.TokenAmount(amount), common.PaymentID(paymentId))
 	log.Debugf("media transfer success: %t, err: %s", success, err)
 	if success && err == nil {
 		return nil
