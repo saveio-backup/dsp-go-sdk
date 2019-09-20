@@ -70,3 +70,7 @@ func (this *Dsp) GetTaskFileHash(id string) string {
 func (this *Dsp) GetUploadTaskId(fileHashStr string) string {
 	return this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
 }
+
+func (this *Dsp) GetDownloadTaskIdByUrl(url string) string {
+	return this.taskMgr.GetDownloadTaskIdFromUrl(url)
+}

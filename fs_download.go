@@ -88,6 +88,7 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 	this.taskMgr.SetFileHash(taskId, fileHashStr)
 	this.taskMgr.SetFileName(taskId, opt.FileName)
 	this.taskMgr.SetFileOwner(taskId, opt.FileOwner)
+	this.taskMgr.SetUrl(taskId, opt.Url)
 	this.taskMgr.SetWalletAddr(taskId, this.WalletAddress())
 	err = this.taskMgr.BatchCommit(taskId)
 	if err != nil {
@@ -286,6 +287,7 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 		SetFileName: setFileName,
 		FileOwner:   fileOwner,
 		MaxPeerCnt:  maxPeerCnt,
+		Url:         url,
 	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeDownload)
 	if !this.taskMgr.TaskExist(taskId) {
@@ -1167,9 +1169,14 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 		return err
 	}
 
-	log.Infof("received all block, start pdp verify %s", fileHashStr)
 	// all block is saved, prove it
-	err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
+	for i := 0; i < common.MAX_START_PDP_RETRY; i++ {
+		log.Infof("received all block, start pdp verify %s, retry: %d", fileHashStr, i)
+		err = this.Fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
 		log.Errorf("start pdp verify err %s", err)
 		deleteErr := this.DeleteDownloadedFile(taskId)

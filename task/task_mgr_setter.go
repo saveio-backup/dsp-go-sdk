@@ -144,6 +144,14 @@ func (this *TaskMgr) SetBindUrlTx(taskId, tx string) error {
 	return v.SetBindUrlTx(tx)
 }
 
+func (this *TaskMgr) SetUrl(taskId, url string) error {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return fmt.Errorf("task: %s, not exist", taskId)
+	}
+	return v.SetUrl(url)
+}
+
 func (this *TaskMgr) SetFilePath(taskId, path string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

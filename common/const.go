@@ -75,6 +75,7 @@ const (
 	MAX_PUBLIC_IP_UPDATE_SECOND  = 5 * 60 // max update second to update peer host addr cache
 	MAX_BLOCK_FETCHED_RETRY      = 2      // max uploading block be fetched retry
 	MAX_REQ_BLOCK_COUNT          = 16     // max block count when request for download
+	MAX_START_PDP_RETRY          = 2      // max start pdp retry
 )
 
 // task

@@ -318,43 +318,44 @@ func (this *Task) SetOwner(owner string) error {
 
 func (this *Task) SetTaskState(newState TaskState) error {
 	this.lock.Lock()
+	defer this.lock.Unlock()
 	oldState := TaskState(this.info.TaskState)
 	taskType := convertToTaskType(this.info.InfoType)
 	taskId := this.id
-	this.lock.Unlock()
 	switch newState {
 	case TaskStatePause:
 		if oldState == TaskStateFailed || oldState == TaskStateDone {
 			return fmt.Errorf("can't stop a failed or completed task")
 		}
-		this.CleanBlockReqPool()
+		log.Debugf("CleanBlockReqPool")
+		if this.blockReqPool == nil {
+			this.blockReqPool = make([]*GetBlockReq, 0)
+		} else {
+			this.blockReqPool = this.blockReqPool[:0]
+		}
 	case TaskStateDoing:
 		log.Debugf("oldstate:%d, newstate: %d", oldState, newState)
 		if oldState == TaskStateDone {
 			return fmt.Errorf("can't continue a failed or completed task")
 		}
+		this.info.ErrorCode = 0
+		this.info.ErrorMsg = ""
 	case TaskStateDone:
 		log.Debugf("task: %s has done", taskId)
 		switch taskType {
 		case TaskTypeUpload:
-			this.lock.Lock()
 			err := this.db.SaveFileUploaded(taskId)
-			this.lock.Unlock()
 			if err != nil {
 				return err
 			}
 		case TaskTypeDownload:
-			this.lock.Lock()
 			err := this.db.SaveFileDownloaded(taskId)
-			this.lock.Unlock()
 			if err != nil {
 				return err
 			}
 		}
 	case TaskStateCancel:
 	}
-	this.lock.Lock()
-	defer this.lock.Unlock()
 	this.info.TaskState = uint64(newState)
 	changeFromPause := (oldState == TaskStatePause && (newState == TaskStateDoing || newState == TaskStateCancel))
 	changeFromDoing := (oldState == TaskStateDoing && (newState == TaskStatePause || newState == TaskStateCancel))
@@ -865,17 +866,6 @@ func (this *Task) DelBlockReqFromPool(blockHash string, index int32) {
 	log.Debugf("block req pool len: %d", len(this.blockReqPool))
 }
 
-func (this *Task) CleanBlockReqPool() {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	log.Debugf("CleanBlockReqPool")
-	if this.blockReqPool == nil {
-		this.blockReqPool = make([]*GetBlockReq, 0)
-		return
-	}
-	this.blockReqPool = this.blockReqPool[:]
-}
-
 func (this *Task) GetBlockReqPool() []*GetBlockReq {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
@@ -948,6 +938,12 @@ func (this *Task) GetUpdatedAt() uint64 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.info.UpdatedAt
+}
+
+func (this *Task) GetUrl() string {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.info.Url
 }
 
 func newTask(id string, info *store.FileInfo, db *store.FileDB) *Task {

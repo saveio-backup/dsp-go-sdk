@@ -860,6 +860,26 @@ func TestBindDns(t *testing.T) {
 	fmt.Printf("hash: %s\n", hash)
 }
 
+func TestGetHashFromUrl(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddrs: []string{rpcAddr},
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc, nil)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	hash := d.GetFileHashFromUrl("oni://share/ecb0ef5d")
+	fmt.Printf("hash: %s\n", hash)
+}
 func TestQueryDns(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddrs: []string{rpcAddr},

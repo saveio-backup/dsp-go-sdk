@@ -392,7 +392,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("fileHashStr :%v", fileHashStr)
+	log.Debugf("cancel upload task id: %s,  fileHash: %v", taskId, fileHashStr)
 	if len(fileHashStr) == 0 {
 		err = this.taskMgr.CleanTask(taskId)
 		if err == nil {
@@ -1261,7 +1261,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 		log.Errorf("%v, err %s", sendLogMsg, err)
 		return false, err
 	}
-	log.Debugf("send block success %s, used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
+	log.Debugf("send block success %s\n used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
 
 	// stored
 	this.taskMgr.SetBlocksUploaded(taskId, nodeAddr, blockInfos)

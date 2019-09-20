@@ -816,3 +816,18 @@ func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
 	log.Debugf("v.state: %d", v.State())
 	return v.State() == TaskStateFailed, nil
 }
+
+func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	for id, t := range this.tasks {
+		if t.GetTaskType() != TaskTypeDownload {
+			continue
+		}
+		if t.GetUrl() != url {
+			continue
+		}
+		return id
+	}
+	return ""
+}

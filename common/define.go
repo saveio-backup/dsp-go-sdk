@@ -44,4 +44,5 @@ type DownloadOption struct {
 	Free        bool
 	SetFileName bool
 	MaxPeerCnt  int
+	Url         string
 }
