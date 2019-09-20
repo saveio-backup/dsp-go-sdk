@@ -1176,6 +1176,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 		if err == nil {
 			break
 		}
+		time.Sleep(time.Duration(common.START_PDP_RETRY_DELAY) * time.Second)
 	}
 	if err != nil {
 		log.Errorf("start pdp verify err %s", err)

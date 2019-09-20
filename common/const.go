@@ -76,6 +76,7 @@ const (
 	MAX_BLOCK_FETCHED_RETRY      = 2      // max uploading block be fetched retry
 	MAX_REQ_BLOCK_COUNT          = 16     // max block count when request for download
 	MAX_START_PDP_RETRY          = 2      // max start pdp retry
+	START_PDP_RETRY_DELAY        = 5      // delay pdp retry
 )
 
 // task
