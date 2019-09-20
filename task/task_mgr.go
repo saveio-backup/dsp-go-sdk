@@ -831,3 +831,15 @@ func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {
 	}
 	return ""
 }
+
+func (this *TaskMgr) GetUrlOfUploadedfile(fileHash, walletAddr string) string {
+	id := this.TaskId(fileHash, walletAddr, TaskTypeUpload)
+	v, ok := this.GetTaskById(id)
+	if !ok {
+		return ""
+	}
+	if v.State() != TaskStateDone {
+		return ""
+	}
+	return v.GetUrl()
+}

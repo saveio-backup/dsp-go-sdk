@@ -74,3 +74,7 @@ func (this *Dsp) GetUploadTaskId(fileHashStr string) string {
 func (this *Dsp) GetDownloadTaskIdByUrl(url string) string {
 	return this.taskMgr.GetDownloadTaskIdFromUrl(url)
 }
+
+func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
+	return this.taskMgr.GetUrlOfUploadedfile(fileHashStr, this.WalletAddress())
+}

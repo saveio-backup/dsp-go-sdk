@@ -320,6 +320,10 @@ func (this *Task) SetTaskState(newState TaskState) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	oldState := TaskState(this.info.TaskState)
+	if oldState == newState {
+		log.Debugf("set task with same state id: %s, state: %d", this.id, oldState)
+		return nil
+	}
 	taskType := convertToTaskType(this.info.InfoType)
 	taskId := this.id
 	switch newState {
