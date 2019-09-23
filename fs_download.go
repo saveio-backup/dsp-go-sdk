@@ -61,7 +61,11 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 			log.Errorf("download file %s err %s", fileHashStr, err)
 		}
 		log.Debugf("emit ret %s %s", taskId, err)
-		this.taskMgr.EmitResult(taskId, nil, sdkErr)
+		if sdkErr != nil {
+			this.taskMgr.EmitResult(taskId, nil, sdkErr)
+		} else {
+			this.taskMgr.EmitResult(taskId, "", sdkErr)
+		}
 		// delete task from cache in the end
 		if this.taskMgr.IsFileDownloaded(taskId) && sdkErr == nil {
 			this.taskMgr.DeleteTask(taskId)

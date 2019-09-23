@@ -1262,6 +1262,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 		return false, err
 	}
 	log.Debugf("send block success %s\n used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
+	// TODO: add pause here
 
 	// stored
 	this.taskMgr.SetBlocksUploaded(taskId, nodeAddr, blockInfos)

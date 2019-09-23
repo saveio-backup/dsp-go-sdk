@@ -324,8 +324,6 @@ func (this *Task) SetTaskState(newState TaskState) error {
 		log.Debugf("set task with same state id: %s, state: %d", this.id, oldState)
 		return nil
 	}
-	taskType := convertToTaskType(this.info.InfoType)
-	taskId := this.id
 	switch newState {
 	case TaskStatePause:
 		if oldState == TaskStateFailed || oldState == TaskStateDone {
@@ -345,19 +343,7 @@ func (this *Task) SetTaskState(newState TaskState) error {
 		this.info.ErrorCode = 0
 		this.info.ErrorMsg = ""
 	case TaskStateDone:
-		log.Debugf("task: %s has done", taskId)
-		switch taskType {
-		case TaskTypeUpload:
-			err := this.db.SaveFileUploaded(taskId)
-			if err != nil {
-				return err
-			}
-		case TaskTypeDownload:
-			err := this.db.SaveFileDownloaded(taskId)
-			if err != nil {
-				return err
-			}
-		}
+		log.Debugf("task: %s has done", this.id)
 	case TaskStateCancel:
 	}
 	this.info.TaskState = uint64(newState)
@@ -443,8 +429,21 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	if errorCode != 0 {
 		this.info.TaskState = uint64(TaskStateFailed)
 	} else if result != nil {
+		log.Debugf("task: %s has done", this.id)
 		this.info.Result = result
 		this.info.TaskState = uint64(TaskStateDone)
+		switch convertToTaskType(this.info.InfoType) {
+		case TaskTypeUpload:
+			err := this.db.SaveFileUploaded(this.id)
+			if err != nil {
+				return err
+			}
+		case TaskTypeDownload:
+			err := this.db.SaveFileDownloaded(this.id)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	if this.batch {
 		return nil

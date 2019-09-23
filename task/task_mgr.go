@@ -106,6 +106,38 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 	return nil
 }
 
+func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, walletAddr string) error {
+	for _, fileHashStr := range fileHashStrs {
+		id := this.TaskId(fileHashStr, walletAddr, TaskTypeUpload)
+		t, ok := this.GetTaskById(id)
+		if ok && t != nil {
+			continue
+		}
+		newId, err := this.NewTask(TaskTypeUpload)
+		if err != nil {
+			return err
+		}
+		this.NewBatchSet(newId)
+		this.SetFileHash(newId, fileHashStr)
+		this.SetWalletAddr(newId, walletAddr)
+		err = this.BatchCommit(newId)
+		if err != nil {
+			return err
+		}
+		err = this.BindTaskId(newId)
+		if err != nil {
+			return err
+		}
+		t, _ = this.GetTaskById(newId)
+		if t == nil {
+			return fmt.Errorf("set new task with id failed %s", newId)
+		}
+		log.Debugf("recover db loss task %s %s", newId, fileHashStr)
+		t.SetResult(nil, sdkErr.GET_FILEINFO_FROM_DB_ERROR, "get task from DB failed")
+	}
+	return nil
+}
+
 // TaskId from hash-walletaddress-type
 func (this *TaskMgr) TaskId(prefix, walletAddress string, tp TaskType) string {
 	var key string
@@ -359,10 +391,6 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *sdkErr.S
 		err := v.SetResult(ret, 0, "")
 		if err != nil {
 			log.Errorf("set task result err %s, %s", taskId, err)
-		}
-		err = v.SetTaskState(TaskStateDone)
-		if err != nil {
-			log.Errorf("set task state err %s, %s", taskId, err)
 		}
 	}
 	pInfo := v.GetProgressInfo()
