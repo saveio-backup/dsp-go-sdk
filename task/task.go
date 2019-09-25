@@ -12,16 +12,6 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
-type TaskType int
-
-const (
-	TaskTypeNone TaskType = iota
-	TaskTypeUpload
-	TaskTypeDownload
-	TaskTypeShare
-	TaskTypeBackup
-)
-
 type GetBlockReq struct {
 	TimeStamp     int64
 	FileHash      string
@@ -43,7 +33,7 @@ type BlockResp struct {
 
 type ProgressInfo struct {
 	TaskId        string
-	Type          TaskType          // task type
+	Type          store.TaskType    // task type
 	StoreType     uint64            // store type
 	FileName      string            // file name
 	FileHash      string            // file hash
@@ -106,7 +96,7 @@ const (
 
 type Task struct {
 	id           string // id
-	info         *store.FileInfo
+	info         *store.TaskInfo
 	peerSenIds   map[string]string // request peerAddr <=> session id
 	transferring bool              // fetch is transferring flag
 	// TODO: refactor, delete below two channels, use request and reply
@@ -124,25 +114,18 @@ type Task struct {
 }
 
 // NewTask. new task for file, and set the task info to DB.
-func NewTask(taskT TaskType, db *store.FileDB) *Task {
+func NewTask(taskT store.TaskType, db *store.FileDB) *Task {
 	id, _ := uuid.NewUUID()
-	var err error
-	var info *store.FileInfo
-	switch taskT {
-	case TaskTypeUpload:
-		info, err = db.NewFileInfo(id.String(), store.FileInfoTypeUpload)
-	case TaskTypeDownload:
-		info, err = db.NewFileInfo(id.String(), store.FileInfoTypeDownload)
-	case TaskTypeShare:
-		info, err = db.NewFileInfo(id.String(), store.FileInfoTypeShare)
-	}
+	info, err := db.NewTaskInfo(id.String(), taskT)
 	if err != nil {
+		log.Errorf("new file info failed %s", err)
 		return nil
 	}
 	t := newTask(id.String(), info, db)
 	t.info.TaskState = uint64(TaskStatePrepare)
 	err = db.SaveFileInfo(t.info)
 	if err != nil {
+		log.Debugf("save file info failed err %s", err)
 		return nil
 	}
 	return t
@@ -150,7 +133,7 @@ func NewTask(taskT TaskType, db *store.FileDB) *Task {
 
 // NewTaskFromDB. Read file info from DB and recover a task by the file info.
 func NewTaskFromDB(id string, db *store.FileDB) *Task {
-	info, err := db.GetFileInfo([]byte(id))
+	info, err := db.GetFileInfo(id)
 	if err != nil {
 		log.Errorf("[Task NewTaskFromDB] get file info failed, id: %s", id)
 		return nil
@@ -184,14 +167,14 @@ func NewTaskFromDB(id string, db *store.FileDB) *Task {
 		log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
 		t.peerSenIds[session.WalletAddr] = session.SessionId
 	}
-	log.Debugf("recover task store type: %d", t.info.StoreType)
+	log.Debugf("NewTaskFromDB store type: %d", t.info.StoreType)
 	return t
 }
 
-func (this *Task) GetTaskType() TaskType {
+func (this *Task) GetTaskType() store.TaskType {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	return convertToTaskType(this.info.InfoType)
+	return this.info.Type
 }
 
 func (this *Task) SetSessionId(peerWalletAddr, id string) {
@@ -432,13 +415,13 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 		log.Debugf("task: %s has done", this.id)
 		this.info.Result = result
 		this.info.TaskState = uint64(TaskStateDone)
-		switch convertToTaskType(this.info.InfoType) {
-		case TaskTypeUpload:
+		switch this.info.Type {
+		case store.TaskTypeUpload:
 			err := this.db.SaveFileUploaded(this.id)
 			if err != nil {
 				return err
 			}
-		case TaskTypeDownload:
+		case store.TaskTypeDownload:
 			err := this.db.SaveFileDownloaded(this.id)
 			if err != nil {
 				return err
@@ -497,9 +480,8 @@ func (this *Task) BindIdWithWalletAddr() error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	prefix := ""
-	taskType := convertToTaskType(this.info.InfoType)
-	switch taskType {
-	case TaskTypeUpload:
+	switch this.info.Type {
+	case store.TaskTypeUpload:
 		if len(this.info.FileHash) == 0 {
 			prefix = utils.StringToSha256Hex(this.info.FilePath)
 		} else {
@@ -508,7 +490,7 @@ func (this *Task) BindIdWithWalletAddr() error {
 	default:
 		prefix = this.info.FileHash
 	}
-	key := taskIdKey(prefix, this.info.WalletAddress, taskType)
+	key := taskIdKey(prefix, this.info.WalletAddress, this.info.Type)
 	return this.db.SaveFileInfoId(key, this.id)
 }
 
@@ -519,7 +501,7 @@ func (this *Task) AddUploadedBlock(id, blockHashStr, nodeAddr string, index uint
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.db.GetFileInfo([]byte(id))
+	newInfo, err := this.db.GetFileInfo(id)
 	if err != nil {
 		return err
 	}
@@ -534,7 +516,7 @@ func (this *Task) SetBlocksUploaded(id, nodeAddr string, blockInfos []*store.Blo
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.db.GetFileInfo([]byte(id))
+	newInfo, err := this.db.GetFileInfo(id)
 	if err != nil {
 		return err
 	}
@@ -549,7 +531,7 @@ func (this *Task) SetUploadProgressDone(id, nodeAddr string) error {
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.db.GetFileInfo([]byte(id))
+	newInfo, err := this.db.GetFileInfo(id)
 	if err != nil {
 		return err
 	}
@@ -564,7 +546,7 @@ func (this *Task) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index ui
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.db.GetFileInfo([]byte(id))
+	newInfo, err := this.db.GetFileInfo(id)
 	if err != nil {
 		return err
 	}
@@ -681,7 +663,7 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 
 	pInfo := &ProgressInfo{
 		TaskId:        this.id,
-		Type:          convertToTaskType(this.info.InfoType),
+		Type:          this.info.Type,
 		StoreType:     this.info.StoreType,
 		FileName:      this.info.FileName,
 		FileHash:      this.info.FileHash,
@@ -949,7 +931,7 @@ func (this *Task) GetUrl() string {
 	return this.info.Url
 }
 
-func newTask(id string, info *store.FileInfo, db *store.FileDB) *Task {
+func newTask(id string, info *store.TaskInfo, db *store.FileDB) *Task {
 	t := &Task{
 		id:            id,
 		info:          info,
@@ -963,24 +945,6 @@ func newTask(id string, info *store.FileInfo, db *store.FileDB) *Task {
 	return t
 }
 
-func taskIdKey(hash, walletAddress string, taskType TaskType) string {
-	key := fmt.Sprintf("%s-%s-%d", hash, walletAddress, taskType)
-	return key
-}
-
-// convertToTaskType. backward compatible
-func convertToTaskType(infoType store.FileInfoType) TaskType {
-	switch infoType {
-	case store.FileInfoTypeNone:
-		return TaskTypeNone
-	case store.FileInfoTypeUpload:
-		return TaskTypeUpload
-	case store.FileInfoTypeDownload:
-		return TaskTypeDownload
-	case store.FileInfoTypeShare:
-		return TaskTypeShare
-	case store.FileInfoTypeBackup:
-		return TaskTypeBackup
-	}
-	return TaskTypeNone
+func taskIdKey(hash, walletAddress string, taskType store.TaskType) string {
+	return store.TaskIdWithFile(hash, walletAddress, taskType)
 }

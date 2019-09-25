@@ -18,3 +18,13 @@ func FileExisted(filename string) bool {
 func ConntextTimeoutErr(err error) bool {
 	return strings.Contains(err.Error(), "context deadline exceeded")
 }
+
+func CreateDirIfNeed(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

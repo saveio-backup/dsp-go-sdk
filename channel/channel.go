@@ -3,7 +3,6 @@ package channel
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -68,11 +67,9 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 		BlockDelay:    cfg.BlockDelay,
 	}
 	log.Debugf("pylons cfg: %v", channelConfig)
-	if _, err := os.Stat(channelConfig.DBPath); os.IsNotExist(err) {
-		err = os.MkdirAll(channelConfig.DBPath, 0755)
-		if err != nil {
-			return nil, err
-		}
+	err := dspcom.CreateDirIfNeed(channelConfig.DBPath)
+	if err != nil {
+		return nil, err
 	}
 	//start channel and actor
 	channelActor, err := ch_actor.NewChannelActor(channelConfig, chain.Native.Channel.DefAcc)

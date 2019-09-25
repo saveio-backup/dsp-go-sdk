@@ -1,9 +1,43 @@
 package dsp
 
 import (
+	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
 )
+
+func (this *Dsp) RecoverDBLossTask() error {
+	list, err := this.Chain.Native.Fs.GetFileList(this.Account.Address)
+	if err != nil {
+		log.Errorf("get file list err %s", err)
+	}
+	uploadHashes := make([]string, 0, int(list.FileNum))
+	nameMap := make(map[string]string, 0)
+	for _, h := range list.List {
+		fileHashStr := string(h.Hash)
+		id := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeUpload)
+		t, ok := this.taskMgr.GetTaskById(id)
+		if ok && t != nil {
+			continue
+		}
+		info, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
+		if info == nil {
+			log.Debugf("info is nil : %v", fileHashStr)
+			continue
+		}
+		uploadHashes = append(uploadHashes, string(h.Hash))
+		nameMap[fileHashStr] = string(info.FileDesc)
+	}
+	if len(uploadHashes) == 0 {
+		return nil
+	}
+	log.Debugf("recover task : %v, %v", uploadHashes, nameMap)
+	err = this.taskMgr.RecoverDBLossTask(uploadHashes, nameMap, this.WalletAddress())
+	if err != nil {
+		log.Errorf("recover DB loss task err %s", err)
+	}
+	return err
+}
 
 func (this *Dsp) GetProgressInfo(taskId string) *task.ProgressInfo {
 	return this.taskMgr.GetProgressInfo(taskId)
@@ -68,13 +102,22 @@ func (this *Dsp) GetTaskFileHash(id string) string {
 }
 
 func (this *Dsp) GetUploadTaskId(fileHashStr string) string {
-	return this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), task.TaskTypeUpload)
+	return this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeUpload)
 }
 
 func (this *Dsp) GetDownloadTaskIdByUrl(url string) string {
-	return this.taskMgr.GetDownloadTaskIdFromUrl(url)
+	fileHash := this.GetFileHashFromUrl(url)
+	return this.taskMgr.TaskId(fileHash, this.WalletAddress(), store.TaskTypeDownload)
 }
 
 func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
 	return this.taskMgr.GetUrlOfUploadedfile(fileHashStr, this.WalletAddress())
+}
+
+func (this *Dsp) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse bool) []string {
+	return this.taskMgr.GetTaskIdList(offset, limit, ft, allType, reverse)
+}
+
+func (this *Dsp) DeleteTaskIds(ids []string) error {
+	return this.taskMgr.DeleteTaskIds(ids)
 }

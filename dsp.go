@@ -59,18 +59,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 		if err != nil {
 			log.Errorf("recover undone task err %s", err)
 		}
-		list, err := d.Chain.Native.Fs.GetFileList(d.Account.Address)
-		if err != nil {
-			log.Errorf("get file list err %s", err)
-		}
-		uploadHashes := make([]string, 0, int(list.FileNum))
-		for _, h := range list.List {
-			uploadHashes = append(uploadHashes, string(h.Hash))
-		}
-		err = d.taskMgr.RecoverDBLossTask(uploadHashes, d.Account.Address.ToBase58())
-		if err != nil {
-			log.Errorf("recover DB loss task err %s", err)
-		}
+		go d.RecoverDBLossTask()
 	}
 	if len(c.FsRepoRoot) > 0 {
 		var err error

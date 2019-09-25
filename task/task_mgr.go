@@ -50,7 +50,7 @@ func (this *TaskMgr) CloseDB() error {
 }
 
 // NewTask. start a task for a file
-func (this *TaskMgr) NewTask(taskT TaskType) (string, error) {
+func (this *TaskMgr) NewTask(taskT store.TaskType) (string, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	t := NewTask(taskT, this.db)
@@ -76,12 +76,12 @@ func (this *TaskMgr) BindTaskId(id string) error {
 func (this *TaskMgr) RecoverUndoneTask() error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	taskIds, err := this.db.UndoneList(store.FileInfoTypeUpload)
+	taskIds, err := this.db.UndoneList(store.TaskTypeUpload)
 	if err != nil {
 		return err
 	}
 	unloadTaskLen := len(taskIds)
-	downloadTaskIds, err := this.db.UndoneList(store.FileInfoTypeDownload)
+	downloadTaskIds, err := this.db.UndoneList(store.TaskTypeDownload)
 	if err != nil {
 		return err
 	}
@@ -95,9 +95,9 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 		if t.State() == TaskStateDone {
 			log.Warnf("task is done %s", id)
 			if i < unloadTaskLen {
-				this.db.RemoveFromUndoneList(nil, id, store.FileInfoTypeUpload)
+				this.db.RemoveFromUndoneList(nil, id, store.TaskTypeUpload)
 			} else {
-				this.db.RemoveFromUndoneList(nil, id, store.FileInfoTypeDownload)
+				this.db.RemoveFromUndoneList(nil, id, store.TaskTypeDownload)
 			}
 			continue
 		}
@@ -106,20 +106,21 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 	return nil
 }
 
-func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, walletAddr string) error {
+func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, fileNameMap map[string]string, walletAddr string) error {
 	for _, fileHashStr := range fileHashStrs {
-		id := this.TaskId(fileHashStr, walletAddr, TaskTypeUpload)
+		id := this.TaskId(fileHashStr, walletAddr, store.TaskTypeUpload)
 		t, ok := this.GetTaskById(id)
 		if ok && t != nil {
 			continue
 		}
-		newId, err := this.NewTask(TaskTypeUpload)
+		newId, err := this.NewTask(store.TaskTypeUpload)
 		if err != nil {
 			return err
 		}
 		this.NewBatchSet(newId)
 		this.SetFileHash(newId, fileHashStr)
 		this.SetWalletAddr(newId, walletAddr)
+		this.SetFileName(newId, fileNameMap[fileHashStr])
 		err = this.BatchCommit(newId)
 		if err != nil {
 			return err
@@ -133,16 +134,16 @@ func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, walletAddr string)
 			return fmt.Errorf("set new task with id failed %s", newId)
 		}
 		log.Debugf("recover db loss task %s %s", newId, fileHashStr)
-		t.SetResult(nil, sdkErr.GET_FILEINFO_FROM_DB_ERROR, "get task from DB failed")
+		t.SetResult(nil, sdkErr.GET_FILEINFO_FROM_DB_ERROR, "DB has damaged. Can't recover the task")
 	}
 	return nil
 }
 
 // TaskId from hash-walletaddress-type
-func (this *TaskMgr) TaskId(prefix, walletAddress string, tp TaskType) string {
+func (this *TaskMgr) TaskId(prefix, walletAddress string, tp store.TaskType) string {
 	var key string
 	switch tp {
-	case TaskTypeUpload:
+	case store.TaskTypeUpload:
 		// use filePath to get id
 		hexStr := utils.StringToSha256Hex(prefix)
 		key = taskIdKey(hexStr, walletAddress, tp)
@@ -154,7 +155,7 @@ func (this *TaskMgr) TaskId(prefix, walletAddress string, tp TaskType) string {
 		key = taskIdKey(prefix, walletAddress, tp)
 		id, _ = this.db.GetFileInfoId(key)
 		return id
-	case TaskTypeDownload, TaskTypeShare:
+	case store.TaskTypeDownload, store.TaskTypeShare:
 		key = taskIdKey(prefix, walletAddress, tp)
 		id, _ := this.db.GetFileInfoId(key)
 		return id
@@ -171,55 +172,9 @@ func (this *TaskMgr) DeleteTask(taskId string) {
 
 // CleanTask. clean task from memory and DB
 func (this *TaskMgr) CleanTask(taskId string) error {
-	var fileHash, walletAddress, filePath string
-	var tp TaskType
 	this.lock.Lock()
-	task, ok := this.tasks[taskId]
-	if !ok {
-		fileInfo, err := this.db.GetFileInfo([]byte(taskId))
-		if err != nil {
-			this.lock.Unlock()
-			return err
-		}
-		if fileInfo != nil {
-			fileHash = fileInfo.FileHash
-			walletAddress = fileInfo.WalletAddress
-			switch fileInfo.InfoType {
-			case store.FileInfoTypeUpload:
-				tp = TaskTypeUpload
-			case store.FileInfoTypeDownload:
-				tp = TaskTypeDownload
-			case store.FileInfoTypeShare:
-				tp = TaskTypeShare
-			}
-			filePath = fileInfo.FilePath
-			log.Debugf("get value from db hash :%v, wallet: %v, tp: %v, path: %v", fileHash, walletAddress, tp, filePath)
-		}
-	} else {
-		fileHash = task.GetFileHash()
-		walletAddress = task.GetWalletAddr()
-		tp = task.GetTaskType()
-		filePath = task.GetFilePath()
-	}
 	delete(this.tasks, taskId)
 	this.lock.Unlock()
-	log.Debugf(" will delete db info")
-	if tp == TaskTypeUpload && len(filePath) > 0 {
-		hexStr := utils.StringToSha256Hex(filePath)
-		key := taskIdKey(hexStr, walletAddress, tp)
-		err := this.db.DeleteFileInfoId(key)
-		if err != nil {
-			log.Debugf("delete file info err %s", err)
-			return err
-		}
-	}
-	key := taskIdKey(fileHash, walletAddress, tp)
-	log.Debugf("delete local file info key %s", key)
-	err := this.db.DeleteFileInfoId(key)
-	if err != nil {
-		log.Errorf("delete file info id err %s", err)
-		return err
-	}
 	return this.db.DeleteFileInfo(taskId)
 }
 
@@ -232,7 +187,7 @@ func (this *TaskMgr) ShareTaskNum() int {
 	defer this.lock.RUnlock()
 	cnt := 0
 	for _, t := range this.tasks {
-		if t.State() == TaskStateDoing && t.GetTaskType() == TaskTypeShare {
+		if t.State() == TaskStateDoing && t.GetTaskType() == store.TaskTypeShare {
 			cnt++
 		}
 	}
@@ -275,7 +230,8 @@ func (this *TaskMgr) UploadingFileExist(taskId, fileHashStr string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	for _, t := range this.tasks {
-		if t.GetFileHash() == fileHashStr && t.GetId() != taskId {
+		if t.GetFileHash() == fileHashStr && t.GetId() != taskId && t.GetTaskType() == store.TaskTypeUpload {
+			log.Debugf("t.hash %s, id %s , new id %s, type %v", fileHashStr, t.GetId(), taskId, t.GetTaskType())
 			return true
 		}
 	}
@@ -849,7 +805,7 @@ func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	for id, t := range this.tasks {
-		if t.GetTaskType() != TaskTypeDownload {
+		if t.GetTaskType() != store.TaskTypeDownload {
 			continue
 		}
 		if t.GetUrl() != url {
@@ -861,7 +817,7 @@ func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {
 }
 
 func (this *TaskMgr) GetUrlOfUploadedfile(fileHash, walletAddr string) string {
-	id := this.TaskId(fileHash, walletAddr, TaskTypeUpload)
+	id := this.TaskId(fileHash, walletAddr, store.TaskTypeUpload)
 	v, ok := this.GetTaskById(id)
 	if !ok {
 		return ""

@@ -3,8 +3,11 @@ package store
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 )
+
+var localTestDBPath = "./testdb"
 
 func TestGetFileUploadInfo(t *testing.T) {
 	dbPath := "../testdata/db1"
@@ -24,6 +27,52 @@ func TestPutFileUploadInfo(t *testing.T) {
 	}
 	fileDB := NewFileDB(db)
 	fmt.Printf("DB: %v\n", fileDB)
+}
+
+func TestPutLargeSlice(t *testing.T) {
+	err := os.MkdirAll(localTestDBPath, 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := NewLevelDBStore(localTestDBPath)
+	if err != nil || db == nil {
+		t.Fatal(err)
+	}
+	fileDB := NewFileDB(db)
+	largeDBSliceKey := "largeDBSliceKey"
+
+	sliceStr := "00e43174-dab8-11e9-8736-e470b8115fb3"
+	largeSlice := make([]string, 0)
+	testLen := 1000000
+	for i := 0; i < testLen; i++ {
+		largeSlice = append(largeSlice, sliceStr)
+	}
+	largeSliceBuf, err := json.Marshal(largeSlice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("largeSliceLen: %d, buf size: %dMB\n", len(largeSlice), len(largeSliceBuf)/1024/1024)
+	err = fileDB.db.Put([]byte(largeDBSliceKey), largeSliceBuf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	largeSliceBuf2, err := fileDB.db.Get([]byte(largeDBSliceKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	largeSlice2 := make([]string, 0)
+	err = json.Unmarshal(largeSliceBuf2, &largeSlice2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(largeSlice2) != testLen {
+		t.Fatalf("recover test len not equal to %d", testLen)
+	}
+	err = os.RemoveAll(localTestDBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestGetBlockOffset(t *testing.T) {

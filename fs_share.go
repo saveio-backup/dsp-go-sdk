@@ -7,6 +7,7 @@ import (
 	netcomm "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
+	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
 )
@@ -38,7 +39,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s", taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[0].WalletAddress, req[0].PeerAddr,
 		req[len(req)-1].FileHash, req[len(req)-1].Hash, req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
 	for _, blockmsg := range req {
-		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, task.TaskTypeShare)
+		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare)
 		reqWalletAddr = blockmsg.WalletAddress
 		reqAsset = blockmsg.Asset
 		// check if has unpaid block request
@@ -54,7 +55,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 			log.Errorf("get block data empty %s", blockmsg.Hash)
 			return
 		}
-		downloadTaskKey := this.taskMgr.TaskId(blockmsg.FileHash, this.WalletAddress(), task.TaskTypeDownload)
+		downloadTaskKey := this.taskMgr.TaskId(blockmsg.FileHash, this.WalletAddress(), store.TaskTypeDownload)
 		offset, err := this.taskMgr.GetBlockOffset(downloadTaskKey, blockmsg.Hash, uint32(blockmsg.Index))
 		if err != nil {
 			log.Errorf("share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s", taskId, downloadTaskKey, blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, offset, blockmsg.PeerAddr, err)

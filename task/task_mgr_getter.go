@@ -16,12 +16,12 @@ func (this *TaskMgr) GetSessionId(taskId, peerWalletAddr string) (string, error)
 		return "", fmt.Errorf("task: %s, not exist", taskId)
 	}
 	switch v.GetTaskType() {
-	case TaskTypeUpload:
+	case store.TaskTypeUpload:
 		// upload or share task, local node is a server
 		return taskId, nil
-	case TaskTypeShare:
+	case store.TaskTypeShare:
 		return taskId, nil
-	case TaskTypeDownload:
+	case store.TaskTypeDownload:
 		return v.GetSessionId(peerWalletAddr), nil
 	}
 	return "", fmt.Errorf("unknown task type %d", v.GetTaskType())
@@ -36,10 +36,10 @@ func (this *TaskMgr) FileNameFromTask(taskId string) (string, error) {
 }
 
 // TaskType.
-func (this *TaskMgr) TaskType(taskId string) (TaskType, error) {
+func (this *TaskMgr) TaskType(taskId string) (store.TaskType, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return TaskTypeNone, fmt.Errorf("task: %s, not exist", taskId)
+		return store.TaskTypeNone, fmt.Errorf("task: %s, not exist", taskId)
 	}
 	return v.GetTaskType(), nil
 }
@@ -201,8 +201,8 @@ func (this *TaskMgr) IsFileDownloaded(id string) bool {
 	return this.db.IsFileDownloaded(id)
 }
 
-func (this *TaskMgr) GetFileInfo(id string) (*store.FileInfo, error) {
-	return this.db.GetFileInfo([]byte(id))
+func (this *TaskMgr) GetFileInfo(id string) (*store.TaskInfo, error) {
+	return this.db.GetFileInfo(id)
 }
 
 func (this *TaskMgr) IsBlockDownloaded(id, blockHashStr string, index uint32) bool {
@@ -232,7 +232,7 @@ func (this *TaskMgr) IsFileInfoExist(id string) bool {
 	return this.db.IsFileInfoExist(id)
 }
 
-func (this *TaskMgr) AllDownloadFiles() ([]*store.FileInfo, []string, error) {
+func (this *TaskMgr) AllDownloadFiles() ([]*store.TaskInfo, []string, error) {
 	return this.db.AllDownloadFiles()
 }
 
@@ -242,4 +242,8 @@ func (this *TaskMgr) CanShareTo(id, walletAddress string, asset int32) (bool, er
 
 func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint32) (uint64, error) {
 	return this.db.GetBlockOffset(id, blockHash, index)
+}
+
+func (this *TaskMgr) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse bool) []string {
+	return this.db.GetTaskIdList(offset, limit, ft, allType, reverse)
 }

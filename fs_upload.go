@@ -50,7 +50,7 @@ func (this *Dsp) CalculateUploadFee(opt *fs.UploadOption) (*fs.StorageFee, error
 
 // UploadTaskExist. check if upload task is existed by filePath hash string
 func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
-	taskId := this.taskMgr.TaskId(filePath, this.WalletAddress(), task.TaskTypeUpload)
+	taskId := this.taskMgr.TaskId(filePath, this.WalletAddress(), store.TaskTypeUpload)
 	if len(taskId) == 0 {
 		return false, nil
 	}
@@ -85,7 +85,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	var err error
 	newTask := false
 	if len(taskId) == 0 {
-		taskId, err = this.taskMgr.NewTask(task.TaskTypeUpload)
+		taskId, err = this.taskMgr.NewTask(store.TaskTypeUpload)
 		newTask = true
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
@@ -324,7 +324,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 // PauseUpload. pause a task
 func (this *Dsp) PauseUpload(taskId string) error {
 	taskType, _ := this.taskMgr.TaskType(taskId)
-	if taskType != task.TaskTypeUpload {
+	if taskType != store.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
 	canPause, err := this.taskMgr.IsTaskCanPause(taskId)
@@ -346,7 +346,7 @@ func (this *Dsp) PauseUpload(taskId string) error {
 
 func (this *Dsp) ResumeUpload(taskId string) error {
 	taskType, _ := this.taskMgr.TaskType(taskId)
-	if taskType != task.TaskTypeUpload {
+	if taskType != store.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
 	canResume, err := this.taskMgr.IsTaskCanResume(taskId)
@@ -369,7 +369,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 
 func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, error) {
 	taskType, _ := this.taskMgr.TaskType(taskId)
-	if taskType != task.TaskTypeUpload {
+	if taskType != store.TaskTypeUpload {
 		return nil, fmt.Errorf("task %s is not a upload task", taskId)
 	}
 	cancel, err := this.taskMgr.IsTaskCancel(taskId)
@@ -431,7 +431,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 
 func (this *Dsp) RetryUpload(taskId string) error {
 	taskType, _ := this.taskMgr.TaskType(taskId)
-	if taskType != task.TaskTypeUpload {
+	if taskType != store.TaskTypeUpload {
 		return fmt.Errorf("task %s is not a upload task", taskId)
 	}
 	failed, err := this.taskMgr.IsTaskFailed(taskId)
@@ -700,6 +700,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 func (this *Dsp) checkFileHasUpload(taskId, fileHashStr string) bool {
 	info, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
 	if info != nil {
+		log.Debugf("checkFileHasUpload fileinfo exist %s", fileHashStr)
 		return true
 	}
 	return this.taskMgr.UploadingFileExist(taskId, fileHashStr)

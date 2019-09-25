@@ -346,7 +346,7 @@ func (this *Dsp) PushLocalFilesToTrackers() {
 
 func (this *Dsp) RegisterFileUrl(url, link string) (string, error) {
 	urlPrefix := common.FILE_URL_CUSTOM_HEADER
-	if !strings.HasPrefix(url, urlPrefix) {
+	if !strings.HasPrefix(url, urlPrefix) && !strings.HasPrefix(url, common.FILE_URL_CUSTOM_HEADER_PROTOCOL) {
 		return "", fmt.Errorf("url should start with %s", urlPrefix)
 	}
 	if !utils.ValidateDomainName(url[len(urlPrefix):]) {

@@ -20,6 +20,11 @@ type P2pResp struct {
 	Error error
 }
 
+type P2pBoolResp struct {
+	Value bool
+	Error error
+}
+
 type ConnectReq struct {
 	Address  string
 	Response chan *P2pResp
@@ -97,6 +102,30 @@ type ReconnectPeerReq struct {
 	NetType  P2pNetType
 	Address  string
 	Response chan *P2pResp
+}
+
+type ConnectionExistReq struct {
+	NetType  P2pNetType
+	Address  string
+	Response chan *P2pBoolResp
+}
+
+func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
+	chReq := &ConnectionExistReq{
+		Address:  address,
+		NetType:  netType,
+		Response: make(chan *P2pBoolResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil {
+			return resp.Value, resp.Error
+		}
+		return false, fmt.Errorf("[P2pConnectionExist] no reponse")
+	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+		return false, fmt.Errorf("[P2pConnectionExist] timeout")
+	}
 }
 
 func P2pWaitForConnected(address string, timeout time.Duration) error {

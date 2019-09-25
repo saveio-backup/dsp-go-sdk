@@ -240,3 +240,7 @@ func (this *TaskMgr) AddFileBlockHashes(id string, blocks []string) error {
 func (this *TaskMgr) DeleteFileUnpaid(id, walletAddress string, asset int32, amount uint64) error {
 	return this.db.DeleteFileUnpaid(id, walletAddress, asset, amount)
 }
+
+func (this *TaskMgr) DeleteTaskIds(ids []string) error {
+	return this.db.DeleteTaskIds(ids)
+}

@@ -47,11 +47,9 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 		MaxStorage: cfg.FsMaxStorage,
 	}
 	if len(cfg.FsFileRoot) > 0 {
-		if _, err := os.Stat(cfg.FsFileRoot); os.IsNotExist(err) {
-			err = os.MkdirAll(cfg.FsFileRoot, 0755)
-			if err != nil {
-				return nil, err
-			}
+		err := common.CreateDirIfNeed(cfg.FsFileRoot)
+		if err != nil {
+			return nil, err
 		}
 	}
 	fs, err := max.NewMaxService(fsConfig, chain)

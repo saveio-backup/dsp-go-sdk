@@ -2,7 +2,6 @@ package store
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -24,7 +23,7 @@ func (this *ChannelDB) Close() {
 
 // AddPayment. put payment info to db
 func (this *ChannelDB) AddPayment(walletAddr string, paymentId int32, amount uint64) error {
-	key := []byte(fmt.Sprintf("payment:%d", paymentId))
+	key := []byte(PaymentKey(paymentId))
 	info := &Payment{
 		WalletAddress: walletAddr,
 		PaymentId:     paymentId,
@@ -39,7 +38,7 @@ func (this *ChannelDB) AddPayment(walletAddr string, paymentId int32, amount uin
 
 // GetPayment. get payment info from db
 func (this *ChannelDB) GetPayment(paymentId int32) (*Payment, error) {
-	key := []byte(fmt.Sprintf("payment:%d", paymentId))
+	key := []byte(PaymentKey(paymentId))
 	value, err := this.db.Get(key)
 	if err != nil {
 		if err != leveldb.ErrNotFound {
@@ -60,13 +59,13 @@ func (this *ChannelDB) GetPayment(paymentId int32) (*Payment, error) {
 
 // RemovePayment. remove payment info from db
 func (this *ChannelDB) RemovePayment(paymentId int32) error {
-	key := []byte(fmt.Sprintf("payment:%d", paymentId))
+	key := []byte(PaymentKey(paymentId))
 	return this.db.Delete(key)
 }
 
 // AddPartner. add partner to localDB.  walletAddr <=> map[partnerAddr]struct{}
 func (this *ChannelDB) AddPartner(walletAddr, partnerAddr string) error {
-	key := []byte(fmt.Sprintf("channel:%s", walletAddr))
+	key := []byte(ChannelListKey(walletAddr))
 	value, _ := this.db.Get(key)
 
 	var partners map[string]struct{}
@@ -88,7 +87,7 @@ func (this *ChannelDB) AddPartner(walletAddr, partnerAddr string) error {
 }
 
 func (this *ChannelDB) DeletePartner(walletAddr, partnerAddr string) error {
-	key := []byte(fmt.Sprintf("channel:%s", walletAddr))
+	key := []byte(ChannelListKey(walletAddr))
 	value, _ := this.db.Get(key)
 
 	var partners map[string]struct{}
@@ -110,7 +109,7 @@ func (this *ChannelDB) DeletePartner(walletAddr, partnerAddr string) error {
 }
 
 func (this *ChannelDB) GetPartners(walletAddr string) ([]string, error) {
-	key := []byte(fmt.Sprintf("channel:%s", walletAddr))
+	key := []byte(ChannelListKey(walletAddr))
 	value, _ := this.db.Get(key)
 	if value == nil {
 		return nil, nil
@@ -125,7 +124,7 @@ func (this *ChannelDB) GetPartners(walletAddr string) ([]string, error) {
 }
 
 func (this *ChannelDB) OverridePartners(walletAddr string, partnerAddrs []string) error {
-	key := []byte(fmt.Sprintf("channel:%s", walletAddr))
+	key := []byte(ChannelListKey(walletAddr))
 	partners := make(map[string]struct{}, 0)
 	for _, addr := range partnerAddrs {
 		partners[addr] = struct{}{}
