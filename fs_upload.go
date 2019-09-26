@@ -1222,7 +1222,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 		blockMsgData := blockMsgDatas[keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))]
 		if len(blockMsgData.blockData) == 0 || len(blockMsgData.tag) == 0 {
 			log.Errorf("block len %d, tag len %d hash %s, peer %s failed", len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
-			continue
+			return false, fmt.Errorf("block len %d, tag len %d hash %s, peer %s failed", len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
 		}
 		isStored := this.taskMgr.IsBlockUploaded(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
 		if !isStored {

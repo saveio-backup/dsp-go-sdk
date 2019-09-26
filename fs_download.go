@@ -253,6 +253,9 @@ func (this *Dsp) DownloadFileByLink(link string, asset int32, inOrder bool, decr
 	linkvalues := this.GetLinkValues(link)
 	fileName := linkvalues[common.FILE_LINK_NAME_KEY]
 	fileOwner := linkvalues[common.FILE_LINK_OWNER_KEY]
+	if maxPeerCnt > common.MAX_PEERCNT_FOR_DOWNLOAD {
+		maxPeerCnt = common.MAX_PEERCNT_FOR_DOWNLOAD
+	}
 	opt := &common.DownloadOption{
 		FileName:    fileName,
 		Asset:       asset,
@@ -282,6 +285,9 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 	linkvalues := this.GetLinkValues(this.GetLinkFromUrl(url))
 	fileName := linkvalues[common.FILE_LINK_NAME_KEY]
 	fileOwner := linkvalues[common.FILE_LINK_OWNER_KEY]
+	if maxPeerCnt > common.MAX_PEERCNT_FOR_DOWNLOAD {
+		maxPeerCnt = common.MAX_PEERCNT_FOR_DOWNLOAD
+	}
 	opt := &common.DownloadOption{
 		FileName:    fileName,
 		Asset:       asset,
@@ -314,6 +320,9 @@ func (this *Dsp) DownloadFileByHash(fileHashStr string, asset int32, inOrder boo
 	if info != nil {
 		fileName = string(info.FileDesc)
 		fileOwner = info.FileOwner.ToBase58()
+	}
+	if maxPeerCnt > common.MAX_PEERCNT_FOR_DOWNLOAD {
+		maxPeerCnt = common.MAX_PEERCNT_FOR_DOWNLOAD
 	}
 	opt := &common.DownloadOption{
 		FileName:    fileName,
@@ -1118,7 +1127,9 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 		}
 	}()
 	// TODO: optimize this with one hash once time
+	downloadQoS := make([]int64, 0)
 	blocks := make([]*block.Block, 0, common.MAX_REQ_BLOCK_COUNT)
+	downloadBlkCap := common.MIN_REQ_BLOCK_COUNT
 	for index, hash := range blockHashes {
 		pause, cancel, err = this.taskMgr.IsTaskPauseOrCancel(taskId)
 		if err != nil {
@@ -1143,13 +1154,26 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 				Asset:  common.ASSET_USDT,
 			},
 		})
-		if index != len(blockHashes)-1 && len(blocks) < common.MAX_REQ_BLOCK_COUNT {
+		if index != len(blockHashes)-1 && len(blocks) < downloadBlkCap {
 			continue
 		}
 		var resps []*task.BlockResp
+		startDownload := time.Now().Unix()
 		resps, err = this.downloadBlockFlights(taskId, fileHashStr, addr, peerWalletAddr, blocks, common.MAX_BLOCK_FETCHED_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
+		if time.Now().Unix() <= startDownload {
+			downloadQoS = append(downloadQoS, 0)
+		} else {
+			downloadQoS = append(downloadQoS, time.Now().Unix()-startDownload)
+		}
+
 		if err != nil {
 			return err
+		}
+		if len(downloadQoS) >= common.MIN_DOWNLOAD_QOS_LEN {
+			// reduce slice
+			downloadQoS = downloadQoS[len(downloadQoS)-common.MIN_DOWNLOAD_QOS_LEN:]
+			downloadBlkCap = adjustDownloadCap(downloadBlkCap, downloadQoS)
+			log.Debugf("adjust new download cap: %d", downloadBlkCap)
 		}
 		blocks = blocks[:0]
 
@@ -1349,7 +1373,36 @@ func createDownloadFile(dir, filePath string) (*os.File, error) {
 	return file, nil
 }
 
-// removeTempFile. remove the temp download file
-func removeTempFile(fileName string) {
-	// os.Remove(common.DOWNLOAD_FILE_TEMP_DIR_PATH + "/" + fileName)
+func adjustDownloadCap(cap int, qos []int64) int {
+	speedUp := canDownloadSpeedUp(qos)
+	newCap := cap
+	if speedUp {
+		newCap = cap + 2
+		if newCap > common.MAX_REQ_BLOCK_COUNT {
+			return common.MAX_REQ_BLOCK_COUNT
+		} else {
+			return newCap
+		}
+	}
+	newCap = cap - 2
+	if newCap < common.MIN_REQ_BLOCK_COUNT {
+		return common.MIN_REQ_BLOCK_COUNT
+	}
+	return newCap
+}
+
+func canDownloadSpeedUp(qos []int64) bool {
+	if len(qos) < common.MIN_DOWNLOAD_QOS_LEN {
+		return false
+	}
+	if qos[len(qos)-1] >= common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT {
+		return false
+	}
+	qosSum := int64(0)
+	for i := 0; i < common.MIN_DOWNLOAD_QOS_LEN; i++ {
+		qosSum += qos[len(qos)-i-1]
+	}
+	avg := qosSum / common.MIN_DOWNLOAD_QOS_LEN
+	log.Debugf("qosSum :%d, avg : %d", qosSum, avg)
+	return avg < common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT
 }
