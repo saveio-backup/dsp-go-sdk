@@ -104,7 +104,7 @@ func (this *Dsp) Start() error {
 		if err != nil {
 			return err
 		}
-		this.SetOnlineDNS()
+		this.BootstrapDNS()
 	}
 	// start seed service
 	if this.Config.SeedInterval > 0 {
@@ -127,11 +127,7 @@ func (this *Dsp) StartChannelService() error {
 	if this.Channel == nil {
 		return errors.New("channel is nil")
 	}
-	err := this.SetupDNSTrackers()
-	if err != nil {
-		return err
-	}
-	err = this.Channel.StartService()
+	err := this.Channel.StartService()
 	if err != nil {
 		return err
 	}

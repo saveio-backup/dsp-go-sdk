@@ -143,7 +143,7 @@ func NewTaskFromDB(id string, db *store.FileDB) *Task {
 		return nil
 	}
 	if (TaskState(info.TaskState) == TaskStatePause || TaskState(info.TaskState) == TaskStateDoing) && info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT < uint64(time.Now().Unix()) {
-		log.Warnf("[Task NewTaskFromDB] task is expired, updatedAt: %d", info.UpdatedAt)
+		log.Warnf("[Task NewTaskFromDB] task: %s is expired, updatedAt: %d", id, info.UpdatedAt)
 	}
 	sessions, err := db.GetFileSessions(id)
 	if err != nil {

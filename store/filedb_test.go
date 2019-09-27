@@ -224,14 +224,14 @@ func TestAddPartner(t *testing.T) {
 func TestMarshalFileInfo(t *testing.T) {
 	testM := make(map[string]uint64, 0)
 	testM["123"] = 1
-	info := &FileInfo{
+	info := &TaskInfo{
 		Id:                "92d25944-cbb9-11e9-8340-acde48001122",
 		FileHash:          "QmbQLV1jU5oCrEvbHwvmPR2Dy2yHBa71hQ3MweCYu5ubC4",
 		FileName:          "2019-08-23_12.17.42_LOG.log",
 		FilePath:          "./2019-08-23_12.17.42_LOG.log",
 		FileOwner:         "AY46Kes2ayy8c38hKBqictG9F9ar73mqhD",
 		CopyNum:           2,
-		InfoType:          0,
+		Type:              0,
 		StoreTx:           "27db5bae0138cb7a42ce161a57c1bdc514eef40a5a4ea1b9893b7fb24af74d8d",
 		TotalBlockCount:   82,
 		SaveBlockCountMap: testM,
@@ -258,7 +258,7 @@ func TestMarshalFileInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Printf("buf lenL: %d\n", len(buf))
-	info2 := &FileInfo{}
+	info2 := &TaskInfo{}
 	err = json.Unmarshal(buf, info2)
 	if err != nil {
 		t.Fatal(err)
@@ -269,7 +269,7 @@ func TestMarshalFileInfo(t *testing.T) {
 	fmt.Printf("FilePath: %v\n", info2.FilePath)
 	fmt.Printf("FileOwner: %v\n", info2.FileOwner)
 	fmt.Printf("CopyNum: %v\n", info2.CopyNum)
-	fmt.Printf("InfoType: %v\n", info2.InfoType)
+	fmt.Printf("InfoType: %v\n", info2.Type)
 	fmt.Printf("StoreTx: %v\n", info2.StoreTx)
 	fmt.Printf("TotalBlockCount: %v\n", info2.TotalBlockCount)
 	fmt.Printf("SaveBlockCountMap: %v\n", info2.SaveBlockCountMap)
@@ -302,14 +302,14 @@ func TestSaveFileInfo(t *testing.T) {
 	fileDB := NewFileDB(db)
 	testM := make(map[string]uint64, 0)
 	testM["123"] = 1
-	info := &FileInfo{
+	info := &TaskInfo{
 		Id:                "92d25944-cbb9-11e9-8340-acde48001122",
 		FileHash:          "QmbQLV1jU5oCrEvbHwvmPR2Dy2yHBa71hQ3MweCYu5ubC4",
 		FileName:          "2019-08-23_12.17.42_LOG.log",
 		FilePath:          "./2019-08-23_12.17.42_LOG.log",
 		FileOwner:         "AY46Kes2ayy8c38hKBqictG9F9ar73mqhD",
 		CopyNum:           2,
-		InfoType:          0,
+		Type:              0,
 		StoreTx:           "27db5bae0138cb7a42ce161a57c1bdc514eef40a5a4ea1b9893b7fb24af74d8d",
 		TotalBlockCount:   82,
 		SaveBlockCountMap: testM,
@@ -331,11 +331,11 @@ func TestSaveFileInfo(t *testing.T) {
 		UpdatedAt:         1567233367,
 		Result:            "123",
 	}
-	err = fileDB.saveFileInfo(info)
+	err = fileDB.SaveFileInfo(info)
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := fileDB.GetFileInfo([]byte(info.Id))
+	info2, err := fileDB.GetFileInfo(info.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +345,7 @@ func TestSaveFileInfo(t *testing.T) {
 	fmt.Printf("FilePath: %v\n", info2.FilePath)
 	fmt.Printf("FileOwner: %v\n", info2.FileOwner)
 	fmt.Printf("CopyNum: %v\n", info2.CopyNum)
-	fmt.Printf("InfoType: %v\n", info2.InfoType)
+	fmt.Printf("InfoType: %v\n", info2.Type)
 	fmt.Printf("StoreTx: %v\n", info2.StoreTx)
 	fmt.Printf("TotalBlockCount: %v\n", info2.TotalBlockCount)
 	fmt.Printf("SaveBlockCountMap: %v\n", info2.SaveBlockCountMap)

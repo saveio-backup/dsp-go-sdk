@@ -196,7 +196,6 @@ func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) 
 		if this.ChannelReachale(walletAddr) {
 			return nil
 		} else {
-			log.Warnf("connect peer:%s failed", walletAddr)
 			this.HealthyCheckNodeState(walletAddr)
 		}
 		<-time.After(interval)

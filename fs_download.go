@@ -684,6 +684,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	if inOrder {
 		sdkErr = this.receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix, peerAddrWallet, asset)
 		if sdkErr != nil {
+			log.Errorf("download file err: %v", sdkErr)
 			return sdkErr
 		}
 		if len(decryptPwd) == 0 {
@@ -1384,7 +1385,7 @@ func adjustDownloadCap(cap int, qos []int64) int {
 			return newCap
 		}
 	}
-	newCap = cap - 2
+	newCap = cap - 4
 	if newCap < common.MIN_REQ_BLOCK_COUNT {
 		return common.MIN_REQ_BLOCK_COUNT
 	}

@@ -12,6 +12,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
+	serr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/scan/tracker"
 	chainsdk "github.com/saveio/themis-go-sdk/utils"
@@ -48,6 +49,7 @@ func NewDNS() *DNS {
 	}
 }
 
+// SetupDNSTrackers. setup DNS tracker url list
 func (this *Dsp) SetupDNSTrackers() error {
 	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
 	if err != nil {
@@ -93,47 +95,15 @@ func (this *Dsp) SetupDNSTrackers() error {
 	return nil
 }
 
-func (this *Dsp) SetOnlineDNS() {
-	log.Debugf("SetOnlineDNS++++")
-	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
+// BootstrapDNS. bootstrap max 15 DNSs from smart contract
+func (this *Dsp) BootstrapDNS() {
+	log.Debugf("start bootstrapDNS...")
+	connetedDNS, err := this.connectDNSs(common.MAX_DNS_NUM)
 	if err != nil {
 		return
 	}
-	if len(ns) == 0 {
-		log.Warnf("no dns nodes")
-		return
-	}
-	dnsCfgMap := make(map[string]struct{}, 0)
-	for _, addr := range this.Config.DNSWalletAddrs {
-		dnsCfgMap[addr] = struct{}{}
-	}
-	// first init
-	for _, v := range ns {
-		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
-		_, ok := dnsCfgMap[v.WalletAddr.ToBase58()]
-		if len(dnsCfgMap) > 0 && !ok {
-			continue
-		}
-		walletAddr := v.WalletAddr.ToBase58()
-		dnsUrl, _ := this.GetExternalIP(walletAddr)
-		if len(dnsUrl) == 0 {
-			dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
-		}
-		if strings.Index(dnsUrl, "0.0.0.0:0") != -1 {
-			log.Warn("it should not happen")
-			continue
-		}
-		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
-		if err != nil {
-			log.Errorf("wait channel connected err %s %s", walletAddr, err)
-			continue
-		}
-		this.DNS.OnlineDNS[v.WalletAddr.ToBase58()] = dnsUrl
-		if len(this.DNS.OnlineDNS) > common.MAX_DNS_NUM {
-			break
-		}
-	}
-
+	this.DNS.OnlineDNS = connetedDNS
+	log.Debugf("online dns :%v", this.DNS.OnlineDNS)
 	if this.Config.AutoSetupDNSEnable {
 		return
 	}
@@ -145,6 +115,7 @@ func (this *Dsp) SetOnlineDNS() {
 	if len(channels.Channels) == 0 {
 		return
 	}
+	log.Debugf("will set online dns")
 	for _, channel := range channels.Channels {
 		url, ok := this.DNS.OnlineDNS[channel.Address]
 		if !ok {
@@ -161,8 +132,10 @@ func (this *Dsp) SetOnlineDNS() {
 		}
 		break
 	}
+	log.Debugf("set online DNSDNS %v", this.DNS.DNSNode)
 }
 
+// SetupDNSChannels. open channel with DNS automatically
 func (this *Dsp) SetupDNSChannels() error {
 	log.Debugf("SetupDNSChannels++++")
 	if !this.Config.AutoSetupDNSEnable {
@@ -258,16 +231,22 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	}
 	var hashBytes [46]byte
 	copy(hashBytes[:], []byte(hash)[:])
-	for _, trackerUrl := range trackerUrls {
+
+	request := func(trackerUrl string, resp chan *trackerResp) {
 		log.Debugf("trackerurl %s hash: %s netIp:%v netPort:%v", trackerUrl, string(hashBytes[:]), netIp, netPort)
-		tracker.CompleteTorrent(trackerUrl, tracker.ActionTorrentCompleteParams{
+		err := tracker.CompleteTorrent(trackerUrl, tracker.ActionTorrentCompleteParams{
 			InfoHash: hashBytes,
 			IP:       netIp,
 			Port:     uint16(netPort),
 		}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
 			return chainsdk.Sign(this.CurrentAccount(), rawData)
 		})
+		resp <- &trackerResp{
+			ret: trackerUrl,
+			err: err,
+		}
 	}
+	this.requestTrackers(request)
 	return nil
 }
 
@@ -277,27 +256,20 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 	peerAddrs := make([]string, 0)
 	selfAddr := client.P2pGetPublicAddr()
 	protocol := selfAddr[:strings.Index(selfAddr, "://")]
-	for _, trackerUrl := range trackerUrls {
-		request := func(resp chan *trackerResp) {
-			peers, err := tracker.GetTorrentPeers(trackerUrl, tracker.ActionGetTorrentPeersParams{
-				InfoHash: hashBytes,
-				NumWant:  -1,
-				Left:     1,
-			}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
-				return chainsdk.Sign(this.CurrentAccount(), rawData)
-			})
+
+	request := func(trackerUrl string, resp chan *trackerResp) {
+		peers, err := tracker.GetTorrentPeers(trackerUrl, tracker.ActionGetTorrentPeersParams{
+			InfoHash: hashBytes,
+			NumWant:  -1,
+			Left:     1,
+		}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
+			return chainsdk.Sign(this.CurrentAccount(), rawData)
+		})
+		if err != nil || len(peers) == 0 {
 			resp <- &trackerResp{
-				ret: peers,
-				err: err,
+				err: fmt.Errorf("peers is empty, err: %s", err),
 			}
-		}
-		ret, err := this.trackerReq(trackerUrl, request)
-		if err != nil {
-			continue
-		}
-		peers := ret.([]tracker.Peer)
-		if len(peers) == 0 {
-			continue
+			return
 		}
 		for _, p := range peers {
 			addr := fmt.Sprintf("%s://%s:%d", protocol, p.IP, p.Port)
@@ -307,10 +279,25 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 			peerAddrs = append(peerAddrs, addr)
 		}
 		if len(peerAddrs) != 0 {
-			break
+			resp <- &trackerResp{
+				err: fmt.Errorf("peers is empty"),
+			}
+			return
+		}
+		resp <- &trackerResp{
+			ret:  peerAddrs,
+			stop: true,
 		}
 	}
-	this.removeLowQoSTracker()
+	result := this.requestTrackers(request)
+	if result == nil {
+		return nil
+	}
+	peerAddrs, ok := result.([]string)
+	if !ok {
+		log.Errorf("convert result to peers failed")
+		return nil
+	}
 	return peerAddrs
 }
 
@@ -339,9 +326,38 @@ func (this *Dsp) PushLocalFilesToTrackers() {
 	if len(files) == 0 {
 		return
 	}
-	for _, fileHashStr := range files {
-		this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
+	req := func(files []interface{}, resp chan *utils.RequestResponse) {
+		if len(files) != 1 {
+			resp <- &utils.RequestResponse{
+				Code:  serr.INTERNAL_ERROR,
+				Error: fmt.Sprintf("invalid arguments %v", files),
+			}
+			return
+		}
+		fileHashStr, ok := files[0].(string)
+		if !ok {
+			resp <- &utils.RequestResponse{
+				Code:  serr.INTERNAL_ERROR,
+				Error: fmt.Sprintf("invalid arguments %v", files),
+			}
+			return
+		}
+		err = this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
+		if err != nil {
+			resp <- &utils.RequestResponse{
+				Error: err.Error(),
+			}
+			return
+		} else {
+			log.Debugf("push localfiles %s to trackers success", fileHashStr)
+		}
+		resp <- &utils.RequestResponse{}
 	}
+	reqArgs := make([][]interface{}, 0, len(files))
+	for _, fileHashStr := range files {
+		reqArgs = append(reqArgs, []interface{}{fileHashStr})
+	}
+	utils.CallRequestWithArgs(req, reqArgs)
 }
 
 func (this *Dsp) RegisterFileUrl(url, link string) (string, error) {
@@ -426,41 +442,32 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 			return err
 		}
 	}
-	hasRegister := false
-	for _, trackerUrl := range this.DNS.TrackerUrls {
-		log.Debugf("trackerurl %s walletAddr: %v netIp:%v netPort:%v", trackerUrl, wallet, netIp, netPort)
 
-		request := func(resp chan *trackerResp) {
-			log.Debugf("start RegEndPoint %s ipport %v:%v", trackerUrl, netIp, netPort)
-			err := tracker.RegEndPoint(trackerUrl, tracker.ActionEndpointRegParams{
-				Wallet: wallet,
-				IP:     netIp,
-				Port:   uint16(netPort),
-			}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
-				return chainsdk.Sign(this.CurrentAccount(), rawData)
-			})
-			log.Debugf("start RegEndPoint end")
-			if err != nil {
-				log.Errorf("req endpoint failed, err %s", err)
-			}
+	request := func(trackerUrl string, resp chan *trackerResp) {
+		log.Debugf("start RegEndPoint %s ipport %v:%v", trackerUrl, netIp, netPort)
+		err := tracker.RegEndPoint(trackerUrl, tracker.ActionEndpointRegParams{
+			Wallet: wallet,
+			IP:     netIp,
+			Port:   uint16(netPort),
+		}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
+			return chainsdk.Sign(this.CurrentAccount(), rawData)
+		})
+		log.Debugf("start RegEndPoint end")
+		if err != nil {
+			log.Errorf("req endpoint failed, err %s", err)
 			resp <- &trackerResp{
-				ret: nil,
 				err: err,
 			}
-		}
-		_, err = this.trackerReq(trackerUrl, request)
-		if err != nil {
-			continue
-		}
-		if err != nil {
-			continue
-		}
-		if !hasRegister {
-			hasRegister = true
+		} else {
+			resp <- &trackerResp{
+				ret:  trackerUrl,
+				stop: true,
+			}
 		}
 	}
-	this.removeLowQoSTracker()
-	if !hasRegister {
+	result := this.requestTrackers(request)
+	log.Debugf("reg endpoint final result %v", result)
+	if result == nil {
 		return errors.New("register endpoint failed for all dns nodes")
 	}
 	return nil
@@ -472,7 +479,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	if ok && info != nil {
 		addrInfo, ok := info.(*PublicAddrInfo)
 		now := time.Now().Unix()
-		if ok && addrInfo != nil && (addrInfo.UpdatedAt+common.MAX_PUBLIC_IP_UPDATE_SECOND) > now {
+		if ok && addrInfo != nil && (addrInfo.UpdatedAt+common.MAX_PUBLIC_IP_UPDATE_SECOND) > now && len(addrInfo.HostAddr) > 0 {
 			log.Debugf("GetExternalIP %s addr %s from cache", walletAddr, addrInfo.HostAddr)
 			return addrInfo.HostAddr, nil
 		}
@@ -486,63 +493,222 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	if len(this.DNS.TrackerUrls) == 0 {
 		log.Warn("GetExternalIP no trackers")
 	}
-	for _, url := range this.DNS.TrackerUrls {
-		request := func(resp chan *trackerResp) {
-			hostAddr, err := tracker.ReqEndPoint(url, address)
-			log.Debugf("ReqEndPoint hostAddr url: %s, address %s, hostaddr:%s", url, address.ToBase58(), string(hostAddr))
+	request := func(url string, resp chan *trackerResp) {
+		hostAddr, err := tracker.ReqEndPoint(url, address)
+		log.Debugf("ReqEndPoint hostAddr url: %s, address %s, hostaddr:%s", url, address.ToBase58(), string(hostAddr))
+		if err != nil {
 			resp <- &trackerResp{
-				ret: hostAddr,
 				err: err,
 			}
+			return
 		}
-		ret, err := this.trackerReq(url, request)
-		if err != nil {
-			log.Errorf("address from req failed %s", err)
-			continue
-		}
-		hostAddr := ret.(string)
 		if len(string(hostAddr)) == 0 || !utils.IsHostAddrValid(string(hostAddr)) {
-			continue
+			resp <- &trackerResp{
+				err: fmt.Errorf("invalid hostAddr %s", hostAddr),
+			}
+			return
 		}
 		hostAddrStr := utils.FullHostAddr(string(hostAddr), this.Config.ChannelProtocol)
 		log.Debugf("GetExternalIP %s :%v from %s", walletAddr, string(hostAddrStr), url)
 		if strings.Index(hostAddrStr, "0.0.0.0:0") != -1 {
-			continue
+			resp <- &trackerResp{
+				err: fmt.Errorf("invalid hostAddr %s", hostAddr),
+			}
+			return
 		}
-		this.DNS.PublicAddrCache.Add(walletAddr, &PublicAddrInfo{
-			HostAddr:  hostAddrStr,
-			UpdatedAt: time.Now().Unix(),
-		})
-		return hostAddrStr, nil
+		resp <- &trackerResp{
+			ret:  hostAddrStr,
+			stop: true,
+		}
 	}
-	this.removeLowQoSTracker()
-	return "", errors.New("host addr not found")
+	result := this.requestTrackers(request)
+	if result == nil {
+		return "", fmt.Errorf("request tracker result is nil : %v", result)
+	}
+	hostAddrStr, ok := result.(string)
+	if !ok {
+		log.Errorf("convert result to string failed: %v", result)
+		return "", fmt.Errorf("convert result to string failed: %v", result)
+	}
+	this.DNS.PublicAddrCache.Add(walletAddr, &PublicAddrInfo{
+		HostAddr:  hostAddrStr,
+		UpdatedAt: time.Now().Unix(),
+	})
+	return hostAddrStr, nil
 }
 
 type trackerResp struct {
-	ret interface{}
-	err error
+	ret  interface{}
+	stop bool
+	err  error
 }
 
-func (this *Dsp) trackerReq(trackerUrl string, request func(chan *trackerResp)) (interface{}, error) {
-	done := make(chan *trackerResp, 1)
-	go request(done)
-	for {
-		select {
-		case ret := <-done:
-			return ret.ret, ret.err
-		case <-time.After(time.Duration(common.TRACKER_SERVICE_TIMEOUT) * time.Second):
-			log.Errorf("tracker: %s request timeout", trackerUrl)
-			errCnt := this.DNS.TrackerFailedCnt[trackerUrl]
-			this.DNS.TrackerFailedCnt[trackerUrl] = errCnt + 1
-			return nil, errors.New("tracker request timeout")
+// requestTrackers. request trackers parallel
+func (this *Dsp) requestTrackers(request func(string, chan *trackerResp)) interface{} {
+	req := func(trackers []interface{}, resp chan *utils.RequestResponse) bool {
+		if len(trackers) != 1 {
+			resp <- &utils.RequestResponse{
+				Code:  serr.INTERNAL_ERROR,
+				Error: fmt.Sprintf("invalid arguments %v", trackers),
+			}
+			return false
+		}
+		trackerUrl, ok := trackers[0].(string)
+		if !ok {
+			resp <- &utils.RequestResponse{
+				Code:  serr.INTERNAL_ERROR,
+				Error: fmt.Sprintf("invalid arguments %v", trackers),
+			}
+			return false
+		}
+
+		done := make(chan *trackerResp, 1)
+		log.Debugf("start request of tracker: %s", trackerUrl)
+		go request(trackerUrl, done)
+		for {
+			select {
+			case ret, ok := <-done:
+				if !ok || ret == nil || ret.err != nil {
+					resp <- &utils.RequestResponse{
+						Result: trackerUrl,
+						Code:   serr.INTERNAL_ERROR,
+						Error:  ret.err.Error(),
+					}
+					return false
+				}
+				resp <- &utils.RequestResponse{
+					Result: ret.ret,
+				}
+				return ret.stop
+			case <-time.After(time.Duration(common.TRACKER_SERVICE_TIMEOUT) * time.Second):
+				log.Errorf("tracker: %s request timeout", trackerUrl)
+				resp <- &utils.RequestResponse{
+					Result: trackerUrl,
+					Code:   serr.INTERNAL_ERROR,
+					Error:  fmt.Sprintf("tracker: %s request timeout", trackerUrl),
+				}
+				return false
+			}
 		}
 	}
+	reqArgs := make([][]interface{}, 0, len(this.DNS.TrackerUrls))
+	for _, u := range this.DNS.TrackerUrls {
+		reqArgs = append(reqArgs, []interface{}{u})
+	}
+	resp := utils.CallRequestOneWithArgs(req, reqArgs)
+	results := make([]interface{}, 0, len(reqArgs))
+	for _, r := range resp {
+		if r.Code == 0 {
+			results = append(results, r.Result)
+			continue
+		}
+		trackerUrl, ok := r.Result.(string)
+		if !ok {
+			continue
+		}
+		errCnt := this.DNS.TrackerFailedCnt[trackerUrl]
+		this.DNS.TrackerFailedCnt[trackerUrl] = errCnt + 1
+		this.removeLowQoSTracker()
+	}
+	if len(results) > 0 {
+		return results[0]
+	}
+	return nil
+}
+
+func (this *Dsp) connectDNSs(maxDNSNum uint32) (map[string]string, error) {
+	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
+	if err != nil {
+		return nil, err
+	}
+	if len(ns) == 0 {
+		return nil, errors.New("no dns nodes")
+	}
+
+	// construct connect request function
+	connectReq := func(nodes []interface{}, resp chan *utils.RequestResponse) {
+		if len(nodes) != 1 {
+			resp <- &utils.RequestResponse{
+				Code:  serr.INTERNAL_ERROR,
+				Error: fmt.Sprintf("invalid arguments %v", nodes),
+			}
+			return
+		}
+		v, ok := nodes[0].(dns.DNSNodeInfo)
+		if !ok {
+			resp <- &utils.RequestResponse{
+				Code:  serr.INTERNAL_ERROR,
+				Error: fmt.Sprintf("invalid arguments %v", nodes),
+			}
+			return
+		}
+		walletAddr := v.WalletAddr.ToBase58()
+		dnsUrl, _ := this.GetExternalIP(walletAddr)
+		if len(dnsUrl) == 0 {
+			dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
+		}
+		if strings.Index(dnsUrl, "0.0.0.0:0") != -1 {
+			log.Warn("it should not happen")
+			resp <- &utils.RequestResponse{
+				Code:  serr.INTERNAL_ERROR,
+				Error: fmt.Sprintf("invalid arguments %v", dnsUrl),
+			}
+			return
+		}
+		log.Debugf("connectDNSs Loop DNS %s dnsUrl %v", v.WalletAddr.ToBase58(), dnsUrl)
+		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
+		if err != nil {
+			log.Errorf("wait channel connected err %s %s", walletAddr, err)
+			resp <- &utils.RequestResponse{
+				Code:  serr.INTERNAL_ERROR,
+				Error: fmt.Sprintf("wait channel connected err %v", err),
+			}
+			return
+		}
+		log.Debugf("wait for connect success: %s", walletAddr)
+		resp <- &utils.RequestResponse{
+			Result: &DNSNodeInfo{
+				WalletAddr: walletAddr,
+				HostAddr:   dnsUrl,
+			},
+		}
+	}
+
+	dnsWalletMap := make(map[string]struct{}, 0)
+	for _, addr := range this.Config.DNSWalletAddrs {
+		dnsWalletMap[addr] = struct{}{}
+	}
+	connectArgs := make([][]interface{}, 0, len(ns))
+	for _, v := range ns {
+		_, ok := dnsWalletMap[v.WalletAddr.ToBase58()]
+		if len(dnsWalletMap) > 0 && !ok {
+			log.Debugf("connectDNSs Loop DNS  continue")
+			continue
+		}
+		connectArgs = append(connectArgs, []interface{}{v})
+	}
+
+	// use dispatch model to call request parallel
+	connectResps := utils.CallRequestWithArgs(connectReq, connectArgs)
+
+	// handle response
+	connectedDNS := make(map[string]string, 0)
+	for _, resp := range connectResps {
+		if resp.Code != 0 {
+			continue
+		}
+		dnsInfo, ok := resp.Result.(*DNSNodeInfo)
+		if !ok {
+			continue
+		}
+		connectedDNS[dnsInfo.WalletAddr] = dnsInfo.HostAddr
+	}
+	log.Debugf("has dispatch all: %v", connectedDNS)
+	return connectedDNS, nil
 }
 
 func (this *Dsp) removeLowQoSTracker() {
 	newTrackers := this.DNS.TrackerUrls[:0]
-	log.Debugf("newTrackers: %v", newTrackers)
 	for _, url := range this.DNS.TrackerUrls {
 		errCnt := this.DNS.TrackerFailedCnt[url]
 		if errCnt >= common.MAX_TRACKER_REQ_TIMEOUT_NUM {
@@ -552,7 +718,7 @@ func (this *Dsp) removeLowQoSTracker() {
 		}
 		newTrackers = append(newTrackers, url)
 	}
-	log.Debugf("new tracker cnt: %d", len(this.DNS.TrackerUrls))
+	log.Debugf("new tracker cnt: %d", len(newTrackers))
 	if len(newTrackers) > 0 {
 		this.DNS.TrackerUrls = newTrackers
 	} else {

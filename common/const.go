@@ -45,7 +45,7 @@ const (
 	P2P_REQ_TIMEOUT                = 15 // 15s
 	P2P_BROADCAST_TIMEOUT          = 10 // 30s
 	P2P_REQUEST_TIMEOUT            = 30 // 30s
-	TRACKER_SERVICE_TIMEOUT        = 15 // 15s
+	TRACKER_SERVICE_TIMEOUT        = 5  // 5s
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT = 10 // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT         = 20 // media transfer timeout
 )
@@ -67,12 +67,12 @@ const (
 	MAX_NETWORK_REQUEST_RETRY    = 4      // max network request retry
 	MAX_BACKUP_FILE_FAILED       = 3      // max backup file failed times
 	MAX_TRACKERS_NUM             = 100    // max tracker num
-	MAX_DNS_NUM                  = 100    // max dns num
+	MAX_DNS_NUM                  = 15     // max dns num
 	MAX_PUBLICADDR_CACHE_LEN     = 100    // cache len
 	MAX_PROGRESS_CHANNEL_SIZE    = 100    // progress channel size
 	MAX_SEND_BLOCK_RETRY         = 3      // max send block retry
 	MAX_SAME_UPLOAD_BLOCK_NUM    = 3      // max enable upload same block for same node
-	MAX_TRACKER_REQ_TIMEOUT_NUM  = 10     // max tracker request timeout num
+	MAX_TRACKER_REQ_TIMEOUT_NUM  = 5      // max tracker request timeout num
 	MAX_PUBLIC_IP_UPDATE_SECOND  = 5 * 60 // max update second to update peer host addr cache
 	MAX_BLOCK_FETCHED_RETRY      = 2      // max uploading block be fetched retry
 	MAX_REQ_BLOCK_COUNT          = 16     // max block count when request for download flights
@@ -81,6 +81,7 @@ const (
 	START_PDP_RETRY_DELAY        = 5      // delay pdp retry
 	MAX_PEERCNT_FOR_DOWNLOAD     = 100    // max peer count (threads) for download file
 	MIN_DOWNLOAD_QOS_LEN         = 3      // min download QoS size
+	MAX_TRACKER_REQUEST_PARALLEL = 10     // max concurrent tracker request num
 )
 
 // task
