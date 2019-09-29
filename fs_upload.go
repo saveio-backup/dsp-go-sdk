@@ -1036,6 +1036,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 	if err != nil {
 		return serr.NewDetailError(serr.GET_SESSION_ID_FAILED, err.Error())
 	}
+	defer timeout.Stop()
 	fileHashStr, _ := this.taskMgr.TaskFileHash(taskId)
 	totalCount := uint64(len(hashes))
 	doneCh := make(chan *fetchedDone)
@@ -1134,6 +1135,8 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 						log.Errorf("handle fetch file %s err %s", fileHashStr, err)
 						continue
 					}
+					// because of the network transfer time consuming, reset timer here after sending blocks finish.
+					timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 					if done == false && err == nil {
 						cleanMsgData(reqInfos)
 						continue
@@ -1154,6 +1157,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 		}(ch)
 	}
 	checkStopTimer := time.NewTicker(time.Duration(common.TASK_STATE_CHECK_DURATION) * time.Second)
+	defer checkStopTimer.Stop()
 	closeCancelFetch := false
 	for {
 		select {
@@ -1257,7 +1261,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 	sendLogMsg := fmt.Sprintf("file: %s, block %s-%s, index:%d-%d to %s", fileHashStr, reqInfos[0].Hash, reqInfos[len(reqInfos)-1].Hash, reqInfos[0].Index, reqInfos[len(reqInfos)-1].Index, reqInfos[0].PeerAddr)
 	sendingTime := time.Now().Unix()
 	log.Debugf("sending %s", sendLogMsg)
-	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), reqInfos[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
+	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), reqInfos[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
 	if err != nil {
 		log.Errorf("%v, err %s", sendLogMsg, err)
 		return false, err

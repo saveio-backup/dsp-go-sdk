@@ -239,7 +239,7 @@ func (this *Dsp) CancelDownload(taskId string) error {
 		wg.Add(1)
 		go func(a string, ses *store.Session) {
 			msg := message.NewFileDownloadCancel(ses.SessionId, fileHashStr, this.WalletAddress(), int32(ses.Asset))
-			client.P2pRequestWithRetry(msg.ToProtoMsg(), a, common.MAX_NETWORK_REQUEST_RETRY, common.P2P_REQUEST_TIMEOUT*common.MAX_NETWORK_REQUEST_RETRY)
+			client.P2pRequestWithRetry(msg.ToProtoMsg(), a, common.MAX_NETWORK_REQUEST_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
 			wg.Done()
 		}(hostAddr, session)
 	}
@@ -551,7 +551,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	msg := message.NewPayment(this.WalletAddress(), payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
 	// TODO: wait for receiver received notification (need optimized)
-	_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), addr, common.MAX_NETWORK_REQUEST_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
+	_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), addr, common.MAX_NETWORK_REQUEST_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
 	log.Debugf("payment msg response :%d, err:%s", paymentId, err)
 	if err != nil {
 		return 0, err
@@ -726,6 +726,7 @@ func (this *Dsp) StartBackupFileService() {
 		case <-ticker.C:
 			if this.stop {
 				log.Debugf("stop backup file service")
+				ticker.Stop()
 				return
 			}
 			if this.Chain == nil {
@@ -794,6 +795,7 @@ func (this *Dsp) StartCheckRemoveFiles() {
 		case <-ticker.C:
 			if this.stop {
 				log.Debugf("stop check remove files service")
+				ticker.Stop()
 				return
 			}
 			files := this.Fs.RemovedExpiredFiles()
@@ -864,6 +866,12 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 	}
 	timeout := time.NewTimer(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 	stateCheckTicker := time.NewTicker(time.Duration(common.TASK_STATE_CHECK_DURATION) * time.Second)
+	defer func() {
+		// clean ticker
+		timeout.Stop()
+		stateCheckTicker.Stop()
+		log.Debugf("clean tickers")
+	}()
 	for {
 		select {
 		case value, ok := <-this.taskMgr.TaskNotify(taskId):

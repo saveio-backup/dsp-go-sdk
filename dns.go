@@ -309,6 +309,7 @@ func (this *Dsp) StartSeedService() {
 		case <-tick.C:
 			if this.stop {
 				log.Debugf("stop seed service")
+				tick.Stop()
 				return
 			}
 			this.PushLocalFilesToTrackers()
