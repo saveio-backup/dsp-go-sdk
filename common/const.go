@@ -29,25 +29,25 @@ const (
 
 // timeout
 const (
-	TX_CONFIRM_TIMEOUT                  = 60      // wait for tx confirmed timeout
-	FILE_FETCH_ACK_TIMEOUT              = 60      // wait for file fetch ack timeout
-	DOWNLOAD_FILE_TIMEOUT               = 120     // download file time out
-	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT       = 40      // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2
-	CHECK_PROVE_TIMEOUT                 = 60      // client upload file and check prove timeout
-	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval
-	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1       // check channel can transfer interval
-	CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT  = 30      // check channel can transfer interval
-	WAIT_CHANNEL_CONNECT_TIMEOUT        = 6       // wait for channel connected
-	FILE_DNS_TTL                        = 10 * 60 //10m
-	// CHANNEL_TRANSFER_TIMEOUT     = 60      // 60s
-	CHANNEL_TRANSFER_TIMEOUT       = 20 // 60s
-	CHANNEL_WITHDRAW_TIMEOUT       = 60 // 60s
-	P2P_REQ_TIMEOUT                = 15 // 15s
-	P2P_BROADCAST_TIMEOUT          = 10 // 30s
-	P2P_REQUEST_WAIT_REPLY_TIMEOUT = 10 // 30s
-	TRACKER_SERVICE_TIMEOUT        = 5  // 5s
-	WAIT_FOR_GENERATEBLOCK_TIMEOUT = 10 // wait for generate timeout
-	MEDIA_TRANSFER_TIMEOUT         = 20 // media transfer timeout
+	TX_CONFIRM_TIMEOUT                  = 60                    // wait for tx confirmed timeout
+	FILE_FETCH_ACK_TIMEOUT              = 60                    // wait for file fetch ack timeout
+	DOWNLOAD_FILE_TIMEOUT               = 120                   // download file time out
+	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT       = 40                    // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2
+	CHECK_PROVE_TIMEOUT                 = 60                    // client upload file and check prove timeout
+	CHECK_CHANNEL_STATE_INTERVAL        = 3                     // check channel state interval
+	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1                     // check channel can transfer interval
+	CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT  = 30                    // check channel can transfer interval
+	WAIT_CHANNEL_CONNECT_TIMEOUT        = 6                     // wait for channel connected
+	FILE_DNS_TTL                        = 10 * 60               //10m
+	CHANNEL_TRANSFER_TIMEOUT            = 20                    // 60s
+	CHANNEL_WITHDRAW_TIMEOUT            = 60                    // 60s
+	ACTOR_P2P_REQ_TIMEOUT               = 15                    // 15s
+	ACTOR_MAX_P2P_REQ_TIMEOUT           = DOWNLOAD_FILE_TIMEOUT // max p2p request timeout
+	P2P_BROADCAST_TIMEOUT               = 10                    // 30s
+	P2P_REQUEST_WAIT_REPLY_TIMEOUT      = 10                    // 30s
+	TRACKER_SERVICE_TIMEOUT             = 5                     // 5s
+	WAIT_FOR_GENERATEBLOCK_TIMEOUT      = 10                    // wait for generate timeout
+	MEDIA_TRANSFER_TIMEOUT              = 20                    // media transfer timeout
 )
 
 const (

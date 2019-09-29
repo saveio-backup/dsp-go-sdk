@@ -1110,8 +1110,12 @@ func (this *Dsp) downloadFileFromPeers(taskId, fileHashStr string, asset int32, 
 // startFetchBlocks for store node, fetch blocks one by one after receive fetch_rdy msg
 func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr string) error {
 	// my task. use my wallet address
-	log.Debugf("startFetchBlocks: %s", fileHashStr)
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeDownload)
+	log.Debugf("startFetchBlocks taskId: %s, fileHash: %s", taskId, fileHashStr)
+	if this.taskMgr.IsFileDownloaded(taskId) {
+		log.Debugf("file has downloaded: %s", fileHashStr)
+		return nil
+	}
 	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
 	if err != nil {
 		return err

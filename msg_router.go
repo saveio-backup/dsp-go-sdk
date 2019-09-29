@@ -83,40 +83,45 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 
 // handleFileAskMsg. client send file ask msg to storage node for handshake and share file metadata
 func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
-	//TODO: verify & save info
-	// task exist at runtime
-	localId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
-	log.Debugf("handle file ask localId: %s", localId)
-	if len(localId) > 0 && this.taskMgr.TaskExist(localId) {
-		state, _ := this.taskMgr.GetTaskState(localId)
-		log.Debugf("fetch_ask task exist localId %s, %s state: %d", localId, fileMsg.Hash, state)
+	// TODO: verify & save info
+
+	// try to find a exist task id
+	existTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	log.Debugf("handle file ask existTaskId: %s", existTaskId)
+	if len(existTaskId) > 0 {
+		// handle old task
+		state, _ := this.taskMgr.GetTaskState(existTaskId)
+		log.Debugf("fetch_ask task exist localId %s, %s state: %d", existTaskId, fileMsg.Hash, state)
 		if state == task.TaskStateCancel || state == task.TaskStateFailed || state == task.TaskStateDone {
 			log.Warnf("the task has a wrong state of file_ask %s", state)
 		}
-		currentBlockHash, currentBlockIndex, err := this.taskMgr.GetCurrentSetBlock(localId)
+		currentBlockHash, currentBlockIndex, err := this.taskMgr.GetCurrentSetBlock(existTaskId)
 		if err != nil {
 			log.Errorf("get current set block err %s", err)
 			return
 		}
-		err = this.taskMgr.AddFileSession(localId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
+		err = this.taskMgr.AddFileSession(existTaskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 		if err != nil {
 			log.Errorf("add session err in file fetch ask %s", err)
 			return
 		}
-		log.Debugf("add file session success %s-%s-%s", localId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress)
+		log.Debugf("add file session success %s-%s-%s", existTaskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress)
 		newMsg := message.NewFileFetchAck(fileMsg.SessionId, fileMsg.GetHash(), currentBlockHash, currentBlockIndex)
 		log.Debugf("fetch task is exist send file_ack msg %v", peer)
 		err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply file_ack msg failed", err)
-		} else {
-			err = this.taskMgr.SetTaskState(localId, task.TaskStateDoing)
-			log.Debugf("set task state err: %s", err)
-			log.Debugf("reply file_ack msg success")
+			return
 		}
+		if state != task.TaskStateDone {
+			// set a new task state
+			err = this.taskMgr.SetTaskState(existTaskId, task.TaskStateDoing)
+			log.Debugf("set task state err: %s", err)
+		}
+		log.Debugf("reply file_ack msg success")
 		return
 	}
-	// my task. use my wallet address
+	// handle new download task. use my wallet address
 	taskId, err := this.taskMgr.NewTask(store.TaskTypeDownload)
 	log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
 	if err != nil {

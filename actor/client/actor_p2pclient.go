@@ -123,7 +123,7 @@ func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
 			return resp.Value, resp.Error
 		}
 		return false, fmt.Errorf("[P2pConnectionExist] no reponse")
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return false, fmt.Errorf("[P2pConnectionExist] timeout")
 	}
 }
@@ -141,7 +141,7 @@ func P2pWaitForConnected(address string, timeout time.Duration) error {
 			return resp.Error
 		}
 		return nil
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return fmt.Errorf("[P2pWaitForConnected] timeout")
 	}
 }
@@ -158,7 +158,7 @@ func P2pConnect(address string) error {
 			return resp.Error
 		}
 		return nil
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return fmt.Errorf("[P2pConnect] timeout")
 	}
 }
@@ -176,7 +176,7 @@ func P2pReconnectPeer(address string, netType P2pNetType) error {
 			return resp.Error
 		}
 		return nil
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return fmt.Errorf("[P2pConnect] timeout")
 	}
 }
@@ -193,7 +193,7 @@ func P2pClose(address string) error {
 			return resp.Error
 		}
 		return nil
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return fmt.Errorf("[P2pClose] timeout")
 	}
 }
@@ -211,7 +211,7 @@ func P2pSend(address string, data proto.Message) error {
 			return resp.Error
 		}
 		return nil
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return fmt.Errorf("[P2pSend] timeout")
 	}
 }
@@ -249,12 +249,13 @@ func P2pGetPublicAddr() string {
 			return ""
 		}
 		return resp.Addr
-	case <-time.After(time.Duration(common.P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		log.Errorf("[P2pGetPublicAddr] timeout")
 		return ""
 	}
 }
 
+// P2pRequestWithRetry. send p2p msg by request method, with <retry> times. Each retry has timeout of <timeout> sec
 func P2pRequestWithRetry(msg proto.Message, peer string, retry, timeout int) (proto.Message, error) {
 	chReq := &RequestWithRetryReq{
 		Address:  peer,
@@ -271,7 +272,7 @@ func P2pRequestWithRetry(msg proto.Message, peer string, retry, timeout int) (pr
 			return nil, resp.Error
 		}
 		return resp.Data, nil
-	case <-time.After(time.Duration(timeout+1) * time.Second):
-		return nil, fmt.Errorf("[P2pRequestWithRetry] timeout")
+	case <-time.After(time.Duration(common.ACTOR_MAX_P2P_REQ_TIMEOUT+1) * time.Second):
+		return nil, fmt.Errorf("[P2pRequestWithRetry] send request msg to %s timeout", peer)
 	}
 }
