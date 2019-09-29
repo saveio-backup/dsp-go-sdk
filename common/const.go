@@ -56,32 +56,33 @@ const (
 )
 
 const (
-	MAX_TASKS_NUM                = 50     // max task number
-	MAX_GOROUTINES_FOR_WORK_TASK = 8      // max goroutines for choose worker to do job
-	BACKUP_FILE_DURATION         = 10     // 10s check
-	REMOVE_FILES_DURATION        = 10     // 10s for remove files check
-	MAX_EXPIRED_PROVE_TASK_NUM   = 10     // max backup tasks one time
-	MAX_WORKER_BLOCK_FAILED_NUM  = 1      // max failed count from a worker to request block
-	MAX_WORKER_FILE_FAILED_NUM   = 10     // max failed count from a worker to request file
-	MAX_DOWNLOAD_PEERS_NUM       = 50     // max peers for download file
-	MAX_NETWORK_REQUEST_RETRY    = 4      // max network request retry
-	MAX_BACKUP_FILE_FAILED       = 3      // max backup file failed times
-	MAX_TRACKERS_NUM             = 100    // max tracker num
-	MAX_DNS_NUM                  = 15     // max dns num
-	MAX_PUBLICADDR_CACHE_LEN     = 100    // cache len
-	MAX_PROGRESS_CHANNEL_SIZE    = 100    // progress channel size
-	MAX_SEND_BLOCK_RETRY         = 3      // max send block retry
-	MAX_SAME_UPLOAD_BLOCK_NUM    = 3      // max enable upload same block for same node
-	MAX_TRACKER_REQ_TIMEOUT_NUM  = 5      // max tracker request timeout num
-	MAX_PUBLIC_IP_UPDATE_SECOND  = 5 * 60 // max update second to update peer host addr cache
-	MAX_BLOCK_FETCHED_RETRY      = 2      // max uploading block be fetched retry
-	MAX_REQ_BLOCK_COUNT          = 16     // max block count when request for download flights
-	MIN_REQ_BLOCK_COUNT          = 4      // min block count when request for download flights
-	MAX_START_PDP_RETRY          = 2      // max start pdp retry
-	START_PDP_RETRY_DELAY        = 5      // delay pdp retry
-	MAX_PEERCNT_FOR_DOWNLOAD     = 100    // max peer count (threads) for download file
-	MIN_DOWNLOAD_QOS_LEN         = 3      // min download QoS size
-	MAX_TRACKER_REQUEST_PARALLEL = 10     // max concurrent tracker request num
+	MAX_TASKS_NUM                  = 50     // max task number
+	MAX_GOROUTINES_FOR_WORK_TASK   = 8      // max goroutines for choose worker to do job
+	BACKUP_FILE_DURATION           = 10     // 10s check
+	REMOVE_FILES_DURATION          = 10     // 10s for remove files check
+	MAX_EXPIRED_PROVE_TASK_NUM     = 10     // max backup tasks one time
+	MAX_WORKER_BLOCK_FAILED_NUM    = 1      // max failed count from a worker to request block
+	MAX_WORKER_FILE_FAILED_NUM     = 10     // max failed count from a worker to request file
+	MAX_DOWNLOAD_PEERS_NUM         = 50     // max peers for download file
+	MAX_NETWORK_REQUEST_RETRY      = 4      // max network request retry
+	MAX_BACKUP_FILE_FAILED         = 3      // max backup file failed times
+	MAX_TRACKERS_NUM               = 100    // max tracker num
+	MAX_DNS_NUM                    = 15     // max dns num
+	MAX_PUBLICADDR_CACHE_LEN       = 100    // cache len
+	MAX_PROGRESS_CHANNEL_SIZE      = 100    // progress channel size
+	MAX_SEND_BLOCK_RETRY           = 3      // max send block retry
+	MAX_SAME_UPLOAD_BLOCK_NUM      = 3      // max enable upload same block for same node
+	MAX_TRACKER_REQ_TIMEOUT_NUM    = 5      // max tracker request timeout num
+	MAX_PUBLIC_IP_UPDATE_SECOND    = 5 * 60 // max update second to update peer host addr cache
+	MAX_BLOCK_FETCHED_RETRY        = 2      // max uploading block be fetched retry
+	MAX_REQ_BLOCK_COUNT            = 16     // max block count when request for download flights
+	MIN_REQ_BLOCK_COUNT            = 4      // min block count when request for download flights
+	MAX_START_PDP_RETRY            = 2      // max start pdp retry
+	START_PDP_RETRY_DELAY          = 5      // delay pdp retry
+	MAX_PEERCNT_FOR_DOWNLOAD       = 100    // max peer count (threads) for download file
+	MIN_DOWNLOAD_QOS_LEN           = 3      // min download QoS size
+	MAX_TRACKER_REQUEST_PARALLEL   = 10     // max concurrent tracker request num
+	MAX_PEERS_NUM_GET_FROM_TRACKER = 1000   // max peer count get from tracker
 )
 
 // task

@@ -1186,7 +1186,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 			// reduce slice
 			downloadQoS = downloadQoS[len(downloadQoS)-common.MIN_DOWNLOAD_QOS_LEN:]
 			downloadBlkCap = adjustDownloadCap(downloadBlkCap, downloadQoS)
-			log.Debugf("adjust new download cap: %d", downloadBlkCap)
+			log.Debugf("adjust new download cap: %d for file %s", downloadBlkCap, fileHashStr)
 		}
 		blocks = blocks[:0]
 

@@ -253,7 +253,6 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string {
 	var hashBytes [46]byte
 	copy(hashBytes[:], []byte(hash)[:])
-	peerAddrs := make([]string, 0)
 	selfAddr := client.P2pGetPublicAddr()
 	protocol := selfAddr[:strings.Index(selfAddr, "://")]
 
@@ -271,14 +270,20 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 			}
 			return
 		}
+		peerAddrs := make([]string, 0)
+		peerMap := make(map[string]struct{}, 0)
 		for _, p := range peers {
 			addr := fmt.Sprintf("%s://%s:%d", protocol, p.IP, p.Port)
 			if addr == selfAddr {
 				continue
 			}
+			if _, ok := peerMap[addr]; ok || len(peerMap) > common.MAX_PEERS_NUM_GET_FROM_TRACKER {
+				continue
+			}
+			peerMap[addr] = struct{}{}
 			peerAddrs = append(peerAddrs, addr)
 		}
-		if len(peerAddrs) != 0 {
+		if len(peerAddrs) == 0 {
 			resp <- &trackerResp{
 				err: fmt.Errorf("peers is empty"),
 			}
