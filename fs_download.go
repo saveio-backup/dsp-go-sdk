@@ -483,8 +483,9 @@ func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string
 	return nil
 }
 
-// PayForData. pay for block
-func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, blockSize uint64) (int32, error) {
+// PayForBlock. Pay for block with media transfer. PayInfo is some payment info of receiver, addr is a host address of receiver.
+// BlockSize is the size to pay in KB. If newpayment flag is set, it is set to a new payment and will accumulate to unpaid amount.
+func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, blockSize uint64, newPayment bool) (int32, error) {
 	if payInfo == nil {
 		log.Warn("payinfo is nil")
 		return 0, nil
@@ -504,10 +505,13 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		return 0, nil
 	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeDownload)
-	err := this.taskMgr.AddFileUnpaid(taskId, payInfo.WalletAddress, payInfo.Asset, amount)
-	if err != nil {
-		return 0, err
+	if newPayment {
+		err := this.taskMgr.AddFileUnpaid(taskId, payInfo.WalletAddress, payInfo.Asset, amount)
+		if err != nil {
+			return 0, err
+		}
 	}
+
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	paymentId := r.Int31()
 	dnsHostAddr, err := this.GetExternalIP(this.DNS.DNSNode.WalletAddr)
@@ -566,8 +570,18 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 }
 
 // PayUnpaidFile. pay unpaid order for file
-func (this *Dsp) PayUnpaidFile(fileHashStr string) error {
-	// TODO: pay unpaid file at first
+func (this *Dsp) PayUnpaidFile(taskId, fileHashStr string, quotation map[string]*file.Payment) error {
+	for hostAddr, payInfo := range quotation {
+		unpaidAmount, _ := this.taskMgr.GetUnpaidAmount(taskId, payInfo.WalletAddress, payInfo.Asset)
+		if unpaidAmount == 0 {
+			continue
+		}
+		log.Debugf("pay to %s of the unpaid amount %d for task %s", payInfo.WalletAddress, unpaidAmount, taskId)
+		_, err := this.PayForBlock(payInfo, hostAddr, fileHashStr, unpaidAmount/payInfo.UnitPrice, false)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -583,7 +597,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		return serr.NewDetailError(serr.FILEINFO_NOT_EXIST, fmt.Sprintf("download info not exist: %s", fileHashStr))
 	}
 	// pay unpaid order of the file after last download
-	err := this.PayUnpaidFile(fileHashStr)
+	err := this.PayUnpaidFile(taskId, fileHashStr, quotation)
 	if err != nil {
 		return serr.NewDetailError(serr.PAY_UNPAID_BLOCK_FAILED, err.Error())
 	}
@@ -669,7 +683,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			return nil, errors.New("request total bytes count 0")
 		}
 		this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocks)
-		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(totalBytes))
+		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(totalBytes), true)
 		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d", fHash, pAddr, walletAddr, paymentId)
 		if err != nil {
 			log.Errorf("pay for blocks err %s", err)

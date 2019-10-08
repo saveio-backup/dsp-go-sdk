@@ -247,3 +247,7 @@ func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint32) (uint64,
 func (this *TaskMgr) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse bool) []string {
 	return this.db.GetTaskIdList(offset, limit, ft, allType, reverse)
 }
+
+func (this *TaskMgr) GetUnpaidAmount(id, payToAddress string, asset int32) (uint64, error) {
+	return this.db.GetUnpaidAmount(id, payToAddress, asset)
+}

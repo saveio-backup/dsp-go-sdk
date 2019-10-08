@@ -530,7 +530,7 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 	}
 
 	// delete progress
-	err = this.batchDeleteProgress(batch, fi.Id)
+	err = this.batchDeleteProgress(batch, id)
 	if err != nil {
 		return err
 	}
@@ -540,36 +540,36 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 	this.db.BatchDelete(batch, []byte(optionKey))
 
 	// delete task id index
-	this.db.BatchDelete(batch, []byte(TaskIdIndexKey(fi.Index)))
-	// delete task count
-	taskCount.TotalCount--
-	switch fi.Type {
-	case TaskTypeUpload:
-		taskCount.UploadCount--
-	case TaskTypeDownload:
-		taskCount.DownloadCount--
-	case TaskTypeShare:
-		taskCount.ShareCount--
-	}
-	err = this.batchSaveTaskCount(batch, taskCount)
-	if err != nil {
-		return err
-	}
-
-	// delete file info id
-	if fi.Type == TaskTypeUpload && len(fi.FilePath) > 0 {
-		hexStr := utils.StringToSha256Hex(fi.FilePath)
-		taskIdWithFilekey := TaskIdWithFile(hexStr, fi.WalletAddress, fi.Type)
-		log.Debugf("will delete taskIdWithFilekey: %s", TaskInfoIdWithFile(taskIdWithFilekey))
+	if fi != nil {
+		this.db.BatchDelete(batch, []byte(TaskIdIndexKey(fi.Index)))
+		// delete task count
+		taskCount.TotalCount--
+		switch fi.Type {
+		case TaskTypeUpload:
+			taskCount.UploadCount--
+		case TaskTypeDownload:
+			taskCount.DownloadCount--
+		case TaskTypeShare:
+			taskCount.ShareCount--
+		}
+		err = this.batchSaveTaskCount(batch, taskCount)
+		if err != nil {
+			return err
+		}
+		// delete file info id
+		if fi.Type == TaskTypeUpload && len(fi.FilePath) > 0 {
+			hexStr := utils.StringToSha256Hex(fi.FilePath)
+			taskIdWithFilekey := TaskIdWithFile(hexStr, fi.WalletAddress, fi.Type)
+			log.Debugf("will delete taskIdWithFilekey: %s", TaskInfoIdWithFile(taskIdWithFilekey))
+			this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
+		}
+		taskIdWithFilekey := TaskIdWithFile(fi.FileHash, fi.WalletAddress, fi.Type)
+		log.Debugf("delete local file info key %s", TaskInfoIdWithFile(taskIdWithFilekey))
 		this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
 	}
-	taskIdWithFilekey := TaskIdWithFile(fi.FileHash, fi.WalletAddress, fi.Type)
-	log.Debugf("delete local file info key %s", TaskInfoIdWithFile(taskIdWithFilekey))
-	this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
 
 	// delete fileInfo
 	this.db.BatchDelete(batch, []byte(TaskInfoKey(id)))
-
 	// commit
 	return this.db.BatchCommit(batch)
 }
@@ -851,10 +851,10 @@ func (this *FileDB) AddFileBlockHashes(id string, blocks []string) error {
 	return this.db.BatchCommit(batch)
 }
 
-func (this *FileDB) AddFileUnpaid(id, walletAddress string, asset int32, amount uint64) error {
+func (this *FileDB) AddFileUnpaid(id, payToAddress string, asset int32, amount uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	unpaidKey := FileUnpaidKey(id, walletAddress, asset)
+	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {
 		log.Errorf("getFileUnpaidInfo err %s", err)
@@ -864,18 +864,34 @@ func (this *FileDB) AddFileUnpaid(id, walletAddress string, asset int32, amount 
 		info = &FileDownloadUnPaid{
 			FileInfoId: id,
 		}
-		info.WalletAddress = walletAddress
+		info.WalletAddress = payToAddress
 		info.Asset = asset
 	}
 	info.Amount = info.Amount + amount
-	log.Debugf("add file unpaid %s taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, walletAddress, amount, info.Amount)
+	log.Debugf("add file unpaid %s taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, payToAddress, amount, info.Amount)
 	return this.saveFileUnpaidInfo(unpaidKey, info)
 }
 
-func (this *FileDB) DeleteFileUnpaid(id, walletAddress string, asset int32, amount uint64) error {
+// GetUnpaidAmount. get unpaid amount of task to payee
+func (this *FileDB) GetUnpaidAmount(id, payToAddress string, asset int32) (uint64, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	unpaidKey := FileUnpaidKey(id, walletAddress, asset)
+	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
+	info, err := this.getFileUnpaidInfo(unpaidKey)
+	if err != nil {
+		log.Errorf("getFileUnpaidInfo err %s", err)
+		return 0, err
+	}
+	if info == nil {
+		return 0, nil
+	}
+	return info.Amount, nil
+}
+
+func (this *FileDB) DeleteFileUnpaid(id, payToAddress string, asset int32, amount uint64) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {
 		log.Debug("getFileUnpaidInfo err %s", err)
@@ -886,10 +902,10 @@ func (this *FileDB) DeleteFileUnpaid(id, walletAddress string, asset int32, amou
 	}
 	if info.Amount > amount {
 		info.Amount = info.Amount - amount
-		log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, walletAddress, amount, info.Amount)
+		log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, payToAddress, amount, info.Amount)
 		return this.saveFileUnpaidInfo(unpaidKey, info)
 	}
-	log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, walletAddress, amount, info.Amount)
+	log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, payToAddress, amount, info.Amount)
 	return this.db.Delete([]byte(unpaidKey))
 }
 
