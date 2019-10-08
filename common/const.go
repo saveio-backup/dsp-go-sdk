@@ -1,5 +1,7 @@
 package common
 
+import "github.com/saveio/carrier/network"
+
 const (
 	CHUNK_SIZE                      = 256 * 1024 // chunk size
 	DOWNLOAD_FILE_TEMP_DIR_PATH     = "./temp"   // download temp file path
@@ -29,25 +31,27 @@ const (
 
 // timeout
 const (
-	TX_CONFIRM_TIMEOUT                  = 60                    // wait for tx confirmed timeout
-	FILE_FETCH_ACK_TIMEOUT              = 60                    // wait for file fetch ack timeout
-	DOWNLOAD_FILE_TIMEOUT               = 120                   // download file time out
-	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT       = 40                    // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2
-	CHECK_PROVE_TIMEOUT                 = 60                    // client upload file and check prove timeout
-	CHECK_CHANNEL_STATE_INTERVAL        = 3                     // check channel state interval
-	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1                     // check channel can transfer interval
-	CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT  = 30                    // check channel can transfer interval
-	WAIT_CHANNEL_CONNECT_TIMEOUT        = 6                     // wait for channel connected
-	FILE_DNS_TTL                        = 10 * 60               //10m
-	CHANNEL_TRANSFER_TIMEOUT            = 20                    // 60s
-	CHANNEL_WITHDRAW_TIMEOUT            = 60                    // 60s
-	ACTOR_P2P_REQ_TIMEOUT               = 15                    // 15s
-	ACTOR_MAX_P2P_REQ_TIMEOUT           = DOWNLOAD_FILE_TIMEOUT // max p2p request timeout
-	P2P_BROADCAST_TIMEOUT               = 10                    // 30s
-	P2P_REQUEST_WAIT_REPLY_TIMEOUT      = 10                    // 30s
-	TRACKER_SERVICE_TIMEOUT             = 5                     // 5s
-	WAIT_FOR_GENERATEBLOCK_TIMEOUT      = 10                    // wait for generate timeout
-	MEDIA_TRANSFER_TIMEOUT              = 20                    // media transfer timeout
+	TX_CONFIRM_TIMEOUT                  = 60      // wait for tx confirmed timeout
+	FILE_FETCH_ACK_TIMEOUT              = 60      // wait for file fetch ack timeout
+	CHECK_PROVE_TIMEOUT                 = 60      // client upload file and check prove timeout
+	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval
+	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1       // check channel can transfer interval
+	CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT  = 30      // check channel can transfer interval
+	WAIT_CHANNEL_CONNECT_TIMEOUT        = 6       // wait for channel connected
+	FILE_DNS_TTL                        = 10 * 60 //10m
+	CHANNEL_TRANSFER_TIMEOUT            = 20      // 60s
+	CHANNEL_WITHDRAW_TIMEOUT            = 60      // 60s
+	ACTOR_P2P_REQ_TIMEOUT               = 15      // 15s
+	P2P_BROADCAST_TIMEOUT               = 10      // 30s
+	P2P_REQUEST_WAIT_REPLY_TIMEOUT      = 10      // 30s
+	TRACKER_SERVICE_TIMEOUT             = 5       // 5s
+	WAIT_FOR_GENERATEBLOCK_TIMEOUT      = 10      // wait for generate timeout
+	MEDIA_TRANSFER_TIMEOUT              = 20      // media transfer timeout
+
+	NETWORK_STREAM_WRITE_TIMEOUT  = 8                                                                                               // network write stream timeout for 128KB (128KB/8s)
+	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT = (CHUNK_SIZE / network.PER_SEND_BLOCK_SIZE) * NETWORK_STREAM_WRITE_TIMEOUT * MAX_REQ_BLOCK_COUNT // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2
+	DOWNLOAD_FILE_TIMEOUT         = DOWNLOAD_BLOCKFLIGHTS_TIMEOUT * MAX_BLOCK_FETCHED_RETRY                                         // download file time out
+	ACTOR_MAX_P2P_REQ_TIMEOUT     = DOWNLOAD_FILE_TIMEOUT                                                                           // max p2p request timeout
 )
 
 const (
@@ -75,7 +79,7 @@ const (
 	MAX_TRACKER_REQ_TIMEOUT_NUM    = 5      // max tracker request timeout num
 	MAX_PUBLIC_IP_UPDATE_SECOND    = 5 * 60 // max update second to update peer host addr cache
 	MAX_BLOCK_FETCHED_RETRY        = 2      // max uploading block be fetched retry
-	MAX_REQ_BLOCK_COUNT            = 16     // max block count when request for download flights
+	MAX_REQ_BLOCK_COUNT            = 8      // max block count when request for download flights
 	MIN_REQ_BLOCK_COUNT            = 4      // min block count when request for download flights
 	MAX_START_PDP_RETRY            = 2      // max start pdp retry
 	START_PDP_RETRY_DELAY          = 5      // delay pdp retry

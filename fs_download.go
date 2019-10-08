@@ -550,7 +550,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		return 0, err
 	}
 	log.Debugf("paying to %s, id %v success", payInfo.WalletAddress, paymentId)
-	log.Debugf("send paymenMsg paymentId %d, for file:%s, size:%d, price:%d success", paymentId, fileHashStr, blockSize, amount)
+	log.Debugf("send paymenMsg paymentId %d, for file:%s, size:%d, price:%d", paymentId, fileHashStr, blockSize, amount)
 	// send payment msg
 	msg := message.NewPayment(this.WalletAddress(), payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
