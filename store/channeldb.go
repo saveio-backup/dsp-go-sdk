@@ -2,6 +2,8 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -63,75 +65,135 @@ func (this *ChannelDB) RemovePayment(paymentId int32) error {
 	return this.db.Delete(key)
 }
 
+type ChannelInfo struct {
+	ID          uint64 `json:"id"`
+	PartnerAddr string `json:"partner_address"`
+	IsDNS       bool   `json:"is_dns"`
+	CreatedAt   uint64 `json:"createdAt"`
+}
+
 // AddPartner. add partner to localDB.  walletAddr <=> map[partnerAddr]struct{}
-func (this *ChannelDB) AddPartner(walletAddr, partnerAddr string) error {
-	key := []byte(ChannelListKey(walletAddr))
-	value, _ := this.db.Get(key)
-
-	var partners map[string]struct{}
-	if value != nil {
-		json.Unmarshal(value, &partners)
-	} else {
-		partners = make(map[string]struct{}, 0)
+func (this *ChannelDB) AddChannelInfo(id uint64, partnerAddr string) error {
+	key := []byte(ChannelInfoKey(partnerAddr))
+	value, err := this.db.Get(key)
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
 	}
-	_, ok := partners[partnerAddr]
-	if ok {
+	if len(value) > 0 {
 		return nil
 	}
-	partners[partnerAddr] = struct{}{}
-	data, err := json.Marshal(partners)
+	ch := &ChannelInfo{
+		ID:          id,
+		PartnerAddr: partnerAddr,
+		CreatedAt:   uint64(time.Now().Unix()),
+	}
+	buf, err := json.Marshal(ch)
 	if err != nil {
 		return err
 	}
-	return this.db.Put(key, data)
+	return this.db.Put(key, buf)
 }
 
-func (this *ChannelDB) DeletePartner(walletAddr, partnerAddr string) error {
-	key := []byte(ChannelListKey(walletAddr))
-	value, _ := this.db.Get(key)
-
-	var partners map[string]struct{}
-	if value != nil {
-		json.Unmarshal(value, &partners)
-	} else {
-		partners = make(map[string]struct{}, 0)
+func (this *ChannelDB) SetChannelIsDNS(partnerAddr string, isDNS bool) error {
+	key := []byte(ChannelInfoKey(partnerAddr))
+	value, err := this.db.Get(key)
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
 	}
-	_, ok := partners[partnerAddr]
-	if !ok {
-		return nil
+	if len(value) == 0 {
+		return fmt.Errorf("channel not exist")
 	}
-	delete(partners, partnerAddr)
-	data, err := json.Marshal(partners)
+	ch := &ChannelInfo{}
+	err = json.Unmarshal(value, &ch)
 	if err != nil {
 		return err
 	}
-	return this.db.Put(key, data)
+	ch.IsDNS = isDNS
+	buf, err := json.Marshal(ch)
+	if err != nil {
+		return err
+	}
+	return this.db.Put(key, buf)
 }
 
-func (this *ChannelDB) GetPartners(walletAddr string) ([]string, error) {
-	key := []byte(ChannelListKey(walletAddr))
-	value, _ := this.db.Get(key)
-	if value == nil {
-		return nil, nil
+func (this *ChannelDB) GetChannelInfo(partnerAddr string) (*ChannelInfo, error) {
+	key := []byte(ChannelInfoKey(partnerAddr))
+	value, err := this.db.Get(key)
+	if err != nil && err != leveldb.ErrNotFound {
+		return nil, err
 	}
-	var partners map[string]struct{}
-	json.Unmarshal(value, &partners)
-	ps := make([]string, 0)
-	for addr, _ := range partners {
-		ps = append(ps, addr)
+	if len(value) == 0 {
+		return nil, fmt.Errorf("channel info is empty")
+	}
+	ch := &ChannelInfo{}
+	err = json.Unmarshal(value, &ch)
+	if err != nil {
+		return nil, err
+	}
+	return ch, nil
+}
+
+func (this *ChannelDB) DeleteChannelInfo(partnerAddr string) error {
+	key := []byte(ChannelInfoKey(partnerAddr))
+	return this.db.Delete(key)
+}
+
+func (this *ChannelDB) GetPartners() ([]string, error) {
+	prefix := ChannelInfoKeyPrefix()
+	keys, err := this.db.QueryKeysByPrefix([]byte(prefix))
+	if err != nil {
+		return nil, err
+	}
+	ps := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value, err := this.db.Get(key)
+		if err != nil || len(value) == 0 {
+			continue
+		}
+		ch := &ChannelInfo{}
+		err = json.Unmarshal(value, &ch)
+		if err != nil {
+			continue
+		}
+		ps = append(ps, ch.PartnerAddr)
 	}
 	return ps, nil
 }
 
 func (this *ChannelDB) OverridePartners(walletAddr string, partnerAddrs []string) error {
-	key := []byte(ChannelListKey(walletAddr))
-	partners := make(map[string]struct{}, 0)
-	for _, addr := range partnerAddrs {
-		partners[addr] = struct{}{}
-	}
-	data, err := json.Marshal(partners)
+	prefix := ChannelInfoKeyPrefix()
+	keys, err := this.db.QueryKeysByPrefix([]byte(prefix))
 	if err != nil {
 		return err
 	}
-	return this.db.Put(key, data)
+	newParnerM := make(map[string]struct{}, 0)
+	for _, addr := range partnerAddrs {
+		newParnerM[addr] = struct{}{}
+	}
+	deleteChannels := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value, err := this.db.Get(key)
+		if err != nil || len(value) == 0 {
+			continue
+		}
+		ch := &ChannelInfo{}
+		err = json.Unmarshal(value, &ch)
+		if err != nil {
+			continue
+		}
+		_, ok := newParnerM[ch.PartnerAddr]
+		if ok {
+			continue
+		}
+		deleteChannels = append(deleteChannels, ch.PartnerAddr)
+	}
+	if len(deleteChannels) == 0 {
+		return nil
+	}
+
+	batch := this.db.NewBatch()
+	for _, addr := range deleteChannels {
+		this.db.BatchDelete(batch, []byte(ChannelInfoKey(addr)))
+	}
+	return this.db.BatchCommit(batch)
 }

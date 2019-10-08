@@ -164,8 +164,16 @@ func (this *Channel) SetChannelDB(db *store.ChannelDB) {
 
 // GetAllPartners. get all partners from local db
 func (this *Channel) GetAllPartners() []string {
-	partners, _ := this.channelDB.GetPartners(this.walletAddr)
+	partners, _ := this.channelDB.GetPartners()
 	return partners
+}
+
+func (this *Channel) AddChannelInfo(id uint64, partnerAddr string) error {
+	return this.channelDB.AddChannelInfo(id, partnerAddr)
+}
+
+func (this *Channel) GetChannelInfoFromDB(targetAddress string) (*store.ChannelInfo, error) {
+	return this.channelDB.GetChannelInfo(targetAddress)
 }
 
 // OverridePartners. override local partners with neighbours from channel
@@ -181,7 +189,6 @@ func (this *Channel) OverridePartners() error {
 	}
 	log.Debugf("override new partners %v\n", newPartners)
 	return this.channelDB.OverridePartners(this.walletAddr, newPartners)
-	return nil
 }
 
 // WaitForConnected. wait for conected for a period.
@@ -254,7 +261,12 @@ func (this *Channel) OpenChannel(targetAddress string, depositAmount uint64) (co
 		// TODO: withdraw and close channel
 		return 0, err
 	}
+	this.channelDB.AddChannelInfo(uint64(channelID), targetAddress)
 	return channelID, nil
+}
+
+func (this *Channel) SetChannelIsDNS(targetAddr string, isDNS bool) error {
+	return this.channelDB.SetChannelIsDNS(targetAddr, isDNS)
 }
 
 func (this *Channel) ChannelClose(targetAddress string) error {
@@ -268,7 +280,7 @@ func (this *Channel) ChannelClose(targetAddress string) error {
 	}
 	success, err := ch_actor.CloseChannel(common.Address(target))
 	if err == nil && success {
-		this.channelDB.DeletePartner(this.walletAddr, targetAddress)
+		this.channelDB.DeleteChannelInfo(targetAddress)
 	}
 	return err
 }

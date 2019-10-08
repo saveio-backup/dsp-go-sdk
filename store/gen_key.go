@@ -23,8 +23,9 @@ const (
 )
 
 const (
-	PAYMENT_ID   = DB_PREFIX + "_" + "payment" + "_" + DB_VERSION
-	CHANNEL_LIST = DB_PREFIX + "_" + "channel_list" + "_" + DB_VERSION
+	PAYMENT_ID          = DB_PREFIX + "_" + "payment" + "_" + DB_VERSION
+	CHANNEL_LIST        = DB_PREFIX + "_" + "channel_list" + "_" + DB_VERSION
+	CHANNEL_INFO_PREFIX = DB_PREFIX + "_" + "channel_info" + "_" + DB_VERSION
 )
 
 // TaskInfoKey. Key of task
@@ -115,4 +116,12 @@ func PaymentKey(paymentId int32) string {
 // ChannelListKey. Key of channel list
 func ChannelListKey(waleltAddr string) string {
 	return fmt.Sprintf("[%s]%s", CHANNEL_LIST, waleltAddr)
+}
+
+func ChannelInfoKey(walletAddr string) string {
+	return fmt.Sprintf("%s%s", ChannelInfoKeyPrefix(), walletAddr)
+}
+
+func ChannelInfoKeyPrefix() string {
+	return fmt.Sprintf("[%s]", CHANNEL_INFO_PREFIX)
 }

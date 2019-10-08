@@ -170,14 +170,6 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSliceDone)
 	fileHashStr = hashes[0]
-	if newTask {
-		hasUploading := this.checkFileHasUpload(taskId, hashes[0])
-		if hasUploading {
-			err = errors.New("file has uploading or uploaded, please cancel the task")
-			sdkerr = serr.NewDetailError(serr.UPLOAD_TASK_EXIST, err.Error())
-			return nil, err
-		}
-	}
 	log.Debugf("after bind task id")
 	this.taskMgr.NewBatchSet(taskId)
 	this.taskMgr.SetFileHash(taskId, fileHashStr)
@@ -191,6 +183,14 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
+	}
+	if newTask {
+		hasUploading := this.checkFileHasUpload(taskId, fileHashStr)
+		if hasUploading {
+			err = errors.New("file has uploading or uploaded, please cancel the task")
+			sdkerr = serr.NewDetailError(serr.UPLOAD_TASK_EXIST, err.Error())
+			return nil, err
+		}
 	}
 	log.Debugf("check if pause after node from file")
 	pause, sdkerr = this.checkIfPause(taskId, fileHashStr)
@@ -495,6 +495,7 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string) ([]*common.DeleteUploadFi
 	if len(ids) == 0 {
 		return nil, errors.New("delete file ids is empty")
 	}
+	log.Debugf("DeleteUploadedFileByIds: %v", ids)
 	fileHashStrs := make([]string, 0, len(ids))
 	taskIds := make([]string, 0, len(ids))
 	taskIdM := make(map[string]struct{}, 0)

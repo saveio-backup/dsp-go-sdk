@@ -110,7 +110,7 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		return err
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileStart)
-	stop, sdkErr := this.stopDownload(taskId)
+	stop, sdkErr := this.isDownloadTaskStop(taskId)
 	if sdkErr != nil {
 		return sdkErr.Error
 	}
@@ -128,7 +128,7 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 	if opt.MaxPeerCnt > common.MAX_DOWNLOAD_PEERS_NUM {
 		opt.MaxPeerCnt = common.MAX_DOWNLOAD_PEERS_NUM
 	}
-	stop, sdkErr = this.stopDownload(taskId)
+	stop, sdkErr = this.isDownloadTaskStop(taskId)
 	if sdkErr != nil {
 		return sdkErr.Error
 	}
@@ -587,7 +587,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	if err != nil {
 		return serr.NewDetailError(serr.PAY_UNPAID_BLOCK_FAILED, err.Error())
 	}
-	stop, sdkErr := this.stopDownload(taskId)
+	stop, sdkErr := this.isDownloadTaskStop(taskId)
 	if sdkErr != nil {
 		return sdkErr
 	}
@@ -641,7 +641,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 	if err != nil {
 		return serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 	}
-	stop, sdkErr = this.stopDownload(taskId)
+	stop, sdkErr = this.isDownloadTaskStop(taskId)
 	if sdkErr != nil {
 		return sdkErr
 	}
@@ -879,7 +879,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			if !ok {
 				return serr.NewDetailError(serr.DOWNLOAD_BLOCK_FAILED, "download internal error")
 			}
-			stop, sdkErr := this.stopDownload(taskId)
+			stop, sdkErr := this.isDownloadTaskStop(taskId)
 			if sdkErr != nil {
 				return sdkErr
 			}
@@ -973,7 +973,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			this.taskMgr.SetTaskState(taskId, task.TaskStateDone)
 			break
 		case <-stateCheckTicker.C:
-			stop, sdkErr := this.stopDownload(taskId)
+			stop, sdkErr := this.isDownloadTaskStop(taskId)
 			if sdkErr != nil {
 				return sdkErr
 			}
@@ -1076,7 +1076,7 @@ func (this *Dsp) downloadFileFromPeers(taskId, fileHashStr string, asset int32, 
 	if len(quotation) == 0 {
 		return serr.NewDetailError(serr.NO_DOWNLOAD_SEED, "no quotation from peers")
 	}
-	stop, sdkErr := this.stopDownload(taskId)
+	stop, sdkErr := this.isDownloadTaskStop(taskId)
 	if sdkErr != nil {
 		return sdkErr
 	}
@@ -1093,7 +1093,7 @@ func (this *Dsp) downloadFileFromPeers(taskId, fileHashStr string, asset int32, 
 	if err != nil {
 		return serr.NewDetailError(serr.PREPARE_CHANNEL_ERROR, err.Error())
 	}
-	stop, sdkErr = this.stopDownload(taskId)
+	stop, sdkErr = this.isDownloadTaskStop(taskId)
 	if sdkErr != nil {
 		return sdkErr
 	}
@@ -1290,7 +1290,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	return nil, err
 }
 
-func (this *Dsp) stopDownload(taskId string) (bool, *serr.SDKError) {
+func (this *Dsp) isDownloadTaskStop(taskId string) (bool, *serr.SDKError) {
 	stop, err := this.taskMgr.IsTaskStop(taskId)
 	if err != nil {
 		sdkerr := serr.NewDetailError(serr.TASK_INTERNAL_ERROR, err.Error())
