@@ -569,6 +569,14 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 				this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
 			}
 		}
+
+		// delete unpaid info
+		if fi.Type == TaskTypeDownload {
+			unpaidKeys, _ := this.db.QueryKeysByPrefix([]byte(FileUnpaidQueryKey(id)))
+			for _, unpaidKey := range unpaidKeys {
+				this.db.BatchDelete(batch, unpaidKey)
+			}
+		}
 		taskIdWithFilekey := TaskIdWithFile(fi.FileHash, fi.WalletAddress, fi.Type)
 		log.Debugf("delete local file info key %s", TaskInfoIdWithFile(taskIdWithFilekey))
 		this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))

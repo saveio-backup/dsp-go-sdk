@@ -131,16 +131,31 @@ func NewTask(taskT store.TaskType, db *store.FileDB) *Task {
 	return t
 }
 
+// GetTaskFromDB. get a task object from DB with file info id
+func GetTaskFromDB(id string, db *store.FileDB) (*Task, error) {
+	info, err := db.GetFileInfo(id)
+	if err != nil {
+		log.Errorf("[Task GetTaskFromDB] get file info failed, id: %s", id)
+		return nil, err
+	}
+	if info == nil {
+		log.Warnf("[Task GetTaskFromDB] recover task get file info is nil, id: %v", id)
+		return nil, nil
+	}
+	t := newTask(id, info, db)
+	return t, nil
+}
+
 // NewTaskFromDB. Read file info from DB and recover a task by the file info.
-func NewTaskFromDB(id string, db *store.FileDB) *Task {
+func NewTaskFromDB(id string, db *store.FileDB) (*Task, error) {
 	info, err := db.GetFileInfo(id)
 	if err != nil {
 		log.Errorf("[Task NewTaskFromDB] get file info failed, id: %s", id)
-		return nil
+		return nil, err
 	}
 	if info == nil {
 		log.Warnf("[Task NewTaskFromDB] recover task get file info is nil, id: %v", id)
-		return nil
+		return nil, nil
 	}
 	if (TaskState(info.TaskState) == TaskStatePause || TaskState(info.TaskState) == TaskStateDoing) && info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT < uint64(time.Now().Unix()) {
 		log.Warnf("[Task NewTaskFromDB] task: %s is expired, updatedAt: %d", id, info.UpdatedAt)
@@ -148,7 +163,7 @@ func NewTaskFromDB(id string, db *store.FileDB) *Task {
 	sessions, err := db.GetFileSessions(id)
 	if err != nil {
 		log.Errorf("[Task NewTaskFromDB] set task session: %s", err)
-		return nil
+		return nil, err
 	}
 	state := TaskState(info.TaskState)
 	if state == TaskStatePrepare || state == TaskStateDoing || state == TaskStateCancel {
@@ -159,16 +174,15 @@ func NewTaskFromDB(id string, db *store.FileDB) *Task {
 	err = db.SaveFileInfo(t.info)
 	if err != nil {
 		log.Errorf("[Task NewTaskFromDB] set file info failed: %s", err)
-		return nil
+		return nil, err
 	}
 	log.Debugf("task name: %s, state: %d", t.info.FileName, state)
-
 	for _, session := range sessions {
 		log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
 		t.peerSenIds[session.WalletAddr] = session.SessionId
 	}
 	log.Debugf("NewTaskFromDB store type: %d", t.info.StoreType)
-	return t
+	return t, nil
 }
 
 func (this *Task) GetTaskType() store.TaskType {

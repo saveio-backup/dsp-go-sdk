@@ -166,8 +166,16 @@ func (this *TaskMgr) GetFilePath(taskId string) (string, error) {
 }
 
 func (this *TaskMgr) GetProgressInfo(taskId string) *ProgressInfo {
-	v, ok := this.GetTaskById(taskId)
-	if !ok {
+	taskExist := this.TaskExist(taskId)
+	if taskExist {
+		v, ok := this.GetTaskById(taskId)
+		if !ok {
+			return nil
+		}
+		return v.GetProgressInfo()
+	}
+	v, _ := GetTaskFromDB(taskId, this.db)
+	if v == nil {
 		return nil
 	}
 	return v.GetProgressInfo()

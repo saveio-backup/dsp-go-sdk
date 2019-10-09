@@ -88,12 +88,12 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 	taskIds = append(taskIds, downloadTaskIds...)
 	log.Debugf("total recover task len: %d", len(taskIds))
 	for i, id := range taskIds {
-		t := NewTaskFromDB(id, this.db)
-		if t == nil {
+		t, err := NewTaskFromDB(id, this.db)
+		if err != nil {
 			continue
 		}
-		if t.State() == TaskStateDone {
-			log.Warnf("task is done %s", id)
+		if t == nil || t.State() == TaskStateDone {
+			log.Warnf("can't recover this task %s", id)
 			if i < unloadTaskLen {
 				this.db.RemoveFromUndoneList(nil, id, store.TaskTypeUpload)
 			} else {
@@ -205,12 +205,11 @@ func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 	if ok {
 		return v, ok
 	}
-	log.Debugf("get task by id from memory failed %s", taskId)
-	t := NewTaskFromDB(taskId, this.db)
+	t, err := NewTaskFromDB(taskId, this.db)
 	if t == nil {
+		log.Debugf("get task by memory and DB failed %s, err: %s", taskId, err)
 		return nil, false
 	}
-	log.Debugf("get task by info success %v", taskId)
 	if t.State() != TaskStateDone {
 		// only cache unfinished task
 		this.tasks[taskId] = t
@@ -218,11 +217,23 @@ func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 	return t, true
 }
 
+// TaskExist. Check if task exist in memory
 func (this *TaskMgr) TaskExist(taskId string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	_, ok := this.tasks[taskId]
 	return ok
+}
+
+// TaskExistInDB. Check if task exist in DB with task id
+func (this *TaskMgr) TaskExistInDB(taskId string) bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	tsk, err := this.db.GetFileInfo(taskId)
+	if err != nil || tsk == nil {
+		return false
+	}
+	return true
 }
 
 // UploadingFileHashExist. check if a uploading task has contained the file
@@ -830,11 +841,8 @@ func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {
 
 func (this *TaskMgr) GetUrlOfUploadedfile(fileHash, walletAddr string) string {
 	id := this.TaskId(fileHash, walletAddr, store.TaskTypeUpload)
-	v, ok := this.GetTaskById(id)
-	if !ok {
-		return ""
-	}
-	if v.State() != TaskStateDone {
+	v, err := GetTaskFromDB(id, this.db)
+	if err != nil || v == nil || v.State() != TaskStateDone {
 		return ""
 	}
 	return v.GetUrl()

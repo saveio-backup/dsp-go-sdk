@@ -60,7 +60,11 @@ func FileProgressKey(fileInfoId, nodeHostAddr string) string {
 
 // FileUnpaidKey. Key of unpaid asset
 func FileUnpaidKey(fileInfoId, walletAddr string, asset int32) string {
-	return fmt.Sprintf("[%s]%s_%s_%d", TASK_UNPAID_PREFIX, fileInfoId, walletAddr, asset)
+	return fmt.Sprintf("%s_%s_%d", FileUnpaidQueryKey(fileInfoId), walletAddr, asset)
+}
+
+func FileUnpaidQueryKey(fileInfoId string) string {
+	return fmt.Sprintf("[%s]%s", TASK_UNPAID_PREFIX, fileInfoId)
 }
 
 // FileDownloadedCountKey. Key of downloaded file count

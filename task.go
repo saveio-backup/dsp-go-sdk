@@ -16,8 +16,8 @@ func (this *Dsp) RecoverDBLossTask() error {
 	for _, h := range list.List {
 		fileHashStr := string(h.Hash)
 		id := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeUpload)
-		t, ok := this.taskMgr.GetTaskById(id)
-		if ok && t != nil {
+		exist := this.taskMgr.TaskExistInDB(id)
+		if exist {
 			continue
 		}
 		info, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
