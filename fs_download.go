@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -414,6 +415,15 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 	log.Debugf("broadcast file download msg result %v err %s", ret, err)
 	if err != nil {
 		return nil, err
+	}
+	connectionErrCnt := 0
+	for _, broadcastErr := range ret {
+		if broadcastErr != nil && strings.Contains(broadcastErr.Error(), "connected timeout") {
+			connectionErrCnt++
+		}
+	}
+	if connectionErrCnt == len(ret) {
+		return nil, errors.New("connect to all peers failed")
 	}
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {

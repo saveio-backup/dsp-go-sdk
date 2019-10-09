@@ -52,7 +52,15 @@ func (this *Dsp) CalculateUploadFee(opt *fs.UploadOption) (*fs.StorageFee, error
 func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
 	taskId := this.taskMgr.TaskId(filePath, this.WalletAddress(), store.TaskTypeUpload)
 	if len(taskId) == 0 {
-		return false, nil
+		checksum, err := utils.GetSimpleChecksumOfFile(filePath)
+		if err != nil {
+			return true, err
+		}
+		taskId = this.taskMgr.TaskId(checksum, this.WalletAddress(), store.TaskTypeUpload)
+		if len(taskId) == 0 {
+			return false, nil
+		}
+		log.Debugf("upload task exist checksum: %s, filepath: %s", checksum, filePath)
 	}
 	opt, err := this.taskMgr.GetFileUploadOptions(taskId)
 	if err != nil || opt == nil {
@@ -121,8 +129,14 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
+	checksum, err := utils.GetSimpleChecksumOfFile(filePath)
+	if err != nil {
+		sdkerr = serr.NewDetailError(serr.INVALID_PARAMS, err.Error())
+		return nil, err
+	}
 	this.taskMgr.NewBatchSet(taskId)
 	this.taskMgr.SetFilePath(taskId, filePath)
+	this.taskMgr.SetSimpleCheckSum(taskId, checksum)
 	this.taskMgr.SetFileName(taskId, string(opt.FileDesc))
 	this.taskMgr.SetWalletAddr(taskId, this.WalletAddress())
 	this.taskMgr.SetCopyNum(taskId, uint64(opt.CopyNum))
@@ -131,6 +145,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
+	// bind task id with file path
 	this.taskMgr.BindTaskId(taskId)
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
 	var tx, fileHashStr string
@@ -179,6 +194,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
+	// bind task id with file hash
 	err = this.taskMgr.BindTaskId(taskId)
 	if err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())

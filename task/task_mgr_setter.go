@@ -160,6 +160,14 @@ func (this *TaskMgr) SetFilePath(taskId, path string) error {
 	return v.SetFilePath(path)
 }
 
+func (this *TaskMgr) SetSimpleCheckSum(taskId, checksum string) error {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return fmt.Errorf("task: %s, not exist", taskId)
+	}
+	return v.SetSimpleCheckSum(checksum)
+}
+
 func (this *TaskMgr) BatchCommit(taskId string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

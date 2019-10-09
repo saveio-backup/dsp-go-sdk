@@ -250,6 +250,7 @@ func (this *Task) SetWalletaddr(walletAddr string) error {
 	}
 	return this.db.SaveFileInfo(this.info)
 }
+
 func (this *Task) SetFilePath(filePath string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -259,6 +260,17 @@ func (this *Task) SetFilePath(filePath string) error {
 	}
 	return this.db.SaveFileInfo(this.info)
 }
+
+func (this *Task) SetSimpleCheckSum(checksum string) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	this.info.SimpleChecksum = checksum
+	if this.batch {
+		return nil
+	}
+	return this.db.SaveFileInfo(this.info)
+}
+
 func (this *Task) SetStoreType(storeType uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -479,19 +491,31 @@ func (this *Task) BatchCommit() error {
 func (this *Task) BindIdWithWalletAddr() error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	prefix := ""
 	switch this.info.Type {
 	case store.TaskTypeUpload:
-		if len(this.info.FileHash) == 0 {
-			prefix = utils.StringToSha256Hex(this.info.FilePath)
-		} else {
-			prefix = this.info.FileHash
+		if len(this.info.FileHash) > 0 {
+			key := taskIdKey(this.info.FileHash, this.info.WalletAddress, this.info.Type)
+			return this.db.SaveFileInfoId(key, this.id)
 		}
+		var err error
+		if len(this.info.FilePath) > 0 {
+			prefix := utils.StringToSha256Hex(this.info.FilePath)
+			key := taskIdKey(prefix, this.info.WalletAddress, this.info.Type)
+			err = this.db.SaveFileInfoId(key, this.id)
+		}
+		if err != nil {
+			return err
+		}
+		if len(this.info.SimpleChecksum) > 0 {
+			prefix := this.info.SimpleChecksum
+			key := taskIdKey(prefix, this.info.WalletAddress, this.info.Type)
+			err = this.db.SaveFileInfoId(key, this.id)
+		}
+		return err
 	default:
-		prefix = this.info.FileHash
+		key := taskIdKey(this.info.FileHash, this.info.WalletAddress, this.info.Type)
+		return this.db.SaveFileInfoId(key, this.id)
 	}
-	key := taskIdKey(prefix, this.info.WalletAddress, this.info.Type)
-	return this.db.SaveFileInfoId(key, this.id)
 }
 
 func (this *Task) AddUploadedBlock(id, blockHashStr, nodeAddr string, index uint32, dataSize, offset uint64) error {

@@ -80,6 +80,7 @@ type TaskInfo struct {
 	FileName          string            `json:"file_name"`              // file name
 	FilePath          string            `json:"file_path"`              // file absolute path
 	FileOwner         string            `json:"file_owner"`             // file owner wallet address
+	SimpleChecksum    string            `json:"simple_checksum"`        // hash of first 128 KB and last 128 KB from file content
 	WalletAddress     string            `json:"wallet_address"`         // task belong to
 	CopyNum           uint64            `json:"copy_num"`               // copy num
 	Type              TaskType          `json:"file_info_type"`         // task type
@@ -498,7 +499,6 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 	if err != nil {
 		return err
 	}
-	//TODO: clean up all
 	batch := this.db.NewBatch()
 	// delete session
 	countKey := []byte(FileSessionCountKey(id))
@@ -556,17 +556,23 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 			return err
 		}
 		// delete file info id
-		if fi.Type == TaskTypeUpload && len(fi.FilePath) > 0 {
-			hexStr := utils.StringToSha256Hex(fi.FilePath)
-			taskIdWithFilekey := TaskIdWithFile(hexStr, fi.WalletAddress, fi.Type)
-			log.Debugf("will delete taskIdWithFilekey: %s", TaskInfoIdWithFile(taskIdWithFilekey))
-			this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
+		if fi.Type == TaskTypeUpload {
+			if len(fi.FilePath) > 0 {
+				hexStr := utils.StringToSha256Hex(fi.FilePath)
+				taskIdWithFilekey := TaskIdWithFile(hexStr, fi.WalletAddress, fi.Type)
+				log.Debugf("will delete taskIdWithFilekey: %s", TaskInfoIdWithFile(taskIdWithFilekey))
+				this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
+			}
+			if len(fi.SimpleChecksum) > 0 {
+				taskIdWithFilekey := TaskIdWithFile(fi.SimpleChecksum, fi.WalletAddress, fi.Type)
+				log.Debugf("will delete taskIdWithFilekey: %s", TaskInfoIdWithFile(taskIdWithFilekey))
+				this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
+			}
 		}
 		taskIdWithFilekey := TaskIdWithFile(fi.FileHash, fi.WalletAddress, fi.Type)
 		log.Debugf("delete local file info key %s", TaskInfoIdWithFile(taskIdWithFilekey))
 		this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
 	}
-
 	// delete fileInfo
 	this.db.BatchDelete(batch, []byte(TaskInfoKey(id)))
 	// commit
