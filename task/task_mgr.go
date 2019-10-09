@@ -417,11 +417,19 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 		max = common.MAX_GOROUTINES_FOR_WORK_TASK
 	}
 
-	flightMap := sync.Map{}
-	blockCache := sync.Map{}
+	flightMap := &sync.Map{}
+	blockCache := &sync.Map{}
 	getBlockCacheLen := func() int {
 		len := int(0)
 		blockCache.Range(func(k, v interface{}) bool {
+			len++
+			return true
+		})
+		return len
+	}
+	getFlightMapLen := func() int {
+		len := int(0)
+		flightMap.Range(func(k, v interface{}) bool {
 			len++
 			return true
 		})
@@ -460,11 +468,15 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				break
 			}
 			// check pool has item or no
-			// check all pool items are in request flights
 			reqPoolLen := tsk.GetBlockReqPoolLen()
 			if reqPoolLen == 0 {
-				// if v.GetBlockReqPoolLen() == 0 || len(flight)+getBlockCacheLen() >= v.GetBlockReqPoolLen() {
-				log.Debugf("sleep for pending block... req pool len: %d", reqPoolLen)
+				log.Debug("sleeping for no request block in pool")
+				time.Sleep(time.Duration(3) * time.Second)
+				continue
+			}
+			// check all pool items are in request flights
+			if getFlightMapLen()+getBlockCacheLen() >= reqPoolLen {
+				log.Debug("sleeping for all request are on flights")
 				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}

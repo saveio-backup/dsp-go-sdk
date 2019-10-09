@@ -264,7 +264,6 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 	for i := start(); cond(i); i = next(i) {
 		id, _ := this.GetTaskIdByIndex(uint32(i))
 		if len(id) == 0 {
-			log.Debugf("i = %d, id = %v", i, id)
 			continue
 		}
 		if offset > reach {
