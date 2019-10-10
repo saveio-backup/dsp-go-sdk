@@ -425,7 +425,7 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	this.info.ErrorMsg = errorMsg
 	if errorCode != 0 {
 		this.info.TaskState = uint64(store.TaskStateFailed)
-	} else {
+	} else if result != nil {
 		log.Debugf("task: %s has done", this.id)
 		this.info.Result = result
 		this.info.TaskState = uint64(store.TaskStateDone)

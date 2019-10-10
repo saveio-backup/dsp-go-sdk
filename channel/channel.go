@@ -3,6 +3,7 @@ package channel
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ type Channel struct {
 	isStart    bool
 	chain      *sdk.Chain
 	cfg        *config.DspConfig
+	r          *rand.Rand
 }
 
 type channelInfo struct {
@@ -91,6 +93,7 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 		walletAddr: chain.Native.Channel.DefAcc.Address.ToBase58(),
 		chain:      chain,
 		cfg:        cfg,
+		r:          rand.New(rand.NewSource(time.Now().UnixNano())),
 	}, nil
 }
 
@@ -330,6 +333,10 @@ func (this *Channel) CanTransfer(to string, amount uint64) error {
 		<-time.After(interval)
 	}
 	return errors.New("check can transfer timeout")
+}
+
+func (this *Channel) NewPaymentId() int32 {
+	return this.r.Int31()
 }
 
 // DirectTransfer. direct transfer to with payment id, and amount

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"strings"
 	"sync"
@@ -65,7 +64,7 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		if sdkErr != nil {
 			this.taskMgr.EmitResult(taskId, nil, sdkErr)
 		} else {
-			this.taskMgr.EmitResult(taskId, "", sdkErr)
+			this.taskMgr.EmitResult(taskId, "", nil)
 		}
 		// delete task from cache in the end
 		if this.taskMgr.IsFileDownloaded(taskId) && sdkErr == nil {
@@ -522,8 +521,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		}
 	}
 
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	paymentId := r.Int31()
+	paymentId := this.Channel.NewPaymentId()
 	dnsHostAddr, err := this.GetExternalIP(this.DNS.DNSNode.WalletAddr)
 	if err != nil {
 		return 0, err
@@ -1265,7 +1263,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 	}
 	this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	// TODO: remove unused file info fields after prove pdp success
-	this.taskMgr.EmitResult(taskId, nil, nil)
+	this.taskMgr.EmitResult(taskId, "", nil)
 	this.taskMgr.DeleteTask(taskId)
 	doneMsg := message.NewFileFetchDone(taskId, fileHashStr)
 	client.P2pSend(addr, doneMsg.ToProtoMsg())
