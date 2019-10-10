@@ -33,6 +33,7 @@ type BlockResp struct {
 type ProgressInfo struct {
 	TaskId        string
 	Type          store.TaskType    // task type
+	Url           string            // task url
 	StoreType     uint64            // store type
 	FileName      string            // file name
 	FileHash      string            // file hash
@@ -424,7 +425,7 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	this.info.ErrorMsg = errorMsg
 	if errorCode != 0 {
 		this.info.TaskState = uint64(store.TaskStateFailed)
-	} else if result != nil {
+	} else {
 		log.Debugf("task: %s has done", this.id)
 		this.info.Result = result
 		this.info.TaskState = uint64(store.TaskStateDone)
@@ -689,6 +690,7 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 	pInfo := &ProgressInfo{
 		TaskId:        this.id,
 		Type:          this.info.Type,
+		Url:           this.info.Url,
 		StoreType:     this.info.StoreType,
 		FileName:      this.info.FileName,
 		FileHash:      this.info.FileHash,

@@ -1265,7 +1265,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 	}
 	this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	// TODO: remove unused file info fields after prove pdp success
-	this.taskMgr.SetTaskState(taskId, store.TaskStateDone)
+	this.taskMgr.EmitResult(taskId, nil, nil)
 	this.taskMgr.DeleteTask(taskId)
 	doneMsg := message.NewFileFetchDone(taskId, fileHashStr)
 	client.P2pSend(addr, doneMsg.ToProtoMsg())
