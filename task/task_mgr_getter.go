@@ -61,10 +61,10 @@ func (this *TaskMgr) OnlyBlock(taskId string) (bool, error) {
 	return v.GetOnlyblock(), nil
 }
 
-func (this *TaskMgr) GetTaskState(taskId string) (TaskState, error) {
+func (this *TaskMgr) GetTaskState(taskId string) (store.TaskState, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return TaskStateNone, fmt.Errorf("task: %s, not exist", taskId)
+		return store.TaskStateNone, fmt.Errorf("task: %s, not exist", taskId)
 	}
 	return v.State(), nil
 }

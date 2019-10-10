@@ -43,9 +43,9 @@ func (this *Dsp) GetProgressInfo(taskId string) *task.ProgressInfo {
 	return this.taskMgr.GetProgressInfo(taskId)
 }
 
-func (this *Dsp) GetTaskState(taskId string) (task.TaskState, error) {
+func (this *Dsp) GetTaskState(taskId string) (store.TaskState, error) {
 	if this.taskMgr == nil {
-		return task.TaskStateNone, nil
+		return store.TaskStateNone, nil
 	}
 	return this.taskMgr.GetTaskState(taskId)
 }

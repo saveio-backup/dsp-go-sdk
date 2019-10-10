@@ -14,6 +14,7 @@ const (
 	DSP_NETWORK_PROTOCOL     = "tcp" // default dsp network protocol
 	TRACKER_PORT             = 6369  // tracker default port
 	TRACKER_NETWORK_PROTOCOL = "udp" // tracker network protocol
+	MILLISECOND_PER_SECOND   = 1000  // 1 Second = 1000 Millisecond
 
 	TASK_STATE_CHECK_DURATION = 1 // task state change check ticker duration
 )

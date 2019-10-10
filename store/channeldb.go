@@ -3,8 +3,8 @@ package store
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
+	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -85,7 +85,7 @@ func (this *ChannelDB) AddChannelInfo(id uint64, partnerAddr string) error {
 	ch := &ChannelInfo{
 		ID:          id,
 		PartnerAddr: partnerAddr,
-		CreatedAt:   uint64(time.Now().Unix()),
+		CreatedAt:   utils.GetMilliSecTimestamp(),
 	}
 	buf, err := json.Marshal(ch)
 	if err != nil {

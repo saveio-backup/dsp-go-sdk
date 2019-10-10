@@ -92,7 +92,7 @@ func (this *TaskMgr) RecoverUndoneTask() error {
 		if err != nil {
 			continue
 		}
-		if t == nil || t.State() == TaskStateDone {
+		if t == nil || t.State() == store.TaskStateDone {
 			log.Warnf("can't recover this task %s", id)
 			if i < unloadTaskLen {
 				this.db.RemoveFromUndoneList(nil, id, store.TaskTypeUpload)
@@ -187,7 +187,7 @@ func (this *TaskMgr) ShareTaskNum() int {
 	defer this.lock.RUnlock()
 	cnt := 0
 	for _, t := range this.tasks {
-		if t.State() == TaskStateDoing && t.GetTaskType() == store.TaskTypeShare {
+		if t.State() == store.TaskStateDoing && t.GetTaskType() == store.TaskTypeShare {
 			cnt++
 		}
 	}
@@ -210,7 +210,7 @@ func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 		log.Debugf("get task by memory and DB failed %s, err: %s", taskId, err)
 		return nil, false
 	}
-	if t.State() != TaskStateDone {
+	if t.State() != store.TaskStateDone {
 		// only cache unfinished task
 		this.tasks[taskId] = t
 	}
@@ -240,9 +240,16 @@ func (this *TaskMgr) TaskExistInDB(taskId string) bool {
 func (this *TaskMgr) UploadingFileExist(taskId, fileHashStr string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
+	tsk := this.tasks[taskId]
+	var tskCreatedAt uint64
+	if tsk != nil {
+		tskCreatedAt = tsk.GetCreatedAt()
+	} else {
+		tskCreatedAt = utils.GetMilliSecTimestamp()
+	}
 	for _, t := range this.tasks {
-		if t.GetFileHash() == fileHashStr && t.GetId() != taskId && t.GetTaskType() == store.TaskTypeUpload {
-			log.Debugf("t.hash %s, id %s , new id %s, type %v", fileHashStr, t.GetId(), taskId, t.GetTaskType())
+		if t.GetFileHash() == fileHashStr && t.GetId() != taskId && t.GetTaskType() == store.TaskTypeUpload && t.GetCreatedAt() < tskCreatedAt {
+			log.Debugf("fileHashStr %s, taskId %s , newTaskId %s, taskCreatedAt: %d, newTaskCreatedAt: %d", fileHashStr, t.GetId(), taskId, t.GetCreatedAt(), tskCreatedAt)
 			return true
 		}
 	}
@@ -466,14 +473,14 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	done := make(chan *getBlocksResp, 1)
 	go func() {
 		for {
-			if tsk.State() == TaskStateDone {
+			if tsk.State() == store.TaskStateDone {
 				log.Debugf("distribute job task is done break")
 				close(jobCh)
 				atomic.AddUint32(&dropDoneCh, 1)
 				close(done)
 				break
 			}
-			if tsk.State() == TaskStatePause || tsk.State() == TaskStateFailed {
+			if tsk.State() == store.TaskStatePause || tsk.State() == store.TaskStateFailed {
 				log.Debugf("distribute job break at pause")
 				close(jobCh)
 				break
@@ -540,7 +547,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 
 	go func() {
 		for {
-			if tsk.State() == TaskStateDone {
+			if tsk.State() == store.TaskStateDone {
 				log.Debugf("receive job task is done break")
 				break
 			}
@@ -604,7 +611,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				log.Debugf("remain %d response at block cache", getBlockCacheLen())
 				log.Debugf("receive response process done")
 			}
-			if tsk.State() == TaskStatePause || tsk.State() == TaskStateFailed {
+			if tsk.State() == store.TaskStatePause || tsk.State() == store.TaskStateFailed {
 				log.Debugf("receive state %d", tsk.State())
 				atomic.AddUint32(&dropDoneCh, 1)
 				close(done)
@@ -620,7 +627,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 		go func() {
 			for {
 				state := tsk.State()
-				if state == TaskStateDone || state == TaskStatePause || state == TaskStateFailed {
+				if state == store.TaskStateDone || state == store.TaskStatePause || state == store.TaskStateFailed {
 					log.Debugf("task is break, state: %d", state)
 					break
 				}
@@ -727,10 +734,10 @@ func (this *TaskMgr) IsTaskCanResume(taskId string) (bool, error) {
 		return false, fmt.Errorf("task not found: %v", taskId)
 	}
 	state := v.State()
-	if state != TaskStatePrepare && state != TaskStatePause && state != TaskStateDoing {
+	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
 		return false, fmt.Errorf("can't resume the task, it's state: %d", state)
 	}
-	if state == TaskStatePause {
+	if state == store.TaskStatePause {
 		return true, nil
 	}
 	return false, nil
@@ -742,10 +749,10 @@ func (this *TaskMgr) IsTaskCanPause(taskId string) (bool, error) {
 		return false, fmt.Errorf("task not found: %v", taskId)
 	}
 	state := v.State()
-	if state != TaskStatePrepare && state != TaskStatePause && state != TaskStateDoing {
+	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
 		return false, fmt.Errorf("can't pause the task, it's state: %d", state)
 	}
-	if state == TaskStateDoing || state == TaskStatePrepare {
+	if state == store.TaskStateDoing || state == store.TaskStatePrepare {
 		return true, nil
 	}
 	return false, nil
@@ -756,7 +763,7 @@ func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("task: %s, not exist", taskId)
 	}
-	return v.State() == TaskStatePause, nil
+	return v.State() == store.TaskStatePause, nil
 }
 
 func (this *TaskMgr) IsTaskDone(taskId string) (bool, error) {
@@ -764,7 +771,7 @@ func (this *TaskMgr) IsTaskDone(taskId string) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("task: %s, not exist", taskId)
 	}
-	return v.State() == TaskStateDone, nil
+	return v.State() == store.TaskStateDone, nil
 }
 
 func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
@@ -773,7 +780,7 @@ func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
 		return false, fmt.Errorf("task: %s, not exist", taskId)
 	}
 	log.Debugf("task state %s, %d", taskId, v.State())
-	return v.State() == TaskStateCancel, nil
+	return v.State() == store.TaskStateCancel, nil
 }
 
 func (this *TaskMgr) IsTaskPaying(taskId string) (bool, error) {
@@ -791,7 +798,7 @@ func (this *TaskMgr) IsTaskPauseOrCancel(taskId string) (bool, bool, error) {
 		return false, false, fmt.Errorf("task: %s, not exist", taskId)
 	}
 	state := v.State()
-	return state == TaskStatePause, state == TaskStateCancel, nil
+	return state == store.TaskStatePause, state == store.TaskStateCancel, nil
 }
 
 func (this *TaskMgr) IsTaskStop(taskId string) (bool, error) {
@@ -800,10 +807,10 @@ func (this *TaskMgr) IsTaskStop(taskId string) (bool, error) {
 		return false, fmt.Errorf("task: %s, not exist", taskId)
 	}
 	state := v.State()
-	if state != TaskStatePause && state != TaskStateCancel {
+	if state != store.TaskStatePause && state != store.TaskStateCancel {
 		return false, nil
 	}
-	return state == TaskStatePause || state == TaskStateCancel, nil
+	return state == store.TaskStatePause || state == store.TaskStateCancel, nil
 }
 
 func (this *TaskMgr) IsTaskPreparingOrDoing(taskId string) (bool, bool, error) {
@@ -812,7 +819,7 @@ func (this *TaskMgr) IsTaskPreparingOrDoing(taskId string) (bool, bool, error) {
 		return false, false, fmt.Errorf("task: %s, not exist", taskId)
 	}
 	state := v.State()
-	return state == TaskStatePrepare, state == TaskStateDoing, nil
+	return state == store.TaskStatePrepare, state == store.TaskStateDoing, nil
 }
 
 func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
@@ -821,7 +828,7 @@ func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
 		return false, fmt.Errorf("task: %s, not exist", taskId)
 	}
 	log.Debugf("v.state: %d", v.State())
-	return v.State() == TaskStateFailed, nil
+	return v.State() == store.TaskStateFailed, nil
 }
 
 func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {
@@ -842,7 +849,7 @@ func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {
 func (this *TaskMgr) GetUrlOfUploadedfile(fileHash, walletAddr string) string {
 	id := this.TaskId(fileHash, walletAddr, store.TaskTypeUpload)
 	v, err := GetTaskFromDB(id, this.db)
-	if err != nil || v == nil || v.State() != TaskStateDone {
+	if err != nil || v == nil || v.State() != store.TaskStateDone {
 		return ""
 	}
 	return v.GetUrl()

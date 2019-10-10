@@ -3,7 +3,6 @@ package task
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/saveio/dsp-go-sdk/common"
@@ -41,7 +40,7 @@ type ProgressInfo struct {
 	CopyNum       uint64            // copyNum
 	Total         uint64            // total file's blocks count
 	Count         map[string]uint64 // address <=> count
-	TaskState     TaskState         // task state
+	TaskState     store.TaskState   // task state
 	ProgressState TaskProgressState // TaskProgressState
 	Result        interface{}       // finish result
 	ErrorCode     uint32            // error code
@@ -82,18 +81,6 @@ type WorkerState struct {
 	TotalFailed map[string]uint32
 }
 
-type TaskState int
-
-const (
-	TaskStatePause TaskState = iota
-	TaskStatePrepare
-	TaskStateDoing
-	TaskStateDone
-	TaskStateFailed
-	TaskStateCancel
-	TaskStateNone
-)
-
 type Task struct {
 	id           string // id
 	info         *store.TaskInfo
@@ -122,7 +109,7 @@ func NewTask(taskT store.TaskType, db *store.FileDB) *Task {
 		return nil
 	}
 	t := newTask(id.String(), info, db)
-	t.info.TaskState = uint64(TaskStatePrepare)
+	t.info.TaskState = uint64(store.TaskStatePrepare)
 	err = db.SaveFileInfo(t.info)
 	if err != nil {
 		log.Debugf("save file info failed err %s", err)
@@ -157,7 +144,7 @@ func NewTaskFromDB(id string, db *store.FileDB) (*Task, error) {
 		log.Warnf("[Task NewTaskFromDB] recover task get file info is nil, id: %v", id)
 		return nil, nil
 	}
-	if (TaskState(info.TaskState) == TaskStatePause || TaskState(info.TaskState) == TaskStateDoing) && info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT < uint64(time.Now().Unix()) {
+	if (store.TaskState(info.TaskState) == store.TaskStatePause || store.TaskState(info.TaskState) == store.TaskStateDoing) && info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT*1000 < utils.GetMilliSecTimestamp() {
 		log.Warnf("[Task NewTaskFromDB] task: %s is expired, updatedAt: %d", id, info.UpdatedAt)
 	}
 	sessions, err := db.GetFileSessions(id)
@@ -165,9 +152,9 @@ func NewTaskFromDB(id string, db *store.FileDB) (*Task, error) {
 		log.Errorf("[Task NewTaskFromDB] set task session: %s", err)
 		return nil, err
 	}
-	state := TaskState(info.TaskState)
-	if state == TaskStatePrepare || state == TaskStateDoing || state == TaskStateCancel {
-		state = TaskStatePause
+	state := store.TaskState(info.TaskState)
+	if state == store.TaskStatePrepare || state == store.TaskStateDoing || state == store.TaskStateCancel {
+		state = store.TaskStatePause
 	}
 	t := newTask(id, info, db)
 	t.info.TaskState = uint64(state)
@@ -325,17 +312,17 @@ func (this *Task) SetOwner(owner string) error {
 	return this.db.SaveFileInfo(this.info)
 }
 
-func (this *Task) SetTaskState(newState TaskState) error {
+func (this *Task) SetTaskState(newState store.TaskState) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	oldState := TaskState(this.info.TaskState)
+	oldState := store.TaskState(this.info.TaskState)
 	if oldState == newState {
 		log.Debugf("set task with same state id: %s, state: %d", this.id, oldState)
 		return nil
 	}
 	switch newState {
-	case TaskStatePause:
-		if oldState == TaskStateFailed || oldState == TaskStateDone {
+	case store.TaskStatePause:
+		if oldState == store.TaskStateFailed || oldState == store.TaskStateDone {
 			return fmt.Errorf("can't stop a failed or completed task")
 		}
 		log.Debugf("CleanBlockReqPool")
@@ -344,20 +331,20 @@ func (this *Task) SetTaskState(newState TaskState) error {
 		} else {
 			this.blockReqPool = this.blockReqPool[:0]
 		}
-	case TaskStateDoing:
+	case store.TaskStateDoing:
 		log.Debugf("oldstate:%d, newstate: %d", oldState, newState)
-		if oldState == TaskStateDone {
+		if oldState == store.TaskStateDone {
 			return fmt.Errorf("can't continue a failed or completed task")
 		}
 		this.info.ErrorCode = 0
 		this.info.ErrorMsg = ""
-	case TaskStateDone:
+	case store.TaskStateDone:
 		log.Debugf("task: %s has done", this.id)
-	case TaskStateCancel:
+	case store.TaskStateCancel:
 	}
 	this.info.TaskState = uint64(newState)
-	changeFromPause := (oldState == TaskStatePause && (newState == TaskStateDoing || newState == TaskStateCancel))
-	changeFromDoing := (oldState == TaskStateDoing && (newState == TaskStatePause || newState == TaskStateCancel))
+	changeFromPause := (oldState == store.TaskStatePause && (newState == store.TaskStateDoing || newState == store.TaskStateCancel))
+	changeFromDoing := (oldState == store.TaskStateDoing && (newState == store.TaskStatePause || newState == store.TaskStateCancel))
 	if changeFromPause {
 		log.Debugf("task: %s changeFromPause, send new state change: %d to %d", this.id, oldState, newState)
 	}
@@ -436,11 +423,11 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	this.info.ErrorCode = errorCode
 	this.info.ErrorMsg = errorMsg
 	if errorCode != 0 {
-		this.info.TaskState = uint64(TaskStateFailed)
+		this.info.TaskState = uint64(store.TaskStateFailed)
 	} else if result != nil {
 		log.Debugf("task: %s has done", this.id)
 		this.info.Result = result
-		this.info.TaskState = uint64(TaskStateDone)
+		this.info.TaskState = uint64(store.TaskStateDone)
 		switch this.info.Type {
 		case store.TaskTypeUpload:
 			err := this.db.SaveFileUploaded(this.id)
@@ -647,10 +634,10 @@ func (this *Task) GetOwner() string {
 	return this.info.FileOwner
 }
 
-func (this *Task) State() TaskState {
+func (this *Task) State() store.TaskState {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	return TaskState(this.info.TaskState)
+	return store.TaskState(this.info.TaskState)
 }
 
 func (this *Task) DetailState() TaskProgressState {
@@ -709,10 +696,10 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 		Total:         this.info.TotalBlockCount,
 		CopyNum:       this.info.CopyNum,
 		Count:         this.db.FileProgress(this.id),
-		TaskState:     TaskState(this.info.TaskState),
+		TaskState:     store.TaskState(this.info.TaskState),
 		ProgressState: TaskProgressState(this.info.TranferState),
-		CreatedAt:     this.info.CreatedAt,
-		UpdatedAt:     this.info.UpdatedAt,
+		CreatedAt:     this.info.CreatedAt / common.MILLISECOND_PER_SECOND,
+		UpdatedAt:     this.info.UpdatedAt / common.MILLISECOND_PER_SECOND,
 		Result:        this.info.Result,
 		ErrorCode:     this.info.ErrorCode,
 		ErrorMsg:      this.info.ErrorMsg,

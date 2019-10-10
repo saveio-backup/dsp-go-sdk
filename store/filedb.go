@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/utils"
@@ -31,6 +30,18 @@ const (
 	TaskTypeDownload
 	TaskTypeShare
 	TaskTypeBackup
+)
+
+type TaskState int
+
+const (
+	TaskStatePause TaskState = iota
+	TaskStatePrepare
+	TaskStateDoing
+	TaskStateDone
+	TaskStateFailed
+	TaskStateCancel
+	TaskStateNone
 )
 
 // blockInfo record a block infomation of a file
@@ -103,9 +114,9 @@ type TaskInfo struct {
 	InOrder           bool              `json:"in_order"`               // is in order
 	OnlyBlock         bool              `json:"only_block"`             // send only raw block data
 	TranferState      uint64            `json:"transfer_state"`         // transfer state
-	CreatedAt         uint64            `json:"createdAt"`              // createAt
+	CreatedAt         uint64            `json:"createdAt"`              // createAt, unit ms
 	CreatedAtHeight   uint64            `json:"createdAt_block_height"` // created at block height
-	UpdatedAt         uint64            `json:"updatedAt"`              // updatedAt
+	UpdatedAt         uint64            `json:"updatedAt"`              // updatedAt, unit ms
 	UpdatedAtHeight   uint64            `json:"updatedAt_block_height"` // updatedAt block height
 	ExpiredHeight     uint64            `json:"expired_block_height"`   // expiredAt block height
 	ErrorCode         uint32            `json:"error_code"`             // error code
@@ -162,7 +173,7 @@ func (this *FileDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
 		Id:                id,
 		Index:             taskCount.Index,
 		Type:              ft,
-		CreatedAt:         uint64(time.Now().Unix()),
+		CreatedAt:         utils.GetMilliSecTimestamp(),
 		SaveBlockCountMap: make(map[string]uint64, 0),
 	}
 	batch := this.db.NewBatch()
@@ -278,6 +289,9 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 				continue
 			}
 			if info.Type != ft {
+				continue
+			}
+			if info.TaskState == uint64(TaskStateDone) {
 				continue
 			}
 		}
@@ -1509,7 +1523,7 @@ func (this *FileDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft Tas
 }
 
 func (this *FileDB) batchSaveFileInfo(batch *leveldb.Batch, info *TaskInfo) error {
-	info.UpdatedAt = uint64(time.Now().Unix())
+	info.UpdatedAt = utils.GetMilliSecTimestamp()
 	key := []byte(TaskInfoKey(info.Id))
 	buf, err := json.Marshal(info)
 	if err != nil {

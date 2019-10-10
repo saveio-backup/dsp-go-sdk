@@ -92,7 +92,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		// handle old task
 		state, _ := this.taskMgr.GetTaskState(existTaskId)
 		log.Debugf("fetch_ask task exist localId %s, %s state: %d", existTaskId, fileMsg.Hash, state)
-		if state == task.TaskStateCancel || state == task.TaskStateFailed || state == task.TaskStateDone {
+		if state == store.TaskStateCancel || state == store.TaskStateFailed || state == store.TaskStateDone {
 			log.Warnf("the task has a wrong state of file_ask %s", state)
 		}
 		currentBlockHash, currentBlockIndex, err := this.taskMgr.GetCurrentSetBlock(existTaskId)
@@ -113,9 +113,9 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			log.Errorf("reply file_ack msg failed", err)
 			return
 		}
-		if state != task.TaskStateDone {
+		if state != store.TaskStateDone {
 			// set a new task state
-			err = this.taskMgr.SetTaskState(existTaskId, task.TaskStateDoing)
+			err = this.taskMgr.SetTaskState(existTaskId, store.TaskStateDoing)
 			log.Debugf("set task state err: %s", err)
 		}
 		log.Debugf("reply file_ack msg success")
@@ -234,7 +234,7 @@ func (this *Dsp) handleFileFetchPauseMsg(ctx *network.ComponentContext, peer *ne
 		return
 	}
 	log.Debugf("reply pause msg success, pause fetching blocks")
-	this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
+	this.taskMgr.SetTaskState(taskId, store.TaskStatePause)
 }
 
 // handleFileFetchResumeMsg. handle resume msg from client
@@ -252,7 +252,7 @@ func (this *Dsp) handleFileFetchResumeMsg(ctx *network.ComponentContext, peer *n
 		return
 	}
 	log.Debugf("reply resume msg success, resume fetching blocks")
-	this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
+	this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
 }
 
 func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
@@ -279,7 +279,7 @@ func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *n
 		log.Debugf("file info not exist of canceling file %s", fileMsg.Hash)
 		return
 	}
-	this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
+	this.taskMgr.SetTaskState(taskId, store.TaskStateCancel)
 }
 
 // handleFileDeleteMsg. client send delete msg to storage nodes for telling them to delete the file and release the resources.
@@ -371,7 +371,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		if err != nil {
 			log.Errorf("reply download ack  msg failed", err)
 		} else {
-			this.taskMgr.SetTaskState(localId, task.TaskStateDoing)
+			this.taskMgr.SetTaskState(localId, store.TaskStateDoing)
 			log.Debugf("reply download ack msg success")
 		}
 		return

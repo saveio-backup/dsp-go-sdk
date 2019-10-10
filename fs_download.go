@@ -158,7 +158,7 @@ func (this *Dsp) PauseDownload(taskId string) error {
 		log.Debugf("task is pausing")
 		return nil
 	}
-	err = this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
+	err = this.taskMgr.SetTaskState(taskId, store.TaskStatePause)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func (this *Dsp) ResumeDownload(taskId string) error {
 		log.Debugf("task is resuming")
 		return nil
 	}
-	err = this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
+	err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (this *Dsp) RetryDownload(taskId string) error {
 	if !failed {
 		return fmt.Errorf("task %s is not failed", taskId)
 	}
-	err = this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
+	err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
 	if err != nil {
 		return err
 	}
@@ -994,7 +994,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			}
 			log.Debugf("IsFileDownloaded last block %t", this.taskMgr.IsFileDownloaded(taskId))
 			// last block
-			this.taskMgr.SetTaskState(taskId, task.TaskStateDone)
+			this.taskMgr.SetTaskState(taskId, store.TaskStateDone)
 			break
 		case <-stateCheckTicker.C:
 			stop, sdkErr := this.isDownloadTaskStop(taskId)
@@ -1006,7 +1006,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				return nil
 			}
 		case <-timeout.C:
-			this.taskMgr.SetTaskState(taskId, task.TaskStateFailed)
+			this.taskMgr.SetTaskState(taskId, store.TaskStateFailed)
 			workerState := this.taskMgr.GetTaskWorkerState(taskId)
 			for addr, state := range workerState {
 				log.Debugf("download timeout worker addr: %s, working : %t, unpaid: %t, totalFailed %v", addr, state.Working, state.Unpaid, state.TotalFailed)
@@ -1265,7 +1265,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 	}
 	this.PushToTrackers(fileHashStr, this.DNS.TrackerUrls, client.P2pGetPublicAddr())
 	// TODO: remove unused file info fields after prove pdp success
-	this.taskMgr.SetTaskState(taskId, task.TaskStateDone)
+	this.taskMgr.SetTaskState(taskId, store.TaskStateDone)
 	this.taskMgr.DeleteTask(taskId)
 	doneMsg := message.NewFileFetchDone(taskId, fileHashStr)
 	client.P2pSend(addr, doneMsg.ToProtoMsg())

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/themis/common"
@@ -125,4 +126,8 @@ func GetDecryptedFilePath(filePath string) string {
 	name := filePath[:i]
 	ext := filePath[i:]
 	return name + "-decrypted" + ext
+}
+
+func GetMilliSecTimestamp() uint64 {
+	return uint64(time.Now().UnixNano() / int64(time.Millisecond))
 }

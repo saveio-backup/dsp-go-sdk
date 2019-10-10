@@ -352,7 +352,7 @@ func (this *Dsp) PauseUpload(taskId string) error {
 		log.Debugf("task is pausing")
 		return nil
 	}
-	err = this.taskMgr.SetTaskState(taskId, task.TaskStatePause)
+	err = this.taskMgr.SetTaskState(taskId, store.TaskStatePause)
 	if err != nil {
 		return err
 	}
@@ -374,7 +374,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 		log.Debugf("task is resuming")
 		return nil
 	}
-	err = this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
+	err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
 	if err != nil {
 		log.Errorf("resume task err %s", err)
 		return err
@@ -404,7 +404,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	}
 	fileHashStr, _ := this.taskMgr.TaskFileHash(taskId)
 	oldState, _ := this.taskMgr.GetTaskState(taskId)
-	err = this.taskMgr.SetTaskState(taskId, task.TaskStateCancel)
+	err = this.taskMgr.SetTaskState(taskId, store.TaskStateCancel)
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +457,7 @@ func (this *Dsp) RetryUpload(taskId string) error {
 	if !failed {
 		return fmt.Errorf("task %s is not failed", taskId)
 	}
-	err = this.taskMgr.SetTaskState(taskId, task.TaskStateDoing)
+	err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
 	if err != nil {
 		return err
 	}

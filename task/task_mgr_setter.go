@@ -87,7 +87,7 @@ func (this *TaskMgr) SetOnlyBlock(taskId string, only bool) error {
 	return v.SetOnlyBlock(only)
 }
 
-func (this *TaskMgr) SetTaskState(taskId string, state TaskState) error {
+func (this *TaskMgr) SetTaskState(taskId string, state store.TaskState) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return fmt.Errorf("task: %s, not exist", taskId)
@@ -212,6 +212,9 @@ func (this *TaskMgr) SetUploadProgressDone(taskId, nodeAddr string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return fmt.Errorf("task: %s, not exist", taskId)
+	}
+	if v.State() == store.TaskStateCancel || v.State() == store.TaskStateFailed {
+		return nil
 	}
 	return v.SetUploadProgressDone(taskId, nodeAddr)
 }

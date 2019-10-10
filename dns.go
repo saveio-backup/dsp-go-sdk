@@ -28,7 +28,7 @@ type DNSNodeInfo struct {
 
 type PublicAddrInfo struct {
 	HostAddr  string
-	UpdatedAt int64
+	UpdatedAt uint64
 }
 
 type DNS struct {
@@ -484,8 +484,8 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	info, ok := this.DNS.PublicAddrCache.Get(walletAddr)
 	if ok && info != nil {
 		addrInfo, ok := info.(*PublicAddrInfo)
-		now := time.Now().Unix()
-		if ok && addrInfo != nil && (addrInfo.UpdatedAt+common.MAX_PUBLIC_IP_UPDATE_SECOND) > now && len(addrInfo.HostAddr) > 0 {
+		now := utils.GetMilliSecTimestamp()
+		if ok && addrInfo != nil && uint64(addrInfo.UpdatedAt+common.MAX_PUBLIC_IP_UPDATE_SECOND*common.MILLISECOND_PER_SECOND) > now && len(addrInfo.HostAddr) > 0 {
 			log.Debugf("GetExternalIP %s addr %s from cache", walletAddr, addrInfo.HostAddr)
 			return addrInfo.HostAddr, nil
 		}
@@ -538,7 +538,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	}
 	this.DNS.PublicAddrCache.Add(walletAddr, &PublicAddrInfo{
 		HostAddr:  hostAddrStr,
-		UpdatedAt: time.Now().Unix(),
+		UpdatedAt: utils.GetMilliSecTimestamp(),
 	})
 	return hostAddrStr, nil
 }
