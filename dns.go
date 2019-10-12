@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -33,7 +34,7 @@ type PublicAddrInfo struct {
 
 type DNS struct {
 	TrackerUrls      []string
-	TrackerFailedCnt map[string]uint64
+	TrackerFailedCnt *sync.Map
 	DNSNode          *DNSNodeInfo
 	OnlineDNS        map[string]string
 	PublicAddrCache  *lru.ARCCache
@@ -43,7 +44,7 @@ func NewDNS() *DNS {
 	cache, _ := lru.NewARC(common.MAX_PUBLICADDR_CACHE_LEN)
 	return &DNS{
 		TrackerUrls:      make([]string, 0, common.MAX_TRACKERS_NUM),
-		TrackerFailedCnt: make(map[string]uint64),
+		TrackerFailedCnt: new(sync.Map),
 		PublicAddrCache:  cache,
 		OnlineDNS:        make(map[string]string),
 	}
@@ -612,8 +613,13 @@ func (this *Dsp) requestTrackers(request func(string, chan *trackerResp)) interf
 		if !ok {
 			continue
 		}
-		errCnt := this.DNS.TrackerFailedCnt[trackerUrl]
-		this.DNS.TrackerFailedCnt[trackerUrl] = errCnt + 1
+		errCnt, ok := this.DNS.TrackerFailedCnt.Load(trackerUrl)
+		if !ok {
+			this.DNS.TrackerFailedCnt.Store(trackerUrl, 1)
+		} else {
+			errCntVal, _ := errCnt.(uint64)
+			this.DNS.TrackerFailedCnt.Store(trackerUrl, errCntVal+1)
+		}
 		this.removeLowQoSTracker()
 	}
 	if len(results) > 0 {
@@ -716,9 +722,13 @@ func (this *Dsp) connectDNSs(maxDNSNum uint32) (map[string]string, error) {
 func (this *Dsp) removeLowQoSTracker() {
 	newTrackers := this.DNS.TrackerUrls[:0]
 	for _, url := range this.DNS.TrackerUrls {
-		errCnt := this.DNS.TrackerFailedCnt[url]
-		if errCnt >= common.MAX_TRACKER_REQ_TIMEOUT_NUM {
-			delete(this.DNS.TrackerFailedCnt, url)
+		errCnt, ok := this.DNS.TrackerFailedCnt.Load(url)
+		if !ok {
+			continue
+		}
+		errCntVal, _ := errCnt.(uint64)
+		if errCntVal >= common.MAX_TRACKER_REQ_TIMEOUT_NUM {
+			this.DNS.TrackerFailedCnt.Delete(url)
 			log.Debugf("remove low QoS tracker %s", url)
 			continue
 		}
