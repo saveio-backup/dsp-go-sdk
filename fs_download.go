@@ -527,11 +527,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		return 0, err
 	}
 	exist, err := client.P2pConnectionExist(dnsHostAddr, client.P2pNetTypeChannel)
-	if err != nil {
-		log.Errorf("reconnect channel err %s %s", this.DNS.DNSNode.WalletAddr, err)
-		return 0, err
-	}
-	if !exist {
+	if err != nil || !exist {
 		log.Debugf("DNS conncetion not exist reconnect...")
 		err = client.P2pReconnectPeer(dnsHostAddr, client.P2pNetTypeChannel)
 		if err != nil {
@@ -542,15 +538,6 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 			return 0, err
 		}
 	}
-	// targetHostAddr, err := this.GetExternalIP(payInfo.WalletAddress)
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// err = client.P2pReconnectPeer(targetHostAddr, client.P2pNetTypeChannel)
-	// if err != nil {
-	// 	log.Errorf("reconnect channel err %s %s", payInfo.WalletAddress, err)
-	// 	return 0, err
-	// }
 	log.Debugf("paying to %s, id %v, err:%s", payInfo.WalletAddress, paymentId, err)
 	err = this.Channel.MediaTransfer(paymentId, amount, this.DNS.DNSNode.WalletAddr, payInfo.WalletAddress)
 	if err != nil {
