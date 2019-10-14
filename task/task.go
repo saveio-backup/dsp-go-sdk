@@ -146,7 +146,7 @@ func NewTaskFromDB(id string, db *store.FileDB) (*Task, error) {
 		return nil, nil
 	}
 	if (store.TaskState(info.TaskState) == store.TaskStatePause || store.TaskState(info.TaskState) == store.TaskStateDoing) && info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT*1000 < utils.GetMilliSecTimestamp() {
-		log.Warnf("[Task NewTaskFromDB] task: %s is expired, updatedAt: %d", id, info.UpdatedAt)
+		log.Warnf("[Task NewTaskFromDB] task: %s is expired, type: %d, updatedAt: %d", id, info.Type, info.UpdatedAt)
 	}
 	sessions, err := db.GetFileSessions(id)
 	if err != nil {
@@ -159,6 +159,7 @@ func NewTaskFromDB(id string, db *store.FileDB) (*Task, error) {
 	}
 	t := newTask(id, info, db)
 	t.info.TaskState = uint64(state)
+	t.info.TranferState = uint64(TaskPause)
 	err = db.SaveFileInfo(t.info)
 	if err != nil {
 		log.Errorf("[Task NewTaskFromDB] set file info failed: %s", err)

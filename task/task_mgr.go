@@ -221,6 +221,9 @@ func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 func (this *TaskMgr) TaskExist(taskId string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
+	if len(taskId) == 0 {
+		return false
+	}
 	_, ok := this.tasks[taskId]
 	return ok
 }
@@ -641,7 +644,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 
 				allFlightskey := make(map[string]struct{}, 0)
 				for _, v := range job.req {
-					log.Debugf("start request block %s-%s from %s, peer wallet: %s", fileHash, v.Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
 					b := &block.Block{
 						SessionId: sessionId,
 						Index:     v.Index,
@@ -656,6 +658,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					flights = append(flights, b)
 					allFlightskey[fmt.Sprintf("%s-%d", v.Hash, v.Index)] = struct{}{}
 				}
+				log.Debugf("start request block %s-%s to %s from %s, peer wallet: %s", fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
 				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(), job.worker.WalletAddr(), flights)
 				tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 				if err != nil {
@@ -665,9 +668,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
 					}
 				} else {
-					for _, v := range ret {
-						log.Debugf("request block %s-%s from %s success", fileHash, v.Hash, job.worker.remoteAddr)
-					}
+					log.Debugf("request block %s-%s to %s from %s success", fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.remoteAddr)
 				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0
 				if stop {

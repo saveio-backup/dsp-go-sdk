@@ -267,6 +267,8 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	// pay file
 	payRet, err := this.payForSendFile(filePath, taskId, fileHashStr, totalCount, opt)
 	if err != nil {
+		// rollback transfer state
+		this.taskMgr.EmitProgress(taskId, task.TaskUploadFileFindReceivers)
 		sdkerr = serr.NewDetailError(serr.PAY_FOR_STORE_FILE_FAILED, err.Error())
 		return nil, err
 	}

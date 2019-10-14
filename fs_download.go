@@ -303,13 +303,15 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 	if !this.taskMgr.TaskExist(taskId) {
 		log.Debugf("DownloadFileByUrl %s, hash %s, opt %v", url, fileHashStr, opt)
 		return this.DownloadFile("", fileHashStr, opt)
+	} else {
+		taskDone, _ := this.taskMgr.IsTaskDone(taskId)
+		if taskDone {
+			log.Debugf("DownloadFileByUrl %s, hash %s, opt %v, download a done task", url, fileHashStr, opt)
+			return this.DownloadFile("", fileHashStr, opt)
+		}
+		log.Debugf("task has exist, but not finished %s", taskId)
+		return this.DownloadFile(taskId, fileHashStr, opt)
 	}
-	taskDone, _ := this.taskMgr.IsTaskDone(taskId)
-	if taskDone {
-		log.Debugf("DownloadFileByUrl %s, hash %s, opt %v, download a done task", url, fileHashStr, opt)
-		return this.DownloadFile("", fileHashStr, opt)
-	}
-	return fmt.Errorf("task has exist, but not finished %s", taskId)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
@@ -973,11 +975,10 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				continue
 			}
 			// find a more accurate way
-			if value.Index != blockIndex || !this.taskMgr.IsFileDownloaded(taskId) {
-				log.Debugf("continue value.Index %d, is %t", value.Index, this.taskMgr.IsFileDownloaded(taskId))
+			if value.Index+common.FILE_DOWNLOADED_INDEX_OFFSET < blockIndex || !this.taskMgr.IsFileDownloaded(taskId) {
 				continue
 			}
-			log.Debugf("IsFileDownloaded last block %t", this.taskMgr.IsFileDownloaded(taskId))
+			log.Debugf("file has downloaded: %t, last block index: %d", this.taskMgr.IsFileDownloaded(taskId), value.Index)
 			// last block
 			this.taskMgr.SetTaskState(taskId, store.TaskStateDone)
 			break
