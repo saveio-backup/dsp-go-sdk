@@ -1,12 +1,14 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/ontio/ontology-eventbus/actor"
 	"github.com/saveio/dsp-go-sdk/common"
+	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -22,6 +24,16 @@ type P2pResp struct {
 
 type P2pBoolResp struct {
 	Value bool
+	Error error
+}
+
+type P2pStringResp struct {
+	Value string
+	Error error
+}
+
+type P2pStringSliceResp struct {
+	Value []string
 	Error error
 }
 
@@ -110,6 +122,34 @@ type ConnectionExistReq struct {
 	Response chan *P2pBoolResp
 }
 
+type CompleteTorrentReq struct {
+	Address  string
+	Hash     []byte
+	IP       string
+	Port     uint64
+	Response chan *P2pResp
+}
+
+type TorrentPeersReq struct {
+	Address  string
+	Hash     []byte
+	Response chan *P2pStringSliceResp
+}
+
+type EndpointRegistryReq struct {
+	Address    string
+	WalletAddr chainCom.Address
+	IP         string
+	Port       uint64
+	Response   chan *P2pResp
+}
+
+type GetEndpointReq struct {
+	Address    string
+	WalletAddr chainCom.Address
+	Response   chan *P2pStringResp
+}
+
 func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
 	chReq := &ConnectionExistReq{
 		Address:  address,
@@ -122,7 +162,7 @@ func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
 		if resp != nil {
 			return resp.Value, resp.Error
 		}
-		return false, fmt.Errorf("[P2pConnectionExist] no reponse")
+		return false, fmt.Errorf("[P2pConnectionExist] no response")
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return false, fmt.Errorf("[P2pConnectionExist] timeout")
 	}
@@ -274,5 +314,83 @@ func P2pRequestWithRetry(msg proto.Message, peer string, retry, timeout int) (pr
 		return resp.Data, nil
 	case <-time.After(time.Duration(common.ACTOR_MAX_P2P_REQ_TIMEOUT+1) * time.Second):
 		return nil, fmt.Errorf("[P2pRequestWithRetry] send request msg to %s timeout", peer)
+	}
+}
+
+func P2pCompleteTorrent(hash []byte, ip string, port uint64, targetDnsAddr string) error {
+	chReq := &CompleteTorrentReq{
+		Address:  targetDnsAddr,
+		Hash:     hash,
+		IP:       ip,
+		Port:     port,
+		Response: make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return resp.Error
+		}
+		return nil
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return fmt.Errorf("[P2pCompleteTorrent] timeout")
+	}
+}
+
+func P2pTorrentPeers(hash []byte, targetDnsAddr string) ([]string, error) {
+	chReq := &TorrentPeersReq{
+		Address:  targetDnsAddr,
+		Hash:     hash,
+		Response: make(chan *P2pStringSliceResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil {
+			return resp.Value, resp.Error
+		}
+		return nil, errors.New("response is nil")
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		log.Errorf("[P2pGetPublicAddr] timeout")
+		return nil, fmt.Errorf("[P2pTorrentPeers] timeout")
+	}
+}
+
+func P2pEndpointRegistry(addr chainCom.Address, ip string, port uint64, targetDnsAddr string) error {
+	chReq := &EndpointRegistryReq{
+		Address:    targetDnsAddr,
+		WalletAddr: addr,
+		IP:         ip,
+		Port:       port,
+		Response:   make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return resp.Error
+		}
+		return nil
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return fmt.Errorf("[P2pEndpointRegistry] timeout")
+	}
+}
+
+func P2pGetEndpointAddr(addr chainCom.Address, targetDnsAddr string) (string, error) {
+	chReq := &GetEndpointReq{
+		Address:    targetDnsAddr,
+		WalletAddr: addr,
+		Response:   make(chan *P2pStringResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil {
+			return resp.Value, resp.Error
+		}
+		return "", errors.New("response is nil")
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		log.Errorf("[P2pGetEndpointAddr] timeout")
+		return "", fmt.Errorf("[P2pGetEndpointAddr] timeout")
 	}
 }

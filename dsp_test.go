@@ -20,18 +20,15 @@ import (
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
-var rpcAddr = "http://139.219.136.38:20336"
+var rpcAddr = "http://127.0.0.1:20336"
 var node1ListAddr = "tcp://127.0.0.1:14001"
 var node2ListAddr = "tcp://127.0.0.1:14002"
 var node3ListAddr = "tcp://127.0.0.1:14003"
 var node4ListAddr = "tcp://127.0.0.1:14004"
 var node5ListAddr = "tcp://127.0.0.1:14005"
-
 var uploadTestFile = "./testdata/testuploadbigfile.txt"
 
-// var uploadTestFile = "./testdata/testuploadfile.txt"
-
-var walletFile = "/Users/zhijie/Desktop/onchain/save-test/node4/wallet.dat"
+var walletFile = "./wallet.dat"
 var wallet2File = "./testdata/wallet2.dat"
 var wallet3File = "./testdata/wallet3.dat"
 var wallet4File = "./testdata/wallet4.dat"
@@ -764,30 +761,6 @@ func TestInitDnsSC(t *testing.T) {
 	fmt.Printf("hash :%v\n", tx)
 }
 
-func TestRegisterHeader(t *testing.T) {
-	dspCfg := &config.DspConfig{
-		ChainRpcAddr: rpcAddr,
-	}
-	w, err := wallet.OpenWallet(walletFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	acc, err := w.GetDefaultAccount([]byte(walletPwd))
-	if err != nil {
-		t.Fatal(err)
-	}
-	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d := NewDsp(dspCfg, acc, nil)
-	if d == nil {
-		t.Fatal("dsp init failed")
-	}
-	hash, err := d.Chain.Native.Dns.RegisterHeader("save", "", 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Printf("hash: %s\n", hash)
-}
-
 func TestRegisterDnsHeader(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChainRpcAddrs: []string{rpcAddr},
@@ -805,7 +778,7 @@ func TestRegisterDnsHeader(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	hash, err := d.Chain.Native.Dns.RegisterHeader("oni://", "oni", 100000)
+	hash, err := d.Chain.Native.Dns.RegisterHeader("oni", "oni", 100000)
 	if err != nil {
 		t.Fatal(err)
 	}

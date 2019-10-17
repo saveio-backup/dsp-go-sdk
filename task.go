@@ -11,6 +11,9 @@ func (this *Dsp) RecoverDBLossTask() error {
 	if err != nil {
 		log.Errorf("get file list err %s", err)
 	}
+	if list == nil {
+		return nil
+	}
 	uploadHashes := make([]string, 0, int(list.FileNum))
 	nameMap := make(map[string]string, 0)
 	for _, h := range list.List {

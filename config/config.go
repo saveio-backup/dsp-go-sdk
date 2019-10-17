@@ -33,6 +33,7 @@ type DspConfig struct {
 	DnsNodeMaxNum      int      // dns node max count
 	DnsChannelDeposit  uint64   // deposit amount of channel between self and dns node
 	SeedInterval       int      // push file to tracker interval in second, if it's 0, no push
+	TrackerProtocol    string   // tracker protocol
 	Trackers           []string // tracker address list
 	DNSWalletAddrs     []string // DNS wallet ADDRESS
 }

@@ -12,8 +12,8 @@ const (
 
 	FILE_DOWNLOAD_UNIT_PRICE = 1     // unit price for all file
 	DSP_NETWORK_PROTOCOL     = "tcp" // default dsp network protocol
-	TRACKER_PORT             = 6369  // tracker default port
-	TRACKER_NETWORK_PROTOCOL = "udp" // tracker network protocol
+	TRACKER_SVR_DEFAULT_PORT = 10340 // tracker default port
+	TRACKER_NETWORK_PROTOCOL = "tcp" // tracker network protocol
 	MILLISECOND_PER_SECOND   = 1000  // 1 Second = 1000 Millisecond
 
 	TASK_STATE_CHECK_DURATION = 1 // task state change check ticker duration
@@ -45,7 +45,7 @@ const (
 	ACTOR_P2P_REQ_TIMEOUT               = 15      // 15s
 	P2P_BROADCAST_TIMEOUT               = 10      // 30s
 	P2P_REQUEST_WAIT_REPLY_TIMEOUT      = 10      // 30s
-	TRACKER_SERVICE_TIMEOUT             = 5       // 5s
+	TRACKER_SERVICE_TIMEOUT             = 15      // 5s
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT      = 10      // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT              = 20      // media transfer timeout
 
@@ -101,7 +101,7 @@ const (
 // go routine
 const (
 	MAX_UPLOAD_ROUTINES = 15 // max upload go routines
-	MAX_ASYNC_ROUTINES  = 15 // max request go routinues
+	MAX_ASYNC_ROUTINES  = 15 // max request go routines
 )
 
 const (

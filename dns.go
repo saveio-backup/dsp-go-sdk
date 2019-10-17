@@ -15,8 +15,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/common"
 	serr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/utils"
-	"github.com/saveio/scan/tracker"
-	chainsdk "github.com/saveio/themis-go-sdk/utils"
 	chaincom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/smartcontract/service/native/dns"
@@ -84,7 +82,7 @@ func (this *Dsp) SetupDNSTrackers() error {
 		if len(this.DNS.TrackerUrls) >= maxTrackerNum {
 			break
 		}
-		trackerUrl := fmt.Sprintf("%s://%s:%d/announce", common.TRACKER_NETWORK_PROTOCOL, v.IP, common.TRACKER_PORT)
+		trackerUrl := fmt.Sprintf("%s://%s:%d", this.Config.TrackerProtocol, v.IP, common.TRACKER_SVR_DEFAULT_PORT)
 		_, ok = existDNSMap[trackerUrl]
 		if ok {
 			continue
@@ -96,10 +94,10 @@ func (this *Dsp) SetupDNSTrackers() error {
 	return nil
 }
 
-// BootstrapDNS. bootstrap max 15 DNSs from smart contract
+// BootstrapDNS. bootstrap max 15 DNS from smart contract
 func (this *Dsp) BootstrapDNS() {
 	log.Debugf("start bootstrapDNS...")
-	connetedDNS, err := this.connectDNSs(common.MAX_DNS_NUM)
+	connetedDNS, err := this.connectDNS(common.MAX_DNS_NUM)
 	if err != nil {
 		return
 	}
@@ -212,6 +210,10 @@ func (this *Dsp) SetupDNSChannels() error {
 	return err
 }
 
+// PushToTrackers. Push torrent file hash to trackers
+// hash: "..."
+// trackerUrls: ["tcp://127.0.0.1:10340"]
+// listenAddr: "tcp://127.0.0.1:1234"
 func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr string) error {
 	index := strings.Index(listenAddr, "://")
 	hostPort := listenAddr
@@ -222,26 +224,14 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	if err != nil {
 		return err
 	}
-	netIp := net.ParseIP(host).To4()
-	if netIp == nil {
-		netIp = net.ParseIP(host).To16()
-	}
 	netPort, err := strconv.Atoi(port)
 	if err != nil {
 		return err
 	}
-	var hashBytes [46]byte
-	copy(hashBytes[:], []byte(hash)[:])
 
 	request := func(trackerUrl string, resp chan *trackerResp) {
-		log.Debugf("trackerurl %s hash: %s netIp:%v netPort:%v", trackerUrl, string(hashBytes[:]), netIp, netPort)
-		err := tracker.CompleteTorrent(trackerUrl, tracker.ActionTorrentCompleteParams{
-			InfoHash: hashBytes,
-			IP:       netIp,
-			Port:     uint16(netPort),
-		}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
-			return chainsdk.Sign(this.CurrentAccount(), rawData)
-		})
+		log.Debugf("trackerUrl %s hash: %s hostAddr: %s", trackerUrl, hash, hostPort)
+		err := client.P2pCompleteTorrent([]byte(hash), host, uint64(netPort), trackerUrl)
 		resp <- &trackerResp{
 			ret: trackerUrl,
 			err: err,
@@ -251,20 +241,14 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	return nil
 }
 
+// GetPeerFromTracker. get peer host addr from trackers
+// return: ["tcp://127.0.0.1:1234"]
 func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string {
-	var hashBytes [46]byte
-	copy(hashBytes[:], []byte(hash)[:])
 	selfAddr := client.P2pGetPublicAddr()
 	protocol := selfAddr[:strings.Index(selfAddr, "://")]
 
 	request := func(trackerUrl string, resp chan *trackerResp) {
-		peers, err := tracker.GetTorrentPeers(trackerUrl, tracker.ActionGetTorrentPeersParams{
-			InfoHash: hashBytes,
-			NumWant:  -1,
-			Left:     1,
-		}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
-			return chainsdk.Sign(this.CurrentAccount(), rawData)
-		})
+		peers, err := client.P2pTorrentPeers([]byte(hash), trackerUrl)
 		if err != nil || len(peers) == 0 {
 			resp <- &trackerResp{
 				err: fmt.Errorf("peers is empty, err: %s", err),
@@ -273,8 +257,10 @@ func (this *Dsp) GetPeerFromTracker(hash string, trackerUrls []string) []string 
 		}
 		peerAddrs := make([]string, 0)
 		peerMap := make(map[string]struct{}, 0)
-		for _, p := range peers {
-			addr := fmt.Sprintf("%s://%s:%d", protocol, p.IP, p.Port)
+		for _, addr := range peers {
+			if !strings.Contains(addr, protocol) {
+				addr = fmt.Sprintf("%s://%s", protocol, addr)
+			}
 			if addr == selfAddr {
 				continue
 			}
@@ -381,7 +367,7 @@ func (this *Dsp) RegisterFileUrl(url, link string) (string, error) {
 	}
 	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, hash[:])
 	if err != nil || !confirmed {
-		return "", errors.New("tx confirme err")
+		return "", errors.New("tx confirm err")
 	}
 	return hex.EncodeToString(chaincom.ToArrayReverse(hash[:])), nil
 }
@@ -393,7 +379,7 @@ func (this *Dsp) BindFileUrl(url, link string) (string, error) {
 	}
 	confirmed, err := this.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, hash[:])
 	if err != nil || !confirmed {
-		return "", errors.New("tx confirme err")
+		return "", errors.New("tx confirm err")
 	}
 	return hex.EncodeToString(chaincom.ToArrayReverse(hash[:])), nil
 }
@@ -431,17 +417,6 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 	if err != nil {
 		return err
 	}
-	netIp := net.ParseIP(host).To4()
-	if netIp == nil {
-		netIp = net.ParseIP(host).To16()
-	}
-	netPort, err := strconv.ParseUint(port, 10, 16)
-	if err != nil {
-		return err
-	}
-
-	var wallet [20]byte
-	copy(wallet[:], walletAddr[:])
 	if len(this.DNS.TrackerUrls) == 0 {
 		log.Debugf("set up dns trackers before register channel endpoint")
 		err = this.SetupDNSTrackers()
@@ -449,16 +424,14 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 			return err
 		}
 	}
+	netPort, err := strconv.Atoi(port)
+	if err != nil {
+		return err
+	}
 
 	request := func(trackerUrl string, resp chan *trackerResp) {
-		log.Debugf("start RegEndPoint %s ipport %v:%v", trackerUrl, netIp, netPort)
-		err := tracker.RegEndPoint(trackerUrl, tracker.ActionEndpointRegParams{
-			Wallet: wallet,
-			IP:     netIp,
-			Port:   uint16(netPort),
-		}, this.CurrentAccount().PublicKey, func(rawData []byte) ([]byte, error) {
-			return chainsdk.Sign(this.CurrentAccount(), rawData)
-		})
+		log.Debugf("start RegEndPoint %s hostAddr %v:%v", trackerUrl, hostPort, netPort)
+		err := client.P2pEndpointRegistry(walletAddr, host, uint64(netPort), trackerUrl)
 		log.Debugf("start RegEndPoint end")
 		if err != nil {
 			log.Errorf("req endpoint failed, err %s", err)
@@ -481,6 +454,7 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 }
 
 // GetExternalIP. get external ip of wallet from dns nodes
+// return ["tcp://127.0.0.1:1234"], nil
 func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	info, ok := this.DNS.PublicAddrCache.Get(walletAddr)
 	if ok && info != nil {
@@ -501,7 +475,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 		log.Warn("GetExternalIP no trackers")
 	}
 	request := func(url string, resp chan *trackerResp) {
-		hostAddr, err := tracker.ReqEndPoint(url, address)
+		hostAddr, err := client.P2pGetEndpointAddr(address, url)
 		log.Debugf("ReqEndPoint hostAddr url: %s, address %s, hostaddr:%s", url, address.ToBase58(), string(hostAddr))
 		if err != nil {
 			resp <- &trackerResp{
@@ -628,7 +602,7 @@ func (this *Dsp) requestTrackers(request func(string, chan *trackerResp)) interf
 	return nil
 }
 
-func (this *Dsp) connectDNSs(maxDNSNum uint32) (map[string]string, error) {
+func (this *Dsp) connectDNS(maxDNSNum uint32) (map[string]string, error) {
 	ns, err := this.Chain.Native.Dns.GetAllDnsNodes()
 	if err != nil {
 		return nil, err
@@ -667,7 +641,7 @@ func (this *Dsp) connectDNSs(maxDNSNum uint32) (map[string]string, error) {
 			}
 			return
 		}
-		log.Debugf("connectDNSs Loop DNS %s dnsUrl %v", v.WalletAddr.ToBase58(), dnsUrl)
+		log.Debugf("connectDNS Loop DNS %s dnsUrl %v", v.WalletAddr.ToBase58(), dnsUrl)
 		err = this.Channel.WaitForConnected(walletAddr, time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)*time.Second)
 		if err != nil {
 			log.Errorf("wait channel connected err %s %s", walletAddr, err)
@@ -694,7 +668,7 @@ func (this *Dsp) connectDNSs(maxDNSNum uint32) (map[string]string, error) {
 	for _, v := range ns {
 		_, ok := dnsWalletMap[v.WalletAddr.ToBase58()]
 		if len(dnsWalletMap) > 0 && !ok {
-			log.Debugf("connectDNSs Loop DNS  continue")
+			log.Debugf("connectDNS Loop DNS  continue")
 			continue
 		}
 		connectArgs = append(connectArgs, []interface{}{v})
