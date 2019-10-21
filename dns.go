@@ -111,7 +111,7 @@ func (this *Dsp) BootstrapDNS() {
 		log.Errorf("get all channel err %s", err)
 		return
 	}
-	if len(channels.Channels) == 0 {
+	if channels == nil || len(channels.Channels) == 0 {
 		return
 	}
 	log.Debugf("will set online dns")
