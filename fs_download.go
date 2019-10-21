@@ -63,11 +63,10 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		log.Debugf("emit ret %s %s", taskId, err)
 		if sdkErr != nil {
 			this.taskMgr.EmitResult(taskId, nil, sdkErr)
-		} else {
-			this.taskMgr.EmitResult(taskId, "", nil)
 		}
 		// delete task from cache in the end
 		if this.taskMgr.IsFileDownloaded(taskId) && sdkErr == nil {
+			this.taskMgr.EmitResult(taskId, "", nil)
 			this.taskMgr.DeleteTask(taskId)
 		}
 	}()
@@ -118,13 +117,11 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		return nil
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadSearchPeers)
-	addrs := this.GetPeerFromTracker(fileHashStr, this.DNS.TrackerUrls)
-	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.DNS.TrackerUrls)
-	if len(addrs) == 0 {
-		err = fmt.Errorf("get 0 peer of %s from %d trackers", fileHashStr, len(this.DNS.TrackerUrls))
-		sdkErr = serr.NewDetailError(serr.NO_DOWNLOAD_SEED, err.Error())
-		return err
+	addrs, sdkErr := this.getPeersForDownload(fileHashStr)
+	if sdkErr != nil {
+		return sdkErr.Error
 	}
+	log.Debugf("get addr from peer %v, hash %s", addrs, fileHashStr)
 	if opt.MaxPeerCnt > common.MAX_DOWNLOAD_PEERS_NUM {
 		opt.MaxPeerCnt = common.MAX_DOWNLOAD_PEERS_NUM
 	}
@@ -530,7 +527,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	}
 	exist, err := client.P2pConnectionExist(dnsHostAddr, client.P2pNetTypeChannel)
 	if err != nil || !exist {
-		log.Debugf("DNS conncetion not exist reconnect...")
+		log.Debugf("DNS connection not exist reconnect...")
 		err = client.P2pReconnectPeer(dnsHostAddr, client.P2pNetTypeChannel)
 		if err != nil {
 			return 0, err
@@ -837,6 +834,23 @@ func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.TaskInfo, error)
 	return this.taskMgr.GetFileInfo(fileInfoKey)
 }
 
+// getPeersForDownload. get peers for download from tracker and fs contract
+func (this *Dsp) getPeersForDownload(fileHashStr string) ([]string, *serr.SDKError) {
+	addrs := this.GetPeerFromTracker(fileHashStr, this.DNS.TrackerUrls)
+	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.DNS.TrackerUrls)
+	if len(addrs) > 0 {
+		return addrs, nil
+	}
+	log.Warnf("get 0 peer from tracker of file %s, tracker num %d", fileHashStr, len(this.DNS.TrackerUrls))
+	addrs = this.getFileProvedNode(fileHashStr)
+	if len(addrs) > 0 {
+		return addrs, nil
+	}
+	err := fmt.Errorf("No peer for downloading the file %s", fileHashStr)
+	sdkErr := serr.NewDetailError(serr.NO_DOWNLOAD_SEED, err.Error())
+	return nil, sdkErr
+}
+
 func (this *Dsp) checkIfResumeDownload(taskId string) error {
 	opt, err := this.taskMgr.GetFileDownloadOptions(taskId)
 	if err != nil {
@@ -857,9 +871,9 @@ func (this *Dsp) checkIfResumeDownload(taskId string) error {
 
 // receiveBlockInOrder. receive blocks in order
 func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix string, peerAddrWallet map[string]string, asset int32) *serr.SDKError {
-	blockIndex, err := this.addUndownloadReq(taskId, fileHashStr)
+	blockIndex, err := this.addUndownloadedReq(taskId, fileHashStr)
 	if err != nil {
-		return serr.NewDetailError(serr.GET_UNDOWNLOAD_BLOCK_FAILED, err.Error())
+		return serr.NewDetailError(serr.GET_UNDOWNLOADED_BLOCK_FAILED, err.Error())
 	}
 	hasCutPrefix := false
 	filePrefix := &utils.FilePrefix{}
@@ -870,23 +884,13 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 		if err != nil {
 			return serr.NewDetailError(serr.CREATE_DOWNLOAD_FILE_FAILED, err.Error())
 		}
-		defer func() {
-			log.Debugf("close file defer")
-			file.Close()
-		}()
+		defer file.Close()
 	}
-	timeout := time.NewTimer(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 	stateCheckTicker := time.NewTicker(time.Duration(common.TASK_STATE_CHECK_DURATION) * time.Second)
-	defer func() {
-		// clean ticker
-		timeout.Stop()
-		stateCheckTicker.Stop()
-		log.Debugf("clean tickers")
-	}()
+	defer stateCheckTicker.Stop()
 	for {
 		select {
 		case value, ok := <-this.taskMgr.TaskNotify(taskId):
-			timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 			if !ok {
 				return serr.NewDetailError(serr.DOWNLOAD_BLOCK_FAILED, "download internal error")
 			}
@@ -991,7 +995,9 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				log.Debugf("stop download task %s", taskId)
 				return nil
 			}
-		case <-timeout.C:
+			if !this.taskMgr.Task(taskId).IsTimeout() {
+				continue
+			}
 			this.taskMgr.SetTaskState(taskId, store.TaskStateFailed)
 			workerState := this.taskMgr.GetTaskWorkerState(taskId)
 			for addr, state := range workerState {
@@ -1047,14 +1053,10 @@ func (this *Dsp) decryptDownloadedFile(fullFilePath, decryptPwd string) *serr.SD
 	if err != nil {
 		return serr.NewDetailError(serr.DECRYPT_FILE_FAILED, err.Error())
 	}
-	// err = os.Rename(fullFilePath+"-decrypted", fullFilePath)
-	// if err != nil {
-	// 	return serr.NewDetailError(serr.RENAME_FILED_FAILED, err.Error())
-	// }
 	return nil
 }
 
-func (this *Dsp) addUndownloadReq(taskId, fileHashStr string) (int32, error) {
+func (this *Dsp) addUndownloadedReq(taskId, fileHashStr string) (int32, error) {
 	hashes, indexMap, err := this.taskMgr.GetUndownloadedBlockInfo(taskId, fileHashStr)
 	if err != nil {
 		return 0, err
@@ -1063,7 +1065,6 @@ func (this *Dsp) addUndownloadReq(taskId, fileHashStr string) (int32, error) {
 		log.Debugf("no undownloaded block %s %v", hashes, indexMap)
 		return 0, nil
 	}
-	// panic("Test")
 	log.Debugf("start download at %s-%s-%d", fileHashStr, hashes[0], indexMap[hashes[0]])
 	blockIndex := int32(0)
 	for _, hash := range hashes {
@@ -1277,6 +1278,9 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	}()
 	msg := message.NewBlockFlightsReqMsg(blocks, timeStamp)
 
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
 	for i := uint32(0); i < retry; i++ {
 		log.Debugf("send download blockflights msg sessionId %s of %s from %s,  retry: %d", sessionId, fileHashStr, ipAddr, i)
 		// TODO: refactor send msg with request-reply model
@@ -1284,17 +1288,27 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 		if err != nil {
 			log.Errorf("send download blockflights msg err: %s", err)
 		}
-		select {
-		case value, ok := <-ch:
-			if !ok {
-				err = fmt.Errorf("receiving block channel close")
-				continue
+		downloadTimeout := false
+		for {
+			select {
+			case value, ok := <-ch:
+				if !ok {
+					err = fmt.Errorf("receiving block channel close")
+					continue
+				}
+				log.Debugf("receive blocks len: %d", len(value))
+				this.taskMgr.ActiveDownloadTaskPeer(ipAddr)
+				return value, nil
+			case <-ticker.C:
+				if this.taskMgr.Task(taskId).WorkerIdleDuration(ipAddr) < uint64(timeout/retry) {
+					continue
+				}
+				err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
+				downloadTimeout = true
 			}
-			log.Debugf("receive blocks len: %d", len(value))
-			return value, nil
-		case <-time.After(time.Duration(timeout/retry) * time.Second):
-			err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
-			continue
+			if downloadTimeout {
+				break
+			}
 		}
 	}
 	return nil, err

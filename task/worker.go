@@ -1,13 +1,19 @@
 package task
 
 import (
+	"sync"
+
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
+	"github.com/saveio/dsp-go-sdk/utils"
 )
 
 type jobFunc func(string, string, string, string, []*block.Block) ([]*BlockResp, error)
 
 type Worker struct {
+	id          string            // worker network peer id
+	activeTime  uint64            // worker active timestamp, millisecond
+	lock        *sync.RWMutex     // lock for private variables
 	remoteAddr  string            // worker remote host addr
 	walletAddr  string            // worker wallet addr
 	working     bool              // flag of working or not of worker
@@ -18,13 +24,20 @@ type Worker struct {
 }
 
 func NewWorker(addr, walletAddr string, j jobFunc) *Worker {
-	w := &Worker{}
-	w.remoteAddr = addr
-	w.walletAddr = walletAddr
-	w.job = j
-	w.failed = make(map[string]int, 0)
-	w.totalFailed = make(map[string]uint32, 0)
+	w := &Worker{
+		remoteAddr:  addr,
+		walletAddr:  walletAddr,
+		job:         j,
+		failed:      make(map[string]int, 0),
+		totalFailed: make(map[string]uint32, 0),
+		activeTime:  utils.GetMilliSecTimestamp(),
+		lock:        new(sync.RWMutex),
+	}
 	return w
+}
+
+func (w *Worker) SetID(id string) {
+	w.id = id
 }
 
 func (w *Worker) Do(taskId, fileHash, peerAddr, walletAddr string, blocks []*block.Block) ([]*BlockResp, error) {
@@ -77,4 +90,18 @@ func (w *Worker) SetUnpaid(unpaid bool) {
 
 func (w *Worker) Unpaid() bool {
 	return w.unpaid
+}
+
+// Active. make the worker active
+func (w *Worker) Active() {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.activeTime = utils.GetMilliSecTimestamp()
+}
+
+// ActiveTime. get last active time in millisecond
+func (w *Worker) ActiveTime() uint64 {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.activeTime
 }

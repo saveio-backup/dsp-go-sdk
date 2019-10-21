@@ -693,6 +693,7 @@ func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.Pee
 				Index:    blockMsg.Index,
 				PeerAddr: peer.Address,
 			})
+			this.taskMgr.ActiveUploadTaskPeer(peer.Address)
 			reqCh <- reqs
 			return
 		default:

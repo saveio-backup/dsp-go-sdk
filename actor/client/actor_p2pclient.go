@@ -351,7 +351,7 @@ func P2pTorrentPeers(hash []byte, targetDnsAddr string) ([]string, error) {
 		}
 		return nil, errors.New("response is nil")
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		log.Errorf("[P2pGetPublicAddr] timeout")
+		log.Errorf("[P2pTorrentPeers] timeout")
 		return nil, fmt.Errorf("[P2pTorrentPeers] timeout")
 	}
 }

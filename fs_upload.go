@@ -1050,12 +1050,10 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 		return serr.NewDetailError(serr.PREPARE_UPLOAD_ERROR, err.Error())
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
-	timeout := time.NewTimer(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
 		return serr.NewDetailError(serr.GET_SESSION_ID_FAILED, err.Error())
 	}
-	defer timeout.Stop()
 	fileHashStr, _ := this.taskMgr.TaskFileHash(taskId)
 	totalCount := uint64(len(hashes))
 	doneCh := make(chan *fetchedDone)
@@ -1101,6 +1099,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 	}
 	cancelFetch := make(chan struct{})
 	log.Debugf("open %d go routines for fetched file taskId: %s, %s", len(addrs), taskId, fileHashStr)
+	this.taskMgr.NewWorkers(taskId, utils.StringSliceToKeyMap(addrs), true, nil)
 
 	reqForPeers := make(map[string]chan []*task.GetBlockReq)
 	for _, p := range addrs {
@@ -1113,7 +1112,6 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 				if len(reqInfo) == 0 {
 					continue
 				}
-				timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 				ch := reqForPeers[reqInfo[0].PeerAddr]
 				go func() {
 					ch <- reqInfo
@@ -1135,9 +1133,9 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 						log.Debugf("stop handle request because task is stop: %t", stop)
 						return
 					}
-					timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 					msgDataM := make(map[string]*blockMsgData, 0)
 					for _, reqInfo := range reqInfos {
+						this.taskMgr.ActiveUploadTaskPeer(reqInfo.PeerAddr)
 						key := keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))
 						log.Debugf("handle request key:%s, %s-%s-%d from peer: %s", key, fileHashStr, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
 						msgData := getMsgData(reqInfo.Hash, uint32(reqInfo.Index))
@@ -1155,7 +1153,6 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 						continue
 					}
 					// because of the network transfer time consuming, reset timer here after sending blocks finish.
-					timeout.Reset(time.Duration(common.DOWNLOAD_FILE_TIMEOUT) * time.Second)
 					if done == false && err == nil {
 						cleanMsgData(reqInfos)
 						continue
@@ -1200,7 +1197,19 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 			log.Infof("all block has sent %s", taskId)
 			this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocksDone)
 			return nil
-		case <-timeout.C:
+		case <-checkStopTimer.C:
+			stop, _ := this.stopUpload(taskId)
+			if stop {
+				log.Debugf("stop wait for fetch because task is stop: %t", stop)
+				if !closeCancelFetch {
+					closeCancelFetch = true
+					close(cancelFetch)
+				}
+				return nil
+			}
+			if !this.taskMgr.Task(taskId).IsTimeout() {
+				continue
+			}
 			if !closeCancelFetch {
 				closeCancelFetch = true
 				close(cancelFetch)
@@ -1212,16 +1221,6 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 				return serr.NewDetailError(serr.TASK_WAIT_TIMEOUT, err.Error())
 			}
 			return nil
-		case <-checkStopTimer.C:
-			stop, _ := this.stopUpload(taskId)
-			if stop {
-				log.Debugf("stop wait for fetch because task is stop: %t", stop)
-				if !closeCancelFetch {
-					closeCancelFetch = true
-					close(cancelFetch)
-				}
-				return nil
-			}
 		}
 	}
 }
@@ -1285,6 +1284,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 		log.Errorf("%v, err %s", sendLogMsg, err)
 		return false, err
 	}
+	this.taskMgr.ActiveUploadTaskPeer(reqInfos[0].PeerAddr)
 	log.Debugf("send block success %s\n used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
 	// TODO: add pause here
 

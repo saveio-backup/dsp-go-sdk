@@ -131,3 +131,12 @@ func GetDecryptedFilePath(filePath string) string {
 func GetMilliSecTimestamp() uint64 {
 	return uint64(time.Now().UnixNano() / int64(time.Millisecond))
 }
+
+// StringSliceToKeyMap. convert a string slice to map with default value ""
+func StringSliceToKeyMap(input []string) map[string]string {
+	m := make(map[string]string, len(input))
+	for _, key := range input {
+		m[key] = ""
+	}
+	return m
+}

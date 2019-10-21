@@ -230,8 +230,12 @@ func (this *Dsp) PushToTrackers(hash string, trackerUrls []string, listenAddr st
 	}
 
 	request := func(trackerUrl string, resp chan *trackerResp) {
-		log.Debugf("trackerUrl %s hash: %s hostAddr: %s", trackerUrl, hash, hostPort)
 		err := client.P2pCompleteTorrent([]byte(hash), host, uint64(netPort), trackerUrl)
+		if err != nil {
+			log.Debugf("pushToTrackers trackerUrl %s hash: %s hostAddr: %s success", trackerUrl, hash, hostPort)
+		} else {
+			log.Errorf("pushToTrackers trackerUrl %s hash: %s hostAddr: %s err: %s", trackerUrl, hash, hostPort, err)
+		}
 		resp <- &trackerResp{
 			ret: trackerUrl,
 			err: err,

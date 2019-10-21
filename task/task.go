@@ -959,6 +959,41 @@ func (this *Task) GetUrl() string {
 	return this.info.Url
 }
 
+func (this *Task) ActiveWorker(addr string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	w, ok := this.workers[addr]
+	if !ok {
+		return
+	}
+	w.Active()
+}
+
+func (this *Task) IsTimeout() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	timeout := uint64(common.DOWNLOAD_FILE_TIMEOUT * 1000)
+	now := utils.GetMilliSecTimestamp()
+	for _, w := range this.workers {
+		if now-w.ActiveTime() < timeout {
+			return false
+		}
+	}
+	return true
+}
+
+// WorkerIdleDuration. worker idle duration 
+func (this *Task) WorkerIdleDuration(addr string) uint64 {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	w, ok := this.workers[addr]
+	if !ok {
+		return 0
+	}
+	now := utils.GetMilliSecTimestamp()
+	return now - w.ActiveTime()
+}
+
 func newTask(id string, info *store.TaskInfo, db *store.FileDB) *Task {
 	t := &Task{
 		id:            id,

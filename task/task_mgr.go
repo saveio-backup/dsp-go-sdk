@@ -198,6 +198,25 @@ func (this *TaskMgr) BlockReqCh() chan []*GetBlockReq {
 	return this.blockReqCh
 }
 
+func (this *TaskMgr) Task(taskId string) *Task {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	v, ok := this.tasks[taskId]
+	if ok {
+		return v
+	}
+	t, err := NewTaskFromDB(taskId, this.db)
+	if t == nil {
+		log.Debugf("get task by memory and DB failed %s, err: %s", taskId, err)
+		return &Task{}
+	}
+	if t.State() != store.TaskStateDone {
+		// only cache unfinished task
+		this.tasks[taskId] = t
+	}
+	return t
+}
+
 func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -409,7 +428,7 @@ func (this *TaskMgr) EmitNotification(taskId string, state ShareState, fileHashS
 	}()
 }
 
-func (this *TaskMgr) NewWorkers(taskId string, addrs map[string]string, inOrder bool, job jobFunc) {
+func (this *TaskMgr) NewWorkers(taskId string, addrToWalletMap map[string]string, inOrder bool, job jobFunc) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
@@ -419,7 +438,7 @@ func (this *TaskMgr) NewWorkers(taskId string, addrs map[string]string, inOrder 
 		log.Errorf("[TaskMgr NewWorkers] set task inOrder failed, err: %s", err)
 		return
 	}
-	v.NewWorkers(addrs, job)
+	v.NewWorkers(addrToWalletMap, job)
 }
 
 // WorkBackground. Run n goroutines to check request pool one second a time.
@@ -854,4 +873,28 @@ func (this *TaskMgr) GetUrlOfUploadedfile(fileHash, walletAddr string) string {
 		return ""
 	}
 	return v.GetUrl()
+}
+
+// ActiveUploadTask. make a upload task peer active
+func (this *TaskMgr) ActiveUploadTaskPeer(peerAddr string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	for _, t := range this.tasks {
+		if t.GetTaskType() != store.TaskTypeUpload {
+			continue
+		}
+		t.ActiveWorker(peerAddr)
+	}
+}
+
+// ActiveDownloadTaskPeer. make a download task peer active
+func (this *TaskMgr) ActiveDownloadTaskPeer(peerAddr string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	for _, t := range this.tasks {
+		if t.GetTaskType() != store.TaskTypeDownload {
+			continue
+		}
+		t.ActiveWorker(peerAddr)
+	}
 }
