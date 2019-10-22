@@ -140,6 +140,11 @@ func (this *Channel) StartService() error {
 	return nil
 }
 
+// Running. Is channel service running
+func (this *Channel) Running() bool {
+	return this.isStart
+}
+
 func (this *Channel) GetCurrentFilterBlockHeight() uint32 {
 	height, err := ch_actor.GetLastFilterBlockHeight()
 	if err != nil {
@@ -149,14 +154,21 @@ func (this *Channel) GetCurrentFilterBlockHeight() uint32 {
 }
 
 func (this *Channel) StopService() {
+	if this.channelDB != nil {
+		this.channelDB.Close()
+	}
+	if this.chActorId != nil {
+		this.chActorId.Stop()
+	}
+	if !this.isStart {
+		return
+	}
 	log.Debug("[dsp-go-sdk-channel] StopService")
 	err := ch_actor.StopPylons()
 	if err != nil {
 		log.Errorf("stop pylons err %s", err)
 		return
 	}
-	this.channelDB.Close()
-	this.chActorId.Stop()
 	close(this.closeCh)
 	this.isStart = false
 }
@@ -179,22 +191,22 @@ func (this *Channel) GetChannelInfoFromDB(targetAddress string) (*store.ChannelI
 	return this.channelDB.GetChannelInfo(targetAddress)
 }
 
-// OverridePartners. override local partners with neighbours from channel
+// OverridePartners. override local partners with neighbors from channel
 func (this *Channel) OverridePartners() error {
 	log.Debugf("[dsp-go-sdk-channel] OverridePartners")
 	if !this.isStart {
 		return errors.New("channel service is not start")
 	}
 	newPartners := make([]string, 0)
-	neighbours := transfer.GetNeighbours(this.chActor.GetChannelService().Service.StateFromChannel())
-	for _, v := range neighbours {
+	neighbors := transfer.GetNeighbours(this.chActor.GetChannelService().Service.StateFromChannel())
+	for _, v := range neighbors {
 		newPartners = append(newPartners, common.ToBase58(v))
 	}
 	log.Debugf("override new partners %v\n", newPartners)
 	return this.channelDB.OverridePartners(this.walletAddr, newPartners)
 }
 
-// WaitForConnected. wait for conected for a period.
+// WaitForConnected. wait for connected for a period.
 func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) error {
 	log.Debugf("[dsp-go-sdk-channel] WaitForConnected %s", walletAddr)
 	interval := time.Duration(dspcom.CHECK_CHANNEL_STATE_INTERVAL) * time.Second

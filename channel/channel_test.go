@@ -9,10 +9,9 @@ import (
 	"github.com/saveio/dsp-go-sdk/config"
 	chain "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis-go-sdk/wallet"
-	cliutil "github.com/saveio/themis/cmd/utils"
+	cliUtil "github.com/saveio/themis/cmd/utils"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/crypto/keypair"
-	"github.com/saveio/pylons/transfer"
 )
 
 var rpcAddr = "http://127.0.0.1:20336"
@@ -48,7 +47,7 @@ func TestCloseChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 	chain := chain.NewChain()
-	chain.NewRpcClient().SetAddress(rpcAddr)
+	chain.NewRpcClient().SetAddress([]string{rpcAddr})
 	chain.SetDefaultAccount(acc2)
 
 	target := acc.Address
@@ -62,7 +61,7 @@ func TestCloseChannel(t *testing.T) {
 	fmt.Printf("id = %d, err %s\n", id, err)
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	nonce := r.Uint64()
-	sig, err := cliutil.Sign([]byte("123"), acc2)
+	sig, err := cliUtil.Sign([]byte("123"), acc2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +84,7 @@ func TestDepositChannel(t *testing.T) {
 	}
 	fmt.Printf("acc %v\n", acc)
 	chain := chain.NewChain()
-	chain.NewRpcClient().SetAddress(rpcAddr)
+	chain.NewRpcClient().SetAddress([]string{rpcAddr})
 	w2, err := wallet.OpenWallet(wallet2File)
 	if err != nil {
 		t.Fatal(err)
@@ -103,8 +102,8 @@ func TestDepositChannel(t *testing.T) {
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 	}
-	c, _ := NewChannelService(cfg, chain)
-	id, err := c.OpenChannel(acc.Address.ToBase58())
+	c, _ := NewChannelService(cfg, chain, nil)
+	id, err := c.OpenChannel(acc.Address.ToBase58(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +135,7 @@ func TestGetTargetBalance(t *testing.T) {
 	fmt.Printf("acc %v\n", acc)
 
 	chain := chain.NewChain()
-	chain.NewRpcClient().SetAddress(rpcAddr)
+	chain.NewRpcClient().SetAddress([]string{rpcAddr})
 	chain.SetDefaultAccount(acc)
 	cfg := &config.DspConfig{
 		ChainRpcAddr:         rpcAddr,
@@ -148,9 +147,7 @@ func TestGetTargetBalance(t *testing.T) {
 	target := "ANa3f9jm2FkWu4NrVn6L1FGu7zadKdvPjL"
 	if target == "" {
 	}
-	c, _ := NewChannelService(cfg, chain)
-	neighbours := transfer.GetNeighbours(c.channel.Service.StateFromChannel())
-	fmt.Printf("len:%d\n", len(neighbours))
+	c, _ := NewChannelService(cfg, chain, nil)
 
 	err = c.StartService()
 	if err != nil {
@@ -161,14 +158,4 @@ func TestGetTargetBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Printf("balance %v\n", bal)
-	c.SetHostAddr(target, "tcp://127.0.0.1:13004")
-	_, err = c.OpenChannel(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = c.WaitForConnected(target, time.Duration(60)*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Printf("connected\n")
 }

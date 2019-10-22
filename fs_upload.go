@@ -1230,7 +1230,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 	reqInfos []*task.GetBlockReq,
 	copyNum int,
 	totalCount uint64,
-	blockMsgDatas map[string]*blockMsgData) (bool, error) {
+	blockMsgDataM map[string]*blockMsgData) (bool, error) {
 	// send block
 	if len(reqInfos) == 0 {
 		log.Warnf("no request to handle of file: %s", fileHashStr)
@@ -1241,7 +1241,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 	nodeAddr := reqInfos[0].PeerAddr
 	for _, reqInfo := range reqInfos {
 		log.Debugf("receive fetch block msg of %s-%s-%d-%d from %s", reqInfo.FileHash, reqInfo.Hash, reqInfo.Index, totalCount, reqInfo.PeerAddr)
-		blockMsgData := blockMsgDatas[keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))]
+		blockMsgData := blockMsgDataM[keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))]
 		if len(blockMsgData.blockData) == 0 || len(blockMsgData.tag) == 0 {
 			log.Errorf("block len %d, tag len %d hash %s, peer %s failed", len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
 			return false, fmt.Errorf("block len %d, tag len %d hash %s, peer %s failed", len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
