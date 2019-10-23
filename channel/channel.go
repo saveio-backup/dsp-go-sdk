@@ -587,9 +587,10 @@ func (this *Channel) registerReceiveNotification() {
 			case event := <-receiveChan:
 				addr, err := chaincomm.AddressParseFromBytes(event.Initiator[:])
 				if err != nil {
+					log.Errorf("receive payment with unrecognized address %v", event)
 					continue
 				}
-				log.Debugf("PaymentReceive2 amount %d from %s with paymentID %d\n",
+				log.Debugf("PaymentReceive amount %d from %s with paymentID %d\n",
 					event.Amount, addr.ToBase58(), event.Identifier)
 				this.channelDB.AddPayment(addr.ToBase58(), int32(event.Identifier), uint64(event.Amount))
 			case <-this.closeCh:

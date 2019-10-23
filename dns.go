@@ -434,7 +434,7 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 	}
 
 	request := func(trackerUrl string, resp chan *trackerResp) {
-		log.Debugf("start RegEndPoint %s hostAddr %v:%v", trackerUrl, hostPort, netPort)
+		log.Debugf("start RegEndPoint %s hostAddr %v", trackerUrl, hostPort)
 		err := client.P2pEndpointRegistry(walletAddr, host, uint64(netPort), trackerUrl)
 		log.Debugf("start RegEndPoint end")
 		if err != nil {
@@ -461,6 +461,7 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr strin
 // return ["tcp://127.0.0.1:1234"], nil
 func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 	info, ok := this.DNS.PublicAddrCache.Get(walletAddr)
+	var oldHostAddr string
 	if ok && info != nil {
 		addrInfo, ok := info.(*PublicAddrInfo)
 		now := utils.GetMilliSecTimestamp()
@@ -468,6 +469,7 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 			log.Debugf("GetExternalIP %s addr %s from cache", walletAddr, addrInfo.HostAddr)
 			return addrInfo.HostAddr, nil
 		}
+		oldHostAddr = addrInfo.HostAddr
 		log.Debugf("wallet: %s, old host ip :%s, now :%d", walletAddr, addrInfo.HostAddr, addrInfo.UpdatedAt)
 	}
 	address, err := chaincom.AddressFromBase58(walletAddr)
@@ -507,11 +509,18 @@ func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
 		}
 	}
 	result := this.requestTrackers(request)
+	log.Debugf("get external ip wallet %s, result %v", walletAddr, result)
 	if result == nil {
+		if len(oldHostAddr) > 0 {
+			return oldHostAddr, nil
+		}
 		return "", fmt.Errorf("request tracker result is nil : %v", result)
 	}
 	hostAddrStr, ok := result.(string)
 	if !ok {
+		if len(oldHostAddr) > 0 {
+			return oldHostAddr, nil
+		}
 		log.Errorf("convert result to string failed: %v", result)
 		return "", fmt.Errorf("convert result to string failed: %v", result)
 	}
