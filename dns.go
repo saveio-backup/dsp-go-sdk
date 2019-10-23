@@ -103,7 +103,7 @@ func (this *Dsp) BootstrapDNS() {
 	}
 	this.DNS.OnlineDNS = connetedDNS
 	log.Debugf("online dns :%v", this.DNS.OnlineDNS)
-	if this.Config.AutoSetupDNSEnable {
+	if this.Config.AutoSetupDNSEnable || len(this.DNS.OnlineDNS) == 0 {
 		return
 	}
 	channels, err := this.Channel.AllChannels()
