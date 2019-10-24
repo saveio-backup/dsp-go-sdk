@@ -7,6 +7,8 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
+	"github.com/saveio/dsp-go-sdk/utils"
+	"github.com/saveio/themis/common/log"
 )
 
 type Header struct {
@@ -20,10 +22,16 @@ type Error struct {
 	Message string
 }
 
+type Signature struct {
+	SigData   []byte
+	PublicKey []byte
+}
+
 type Message struct {
 	MessageId uint64
 	Header    *Header
 	Payload   proto.Message
+	Sig       *Signature
 	Error     *Error
 }
 
@@ -60,16 +68,42 @@ func ReadMessage(msg proto.Message) *Message {
 			}
 			newMsg.Payload = blk
 		case common.MSG_TYPE_FILE:
-			file := &file.File{}
-			err := proto.Unmarshal(data, file)
+			// verify signature
+			if pbMsg.Sig == nil || len(pbMsg.Sig.SigData) == 0 || len(pbMsg.Sig.PublicKey) == 0 {
+				log.Debugf("receive a no signed file msg")
+				return nil
+			}
+			err := utils.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
 			if err != nil {
+				return nil
+			}
+			file := &file.File{}
+			err = proto.Unmarshal(data, file)
+			if err != nil {
+				return nil
+			}
+			if file.PayInfo == nil {
+				log.Debugf("file msg missing pay info field")
+				return nil
+			}
+			if err := utils.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, file.PayInfo.WalletAddress); err != nil {
+				log.Debugf("receive a invalid file msg")
 				return nil
 			}
 			newMsg.Payload = file
 		case common.MSG_TYPE_PAYMENT:
+			// verify signature
+			if pbMsg.Sig == nil || len(pbMsg.Sig.SigData) == 0 || len(pbMsg.Sig.PublicKey) == 0 {
+				log.Debugf("receive a no signed payment msg")
+				return nil
+			}
 			pay := &payment.Payment{}
 			err := proto.Unmarshal(data, pay)
 			if err != nil {
+				return nil
+			}
+			if err := utils.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, pay.Sender); err != nil {
+				log.Debugf("receive a invalid payment msg")
 				return nil
 			}
 			newMsg.Payload = pay
@@ -99,6 +133,11 @@ func (this *Message) ToProtoMsg() proto.Message {
 			return nil
 		}
 		msg.Data = data
+	}
+	if this.Sig != nil {
+		msg.Sig = new(pb.Signature)
+		msg.Sig.SigData = this.Sig.SigData
+		msg.Sig.PublicKey = this.Sig.PublicKey
 	}
 	if this.Error != nil {
 		msg.Error = new(pb.Error)

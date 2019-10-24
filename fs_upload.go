@@ -433,7 +433,11 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 		return resps[0], nil
 	}
 	// send pause msg
-	msg := message.NewFileFetchCancel(taskId, fileHashStr)
+	msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_CANCEL,
+		message.WithSessionId(taskId),
+		message.WithWalletAddress(this.WalletAddress()),
+		message.WithSign(this.Account),
+	)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
 	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
 	resps, err := this.DeleteUploadedFileByIds([]string{taskId})
@@ -585,7 +589,13 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string) ([]*common.DeleteUploadFi
 		}
 
 		log.Debugf("send delete msg to nodes :%v", storingNode)
-		msg := message.NewFileDelete(taskId, fileHashStr, this.WalletAddress(), txHashStr, uint64(txHeight))
+		msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_DELETE,
+			message.WithSessionId(taskId),
+			message.WithWalletAddress(this.WalletAddress()),
+			message.WithTxHash(txHashStr),
+			message.WithTxHeight(uint64(txHeight)),
+			message.WithSign(this.Account),
+		)
 		nodeStatusLock := new(sync.Mutex)
 		nodeStatus := make([]common.DeleteFileStatus, 0, len(storingNode))
 		reply := func(msg proto.Message, addr string) bool {
@@ -636,7 +646,11 @@ func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, *serr.SDKError)
 		return pause, nil
 	}
 	// send pause msg
-	msg := message.NewFileFetchPause(taskId, fileHashStr)
+	msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_PAUSE,
+		message.WithSessionId(taskId),
+		message.WithWalletAddress(this.WalletAddress()),
+		message.WithSign(this.Account),
+	)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
 	if err != nil {
 		sdkerr := serr.NewDetailError(serr.TASK_PAUSE_ERROR, err.Error())
@@ -705,7 +719,11 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		}
 		log.Warnf("drain request len: %d", len(req))
 	}
-	msg := message.NewFileFetchResume(taskId, fileHashStr)
+	msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_RESUME,
+		message.WithSessionId(taskId),
+		message.WithWalletAddress(this.WalletAddress()),
+		message.WithSign(this.Account),
+	)
 	_, err = client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
 	if err != nil {
 		return err
@@ -954,7 +972,13 @@ func (this *Dsp) waitFileReceivers(taskId, fileHashStr, prefix string, nodeList,
 		return nil, err
 	}
 	log.Debugf("waitFileReceivers sessionId: %s prefix hex: %s", sessionId, hex.EncodeToString([]byte(prefix)))
-	msg := message.NewFileFetchAsk(sessionId, fileHashStr, blockHashes, this.WalletAddress(), []byte(prefix))
+	msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_ASK,
+		message.WithSessionId(sessionId),
+		message.WithBlockHashes(blockHashes), // TODO: refactor this to reduce msg data length
+		message.WithWalletAddress(this.WalletAddress()),
+		message.WithPrefix([]byte(prefix)),
+		message.WithSign(this.Account),
+	)
 	action := func(res proto.Message, addr string) bool {
 		p2pMsg := message.ReadMessage(res)
 		if p2pMsg.Error != nil && p2pMsg.Error.Code != serr.SUCCESS {
@@ -1005,7 +1029,13 @@ func (this *Dsp) notifyFetchReady(taskId, fileHashStr string, receivers []string
 		return err
 	}
 	log.Debugf("send ready msg %s %d", tx, txHeight)
-	msg := message.NewFileFetchRdy(sessionId, fileHashStr, this.WalletAddress(), tx, txHeight)
+	msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_RDY,
+		message.WithSessionId(sessionId),
+		message.WithWalletAddress(this.WalletAddress()),
+		message.WithTxHash(tx),
+		message.WithTxHeight(txHeight),
+		message.WithSign(this.Account),
+	)
 	ret, err := client.P2pBroadcast(receivers, msg.ToProtoMsg(), false, nil)
 	if err != nil {
 		log.Errorf("notify err %s", err)

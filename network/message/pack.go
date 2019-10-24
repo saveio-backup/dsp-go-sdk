@@ -1,6 +1,7 @@
 package message
 
 import (
+	"crypto/sha256"
 	"math/rand"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
+	"github.com/saveio/themis-go-sdk/utils"
+	"github.com/saveio/themis/account"
+	"github.com/saveio/themis/crypto/keypair"
 )
 
 func GenMessageId() uint64 {
@@ -126,19 +130,203 @@ func NewBlockFlightsMsg(flights *block.BlockFlights) *Message {
 	return msg
 }
 
+type Option interface{}
+
+type FileMsgOption interface {
+	apply(*file.File)
+}
+
+type PaymentMsgOption interface {
+	apply(*payment.Payment)
+}
+
+type SignOption interface {
+	sign(*Message)
+}
+
+type msgOptionFunc func(*Message)
+
+func (f msgOptionFunc) sign(m *Message) {
+	f(m)
+}
+
+type optionFunc func(*file.File)
+
+func (f optionFunc) apply(o *file.File) {
+	f(o)
+}
+
+type paymentOptionFunc func(*payment.Payment)
+
+func (f paymentOptionFunc) apply(p *payment.Payment) {
+	f(p)
+}
+
+func WithSign(acc *account.Account) SignOption {
+	return msgOptionFunc(func(msg *Message) {
+		data, err := proto.Marshal(msg.ToProtoMsg())
+		if err != nil {
+			return
+		}
+		msg.Header.MsgLength = int32(len(data))
+		var sigData []byte
+		if msg.Header.MsgLength < common.MAX_SIG_DATA_LEN {
+			sigData, err = utils.Sign(acc, data)
+			if err != nil {
+				return
+			}
+		} else {
+			hashData := sha256.Sum256(data)
+			sigData, err = utils.Sign(acc, hashData[:])
+			if err != nil {
+				return
+			}
+		}
+		msg.Sig = &Signature{
+			SigData:   sigData,
+			PublicKey: keypair.SerializePublicKey(acc.PublicKey),
+		}
+		return
+	})
+}
+
+func WithSessionId(sessionId string) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		f.SessionId = sessionId
+	})
+}
+
+func WithHash(hash string) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		f.Hash = hash
+	})
+}
+
+func WithBlockHashes(blockHashes []string) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		f.BlockHashes = blockHashes
+	})
+}
+
+func WithOperation(operation int32) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		f.Operation = operation
+	})
+}
+
+func WithPrefix(prefix []byte) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		f.Prefix = prefix
+	})
+}
+
+func WithChunkSize(chunkSize int32) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		f.ChunkSize = chunkSize
+	})
+}
+
+func WithWalletAddress(walletAddr string) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.PayInfo == nil {
+			f.PayInfo = &file.Payment{}
+		}
+		f.PayInfo.WalletAddress = walletAddr
+	})
+}
+
+func WithAsset(asset int32) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.PayInfo == nil {
+			f.PayInfo = &file.Payment{}
+		}
+		f.PayInfo.Asset = asset
+	})
+}
+
+func WithUnitPrice(unitPrice uint64) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.PayInfo == nil {
+			f.PayInfo = &file.Payment{}
+		}
+		f.PayInfo.UnitPrice = unitPrice
+	})
+}
+
+func WithTxHash(txHash string) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.Tx == nil {
+			f.Tx = &file.Tx{}
+		}
+		f.Tx.Hash = txHash
+	})
+}
+
+func WithTxHeight(txHeight uint64) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.Tx == nil {
+			f.Tx = &file.Tx{}
+		}
+		f.Tx.Height = txHeight
+	})
+}
+
+func WithBreakpointHash(hash string) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.Breakpoint == nil {
+			f.Breakpoint = &file.Breakpoint{}
+		}
+		f.Breakpoint.Hash = hash
+	})
+}
+
+func WithBreakpointIndex(index uint64) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.Breakpoint == nil {
+			f.Breakpoint = &file.Breakpoint{}
+		}
+		f.Breakpoint.Index = index
+	})
+}
+
 // NewFileMsg file msg
-func NewFileMsg(file *file.File, errorCode uint32, errorMsg string) *Message {
+func NewFileMsg(fileHashStr string, op int32, opts ...Option) *Message {
+	return NewFileMsgWithError(fileHashStr, op, common.MSG_ERROR_CODE_NONE, "", opts...)
+}
+
+func NewFileMsgWithError(fileHashStr string, op int32, errorCode uint32, errorMsg string, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_FILE
-	msg.Payload = file
+	f := &file.File{
+		Operation: op,
+		Hash:      fileHashStr,
+	}
+	for _, opt := range opts {
+		fOpt, ok := opt.(FileMsgOption)
+		if !ok {
+			continue
+		}
+		fOpt.apply(f)
+	}
+	msg.Payload = f
 	if errorCode != common.MSG_ERROR_CODE_NONE {
 		msg.Error = &Error{
 			Code:    errorCode,
 			Message: errorMsg,
 		}
+	}
+	for _, opt := range opts {
+		mOpt, ok := opt.(SignOption)
+		if !ok {
+			continue
+		}
+		mOpt.sign(msg)
+	}
+	if msg.Header.MsgLength > 0 {
+		return msg
 	}
 	data, err := proto.Marshal(msg.ToProtoMsg())
 	if err != nil {
@@ -148,189 +336,12 @@ func NewFileMsg(file *file.File, errorCode uint32, errorMsg string) *Message {
 	return msg
 }
 
-// NewFileFetchAsk
-func NewFileFetchAsk(sessionId, hash string, blkHashes []string, walletAddr string, prefix []byte) *Message {
-	f := &file.File{
-		SessionId:   sessionId,
-		Hash:        hash,
-		BlockHashes: blkHashes,
-		Operation:   common.FILE_OP_FETCH_ASK,
-		Prefix:      prefix,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-		},
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
+// NewPaymentMsg. new payment msg
+func NewPaymentMsg(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, opts ...Option) *Message {
+	return NewPaymentMsgWithError(sender, receiver, paymentId, asset, amount, fileHash, common.MSG_ERROR_CODE_NONE, opts...)
 }
 
-// NewFileFetchAck
-func NewFileFetchAck(sessionId, hash, blockHash string, blockIndex uint64) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_FETCH_ACK,
-		Breakpoint: &file.Breakpoint{
-			Hash:  blockHash,
-			Index: blockIndex,
-		},
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-// NewFileFetchRdy
-func NewFileFetchRdy(sessionId, hash, walletAddr string, tx string, txHeight uint64) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_FETCH_RDY,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-		},
-		Tx: &file.Tx{
-			Hash:   tx,
-			Height: txHeight,
-		},
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-// NewFileFetchPause
-func NewFileFetchPause(sessionId, hash string) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_FETCH_PAUSE,
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-func NewFileFetchCancel(sessionId, hash string) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_FETCH_CANCEL,
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-// NewFileFetchResume
-func NewFileFetchResume(sessionId, hash string) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_FETCH_RESUME,
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-// NewFileFetchDone
-func NewFileFetchDone(sessionId, hash string) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_FETCH_DONE,
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-// NewFileDownloadAsk
-func NewFileDownloadAsk(hash, walletAddr string, asset int32) *Message {
-	f := &file.File{
-		Hash:      hash,
-		Operation: common.FILE_OP_DOWNLOAD_ASK,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-			Asset:         asset,
-		},
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-// NewFileDownloadAck
-func NewFileDownloadAck(sessionId, hash string, blkHashes []string, walletAddr string, prefix []byte, uintPrice uint64, asset int32, errorCode uint32, errorMsg string) *Message {
-	f := &file.File{
-		SessionId:   sessionId,
-		Hash:        hash,
-		BlockHashes: blkHashes,
-		Operation:   common.FILE_OP_DOWNLOAD_ACK,
-		Prefix:      prefix,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-			UnitPrice:     uintPrice,
-			Asset:         asset,
-		},
-	}
-	return NewFileMsg(f, errorCode, errorMsg)
-}
-
-// NewFileDownload download file from server msg
-func NewFileDownload(sessionId, hash, walletAddr string, asset int32) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_DOWNLOAD,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-			Asset:         asset,
-		},
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-func NewFileDownloadCancel(sessionId, hash string, walletAddr string, asset int32) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_DOWNLOAD_CANCEL,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-			Asset:         asset,
-		},
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-func NewFileDownloadOk(sessionId, hash, walletAddr string, asset int32) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_DOWNLOAD_OK,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-			Asset:         asset,
-		},
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-// NewFileDelete
-func NewFileDelete(sessionId, hash, walletAddr, txHash string, txHeight uint64) *Message {
-	f := &file.File{
-		Hash:      hash,
-		Operation: common.FILE_OP_DELETE,
-		PayInfo: &file.Payment{
-			WalletAddress: walletAddr,
-		},
-		Tx: &file.Tx{
-			Hash:   txHash,
-			Height: txHeight,
-		},
-	}
-	return NewFileMsg(f, common.MSG_ERROR_CODE_NONE, "")
-}
-
-// NewFileDeleteAck
-func NewFileDeleteAck(sessionId, hash string, errorCode uint32, errorMsg string) *Message {
-	f := &file.File{
-		SessionId: sessionId,
-		Hash:      hash,
-		Operation: common.FILE_OP_DELETE_ACK,
-	}
-	return NewFileMsg(f, errorCode, errorMsg)
-}
-
-// NewPayment new payment msg
-func NewPayment(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, errorCode uint32) *Message {
+func NewPaymentMsgWithError(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, errorCode uint32, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
@@ -354,6 +365,16 @@ func NewPayment(sender, receiver string, paymentId int32, asset int32, amount ui
 			Code:    errorCode,
 			Message: errorMsg,
 		}
+	}
+	for _, opt := range opts {
+		mOpt, ok := opt.(SignOption)
+		if !ok {
+			continue
+		}
+		mOpt.sign(msg)
+	}
+	if msg.Header.MsgLength > 0 {
+		return msg
 	}
 	data, err := proto.Marshal(msg.ToProtoMsg())
 	if err != nil {

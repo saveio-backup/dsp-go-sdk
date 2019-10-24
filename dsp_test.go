@@ -17,6 +17,8 @@ import (
 	"github.com/saveio/themis/account"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
+	"github.com/saveio/themis/core/types"
+	"github.com/saveio/themis/crypto/keypair"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
@@ -984,4 +986,25 @@ func TestCloseChannel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestPubKeyToAdr(t *testing.T) {
+	w, err := wallet.OpenWallet("./wallet.dat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := keypair.SerializePublicKey(acc.PublicKey)
+	fmt.Printf("len: %d\n", len(pub))
+	addr := types.AddressFromPubKey(acc.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if addr.ToBase58() != acc.Address.ToBase58() {
+		t.Fatal("no match")
+	}
+	fmt.Printf("addr :%s %s\n", addr.ToBase58(), acc.Address.ToBase58())
 }

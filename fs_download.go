@@ -235,7 +235,12 @@ func (this *Dsp) CancelDownload(taskId string) error {
 	for hostAddr, session := range sessions {
 		wg.Add(1)
 		go func(a string, ses *store.Session) {
-			msg := message.NewFileDownloadCancel(ses.SessionId, fileHashStr, this.WalletAddress(), int32(ses.Asset))
+			msg := message.NewFileMsg(fileHashStr, netcom.FILE_OP_DOWNLOAD_CANCEL,
+				message.WithSessionId(ses.SessionId),
+				message.WithWalletAddress(this.WalletAddress()),
+				message.WithAsset(int32(ses.Asset)),
+				message.WithSign(this.Account),
+			)
 			client.P2pRequestWithRetry(msg.ToProtoMsg(), a, common.MAX_NETWORK_REQUEST_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
 			wg.Done()
 		}(hostAddr, session)
@@ -371,7 +376,11 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 		log.Debugf("get session from db : %v", peerPayInfos)
 		return peerPayInfos, nil
 	}
-	msg := message.NewFileDownloadAsk(fileHashStr, this.WalletAddress(), asset)
+	msg := message.NewFileMsg(fileHashStr, netcom.FILE_OP_DOWNLOAD_ASK,
+		message.WithWalletAddress(this.WalletAddress()),
+		message.WithAsset(asset),
+		message.WithSign(this.Account),
+	)
 	blockHashes := make([]string, 0)
 	prefix := ""
 	replyLock := &sync.Mutex{}
@@ -546,8 +555,10 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 	log.Debugf("paying to %s, id %v success", payInfo.WalletAddress, paymentId)
 	log.Debugf("send paymenMsg paymentId %d, for file:%s, size:%d, price:%d", paymentId, fileHashStr, blockSize, amount)
 	// send payment msg
-	msg := message.NewPayment(this.WalletAddress(), payInfo.WalletAddress, paymentId,
-		payInfo.Asset, amount, fileHashStr, netcom.MSG_ERROR_CODE_NONE)
+	msg := message.NewPaymentMsg(this.WalletAddress(), payInfo.WalletAddress, paymentId,
+		payInfo.Asset, amount, fileHashStr,
+		message.WithSign(this.Account),
+	)
 	// TODO: wait for receiver received notification (need optimized)
 	_, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), addr, common.MAX_NETWORK_REQUEST_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
 	log.Debugf("payment msg response :%d, err:%s", paymentId, err)
@@ -613,7 +624,12 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		}
 		peerAddrWallet[addr] = payInfo.WalletAddress
 		go func(a string) {
-			msg := message.NewFileDownload(sessionId, fileHashStr, this.WalletAddress(), asset)
+			msg := message.NewFileMsg(fileHashStr, netcom.FILE_OP_DOWNLOAD,
+				message.WithSessionId(sessionId),
+				message.WithWalletAddress(this.WalletAddress()),
+				message.WithAsset(asset),
+				message.WithSign(this.Account),
+			)
 			log.Debugf("broadcast file_download msg to %v", a)
 			broadcastRet, err := client.P2pBroadcast([]string{a}, msg.ToProtoMsg(), true, nil)
 			log.Debugf("brocast file download msg %v err %v", broadcastRet, err)
@@ -1022,7 +1038,12 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			continue
 		}
 		go func(a, w, sid string) {
-			fileDownloadOkMsg := message.NewFileDownloadOk(sid, fileHashStr, this.WalletAddress(), asset)
+			fileDownloadOkMsg := message.NewFileMsg(fileHashStr, netcom.FILE_OP_DOWNLOAD_OK,
+				message.WithSessionId(sid),
+				message.WithWalletAddress(this.WalletAddress()),
+				message.WithAsset(asset),
+				message.WithSign(this.Account),
+			)
 			client.P2pBroadcast([]string{a}, fileDownloadOkMsg.ToProtoMsg(), true, nil)
 		}(addr, walletAddr, sessionId)
 	}
@@ -1254,7 +1275,11 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 	// TODO: remove unused file info fields after prove pdp success
 	this.taskMgr.EmitResult(taskId, "", nil)
 	this.taskMgr.DeleteTask(taskId)
-	doneMsg := message.NewFileFetchDone(taskId, fileHashStr)
+	doneMsg := message.NewFileMsg(fileHashStr, netcom.FILE_OP_FETCH_DONE,
+		message.WithSessionId(taskId),
+		message.WithWalletAddress(this.WalletAddress()),
+		message.WithSign(this.Account),
+	)
 	client.P2pSend(addr, doneMsg.ToProtoMsg())
 	log.Debugf("fetch file done, send done msg to %s", addr)
 	return nil

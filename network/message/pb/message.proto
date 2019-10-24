@@ -13,9 +13,15 @@ message Error {
     string message = 2;
 }
 
+message Signature {
+    bytes sigData = 1; // user signature
+    bytes publicKey = 2; // user public key
+}
+
 message Message {
     uint64 msgId  = 1;
     Header header = 2;
     bytes  data = 3;
-    Error error = 4;
+    Signature sig = 4;
+    Error error = 5;
 }
