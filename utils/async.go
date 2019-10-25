@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"errors"
 	"sync"
+	"time"
 
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/themis/common/log"
@@ -141,4 +143,22 @@ func RequestOneWithArgsLimited(routinesNum int, request func([]interface{}, chan
 		}
 	}
 	return result
+}
+
+type TimeoutFunc func() error
+
+func DoWithTimeout(job TimeoutFunc, timeout time.Duration) error {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	done := make(chan error)
+	go func() {
+		err := job()
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-timer.C:
+		return errors.New("action timeout")
+	}
 }
