@@ -176,7 +176,7 @@ func WithSign(acc *account.Account) SignOption {
 				return
 			}
 		} else {
-			hashData := sha256.Sum256(data)
+			hashData := sha256.Sum256(data[:common.MAX_SIG_DATA_LEN])
 			sigData, err = utils.Sign(acc, hashData[:])
 			if err != nil {
 				return

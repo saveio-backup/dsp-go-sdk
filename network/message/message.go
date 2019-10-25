@@ -1,6 +1,8 @@
 package message
 
 import (
+	"crypto/sha256"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/pb"
@@ -73,12 +75,21 @@ func ReadMessage(msg proto.Message) *Message {
 				log.Debugf("receive a no signed file msg")
 				return nil
 			}
-			err := utils.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
-			if err != nil {
-				return nil
+			if len(data) < common.MAX_SIG_DATA_LEN {
+				err := utils.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
+				if err != nil {
+					return nil
+				}
+			} else {
+				hashData := sha256.Sum256(data[:common.MAX_SIG_DATA_LEN])
+				err := utils.VerifyMsg(pbMsg.Sig.PublicKey, hashData[:], pbMsg.Sig.SigData)
+				if err != nil {
+					return nil
+				}
 			}
+
 			file := &file.File{}
-			err = proto.Unmarshal(data, file)
+			err := proto.Unmarshal(data, file)
 			if err != nil {
 				return nil
 			}
