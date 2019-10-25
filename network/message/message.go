@@ -71,23 +71,10 @@ func ReadMessage(msg proto.Message) *Message {
 			newMsg.Payload = blk
 		case common.MSG_TYPE_FILE:
 			// verify signature
-			if pbMsg.Sig == nil || len(pbMsg.Sig.SigData) == 0 || len(pbMsg.Sig.PublicKey) == 0 {
-				log.Debugf("receive a no signed file msg")
+			if valid := isMsgVerified(pbMsg); !valid {
+				log.Debugf("file msg has wrong signature")
 				return nil
 			}
-			if len(data) < common.MAX_SIG_DATA_LEN {
-				err := utils.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
-				if err != nil {
-					return nil
-				}
-			} else {
-				hashData := sha256.Sum256(data[:common.MAX_SIG_DATA_LEN])
-				err := utils.VerifyMsg(pbMsg.Sig.PublicKey, hashData[:], pbMsg.Sig.SigData)
-				if err != nil {
-					return nil
-				}
-			}
-
 			file := &file.File{}
 			err := proto.Unmarshal(data, file)
 			if err != nil {
@@ -104,8 +91,8 @@ func ReadMessage(msg proto.Message) *Message {
 			newMsg.Payload = file
 		case common.MSG_TYPE_PAYMENT:
 			// verify signature
-			if pbMsg.Sig == nil || len(pbMsg.Sig.SigData) == 0 || len(pbMsg.Sig.PublicKey) == 0 {
-				log.Debugf("receive a no signed payment msg")
+			if valid := isMsgVerified(pbMsg); !valid {
+				log.Debugf("payment msg has wrong signature")
 				return nil
 			}
 			pay := &payment.Payment{}
@@ -157,4 +144,31 @@ func (this *Message) ToProtoMsg() proto.Message {
 	}
 	msg.MsgId = this.MessageId
 	return msg
+}
+
+func isMsgVerified(pbMsg *pb.Message) bool {
+	if pbMsg.Sig == nil || len(pbMsg.Sig.SigData) == 0 || len(pbMsg.Sig.PublicKey) == 0 {
+		log.Debugf("receive a no signed file msg")
+		return false
+	}
+	data := pbMsg.GetData()
+
+	// msg data length too large
+	if len(data) < common.MAX_SIG_DATA_LEN {
+		err := utils.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
+		if err != nil {
+			log.Errorf("verified failed %x %x %x", pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
+			return false
+		}
+		return true
+	}
+
+	hashData := sha256.Sum256(data[:common.MAX_SIG_DATA_LEN])
+	err := utils.VerifyMsg(pbMsg.Sig.PublicKey, hashData[:], pbMsg.Sig.SigData)
+	if err != nil {
+		log.Errorf("verified failed %x %x %x", pbMsg.Sig.PublicKey, hashData, pbMsg.Sig.SigData)
+		return false
+	}
+
+	return true
 }

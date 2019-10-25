@@ -164,7 +164,7 @@ func (f paymentOptionFunc) apply(p *payment.Payment) {
 
 func WithSign(acc *account.Account) SignOption {
 	return msgOptionFunc(func(msg *Message) {
-		data, err := proto.Marshal(msg.ToProtoMsg())
+		data, err := proto.Marshal(msg.Payload)
 		if err != nil {
 			return
 		}

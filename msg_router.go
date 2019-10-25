@@ -23,11 +23,11 @@ import (
 func (this *Dsp) Receive(ctx *network.ComponentContext) {
 	msg := message.ReadMessage(ctx.Message())
 	peer := ctx.Client()
-	log.Debugf("received msg from peer %s, msgId %d", peer.Address, msg.MessageId)
 	if msg == nil || msg.Header == nil {
 		log.Debugf("receive nil msg from %s", peer.Address)
 		return
 	}
+	log.Debugf("received msg from peer %s, msgId %d", peer.Address, msg.MessageId)
 	if msg.Header.Version != netcom.MESSAGE_VERSION {
 		log.Debugf("unrecognized msg version %s", msg.Header.Version)
 		return
