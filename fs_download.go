@@ -1011,7 +1011,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				log.Debugf("stop download task %s", taskId)
 				return nil
 			}
-			if !this.taskMgr.Task(taskId).IsTimeout() {
+			if timeout, _ := this.taskMgr.IsTaskTimeout(taskId); !timeout {
 				continue
 			}
 			this.taskMgr.SetTaskState(taskId, store.TaskStateFailed)
@@ -1315,6 +1315,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 			continue
 		}
 		downloadTimeout := false
+		logCounter := 0
 		for {
 			select {
 			case value, ok := <-ch:
@@ -1326,7 +1327,15 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 				this.taskMgr.ActiveDownloadTaskPeer(ipAddr)
 				return value, nil
 			case <-ticker.C:
-				if this.taskMgr.Task(taskId).WorkerIdleDuration(ipAddr) < uint64(timeout/retry) {
+				duration, err := this.taskMgr.GetTaskWorkerIdleDuration(taskId, ipAddr)
+				logCounter++
+				if logCounter%10 == 0 {
+					log.Debugf("worker %s idle duration %d, timeout %d", ipAddr, duration, timeout/retry)
+				}
+				if err != nil {
+					return nil, err
+				}
+				if duration < uint64(timeout/retry) {
 					continue
 				}
 				err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())

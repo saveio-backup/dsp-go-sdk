@@ -198,25 +198,6 @@ func (this *TaskMgr) BlockReqCh() chan []*GetBlockReq {
 	return this.blockReqCh
 }
 
-func (this *TaskMgr) Task(taskId string) *Task {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	v, ok := this.tasks[taskId]
-	if ok {
-		return v
-	}
-	t, err := NewTaskFromDB(taskId, this.db)
-	if t == nil {
-		log.Debugf("get task by memory and DB failed %s, err: %s", taskId, err)
-		return &Task{}
-	}
-	if t.State() != store.TaskStateDone {
-		// only cache unfinished task
-		this.tasks[taskId] = t
-	}
-	return t
-}
-
 func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -897,4 +878,22 @@ func (this *TaskMgr) ActiveDownloadTaskPeer(peerAddr string) {
 		}
 		t.ActiveWorker(peerAddr)
 	}
+}
+
+// IsTaskTimeout. Check is task timeout
+func (this *TaskMgr) IsTaskTimeout(taskId string) (bool, error) {
+	tsk, ok := this.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return false, fmt.Errorf("task %s not found", taskId)
+	}
+	return tsk.IsTimeout(), nil
+}
+
+// GetTaskWorkerIdleDuration.
+func (this *TaskMgr) GetTaskWorkerIdleDuration(taskId, peerAddr string) (uint64, error) {
+	tsk, ok := this.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return 0, fmt.Errorf("task %s not found", taskId)
+	}
+	return tsk.WorkerIdleDuration(peerAddr), nil
 }

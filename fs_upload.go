@@ -1257,7 +1257,7 @@ func (this *Dsp) waitForFetchBlock(taskId string, hashes, addrs []string, copyNu
 				}
 				return nil
 			}
-			if !this.taskMgr.Task(taskId).IsTimeout() {
+			if timeout, _ := this.taskMgr.IsTaskTimeout(taskId); !timeout {
 				continue
 			}
 			if !closeCancelFetch {
