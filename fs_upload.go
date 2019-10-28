@@ -119,13 +119,11 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		sdkerr = serr.NewDetailError(serr.INVALID_PARAMS, err.Error())
 		return nil, err
 	}
-	err = this.taskMgr.SetFilePath(taskId, filePath)
-	if err != nil {
+	if err = this.taskMgr.SetFilePath(taskId, filePath); err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
-	err = this.taskMgr.SetFileUploadOptions(taskId, opt)
-	if err != nil {
+	if err = this.taskMgr.SetFileUploadOptions(taskId, opt); err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
@@ -148,7 +146,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	// bind task id with file path
 	this.taskMgr.BindTaskId(taskId)
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
-	var tx, fileHashStr string
+	var tx, fileHashStr, prefixStr string
 	var totalCount uint64
 	log.Debugf("upload task: %s, will split for file", taskId)
 	// split file to pieces
@@ -159,20 +157,42 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	if pause {
 		return nil, nil
 	}
-	filePrefix := &utils.FilePrefix{
-		Version:    utils.PREFIX_VERSION,
-		Encrypt:    opt.Encrypt,
-		EncryptPwd: string(opt.EncryptPassword),
-		Owner:      this.CurrentAccount().Address,
-		FileSize:   opt.FileSize,
-	}
-	prefixStr := filePrefix.String()
-	log.Debugf("node from file prefix: %v, len: %d", prefixStr, len(prefixStr))
-	hashes, err := this.Fs.NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword))
-	if err != nil {
-		sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
-		log.Errorf("node from file err: %s", err)
-		return nil, err
+	tx, _ = this.taskMgr.GetStoreTx(taskId)
+	var hashes []string
+	if len(tx) == 0 {
+		filePrefix := &utils.FilePrefix{
+			Version:    utils.PREFIX_VERSION,
+			Encrypt:    opt.Encrypt,
+			EncryptPwd: string(opt.EncryptPassword),
+			Owner:      this.CurrentAccount().Address,
+			FileSize:   opt.FileSize,
+		}
+		filePrefix.SetSalt()
+		prefixStr = filePrefix.String()
+		log.Debugf("node from file prefix: %v, len: %d", prefixStr, len(prefixStr))
+		hashes, err = this.Fs.NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword))
+		if err != nil {
+			sdkerr = serr.NewDetailError(serr.SHARDING_FAIELD, err.Error())
+			log.Errorf("node from file err: %s", err)
+			return nil, err
+		}
+	} else {
+		prefixBuf, err := this.taskMgr.GetFilePrefix(taskId)
+		if err != nil {
+			sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+			return nil, err
+		}
+		prefixStr = string(prefixBuf)
+		fileHashStr, err = this.taskMgr.TaskFileHash(taskId)
+		if err != nil {
+			sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+			return nil, err
+		}
+		hashes, err = this.Fs.GetFileAllHashes(fileHashStr)
+		if err != nil {
+			sdkerr = serr.NewDetailError(serr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+			return nil, err
+		}
 	}
 
 	totalCount = uint64(len(hashes))

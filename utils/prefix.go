@@ -33,6 +33,17 @@ type FilePrefix struct {
 	Reserved    [4]byte
 }
 
+// SetSalt. set a random encrypt salt for prefix
+func (p *FilePrefix) SetSalt() error {
+	var salt [4]byte
+	_, err := rand.Read(salt[:])
+	if err != nil {
+		return err
+	}
+	copy(p.EncryptSalt[:], salt[:])
+	return nil
+}
+
 // version + en/de + salt + hash + owner + fileSize + reserved + checksum
 // 1 byte  + 1 byte + 4 byte + 32 byte + 20 byte + 8 byte + 4 byte +  4 byte = 74 byte
 
@@ -44,10 +55,7 @@ func (p *FilePrefix) Serialize() []byte {
 	var hash [32]byte
 	if p.Encrypt {
 		cryptoBuf[0] = byte(1)
-		_, err := rand.Read(salt[:])
-		if err != nil {
-			return nil
-		}
+		copy(salt[:], p.EncryptSalt[:])
 		encryptData := make([]byte, 0)
 		encryptData = append(encryptData, []byte(p.EncryptPwd)...)
 		encryptData = append(encryptData, salt[:]...)

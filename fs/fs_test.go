@@ -403,3 +403,30 @@ func TestReadBlock(t *testing.T) {
 	block := fs.GetBlock("zb2rhZTC99p7TDkwcKLtoKNkzm16WwCfyAQekifTe6v2JLu4G")
 	fmt.Printf("block: %v\n", block)
 }
+
+func TestGetAllCid(t *testing.T) {
+	cfg := &config.DspConfig{
+		FsRepoRoot: "./Repo",
+		FsFileRoot: "./Downloads",
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, err := fs.NodesFromFile("./setup.exe", "AQGt++s87eSu6qgQvNcaEj7SFqUvDiPZ6c2D70HTVFlyIcsr0t8TbAC0qZqQYyxOEOIHzr/C5t1JGgAAAAAAAP84AAAAADipJRM=", true, "123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("len: %d\n", len(hash))
+	for i, h := range hash {
+		fmt.Printf("i = %d, h = %s\n", i, h)
+	}
+	cids, err := fs.GetFileAllHashes(hash[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("len: %d\n", len(cids))
+	for i, h := range cids {
+		fmt.Printf("i = %d, h = %s\n", i, h)
+	}
+}

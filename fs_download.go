@@ -1312,6 +1312,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 		err = client.P2pSend(ipAddr, msg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("send download blockflights msg err: %s", err)
+			continue
 		}
 		downloadTimeout := false
 		for {

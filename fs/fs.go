@@ -105,6 +105,22 @@ func (this *Fs) GetAllOffsets(rootHash string) (map[string]uint64, error) {
 	return m, nil
 }
 
+func (this *Fs) GetFileAllHashes(rootHash string) ([]string, error) {
+	rootCid, err := cid.Decode(rootHash)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := this.fs.GetFileAllCids(context.Background(), rootCid)
+	if err != nil {
+		return nil, err
+	}
+	hashes := make([]string, 0, len(ids))
+	for _, id := range ids {
+		hashes = append(hashes, id.String())
+	}
+	return hashes, nil
+}
+
 func (this *Fs) GetBlockLinks(block blocks.Block) ([]string, error) {
 	if block.Cid().Type() != cid.DagProtobuf {
 		return nil, nil
