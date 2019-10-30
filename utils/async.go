@@ -15,19 +15,19 @@ type RequestResponse struct {
 	Error  string
 }
 
-// CallRequestWithArgs. Use N gotinues to dispatch a same request with different args. wait response of each request
+// CallRequestWithArgs. Use N goroutines to dispatch a same request with different args. wait response of each request
 func CallRequestWithArgs(request func([]interface{}, chan *RequestResponse), argsOfRequests [][]interface{}) []*RequestResponse {
 	max := common.MAX_ASYNC_ROUTINES
 	return RequestAllWithArgsLimited(max, request, argsOfRequests)
 }
 
-// CallRequestOneWithArgs. Use N gotinues to dispatch a same request with different args. wait response of each request
+// CallRequestOneWithArgs. Use N goroutines to dispatch a same request with different args. wait response of each request
 func CallRequestOneWithArgs(request func([]interface{}, chan *RequestResponse) bool, argsOfRequests [][]interface{}) []*RequestResponse {
 	max := common.MAX_ASYNC_ROUTINES
 	return RequestOneWithArgsLimited(max, request, argsOfRequests)
 }
 
-// CallRequestWithArgs. Use N gotinues to dispatch a same request with different args. wait response of each request
+// CallRequestWithArgs. Use N goroutines to dispatch a same request with different args. wait response of each request
 func RequestAllWithArgsLimited(routinesNum int, request func([]interface{}, chan *RequestResponse), argsOfRequests [][]interface{}) []*RequestResponse {
 	max := routinesNum
 	lock := new(sync.Mutex)
@@ -84,7 +84,7 @@ func RequestAllWithArgsLimited(routinesNum int, request func([]interface{}, chan
 	return result
 }
 
-// RequestOneWithArgsLimited. Use N gotinues to dispatch a same request with different args. wait response of each request
+// RequestOneWithArgsLimited. Use N goroutines to dispatch a same request with different args. wait response of each request
 func RequestOneWithArgsLimited(routinesNum int, request func([]interface{}, chan *RequestResponse) bool, argsOfRequests [][]interface{}) []*RequestResponse {
 	max := routinesNum
 	lock := new(sync.Mutex)
@@ -147,12 +147,12 @@ func RequestOneWithArgsLimited(routinesNum int, request func([]interface{}, chan
 
 type TimeoutFunc func() error
 
-func DoWithTimeout(job TimeoutFunc, timeout time.Duration) error {
+func DoWithTimeout(f TimeoutFunc, timeout time.Duration) error {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	done := make(chan error)
 	go func() {
-		err := job()
+		err := f()
 		done <- err
 	}()
 	select {

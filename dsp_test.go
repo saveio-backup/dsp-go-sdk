@@ -10,6 +10,7 @@ import (
 
 	"github.com/saveio/dsp-go-sdk/utils"
 
+	"github.com/saveio/themis-go-sdk/usdt"
 	"github.com/saveio/themis-go-sdk/wallet"
 
 	"github.com/saveio/dsp-go-sdk/common"
@@ -785,6 +786,47 @@ func TestRegisterDnsHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Printf("hash: %v\n", hash)
+}
+
+func TestGetSmartEvent(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddrs: []string{"http://139.219.136.38:20336"},
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc, nil)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+
+	event, err := d.Chain.GetSmartContractEventByBlock(1021445)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, n := range event.Notify {
+		contractAddr, err := chainCom.AddressFromHexString(n.ContractAddress)
+		if err != nil {
+			continue
+		}
+		switch contractAddr.ToBase58() {
+		case usdt.USDT_CONTRACT_ADDRESS.ToBase58():
+			states, ok := n.States.([]interface{})
+			if !ok || states[0].(string) != "transfer" {
+				continue
+			}
+			fmt.Printf("from %s to %s len: %d\n", states[1], states[2], len(states))
+		}
+		fmt.Printf("contract: %s, id: %d\n", n.ContractAddress, n.EventIdentifier)
+	}
+
 }
 
 func TestRegisterDns(t *testing.T) {

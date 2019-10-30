@@ -63,6 +63,8 @@ func (this *Dsp) SetupDNSTrackers() error {
 	}
 	if this.DNS.TrackerUrls == nil {
 		this.DNS.TrackerUrls = make([]string, 0)
+	} else {
+		this.DNS.TrackerUrls = this.DNS.TrackerUrls[:0]
 	}
 	existDNSMap := make(map[string]struct{}, 0)
 	for _, trackerUrl := range this.DNS.TrackerUrls {
