@@ -26,8 +26,9 @@ type DspConfig struct {
 	ChannelProtocol      string // channel network protocol. e.g: "tcp"
 	ChannelRevealTimeout string // channel reveal timeout. e.g: "50"
 	ChannelSettleTimeout string // channel settle timeout. e.g: "120"
-	ChannelDBPath        string
-	BlockDelay           string
+	ChannelDBPath        string // channel DB path
+	BlockDelay           string // block delay for confirmation
+	MaxUnpaidPayment     int32  // max unpaid payments for sharing a file
 
 	AutoSetupDNSEnable bool     // enable auto setup DNS node or not
 	DnsNodeMaxNum      int      // dns node max count

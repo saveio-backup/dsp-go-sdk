@@ -1386,7 +1386,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 	if err != nil {
 		return err
 	}
-	output, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	output, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return err
 	}
@@ -1429,7 +1429,7 @@ func createDownloadFile(dir, filePath string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0666)
 	log.Debugf("create download file %s %v %s", filePath, file, err)
 	if err != nil {
 		return nil, err

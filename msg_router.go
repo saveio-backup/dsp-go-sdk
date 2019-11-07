@@ -382,8 +382,8 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 			replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 			return
 		}
-		canShare, err := this.taskMgr.CanShareTo(localId, fileMsg.PayInfo.WalletAddress, fileMsg.PayInfo.Asset)
-		if err != nil || !canShare {
+		canShare := this.canShareTo(localId, fileMsg.PayInfo.WalletAddress, fileMsg.PayInfo.Asset)
+		if !canShare {
 			replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, fmt.Sprintf("can't share %s to, err: %v", fileMsg.Hash, err), ctx)
 			return
 		}

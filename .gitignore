@@ -35,3 +35,4 @@ data/*
 temp/*
 store/test_db/*
 test/*
+.idea

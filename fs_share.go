@@ -1,6 +1,7 @@
 package dsp
 
 import (
+	"bytes"
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
@@ -12,6 +13,7 @@ import (
 	chActor "github.com/saveio/pylons/actor/server"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
+	cUtils "github.com/saveio/themis/smartcontract/service/native/utils"
 )
 
 func (this *Dsp) StartShareServices() {
@@ -67,16 +69,20 @@ func (this *Dsp) registerReceiveNotification() {
 					event.Amount, addr.ToBase58(), event.Identifier)
 				taskId, err := this.taskMgr.GetTaskIdWithPaymentId(int32(event.Identifier))
 				if err != nil {
-					log.Errorf("get taskid with payment id failed %s", err)
+					log.Errorf("get taskId with payment id failed %s", err)
 					continue
 				}
 				fileHashStr, err := this.taskMgr.TaskFileHash(taskId)
 				if err != nil {
-					log.Errorf("get filehash with task id failed %s", err)
+					log.Errorf("get fileHash with task id failed %s", err)
 					continue
 				}
+				asset := common.ASSET_NONE
+				if bytes.Compare(event.TokenNetworkId[:], cUtils.UsdtContractAddress[:]) == 0 {
+					asset = common.ASSET_USDT
+				}
 				// delete record
-				err = this.taskMgr.DeleteFileUnpaid(taskId, addr.ToBase58(), int32(event.Identifier), 0, uint64(event.Amount))
+				err = this.taskMgr.DeleteFileUnpaid(taskId, addr.ToBase58(), int32(event.Identifier), int32(asset), uint64(event.Amount))
 				if err != nil {
 					log.Errorf("delete share file info %s", err)
 					continue
@@ -91,6 +97,16 @@ func (this *Dsp) registerReceiveNotification() {
 			}
 		}
 	}()
+}
+
+func (this *Dsp) canShareTo(taskId, walletAddress string, asset int32) bool {
+	unpaidAmount, err := this.taskMgr.GetUnpaidAmount(taskId, walletAddress, asset)
+	maxUnpaidAmount := uint64(common.CHUNK_SIZE * common.MAX_REQ_BLOCK_COUNT * this.Config.MaxUnpaidPayment)
+	if err != nil || unpaidAmount >= maxUnpaidAmount {
+		log.Errorf("cant share to %s for file %s, unpaidAmount: %d err %s", walletAddress, taskId, unpaidAmount, err)
+		return false
+	}
+	return true
 }
 
 func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
@@ -111,9 +127,9 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		reqWalletAddr = blockmsg.WalletAddress
 		reqAsset = blockmsg.Asset
 		// check if has unpaid block request
-		canShare, err := this.taskMgr.CanShareTo(taskId, blockmsg.WalletAddress, blockmsg.Asset)
-		if err != nil || !canShare {
-			log.Errorf("cant share to %s for file %s, can:%t err %s", blockmsg.WalletAddress, blockmsg.FileHash, canShare, err)
+		canShareTo := this.canShareTo(taskId, blockmsg.WalletAddress, blockmsg.Asset)
+		if !canShareTo {
+			log.Errorf("cant share to %s for file %s", blockmsg.WalletAddress, blockmsg.FileHash)
 			return
 		}
 		// send block if requester has paid all block

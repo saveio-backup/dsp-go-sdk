@@ -244,8 +244,8 @@ func (this *TaskMgr) AllDownloadFiles() ([]*store.TaskInfo, []string, error) {
 	return this.db.AllDownloadFiles()
 }
 
-func (this *TaskMgr) CanShareTo(id, walletAddress string, asset int32) (bool, error) {
-	return this.db.CanShareTo(id, walletAddress, asset)
+func (this *TaskMgr) GetUnpaidAmount(id, walletAddress string, asset int32) (uint64, error) {
+	return this.db.GetUnpaidAmount(id, walletAddress, asset)
 }
 
 func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint32) (uint64, error) {

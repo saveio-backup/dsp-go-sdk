@@ -1355,30 +1355,27 @@ func (this *FileDB) AddShareTo(id, walletAddress string) error {
 	return this.db.Put([]byte(shareKey), []byte("true"))
 }
 
-func (this *FileDB) CanShareTo(id, walletAddress string, asset int32) (bool, error) {
+func (this *FileDB) GetUnpaidAmount(id, walletAddress string, asset int32) (uint64, error) {
 	shareKey := FileShareToKey(id, walletAddress)
 	exist, err := this.db.Get([]byte(shareKey))
 	if err != nil && err != leveldb.ErrNotFound {
-		return false, err
+		return 0, err
 	}
 	if len(exist) == 0 {
-		return true, nil
+		return 0, nil
 	}
 	unpaid, err := this.getFileUnpaidInfo(FileUnpaidKey(id, walletAddress, asset))
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 	if unpaid == nil {
-		return true, nil
+		return 0, nil
 	}
 	unpaidAmount := uint64(0)
 	for _, p := range unpaid.Payments {
 		unpaidAmount += p.Amount
-		if unpaidAmount >= common.CHUNK_SIZE*common.MAX_REQ_BLOCK_COUNT {
-			return false, fmt.Errorf("can't share to: %s, has unpaid amount: %d, %d", walletAddress, p.Amount, unpaidAmount)
-		}
 	}
-	return true, nil
+	return unpaidAmount, nil
 }
 
 // getFileUploadInfo. helper function, get file upload info from db. if fileinfo not found, return (nil, nil)

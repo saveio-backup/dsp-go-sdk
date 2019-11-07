@@ -679,8 +679,10 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				for _, v := range ret {
 					key := fmt.Sprintf("%s-%d", v.Hash, v.Index)
 					flightskey = append(flightskey, key)
-					log.Debugf("push flightskey %q", key)
 					delete(allFlightskey, key)
+				}
+				if len(ret) > 0 {
+					log.Debugf("push flightskey from %s to %s", fmt.Sprintf("%s-%d", ret[0].Hash, ret[0].Index), fmt.Sprintf("%s-%d", ret[len(ret)-1].Hash, ret[len(ret)-1].Index))
 				}
 				resp := &getBlocksResp{
 					worker:          job.worker,
