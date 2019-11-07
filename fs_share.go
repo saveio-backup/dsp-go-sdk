@@ -119,8 +119,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	taskId := ""
 	reqWalletAddr := ""
 	reqAsset := int32(0)
-	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s", taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[0].WalletAddress, req[0].PeerAddr,
-		req[len(req)-1].FileHash, req[len(req)-1].Hash, req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
+
 	paymentId := this.Channel.NewPaymentId()
 	for _, blockmsg := range req {
 		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare)
@@ -186,6 +185,8 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		TimeStamp: req[0].TimeStamp,
 		Blocks:    blocks,
 	}
+	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s", taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[0].WalletAddress, req[0].PeerAddr,
+		req[len(req)-1].FileHash, req[len(req)-1].Hash, req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
 	msg := message.NewBlockFlightsMsg(flights)
 	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), req[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
 	if err != nil {

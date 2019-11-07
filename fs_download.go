@@ -1327,16 +1327,20 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 				if err != nil {
 					return nil, err
 				}
-				if duration < uint64(timeout/retry) {
+				if duration < uint64(timeout/retry)*1000 {
 					continue
 				}
 				err = fmt.Errorf("receiving blockflight %s timeout", blocks[0].GetHash())
+				// TODO: why err is nil here
 				downloadTimeout = true
 			}
 			if downloadTimeout {
 				break
 			}
 		}
+	}
+	if err != nil {
+		log.Errorf("download block flight err %s", err)
 	}
 	return nil, err
 }
