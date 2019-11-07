@@ -22,12 +22,13 @@ type GetBlockReq struct {
 }
 
 type BlockResp struct {
-	Hash     string
-	Index    int32
-	PeerAddr string
-	Block    []byte
-	Tag      []byte
-	Offset   int64
+	Hash      string
+	Index     int32
+	PeerAddr  string
+	Block     []byte
+	Tag       []byte
+	Offset    int64
+	PaymentId int32
 }
 
 type ProgressInfo struct {
@@ -975,6 +976,7 @@ func (this *Task) IsTimeout() bool {
 	timeout := uint64(common.DOWNLOAD_FILE_TIMEOUT * 1000)
 	now := utils.GetMilliSecTimestamp()
 	for _, w := range this.workers {
+		log.Debugf("worker active time %s %d", w.RemoteAddress(), w.ActiveTime())
 		if now-w.ActiveTime() < timeout {
 			return false
 		}
@@ -982,7 +984,7 @@ func (this *Task) IsTimeout() bool {
 	return true
 }
 
-// WorkerIdleDuration. worker idle duration 
+// WorkerIdleDuration. worker idle duration
 func (this *Task) WorkerIdleDuration(addr string) uint64 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()

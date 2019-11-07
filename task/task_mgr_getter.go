@@ -252,10 +252,15 @@ func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint32) (uint64,
 	return this.db.GetBlockOffset(id, blockHash, index)
 }
 
-func (this *TaskMgr) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse bool) []string {
-	return this.db.GetTaskIdList(offset, limit, ft, allType, reverse)
+func (this *TaskMgr) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse, includeFailed bool) []string {
+	return this.db.GetTaskIdList(offset, limit, ft, allType, reverse, includeFailed)
 }
 
-func (this *TaskMgr) GetUnpaidAmount(id, payToAddress string, asset int32) (uint64, error) {
-	return this.db.GetUnpaidAmount(id, payToAddress, asset)
+// GetUnpaidPayments. get unpaid payments
+func (this *TaskMgr) GetUnpaidPayments(id, payToAddress string, asset int32) (map[int32]*store.Payment, error) {
+	return this.db.GetUnpaidPayments(id, payToAddress, asset)
+}
+
+func (this *TaskMgr) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
+	return this.db.GetTaskIdWithPaymentId(paymentId)
 }

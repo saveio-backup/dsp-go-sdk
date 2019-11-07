@@ -132,9 +132,9 @@ type FileProgress struct {
 }
 
 type FileDownloadUnPaid struct {
-	FileInfoId   string `json:"file_info_id"`
-	NodeHostAddr string `json:"node_host_addr"`
-	Payment
+	FileInfoId   string             `json:"file_info_id"`
+	NodeHostAddr string             `json:"node_host_addr"`
+	Payments     map[int32]*Payment `json:"payments"`
 }
 
 type Session struct {
@@ -237,7 +237,7 @@ func (this *FileDB) GetTaskIdByIndex(index uint32) (string, error) {
 }
 
 // GetTaskIdList. Get all task id list with offset, limit, task type
-func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, reverse bool) []string {
+func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, reverse, includeFailed bool) []string {
 	count, err := this.GetTaskCount()
 	if err != nil {
 		return nil
@@ -282,18 +282,21 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 			reach++
 			continue
 		}
+		info, err := this.GetFileInfo(id)
+		if err != nil || info == nil {
+			log.Warnf("get file info of id %s failed", id)
+			continue
+		}
 		if !allType {
-			info, err := this.GetFileInfo(id)
-			if err != nil || info == nil {
-				log.Warnf("get file info of id %s failed", id)
-				continue
-			}
 			if info.Type != ft {
 				continue
 			}
 			if info.TaskState == uint64(TaskStateDone) {
 				continue
 			}
+		}
+		if !includeFailed && info.TaskState == uint64(TaskStateFailed) {
+			continue
 		}
 		list = append(list, id)
 		if uint32(len(list)) >= limit {
@@ -878,10 +881,10 @@ func (this *FileDB) AddFileBlockHashes(id string, blocks []string) error {
 	return this.db.BatchCommit(batch)
 }
 
-func (this *FileDB) AddFileUnpaid(id, payToAddress string, asset int32, amount uint64) error {
+func (this *FileDB) AddFileUnpaid(id, recipientWalAddr string, paymentId, asset int32, amount uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
+	unpaidKey := FileUnpaidKey(id, recipientWalAddr, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {
 		log.Errorf("getFileUnpaidInfo err %s", err)
@@ -890,32 +893,51 @@ func (this *FileDB) AddFileUnpaid(id, payToAddress string, asset int32, amount u
 	if info == nil {
 		info = &FileDownloadUnPaid{
 			FileInfoId: id,
+			Payments:   make(map[int32]*Payment, 0),
 		}
-		info.WalletAddress = payToAddress
-		info.Asset = asset
 	}
-	info.Amount = info.Amount + amount
-	log.Debugf("add file unpaid %s taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, payToAddress, amount, info.Amount)
-	return this.saveFileUnpaidInfo(unpaidKey, info)
+
+	if p, ok := info.Payments[paymentId]; ok {
+		p.Amount += amount
+		info.Payments[paymentId] = p
+		log.Debugf("add file unpaid %s taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, recipientWalAddr, amount, p.Amount)
+	} else {
+		p := &Payment{
+			PaymentId:     paymentId,
+			WalletAddress: recipientWalAddr,
+			Asset:         asset,
+			Amount:        amount,
+		}
+		info.Payments[paymentId] = p
+		log.Debugf("add file unpaid %s taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, recipientWalAddr, amount, amount)
+	}
+	batch := this.db.NewBatch()
+	this.db.BatchPut(batch, []byte(TaskIdOfPaymentIDKey(paymentId)), []byte(id))
+	buf, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+	this.db.BatchPut(batch, []byte(unpaidKey), buf)
+	return this.db.BatchCommit(batch)
 }
 
-// GetUnpaidAmount. get unpaid amount of task to payee
-func (this *FileDB) GetUnpaidAmount(id, payToAddress string, asset int32) (uint64, error) {
+// GetUnpaidPayments. get unpaid amount of task to payee
+func (this *FileDB) GetUnpaidPayments(id, payToAddress string, asset int32) (map[int32]*Payment, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {
 		log.Errorf("getFileUnpaidInfo err %s", err)
-		return 0, err
+		return nil, err
 	}
 	if info == nil {
-		return 0, nil
+		return nil, nil
 	}
-	return info.Amount, nil
+	return info.Payments, nil
 }
 
-func (this *FileDB) DeleteFileUnpaid(id, payToAddress string, asset int32, amount uint64) error {
+func (this *FileDB) DeleteFileUnpaid(id, payToAddress string, paymentId, asset int32, amount uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
@@ -927,13 +949,26 @@ func (this *FileDB) DeleteFileUnpaid(id, payToAddress string, asset int32, amoun
 	if info == nil {
 		return fmt.Errorf("can't find file info of id %s, unpaidkey %s", id, unpaidKey)
 	}
-	if info.Amount > amount {
-		info.Amount = info.Amount - amount
-		log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, payToAddress, amount, info.Amount)
-		return this.saveFileUnpaidInfo(unpaidKey, info)
+	payment, ok := info.Payments[paymentId]
+	if !ok {
+		return fmt.Errorf("can't find file info of paymentId %d, unpaidkey %s", paymentId, unpaidKey)
 	}
-	log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, payToAddress, amount, info.Amount)
-	return this.db.Delete([]byte(unpaidKey))
+	if payment.Amount > amount {
+		payment.Amount = payment.Amount - amount
+		info.Payments[paymentId] = payment
+		log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, remain: %d", unpaidKey, id, payToAddress, amount, payment.Amount)
+		buf, err := json.Marshal(info)
+		if err != nil {
+			return err
+		}
+		return this.db.Put([]byte(unpaidKey), buf)
+	}
+	delete(info.Payments, paymentId)
+	log.Debugf("delete file unpaid %s, taskId: %s, sender:%s, amount: %d, paymentId: %d", unpaidKey, id, payToAddress, amount, paymentId)
+	batch := this.db.NewBatch()
+	this.db.BatchDelete(batch, []byte(TaskIdOfPaymentIDKey(paymentId)))
+	this.db.BatchDelete(batch, []byte(unpaidKey))
+	return this.db.BatchCommit(batch)
 }
 
 // IsInfoExist return a file is exist or not
@@ -1134,9 +1169,9 @@ func (this *FileDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Debugf("undownload hashes :%v, len:%d", hashes, len(hashes))
+	log.Debugf("undownloaded hashes :%v, len:%d", hashes, len(hashes))
 	for h, i := range indexMap {
-		log.Debugf("undownload hashes-index %s-%d", h, i)
+		log.Debugf("undownloaded hashes-index %s-%d", h, i)
 	}
 	return hashes, indexMap, nil
 }
@@ -1281,7 +1316,7 @@ func (this *FileDB) SaveFileDownloaded(id string) error {
 func (this *FileDB) AllDownloadFiles() ([]*TaskInfo, []string, error) {
 	countKey := FileDownloadedCountKey()
 	countBuf, err := this.db.Get([]byte(countKey))
-	log.Debugf("countkey:%v, countbuf:%v, err %s", countKey, countBuf, err)
+	log.Debugf("countkey:%v, countBuf:%v, err %s", countKey, countBuf, err)
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, nil, err
 	}
@@ -1333,8 +1368,15 @@ func (this *FileDB) CanShareTo(id, walletAddress string, asset int32) (bool, err
 	if err != nil {
 		return false, err
 	}
-	if unpaid != nil && unpaid.Amount >= common.CHUNK_SIZE*common.MAX_REQ_BLOCK_COUNT {
-		return false, fmt.Errorf("can't share to: %s, has unpaid amount: %d", walletAddress, unpaid.Amount)
+	if unpaid == nil {
+		return true, nil
+	}
+	unpaidAmount := uint64(0)
+	for _, p := range unpaid.Payments {
+		unpaidAmount += p.Amount
+		if unpaidAmount >= common.CHUNK_SIZE*common.MAX_REQ_BLOCK_COUNT {
+			return false, fmt.Errorf("can't share to: %s, has unpaid amount: %d, %d", walletAddress, p.Amount, unpaidAmount)
+		}
 	}
 	return true, nil
 }
@@ -1479,6 +1521,14 @@ func (this *FileDB) SaveFileInfo(info *TaskInfo) error {
 	return this.batchSaveFileInfo(nil, info)
 }
 
+func (this *FileDB) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
+	buf, err := this.db.Get([]byte(TaskIdOfPaymentIDKey(paymentId)))
+	if err != nil && err != leveldb.ErrNotFound {
+		return "", err
+	}
+	return string(buf), nil
+}
+
 func (this *FileDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {
 	var list []string
 	var undoneKey string
@@ -1612,14 +1662,6 @@ func (this *FileDB) getFileUnpaidInfo(key string) (*FileDownloadUnPaid, error) {
 		return nil, err
 	}
 	return info, nil
-}
-
-func (this *FileDB) saveFileUnpaidInfo(key string, info *FileDownloadUnPaid) error {
-	buf, err := json.Marshal(info)
-	if err != nil {
-		return err
-	}
-	return this.db.Put([]byte(key), buf)
 }
 
 func (this *FileDB) batchDeleteBlocks(batch *leveldb.Batch, fi *TaskInfo) error {

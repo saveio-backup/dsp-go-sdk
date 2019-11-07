@@ -240,16 +240,16 @@ func (this *TaskMgr) AddFileSession(fileInfoId string, sessionId, walletAddress,
 	return this.db.AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress, asset, unitPrice)
 }
 
-func (this *TaskMgr) AddFileUnpaid(id, walletAddress string, asset int32, amount uint64) error {
-	return this.db.AddFileUnpaid(id, walletAddress, asset, amount)
+func (this *TaskMgr) AddFileUnpaid(id, walletAddress string, paymentId, asset int32, amount uint64) error {
+	return this.db.AddFileUnpaid(id, walletAddress, paymentId, asset, amount)
 }
 
 func (this *TaskMgr) AddFileBlockHashes(id string, blocks []string) error {
 	return this.db.AddFileBlockHashes(id, blocks)
 }
 
-func (this *TaskMgr) DeleteFileUnpaid(id, walletAddress string, asset int32, amount uint64) error {
-	return this.db.DeleteFileUnpaid(id, walletAddress, asset, amount)
+func (this *TaskMgr) DeleteFileUnpaid(id, walletAddress string, paymentId, asset int32, amount uint64) error {
+	return this.db.DeleteFileUnpaid(id, walletAddress, paymentId, asset, amount)
 }
 
 func (this *TaskMgr) DeleteTaskIds(ids []string) error {

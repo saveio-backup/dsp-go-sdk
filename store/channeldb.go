@@ -23,48 +23,6 @@ func (this *ChannelDB) Close() {
 	this.db.Close()
 }
 
-// AddPayment. put payment info to db
-func (this *ChannelDB) AddPayment(walletAddr string, paymentId int32, amount uint64) error {
-	key := []byte(PaymentKey(paymentId))
-	info := &Payment{
-		WalletAddress: walletAddr,
-		PaymentId:     paymentId,
-		Amount:        amount,
-	}
-	buf, err := json.Marshal(info)
-	if err != nil {
-		return err
-	}
-	return this.db.Put(key, buf)
-}
-
-// GetPayment. get payment info from db
-func (this *ChannelDB) GetPayment(paymentId int32) (*Payment, error) {
-	key := []byte(PaymentKey(paymentId))
-	value, err := this.db.Get(key)
-	if err != nil {
-		if err != leveldb.ErrNotFound {
-			return nil, err
-		}
-	}
-	if len(value) == 0 {
-		return nil, nil
-	}
-
-	info := &Payment{}
-	err = json.Unmarshal(value, info)
-	if err != nil {
-		return nil, err
-	}
-	return info, nil
-}
-
-// RemovePayment. remove payment info from db
-func (this *ChannelDB) RemovePayment(paymentId int32) error {
-	key := []byte(PaymentKey(paymentId))
-	return this.db.Delete(key)
-}
-
 type ChannelInfo struct {
 	ID          uint64 `json:"id"`
 	PartnerAddr string `json:"partner_address"`

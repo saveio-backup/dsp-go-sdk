@@ -117,8 +117,8 @@ func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
 	return this.taskMgr.GetUrlOfUploadedfile(fileHashStr, this.WalletAddress())
 }
 
-func (this *Dsp) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse bool) []string {
-	return this.taskMgr.GetTaskIdList(offset, limit, ft, allType, reverse)
+func (this *Dsp) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse, includeFailed bool) []string {
+	return this.taskMgr.GetTaskIdList(offset, limit, ft, allType, reverse, includeFailed)
 }
 
 func (this *Dsp) DeleteTaskIds(ids []string) error {

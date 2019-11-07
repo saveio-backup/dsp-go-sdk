@@ -6,5 +6,6 @@ package block;
 
 message BlockFlights{
    int64 TimeStamp = 1;
-   repeated Block blocks = 2;
+   int32 PaymentId = 2;
+   repeated Block blocks = 3;
 }

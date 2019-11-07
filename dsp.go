@@ -127,6 +127,7 @@ func (this *Dsp) StartChannelService() error {
 	if this.Channel == nil {
 		return errors.New("channel is nil")
 	}
+	this.registerReceiveNotification()
 	err := this.Channel.StartService()
 	if err != nil {
 		return err

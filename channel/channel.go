@@ -124,7 +124,6 @@ func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
 func (this *Channel) StartService() error {
 	//start connect target
 	log.Debugf("[dsp-go-sdk-channel] StartService")
-	this.registerReceiveNotification()
 	err := this.chActor.SyncBlockData()
 	if err != nil {
 		log.Errorf("channel sync block err %s", err)
@@ -171,6 +170,10 @@ func (this *Channel) StopService() {
 	}
 	close(this.closeCh)
 	this.isStart = false
+}
+
+func (this *Channel) GetCloseCh() chan struct{} {
+	return this.closeCh
 }
 
 func (this *Channel) SetChannelDB(db *store.ChannelDB) {
@@ -523,14 +526,6 @@ func (this *Channel) CleanUnitPrices(asset int32) {
 	delete(this.unitPrices, asset)
 }
 
-func (this *Channel) GetPayment(paymentId int32) (*store.Payment, error) {
-	return this.channelDB.GetPayment(paymentId)
-}
-
-func (this *Channel) DeletePayment(paymentId int32) error {
-	return this.channelDB.RemovePayment(paymentId)
-}
-
 func (this *Channel) ChannelExist(walletAddr string) bool {
 	if !this.isStart {
 		return false
@@ -571,31 +566,4 @@ func (this *Channel) AllChannels() (*ch_actor.ChannelsInfoResp, error) {
 		return nil, nil
 	}
 	return ch_actor.GetAllChannels()
-}
-
-// registerReceiveNotification. register receive payment notification
-func (this *Channel) registerReceiveNotification() {
-	log.Debugf("[dsp-go-sdk-channel] registerReceiveNotification")
-	receiveChan, err := ch_actor.RegisterReceiveNotification()
-	log.Debugf("receiveChan:%v, err %v", receiveChan, err)
-	if err != nil {
-		panic(err)
-	}
-	go func() {
-		for {
-			select {
-			case event := <-receiveChan:
-				addr, err := chaincomm.AddressParseFromBytes(event.Initiator[:])
-				if err != nil {
-					log.Errorf("receive payment with unrecognized address %v", event)
-					continue
-				}
-				log.Debugf("PaymentReceive amount %d from %s with paymentID %d\n",
-					event.Amount, addr.ToBase58(), event.Identifier)
-				this.channelDB.AddPayment(addr.ToBase58(), int32(event.Identifier), uint64(event.Amount))
-			case <-this.closeCh:
-				return
-			}
-		}
-	}()
 }

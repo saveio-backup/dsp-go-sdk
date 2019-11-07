@@ -20,6 +20,7 @@ const (
 	TASK_DOWNLOAD_UNDONE_PREFIX  = DB_PREFIX + "_" + "task_download_undone" + "_" + DB_VERSION
 	TASK_SESSIONS_COUNT_PREFIX   = DB_PREFIX + "_" + "task_session_count" + "_" + DB_VERSION
 	TASK_SESSIONS_PREFIX         = DB_PREFIX + "_" + "task_sessions" + "_" + DB_VERSION
+	TASK_OF_PAYMENT_ID_PREFIX    = DB_PREFIX + "_" + "task_payment_id" + "_" + DB_VERSION
 )
 
 const (
@@ -128,4 +129,8 @@ func ChannelInfoKey(walletAddr string) string {
 
 func ChannelInfoKeyPrefix() string {
 	return fmt.Sprintf("[%s]", CHANNEL_INFO_PREFIX)
+}
+
+func TaskIdOfPaymentIDKey(paymentId int32) string {
+	return fmt.Sprintf("[%s]%d", TASK_OF_PAYMENT_ID_PREFIX, paymentId)
 }

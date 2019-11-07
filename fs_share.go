@@ -9,6 +9,8 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
+	chActor "github.com/saveio/pylons/actor/server"
+	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -26,6 +28,71 @@ func (this *Dsp) StartShareServices() {
 	}
 }
 
+// RegShareNotificationChannel. register share channel
+func (this *Dsp) RegShareNotificationChannel() {
+	if this == nil {
+		log.Errorf("this.taskMgr == nil")
+	}
+	this.taskMgr.RegShareNotification()
+}
+
+// ShareNotificationChannel.
+func (this *Dsp) ShareNotificationChannel() chan *task.ShareNotification {
+	return this.taskMgr.ShareNotification()
+}
+
+// CloseShareNotificationChannel.
+func (this *Dsp) CloseShareNotificationChannel() {
+	this.taskMgr.CloseShareNotification()
+}
+
+// registerReceiveNotification. register receive payment notification
+func (this *Dsp) registerReceiveNotification() {
+	log.Debugf("registerReceiveNotification")
+	receiveChan, err := chActor.RegisterReceiveNotification()
+	log.Debugf("receiveChan:%v, err %v", receiveChan, err)
+	if err != nil {
+		// panic(err)
+	}
+	go func() {
+		for {
+			select {
+			case event := <-receiveChan:
+				addr, err := chainCom.AddressParseFromBytes(event.Initiator[:])
+				if err != nil {
+					log.Errorf("receive payment with unrecognized address %v", event)
+					continue
+				}
+				log.Debugf("PaymentReceive amount %d from %s with paymentID %d\n",
+					event.Amount, addr.ToBase58(), event.Identifier)
+				taskId, err := this.taskMgr.GetTaskIdWithPaymentId(int32(event.Identifier))
+				if err != nil {
+					log.Errorf("get taskid with payment id failed %s", err)
+					continue
+				}
+				fileHashStr, err := this.taskMgr.TaskFileHash(taskId)
+				if err != nil {
+					log.Errorf("get filehash with task id failed %s", err)
+					continue
+				}
+				// delete record
+				err = this.taskMgr.DeleteFileUnpaid(taskId, addr.ToBase58(), int32(event.Identifier), 0, uint64(event.Amount))
+				if err != nil {
+					log.Errorf("delete share file info %s", err)
+					continue
+				}
+				log.Debugf("delete unpaid success %v", taskId)
+				downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeDownload)
+				fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
+				fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
+				this.taskMgr.EmitNotification(taskId, task.ShareStateReceivedPaying, fileHashStr, fileName, fileOwner, addr.ToBase58(), uint64(event.Identifier), uint64(event.Amount))
+			case <-this.Channel.GetCloseCh():
+				return
+			}
+		}
+	}()
+}
+
 func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	if req == nil || len(req) == 0 {
 		log.Debugf("share block request empty")
@@ -38,6 +105,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	reqAsset := int32(0)
 	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s", taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[0].WalletAddress, req[0].PeerAddr,
 		req[len(req)-1].FileHash, req[len(req)-1].Hash, req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
+	paymentId := this.Channel.NewPaymentId()
 	for _, blockmsg := range req {
 		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare)
 		reqWalletAddr = blockmsg.WalletAddress
@@ -74,7 +142,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 			return
 		}
 		// add new unpaid block request to store
-		err = this.taskMgr.AddFileUnpaid(taskId, blockmsg.WalletAddress, blockmsg.Asset, uint64(len(blockData))*up)
+		err = this.taskMgr.AddFileUnpaid(taskId, blockmsg.WalletAddress, paymentId, blockmsg.Asset, uint64(len(blockData))*up)
 		if err != nil {
 			log.Errorf("add file unpaid failed err : %s", err)
 			return
@@ -98,6 +166,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		return
 	}
 	flights := &block.BlockFlights{
+		PaymentId: paymentId,
 		TimeStamp: req[0].TimeStamp,
 		Blocks:    blocks,
 	}
@@ -107,25 +176,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		log.Errorf("share send block, err: %s", err)
 		// TODO: delete unpaid msg if need
 		if !common.ConntextTimeoutErr(err) {
-			this.taskMgr.DeleteFileUnpaid(taskId, reqWalletAddr, reqAsset, totalAmount)
+			this.taskMgr.DeleteFileUnpaid(taskId, reqWalletAddr, paymentId, reqAsset, totalAmount)
 		}
 	}
-}
-
-// RegShareNotificationChannel. register share channel
-func (this *Dsp) RegShareNotificationChannel() {
-	if this == nil {
-		log.Errorf("this.taskMgr == nil")
-	}
-	this.taskMgr.RegShareNotification()
-}
-
-// ShareNotificationChannel.
-func (this *Dsp) ShareNotificationChannel() chan *task.ShareNotification {
-	return this.taskMgr.ShareNotification()
-}
-
-// CloseShareNotificationChannel.
-func (this *Dsp) CloseShareNotificationChannel() {
-	this.taskMgr.CloseShareNotification()
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
-	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
@@ -36,12 +35,8 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 	switch msg.Header.Type {
 	case netcom.MSG_TYPE_FILE:
 		this.handleFileMsg(ctx, peer, msg)
-	case netcom.MSG_TYPE_BLOCK:
-		this.handleBlockMsg(ctx, peer, msg)
 	case netcom.MSG_TYPE_BLOCK_FLIGHTS:
 		this.handleBlockFlightsMsg(ctx, peer, msg)
-	case netcom.MSG_TYPE_PAYMENT:
-		this.handlePaymentMsg(ctx, peer, msg)
 	default:
 		log.Debugf("unrecognized msg type %s", msg.Header.Type)
 	}
@@ -76,7 +71,6 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 		this.handleFileDownloadOkMsg(ctx, peer, fileMsg)
 	case netcom.FILE_OP_DOWNLOAD_CANCEL:
 		this.handleFileDownloadCancelMsg(ctx, peer, fileMsg)
-
 	default:
 	}
 }
@@ -555,12 +549,13 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
 			if !isDownloaded {
 				b := &task.BlockResp{
-					Hash:     blockMsg.Hash,
-					Index:    blockMsg.Index,
-					PeerAddr: peer.Address,
-					Block:    blockMsg.Data,
-					Tag:      blockMsg.Tag,
-					Offset:   blockMsg.Offset,
+					Hash:      blockMsg.Hash,
+					Index:     blockMsg.Index,
+					PeerAddr:  peer.Address,
+					Block:     blockMsg.Data,
+					Tag:       blockMsg.Tag,
+					Offset:    blockMsg.Offset,
+					PaymentId: blockFlightsMsg.PaymentId,
 				}
 				blocks = append(blocks, b)
 				log.Debugf("append block %s finished", blockMsg.Hash)
@@ -658,129 +653,6 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 		}
 	default:
 	}
-}
-
-// handleBlockMsg[Deprecated].  handle all file msg
-func (this *Dsp) handleBlockMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
-	blockMsg := msg.Payload.(*block.Block)
-
-	switch blockMsg.Operation {
-	case netcom.BLOCK_OP_NONE:
-		taskId := this.taskMgr.TaskId(blockMsg.FileHash, this.WalletAddress(), store.TaskTypeDownload)
-		log.Debugf("taskId: %s, sessionId: %s receive block %d %s-%s-%d from peer:%s, length:%d", taskId, blockMsg.SessionId, blockMsg.Operation, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address, msg.Header.MsgLength)
-		exist := this.taskMgr.TaskExist(taskId)
-		if !exist {
-			log.Debugf("task %s not exist", blockMsg.FileHash)
-			return
-		}
-		isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
-		if !isDownloaded {
-			this.taskMgr.PushGetBlock(taskId, blockMsg.SessionId, blockMsg.Index, &task.BlockResp{
-				Hash:     blockMsg.Hash,
-				Index:    blockMsg.Index,
-				PeerAddr: peer.Address,
-				Block:    blockMsg.Data,
-				Tag:      blockMsg.Tag,
-				Offset:   blockMsg.Offset,
-			})
-			log.Debugf("push block finished")
-		} else {
-			log.Debugf("the block has downloaded")
-		}
-		emptyMsg := message.NewEmptyMsg()
-		err := ctx.Reply(context.Background(), emptyMsg.ToProtoMsg())
-		if err != nil {
-			log.Errorf("reply block msg failed", err)
-		} else {
-			log.Debugf("reply block msg success")
-		}
-	case netcom.BLOCK_OP_GET:
-		sessionId := blockMsg.SessionId
-		log.Debugf("session: %s handle get block %s-%s-%d from %s", sessionId, blockMsg.FileHash, blockMsg.Hash, blockMsg.Index, peer.Address)
-		if len(sessionId) == 0 {
-			return
-		}
-		exist := this.taskMgr.TaskExist(sessionId)
-		if !exist {
-			log.Debugf("task %s not exist", blockMsg.FileHash)
-			return
-		}
-		taskType, err := this.taskMgr.TaskType(sessionId)
-		if err != nil {
-			log.Errorf("[dsp handleBlockMsg] get task type failed id: %s, err: %s", sessionId, err)
-		}
-		log.Debugf("task key:%s type %d", sessionId, taskType)
-		switch taskType {
-		case store.TaskTypeUpload:
-			pause, sdkerr := this.checkIfPause(sessionId, blockMsg.FileHash)
-			if sdkerr != nil {
-				log.Debugf("handle get block pause %v %t", sdkerr, pause)
-				return
-			}
-			if pause {
-				log.Debugf("handle get block pause %v %t", sdkerr, pause)
-				return
-			}
-			reqCh, err := this.taskMgr.TaskBlockReq(sessionId)
-			if err != nil {
-				log.Errorf("get task block reqCh err: %s", err)
-				return
-			}
-			log.Debugf("push get block to request")
-			reqs := make([]*task.GetBlockReq, 0, 1)
-			reqs = append(reqs, &task.GetBlockReq{
-				FileHash: blockMsg.FileHash,
-				Hash:     blockMsg.Hash,
-				Index:    blockMsg.Index,
-				PeerAddr: peer.Address,
-			})
-			this.taskMgr.ActiveUploadTaskPeer(peer.Address)
-			reqCh <- reqs
-			return
-		default:
-			log.Debugf("handle block get msg, tasktype not found %v", taskType)
-		}
-	default:
-	}
-}
-
-// handlePaymentMsg. handle payment msg
-func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
-	paymentMsg := msg.Payload.(*payment.Payment)
-	log.Debugf("received paymentMsg: %v sender:%v, asset:%d, amount:%d", paymentMsg.PaymentId, paymentMsg.Sender, paymentMsg.Asset, paymentMsg.Amount)
-	// check
-	pay, err := this.Channel.GetPayment(paymentMsg.PaymentId)
-	if err != nil || pay == nil {
-		log.Errorf("get payment from db err %s, pay %v", err, pay)
-		return
-	}
-	if pay.WalletAddress != paymentMsg.Sender || pay.Amount != paymentMsg.Amount {
-		log.Errorf("payment %v is different from payment msg %v", pay, paymentMsg)
-		return
-	}
-	err = this.Channel.DeletePayment(paymentMsg.PaymentId)
-	if err != nil {
-		log.Errorf("delete payment from db err %s", err)
-		return
-	}
-	// delete record
-	taskKey := this.taskMgr.TaskId(paymentMsg.FileHash, paymentMsg.Sender, store.TaskTypeShare)
-	log.Debugf("delete payment success, taskId:%s, paymentId:%v", taskKey, paymentMsg.PaymentId)
-	err = this.taskMgr.DeleteFileUnpaid(taskKey, paymentMsg.Sender, paymentMsg.Asset, paymentMsg.Amount)
-	if err != nil {
-		log.Errorf("delete share file info %s", err)
-		return
-	}
-	log.Debugf("delete unpaid success %v", paymentMsg)
-	err = ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
-	if err != nil {
-		log.Errorf("reply delete ok msg failed", err)
-	}
-	log.Debugf("reply handle payment msg")
-	downloadTaskId := this.taskMgr.TaskId(paymentMsg.FileHash, this.WalletAddress(), store.TaskTypeDownload)
-	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
-	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
-	this.taskMgr.EmitNotification(taskKey, task.ShareStateReceivedPaying, paymentMsg.FileHash, fileName, fileOwner, paymentMsg.Sender, uint64(paymentMsg.PaymentId), uint64(paymentMsg.Amount))
 }
 
 func (this *Dsp) waitForTxConfirmed(blockHeight uint64) error {

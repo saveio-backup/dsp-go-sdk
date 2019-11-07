@@ -644,6 +644,7 @@ func (this *Dsp) connectDNS(maxDNSNum uint32) (map[string]string, error) {
 			return
 		}
 		walletAddr := v.WalletAddr.ToBase58()
+		log.Debugf("will connect to %s", walletAddr)
 		dnsUrl, _ := this.GetExternalIP(walletAddr)
 		if len(dnsUrl) == 0 {
 			dnsUrl = fmt.Sprintf("%s://%s:%s", this.Config.ChannelProtocol, v.IP, v.Port)
@@ -683,12 +684,12 @@ func (this *Dsp) connectDNS(maxDNSNum uint32) (map[string]string, error) {
 	for _, v := range ns {
 		_, ok := dnsWalletMap[v.WalletAddr.ToBase58()]
 		if len(dnsWalletMap) > 0 && !ok {
-			log.Debugf("connectDNS Loop DNS  continue")
 			continue
 		}
 		connectArgs = append(connectArgs, []interface{}{v})
 	}
 
+	log.Debugf("connect DNS %v", connectArgs)
 	// use dispatch model to call request parallel
 	connectResps := utils.CallRequestWithArgs(connectReq, connectArgs)
 
