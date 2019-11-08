@@ -160,6 +160,12 @@ func (this *Channel) StopService() {
 		this.chActorId.Stop()
 	}
 	if !this.isStart {
+		if this.chActor.GetChannelService().Service != nil &&
+			this.chActor.GetChannelService().Service.Wal != nil &&
+			this.chActor.GetChannelService().Service.Wal.Storage != nil {
+			// close channel DB if it is opened
+			this.chActor.GetChannelService().Service.Wal.Storage.Close()
+		}
 		return
 	}
 	log.Debug("[dsp-go-sdk-channel] StopService")
