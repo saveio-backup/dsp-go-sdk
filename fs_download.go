@@ -1283,14 +1283,14 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	if err != nil {
 		return nil, err
 	}
-	for _, v := range blocks {
-		log.Debugf("download block of task: %s %s-%s-%d from %s", taskId, fileHashStr, v.Hash, v.Index, ipAddr)
+	if len(blocks) > 0 {
+		log.Debugf("download block of task: %s %s-%s-%d to %s-%s-%d to %s", taskId, fileHashStr, blocks[0].Hash, blocks[0].Index, fileHashStr, blocks[len(blocks)-1].Hash, blocks[len(blocks)-1].Index, ipAddr)
 	}
 	timeStamp := time.Now().UnixNano()
 	log.Debugf("download block timestamp %d", timeStamp)
 	ch := this.taskMgr.NewBlockFlightsRespCh(taskId, sessionId, timeStamp)
 	defer func() {
-		log.Debugf("drop blockflight resp channel: %s-%s-%d", taskId, sessionId, timeStamp)
+		log.Debugf("drop block flight resp channel: %s-%s-%d", taskId, sessionId, timeStamp)
 		this.taskMgr.DropBlockFlightsRespCh(taskId, sessionId, timeStamp)
 	}()
 	msg := message.NewBlockFlightsReqMsg(blocks, timeStamp)
@@ -1299,11 +1299,11 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	defer ticker.Stop()
 
 	for i := uint32(0); i < retry; i++ {
-		log.Debugf("send download blockflights msg sessionId %s of %s from %s,  retry: %d", sessionId, fileHashStr, ipAddr, i)
+		log.Debugf("send download block flights msg sessionId %s of %s from %s,  retry: %d", sessionId, fileHashStr, ipAddr, i)
 		// TODO: refactor send msg with request-reply model
 		err = client.P2pSend(ipAddr, msg.ToProtoMsg())
 		if err != nil {
-			log.Errorf("send download blockflights msg err: %s", err)
+			log.Errorf("send download block flights msg err: %s", err)
 			continue
 		}
 		downloadTimeout := false

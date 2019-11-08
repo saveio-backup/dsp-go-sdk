@@ -308,7 +308,7 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 		}
 	}
 	info, err := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
-	if info != nil || strings.Index(err.Error(), "FsGetFileInfo not found") == -1 {
+	if info != nil || (err != nil && strings.Index(err.Error(), "FsGetFileInfo not found") == -1) {
 		log.Errorf("delete file info is not nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 		replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK, serr.DELETE_FILE_FILEINFO_EXISTS, "file info hasn't been deleted",
 			message.WithSessionId(fileMsg.SessionId),
@@ -531,7 +531,7 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *ne
 // handleBlockFlightsMsg handle block flight msg
 func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	blockFlightsMsg := msg.Payload.(*block.BlockFlights)
-	if blockFlightsMsg == nil {
+	if blockFlightsMsg == nil || len(blockFlightsMsg.Blocks) == 0 {
 		log.Error("msg Payload is not valid *block.BlockFlights")
 		return
 	}
@@ -580,8 +580,8 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 	case netcom.BLOCK_OP_GET:
 		blockMsg := blockFlightsMsg.Blocks[0]
 		sessionId := blockMsg.SessionId
-		for _, block := range blockFlightsMsg.Blocks {
-			log.Debugf("session: %s handle get block %s-%s-%d from %s", sessionId, block.FileHash, block.Hash, block.Index, peer.Address)
+		for _, blk := range blockFlightsMsg.Blocks {
+			log.Debugf("session: %s handle get block %s-%s-%d from %s", sessionId, blk.FileHash, blk.Hash, blk.Index, peer.Address)
 			if len(sessionId) == 0 {
 				return
 			}

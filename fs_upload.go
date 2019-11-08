@@ -307,8 +307,8 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFilePayingDone)
 	_, sdkerr = this.addWhitelist(taskId, fileHashStr, opt)
-	log.Debugf("add whitelist sdkerr %v", sdkerr)
 	if sdkerr != nil {
+		log.Errorf("add whitelist sdk err %v", sdkerr)
 		return nil, errors.New(sdkerr.Error.Error())
 	}
 	tx = payRet.Tx
@@ -318,7 +318,11 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		return nil, err
 	}
 	if opt != nil && opt.Share {
-		go this.shareUploadedFile(filePath, string(opt.FileDesc), this.WalletAddress(), hashes)
+		go func() {
+			if err := this.shareUploadedFile(filePath, string(opt.FileDesc), this.WalletAddress(), hashes); err != nil {
+				log.Errorf("share upload fle err %s", err)
+			}
+		}()
 	}
 	if !opt.Share && opt.Encrypt {
 		// TODO: delete encrypted block store
@@ -442,15 +446,15 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	}
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
-		resps, err := this.DeleteUploadedFileByIds([]string{taskId})
+		resp, err := this.DeleteUploadedFileByIds([]string{taskId})
 		if err != nil {
 			this.taskMgr.SetTaskState(taskId, oldState)
 			return nil, err
 		}
-		if len(resps) == 0 {
+		if len(resp) == 0 {
 			return nil, fmt.Errorf("delete file but not response %s", fileHashStr)
 		}
-		return resps[0], nil
+		return resp[0], nil
 	}
 	// send pause msg
 	msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_CANCEL,
@@ -460,15 +464,15 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
 	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
-	resps, err := this.DeleteUploadedFileByIds([]string{taskId})
+	resp, err := this.DeleteUploadedFileByIds([]string{taskId})
 	if err != nil {
 		this.taskMgr.SetTaskState(taskId, oldState)
 		return nil, err
 	}
-	if len(resps) == 0 {
+	if len(resp) == 0 {
 		return nil, fmt.Errorf("delete file but not response %s", fileHashStr)
 	}
-	return resps[0], nil
+	return resp[0], nil
 }
 
 func (this *Dsp) RetryUpload(taskId string) error {
