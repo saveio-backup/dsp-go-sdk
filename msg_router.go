@@ -92,8 +92,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			log.Errorf("get current set block err %s", err)
 			return
 		}
-		err = this.taskMgr.AddFileSession(existTaskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
-		if err != nil {
+		if err := this.taskMgr.AddFileSession(existTaskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice); err != nil {
 			log.Errorf("add session err in file fetch ask %s", err)
 			return
 		}
@@ -107,8 +106,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		)
 
 		log.Debugf("fetch task is exist send file_ack msg %v", peer)
-		err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
-		if err != nil {
+		if err := ctx.Reply(context.Background(), newMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply file_ack msg failed", err)
 			return
 		}
@@ -127,21 +125,15 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		log.Errorf("new task failed %s", err)
 		return
 	}
-	this.taskMgr.NewBatchSet(taskId)
-	this.taskMgr.SetFileHash(taskId, fileMsg.Hash)
-	this.taskMgr.SetWalletAddr(taskId, this.WalletAddress())
-	err = this.taskMgr.BatchCommit(taskId)
-	if err != nil {
+	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.FileHash(fileMsg.Hash), task.Walletaddr(this.WalletAddress())); err != nil {
 		log.Errorf("batch set file info fetch ask %s", err)
 		return
 	}
-	err = this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
-	if err != nil {
+	if err := this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, peer.Address, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice); err != nil {
 		log.Errorf("add session err in file fetch ask %s", err)
 		return
 	}
-	err = this.taskMgr.BindTaskId(taskId)
-	if err != nil {
+	if err := this.taskMgr.BindTaskId(taskId); err != nil {
 		log.Errorf("set task info err in file fetch ask %s", err)
 		return
 	}
@@ -154,11 +146,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			return
 		}
 		log.Debugf("save file prefix :%s", string(fileMsg.Prefix))
-		this.taskMgr.NewBatchSet(taskId)
-		this.taskMgr.SetPrefix(taskId, string(fileMsg.Prefix))
-		this.taskMgr.SetTotalBlockCount(taskId, hashListLen)
-		err = this.taskMgr.BatchCommit(taskId)
-		if err != nil {
+		if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.Prefix(string(fileMsg.Prefix)), task.TotalBlockCnt(hashListLen)); err != nil {
 			log.Errorf("SetFileInfoFields failed:%s", err)
 			return
 		}
@@ -452,11 +440,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		log.Errorf("reply download ack  msg failed", err)
 	}
 	log.Debugf("reply download ack success new share task %s, key %s", fileMsg.Hash, taskId)
-	this.taskMgr.NewBatchSet(taskId)
-	this.taskMgr.SetFileHash(taskId, fileMsg.Hash)
-	this.taskMgr.SetWalletAddr(taskId, fileMsg.PayInfo.WalletAddress)
-	err = this.taskMgr.BatchCommit(taskId)
-	if err != nil {
+	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.FileHash(fileMsg.Hash), task.Walletaddr(fileMsg.PayInfo.WalletAddress)); err != nil {
 		log.Errorf("[DSP handleFileDownloadAskMsg] batch commit file info failed, err: %s", err)
 	}
 	this.taskMgr.BindTaskId(taskId)

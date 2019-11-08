@@ -137,7 +137,6 @@ func TestDeleteUnpaid(t *testing.T) {
 	dbPath := "../testdata/db1"
 	db, err := NewLevelDBStore(dbPath)
 	if err != nil || db == nil {
-
 		return
 	}
 	fileDB := NewFileDB(db)
@@ -145,15 +144,14 @@ func TestDeleteUnpaid(t *testing.T) {
 		fmt.Printf("DB is nil\n")
 		return
 	}
-	can, err := fileDB.CanShareTo("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", "AGeTrARjozPVLhuzMxZq36THMtvsrZNAHq", 0)
-	fmt.Printf("can share %t, err: %s\n", can, err)
+	amount, err := fileDB.GetUnpaidAmount("", "AGeTrARjozPVLhuzMxZq36THMtvsrZNAHq", 0)
+	fmt.Printf("unpaid amount %d, err: %s\n", amount, err)
 }
 
 func TestAllDownloadFiles(t *testing.T) {
 	dbPath := "../testdata/db1"
 	db, err := NewLevelDBStore(dbPath)
 	if err != nil || db == nil {
-
 		return
 	}
 	fileDB := NewFileDB(db)

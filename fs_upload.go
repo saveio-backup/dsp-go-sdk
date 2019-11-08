@@ -132,14 +132,8 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		sdkerr = serr.NewDetailError(serr.INVALID_PARAMS, err.Error())
 		return nil, err
 	}
-	this.taskMgr.NewBatchSet(taskId)
-	this.taskMgr.SetFilePath(taskId, filePath)
-	this.taskMgr.SetSimpleCheckSum(taskId, checksum)
-	this.taskMgr.SetFileName(taskId, string(opt.FileDesc))
-	this.taskMgr.SetWalletAddr(taskId, this.WalletAddress())
-	this.taskMgr.SetCopyNum(taskId, uint64(opt.CopyNum))
-	err = this.taskMgr.BatchCommit(taskId)
-	if err != nil {
+	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.FilePath(filePath), task.SimpleCheckSum(checksum),
+		task.FileName(string(opt.FileDesc)), task.Walletaddr(this.WalletAddress()), task.CopyNum(uint64(opt.CopyNum))); err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
@@ -206,11 +200,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSliceDone)
 	fileHashStr = hashes[0]
 	log.Debugf("after bind task id")
-	this.taskMgr.NewBatchSet(taskId)
-	this.taskMgr.SetFileHash(taskId, fileHashStr)
-	this.taskMgr.SetTotalBlockCount(taskId, totalCount)
-	err = this.taskMgr.BatchCommit(taskId)
-	if err != nil {
+	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.FileHash(fileHashStr), task.TotalBlockCnt(totalCount)); err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, err
 	}
@@ -1406,11 +1396,7 @@ func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, 
 		BindDnsTx:      dnsBindTx,
 		AddWhiteListTx: addWhiteListTx,
 	}
-	this.taskMgr.NewBatchSet(taskId)
-	this.taskMgr.SetRegUrlTx(taskId, dnsRegTx)
-	this.taskMgr.SetBindUrlTx(taskId, dnsBindTx)
-	err = this.taskMgr.BatchCommit(taskId)
-	if err != nil {
+	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.RegUrlTx(dnsRegTx), task.BindUrlTx(dnsBindTx)); err != nil {
 		sdkerr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return nil, sdkerr
 	}

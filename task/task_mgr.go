@@ -117,12 +117,7 @@ func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, fileNameMap map[st
 		if err != nil {
 			return err
 		}
-		this.NewBatchSet(newId)
-		this.SetFileHash(newId, fileHashStr)
-		this.SetWalletAddr(newId, walletAddr)
-		this.SetFileName(newId, fileNameMap[fileHashStr])
-		err = this.BatchCommit(newId)
-		if err != nil {
+		if err := this.SetFileInfoWithOptions(newId, FileHash(fileHashStr), Walletaddr(walletAddr), FileName(fileNameMap[fileHashStr])); err != nil {
 			return err
 		}
 		err = this.BindTaskId(newId)

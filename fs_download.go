@@ -87,14 +87,8 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		return err
 	}
 	log.Debugf("download file dns node %s", this.DNS.DNSNode.WalletAddr)
-	this.taskMgr.NewBatchSet(taskId)
-	this.taskMgr.SetFileHash(taskId, fileHashStr)
-	this.taskMgr.SetFileName(taskId, opt.FileName)
-	this.taskMgr.SetFileOwner(taskId, opt.FileOwner)
-	this.taskMgr.SetUrl(taskId, opt.Url)
-	this.taskMgr.SetWalletAddr(taskId, this.WalletAddress())
-	err = this.taskMgr.BatchCommit(taskId)
-	if err != nil {
+	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.FileHash(fileHashStr), task.FileName(opt.FileName),
+		task.FileOwner(opt.FileOwner), task.Url(opt.Url), task.Walletaddr(this.WalletAddress())); err != nil {
 		sdkErr = serr.NewDetailError(serr.SET_FILEINFO_DB_ERROR, err.Error())
 		return err
 	}
@@ -446,11 +440,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 	if err != nil {
 		return nil, err
 	}
-	this.taskMgr.NewBatchSet(taskId)
-	this.taskMgr.SetPrefix(taskId, prefix)
-	this.taskMgr.SetTotalBlockCount(taskId, uint64(len(blockHashes)))
-	err = this.taskMgr.BatchCommit(taskId)
-	if err != nil {
+	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.Prefix(prefix), task.TotalBlockCnt(uint64(len(blockHashes)))); err != nil {
 		return nil, err
 	}
 	return peerPayInfos, nil

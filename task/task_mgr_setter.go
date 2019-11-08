@@ -9,15 +9,13 @@ import (
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
-// setter list for task info
-
-func (this *TaskMgr) NewBatchSet(taskId string) error {
+// SetFileInfoWithOptions
+func (this *TaskMgr) SetFileInfoWithOptions(taskId string, opts ...InfoOption) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetSessionId] task not found: %s", taskId)
 	}
-	v.NewBatchSet()
-	return nil
+	return v.SetInfoWithOptions(opts...)
 }
 
 // SetFileHash. set file hash of task

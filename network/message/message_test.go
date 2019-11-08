@@ -14,16 +14,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 )
 
-func TestReadMsg(t *testing.T) {
-	msg1 := NewFileFetchAsk("1", "132245457678789", []string{"1", "2"}, "wallet", []byte{24, 123})
-	fmt.Printf("msg1.header:%v, payload:%v\n", msg1.Header, msg1.Payload)
-	msg1Proto := msg1.ToProtoMsg()
-	msg2 := ReadMessage(msg1Proto)
-	fmt.Printf("msg2.header:%v, payload:%v\n", msg2.Header, msg2.Payload)
-	msg2payload := msg2.Payload.(*file.File)
-	fmt.Printf("msg2.op:%d, hash:%s, payinfo:%v\n", msg2payload.Operation, msg2payload.Hash, msg2payload.PayInfo)
-}
-
 func TestFileMarshal(t *testing.T) {
 	f := &file.File{
 		Hash:        "1",
