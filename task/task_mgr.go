@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/saveio/dsp-go-sdk/common"
-	sdkErr "github.com/saveio/dsp-go-sdk/error"
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 	netcom "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
@@ -46,7 +46,11 @@ func (this *TaskMgr) CloseDB() error {
 	if this.db == nil {
 		return nil
 	}
-	return this.db.Close()
+	err := this.db.Close()
+	if err != nil {
+		return dspErr.NewWithError(dspErr.CLOSE_DB_ERROR, err)
+	}
+	return nil
 }
 
 // NewTask. start a task for a file
@@ -55,7 +59,7 @@ func (this *TaskMgr) NewTask(taskT store.TaskType) (string, error) {
 	defer this.lock.Unlock()
 	t := NewTask(taskT, this.db)
 	if t == nil {
-		return "", fmt.Errorf("[TaskMgr NewTask] new task failed %d", taskT)
+		return "", dspErr.New(dspErr.NEW_TASK_FAILED, fmt.Sprintf("new task of type %d", taskT))
 	}
 	id := t.GetId()
 	this.tasks[id] = t
@@ -67,9 +71,13 @@ func (this *TaskMgr) NewTask(taskT store.TaskType) (string, error) {
 func (this *TaskMgr) BindTaskId(id string) error {
 	t, ok := this.GetTaskById(id)
 	if !ok {
-		return fmt.Errorf("[TaskMgr BindTaskId] task not found: %s", id)
+		return dspErr.New(dspErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task %s not found", id))
 	}
-	return t.BindIdWithWalletAddr()
+	err := t.BindIdWithWalletAddr()
+	if err != nil {
+		return dspErr.New(dspErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 // RecoverUndoneTask. recover unfinished task from DB
@@ -117,7 +125,7 @@ func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, fileNameMap map[st
 		if err != nil {
 			return err
 		}
-		if err := this.SetFileInfoWithOptions(newId, FileHash(fileHashStr), Walletaddr(walletAddr), FileName(fileNameMap[fileHashStr])); err != nil {
+		if err := this.SetTaskInfoWithOptions(newId, FileHash(fileHashStr), Walletaddr(walletAddr), FileName(fileNameMap[fileHashStr])); err != nil {
 			return err
 		}
 		err = this.BindTaskId(newId)
@@ -129,7 +137,7 @@ func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, fileNameMap map[st
 			return fmt.Errorf("set new task with id failed %s", newId)
 		}
 		log.Debugf("recover db loss task %s %s", newId, fileHashStr)
-		t.SetResult(nil, sdkErr.GET_FILEINFO_FROM_DB_ERROR, "DB has damaged. Can't recover the task")
+		t.SetResult(nil, dspErr.GET_FILEINFO_FROM_DB_ERROR, "DB has damaged. Can't recover the task")
 	}
 	return nil
 }
@@ -170,7 +178,11 @@ func (this *TaskMgr) CleanTask(taskId string) error {
 	this.lock.Lock()
 	delete(this.tasks, taskId)
 	this.lock.Unlock()
-	return this.db.DeleteFileInfo(taskId)
+	err := this.db.DeleteFileInfo(taskId)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
+	}
+	return nil
 }
 
 func (this *TaskMgr) TaskNum() int {
@@ -257,7 +269,7 @@ func (this *TaskMgr) UploadingFileExist(taskId, fileHashStr string) bool {
 func (this *TaskMgr) TaskBlockReq(taskId string) (chan []*GetBlockReq, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return nil, errors.New("task not found")
+		return nil, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
 	return v.GetBlockReq(), nil
 }
@@ -342,7 +354,7 @@ func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 }
 
 // EmitResult. emit result or error async
-func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *sdkErr.SDKError) {
+func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *dspErr.Error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		log.Errorf("[TaskMgr EmitResult] emit result get no task")
@@ -729,11 +741,11 @@ func (this *TaskMgr) DelBlockReq(taskId, blockHash string, index int32) {
 func (this *TaskMgr) IsTaskCanResume(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task not found: %v", taskId)
+		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	state := v.State()
 	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
-		return false, fmt.Errorf("can't resume the task, it's state: %d", state)
+		return false, dspErr.New(dspErr.WRONG_TASK_TYPE, "can't resume the task, it's state: %d", state)
 	}
 	if state == store.TaskStatePause {
 		return true, nil
@@ -744,11 +756,11 @@ func (this *TaskMgr) IsTaskCanResume(taskId string) (bool, error) {
 func (this *TaskMgr) IsTaskCanPause(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task not found: %v", taskId)
+		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	state := v.State()
 	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
-		return false, fmt.Errorf("can't pause the task, it's state: %d", state)
+		return false, dspErr.New(dspErr.WRONG_TASK_TYPE, "can't pause the task, it's state: %d", state)
 	}
 	if state == store.TaskStateDoing || state == store.TaskStatePrepare {
 		return true, nil
@@ -759,7 +771,7 @@ func (this *TaskMgr) IsTaskCanPause(taskId string) (bool, error) {
 func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	return v.State() == store.TaskStatePause, nil
 }
@@ -767,7 +779,7 @@ func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
 func (this *TaskMgr) IsTaskDone(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	return v.State() == store.TaskStateDone, nil
 }
@@ -775,7 +787,7 @@ func (this *TaskMgr) IsTaskDone(taskId string) (bool, error) {
 func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	log.Debugf("task state %s, %d", taskId, v.State())
 	return v.State() == store.TaskStateCancel, nil
@@ -784,7 +796,7 @@ func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
 func (this *TaskMgr) IsTaskPaying(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	log.Debugf("task detail state %s, %d", taskId, v.DetailState())
 	return v.DetailState() == TaskUploadFilePaying || v.DetailState() == TaskDownloadPayForBlocks, nil
@@ -793,7 +805,7 @@ func (this *TaskMgr) IsTaskPaying(taskId string) (bool, error) {
 func (this *TaskMgr) IsTaskPauseOrCancel(taskId string) (bool, bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	state := v.State()
 	return state == store.TaskStatePause, state == store.TaskStateCancel, nil
@@ -802,7 +814,7 @@ func (this *TaskMgr) IsTaskPauseOrCancel(taskId string) (bool, bool, error) {
 func (this *TaskMgr) IsTaskStop(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	state := v.State()
 	if state != store.TaskStatePause && state != store.TaskStateCancel {
@@ -814,7 +826,7 @@ func (this *TaskMgr) IsTaskStop(taskId string) (bool, error) {
 func (this *TaskMgr) IsTaskPreparingOrDoing(taskId string) (bool, bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	state := v.State()
 	return state == store.TaskStatePrepare, state == store.TaskStateDoing, nil
@@ -823,7 +835,7 @@ func (this *TaskMgr) IsTaskPreparingOrDoing(taskId string) (bool, bool, error) {
 func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
 	log.Debugf("v.state: %d", v.State())
 	return v.State() == store.TaskStateFailed, nil

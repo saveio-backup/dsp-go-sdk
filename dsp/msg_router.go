@@ -78,7 +78,7 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 // handleFileAskMsg. client send file ask msg to storage node for handshake and share file metadata
 func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	// try to find a exist task id
-	existTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	existTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	log.Debugf("handle file ask existTaskId: %s", existTaskId)
 	if len(existTaskId) > 0 {
 		// handle old task
@@ -101,8 +101,8 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			message.WithSessionId(fileMsg.SessionId),
 			message.WithBreakpointHash(currentBlockHash),
 			message.WithBreakpointIndex(currentBlockIndex),
-			message.WithWalletAddress(this.WalletAddress()),
-			message.WithSign(this.Account),
+			message.WithWalletAddress(this.chain.WalletAddress()),
+			message.WithSign(this.account),
 		)
 
 		log.Debugf("fetch task is exist send file_ack msg %v", peer)
@@ -125,7 +125,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		log.Errorf("new task failed %s", err)
 		return
 	}
-	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.FileHash(fileMsg.Hash), task.Walletaddr(this.WalletAddress())); err != nil {
+	if err := this.taskMgr.SetTaskInfoWithOptions(taskId, task.FileHash(fileMsg.Hash), task.Walletaddr(this.chain.WalletAddress())); err != nil {
 		log.Errorf("batch set file info fetch ask %s", err)
 		return
 	}
@@ -146,7 +146,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			return
 		}
 		log.Debugf("save file prefix :%s", string(fileMsg.Prefix))
-		if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.Prefix(string(fileMsg.Prefix)), task.TotalBlockCnt(hashListLen)); err != nil {
+		if err := this.taskMgr.SetTaskInfoWithOptions(taskId, task.Prefix(string(fileMsg.Prefix)), task.TotalBlockCnt(hashListLen)); err != nil {
 			log.Errorf("SetFileInfoFields failed:%s", err)
 			return
 		}
@@ -155,8 +155,8 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		message.WithSessionId(fileMsg.SessionId),
 		message.WithBreakpointHash(""),
 		message.WithBreakpointIndex(0),
-		message.WithWalletAddress(this.WalletAddress()),
-		message.WithSign(this.Account),
+		message.WithWalletAddress(this.chain.WalletAddress()),
+		message.WithSign(this.account),
 	)
 	log.Debugf("send file_ack msg %v %v", peer, newMsg)
 	err = ctx.Reply(context.Background(), newMsg.ToProtoMsg())
@@ -169,7 +169,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 // handleFileRdyMsg. client send ready msg to storage node for telling them it's ready for be fetched
 func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	// my task. use my wallet address
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	if fileMsg.Tx == nil {
 		return
 	}
@@ -179,7 +179,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		this.taskMgr.DeleteTask(taskId)
 		return
 	}
-	info, _ := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
+	info, _ := this.chain.GetFileInfo(fileMsg.Hash)
 	if info == nil {
 		log.Errorf("fetch ask file info is nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 		this.taskMgr.DeleteTask(taskId)
@@ -215,7 +215,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 // handleFileFetchPauseMsg. client send pause msg to storage nodes for telling them to pause the task
 func (this *Dsp) handleFileFetchPauseMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	// my task. use my wallet address
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	log.Debugf("handleFileFetchPauseMsg: of %s, taskId: %s from", fileMsg.Hash, taskId, peer.Address)
 	if !this.taskMgr.IsFileInfoExist(taskId) {
 		return
@@ -233,7 +233,7 @@ func (this *Dsp) handleFileFetchPauseMsg(ctx *network.ComponentContext, peer *ne
 // handleFileFetchResumeMsg. handle resume msg from client
 func (this *Dsp) handleFileFetchResumeMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	// my task. use my wallet address
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	log.Debugf("handleFileFetchResumeMsg: of %s, taskId: %s from", fileMsg.Hash, taskId, peer.Address)
 	if !this.taskMgr.IsFileInfoExist(taskId) {
 		return
@@ -249,7 +249,7 @@ func (this *Dsp) handleFileFetchResumeMsg(ctx *network.ComponentContext, peer *n
 }
 
 func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeUpload)
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeUpload)
 	if !this.taskMgr.IsFileInfoExist(taskId) {
 		return
 	}
@@ -259,7 +259,7 @@ func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext, peer *net
 
 func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
 	// my task. use my wallet address
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	log.Debugf("handleFileFetchCancelMsg: of %s, taskId: %s from", fileMsg.Hash, taskId, peer.Address)
 	replyMsg := message.NewEmptyMsg()
 	err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
@@ -283,8 +283,8 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 			log.Errorf("get block height err %s", err)
 			replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK, serr.DELETE_FILE_TX_UNCONFIRMED, err.Error(),
 				message.WithSessionId(fileMsg.SessionId),
-				message.WithWalletAddress(this.WalletAddress()),
-				message.WithSign(this.Account),
+				message.WithWalletAddress(this.chain.WalletAddress()),
+				message.WithSign(this.account),
 			)
 			err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 			if err != nil {
@@ -295,13 +295,13 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 			return
 		}
 	}
-	info, err := this.Chain.Native.Fs.GetFileInfo(fileMsg.Hash)
+	info, err := this.chain.GetFileInfo(fileMsg.Hash)
 	if info != nil || (err != nil && strings.Index(err.Error(), "FsGetFileInfo not found") == -1) {
 		log.Errorf("delete file info is not nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 		replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK, serr.DELETE_FILE_FILEINFO_EXISTS, "file info hasn't been deleted",
 			message.WithSessionId(fileMsg.SessionId),
-			message.WithWalletAddress(this.WalletAddress()),
-			message.WithSign(this.Account),
+			message.WithWalletAddress(this.chain.WalletAddress()),
+			message.WithSign(this.account),
 		)
 		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		if err != nil {
@@ -313,8 +313,8 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 	}
 	replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK,
 		message.WithSessionId(fileMsg.SessionId),
-		message.WithWalletAddress(this.WalletAddress()),
-		message.WithSign(this.Account),
+		message.WithWalletAddress(this.chain.WalletAddress()),
+		message.WithSign(this.account),
 	)
 	err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 	if err != nil {
@@ -323,7 +323,7 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 		log.Debugf("reply delete ack msg success")
 	}
 	// TODO: check file owner
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	err = this.DeleteDownloadedFile(taskId)
 	if err != nil {
 		log.Errorf("delete downloaded file failed", err)
@@ -332,17 +332,17 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 
 // handleFileDownloadAskMsg. client send download ask msg to peers for download
 func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
-	if !this.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
+	if !this.chain.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
 		log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
 		return
 	}
 	replyErr := func(sessionId, fileHash string, errorCode uint32, errorMsg string, ctx *network.ComponentContext) {
 		replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK, errorCode, errorMsg,
 			message.WithSessionId(sessionId),
-			message.WithWalletAddress(this.WalletAddress()),
+			message.WithWalletAddress(this.chain.WalletAddress()),
 			message.WithUnitPrice(0),
 			message.WithAsset(0),
-			message.WithSign(this.Account),
+			message.WithSign(this.account),
 		)
 		err := ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		log.Debugf("reply download_ack errmsg code %d, err %s", errorCode, err)
@@ -350,7 +350,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 			log.Errorf("reply download ack err msg failed", err)
 		}
 	}
-	downloadInfoId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	downloadInfoId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	price, err := this.GetFileUnitPrice(fileMsg.PayInfo.Asset)
 	if err != nil {
 		replyErr("", fileMsg.Hash, serr.UNITPRICE_ERROR, err.Error(), ctx)
@@ -378,11 +378,11 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK,
 			message.WithSessionId(sessionId),
 			message.WithBlockHashes(this.taskMgr.FileBlockHashes(downloadInfoId)),
-			message.WithWalletAddress(this.WalletAddress()),
+			message.WithWalletAddress(this.chain.WalletAddress()),
 			message.WithPrefix(prefix),
 			message.WithUnitPrice(price),
 			message.WithAsset(fileMsg.PayInfo.Asset),
-			message.WithSign(this.Account),
+			message.WithSign(this.account),
 		)
 		err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 		if err != nil {
@@ -404,7 +404,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return
 	}
-	rootBlk := this.Fs.GetBlock(fileMsg.Hash)
+	rootBlk := this.fs.GetBlock(fileMsg.Hash)
 
 	if !this.taskMgr.IsFileInfoExist(downloadInfoId) {
 		replyErr(sessionId, fileMsg.Hash, serr.FILEINFO_NOT_EXIST, "", ctx)
@@ -429,18 +429,18 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 	replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK,
 		message.WithSessionId(sessionId),
 		message.WithBlockHashes(this.taskMgr.FileBlockHashes(downloadInfoId)),
-		message.WithWalletAddress(this.WalletAddress()),
+		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithPrefix(prefix),
 		message.WithUnitPrice(price),
 		message.WithAsset(fileMsg.PayInfo.Asset),
-		message.WithSign(this.Account),
+		message.WithSign(this.account),
 	)
 	err = ctx.Reply(context.Background(), replyMsg.ToProtoMsg())
 	if err != nil {
 		log.Errorf("reply download ack  msg failed", err)
 	}
 	log.Debugf("reply download ack success new share task %s, key %s", fileMsg.Hash, taskId)
-	if err := this.taskMgr.SetFileInfoWithOptions(taskId, task.FileHash(fileMsg.Hash), task.Walletaddr(fileMsg.PayInfo.WalletAddress)); err != nil {
+	if err := this.taskMgr.SetTaskInfoWithOptions(taskId, task.FileHash(fileMsg.Hash), task.Walletaddr(fileMsg.PayInfo.WalletAddress)); err != nil {
 		log.Errorf("[DSP handleFileDownloadAskMsg] batch commit file info failed, err: %s", err)
 	}
 	this.taskMgr.BindTaskId(taskId)
@@ -451,14 +451,14 @@ func (this *Dsp) handleFileDownloadMsg(ctx *network.ComponentContext, peer *netw
 	taskKey := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, store.TaskTypeShare)
 	// TODO: check channel balance and router path
 	this.taskMgr.AddShareTo(taskKey, fileMsg.PayInfo.WalletAddress)
-	hostAddr, _ := this.GetExternalIP(fileMsg.PayInfo.WalletAddress)
+	hostAddr, _ := this.dns.GetExternalIP(fileMsg.PayInfo.WalletAddress)
 	log.Debugf("Set host addr after recv file download %s - %s", fileMsg.PayInfo.WalletAddress, hostAddr)
 	err := ctx.Reply(context.Background(), message.NewEmptyMsg().ToProtoMsg())
 	if err != nil {
 		log.Errorf("reply download msg failed, err %s", err)
 	}
 	log.Debugf("reply download msg success")
-	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
 	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
 	this.taskMgr.EmitNotification(taskKey, task.ShareStateBegin, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
@@ -485,7 +485,7 @@ func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer
 	} else {
 		log.Debugf("reply download cancel msg success")
 	}
-	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
 	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
 	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
@@ -506,7 +506,7 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *ne
 		log.Errorf("reply download msg failed, err %s", err)
 	}
 	log.Debugf("reply download ack msg success")
-	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.WalletAddress(), store.TaskTypeDownload)
+	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
 	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
 	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
@@ -521,7 +521,7 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 	}
 	switch blockFlightsMsg.Blocks[0].Operation {
 	case netcom.BLOCK_OP_NONE:
-		taskId := this.taskMgr.TaskId(blockFlightsMsg.Blocks[0].FileHash, this.WalletAddress(), store.TaskTypeDownload)
+		taskId := this.taskMgr.TaskId(blockFlightsMsg.Blocks[0].FileHash, this.chain.WalletAddress(), store.TaskTypeDownload)
 		log.Debugf("taskId: %s, sessionId: %s receive %d blocks from peer:%s", taskId, blockFlightsMsg.Blocks[0].SessionId, len(blockFlightsMsg.Blocks), peer.Address)
 		exist := this.taskMgr.TaskExist(taskId)
 		if !exist {
@@ -575,7 +575,7 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 				return
 			}
 		}
-		taskType, _ := this.taskMgr.TaskType(sessionId)
+		taskType, _ := this.taskMgr.GetTaskType(sessionId)
 		log.Debugf("task key:%s type %d", sessionId, taskType)
 		switch taskType {
 		case store.TaskTypeDownload, store.TaskTypeShare:
@@ -640,7 +640,7 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 }
 
 func (this *Dsp) waitForTxConfirmed(blockHeight uint64) error {
-	currentBlockHeight, err := this.Chain.GetCurrentBlockHeight()
+	currentBlockHeight, err := this.chain.GetCurrentBlockHeight()
 	log.Debugf("wait for tx confirmed height: %d, now: %d", blockHeight, currentBlockHeight)
 	if err != nil {
 		log.Errorf("get block height err %s", err)
@@ -654,7 +654,7 @@ func (this *Dsp) waitForTxConfirmed(blockHeight uint64) error {
 	if timeout > common.DOWNLOAD_FILE_TIMEOUT {
 		timeout = common.DOWNLOAD_FILE_TIMEOUT
 	}
-	waitSuccess, err := this.Chain.WaitForGenerateBlock(time.Duration(timeout)*time.Second, uint32(blockHeight-uint64(currentBlockHeight)))
+	waitSuccess, err := this.chain.WaitForGenerateBlock(time.Duration(timeout)*time.Second, uint32(blockHeight-uint64(currentBlockHeight)))
 	if err != nil || !waitSuccess {
 		log.Errorf("get block height err %s %d %d", err, currentBlockHeight, blockHeight)
 		return fmt.Errorf("get block height err %d %d", currentBlockHeight, blockHeight)

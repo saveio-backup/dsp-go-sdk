@@ -1,18 +1,38 @@
 package error
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
-type SDKError struct {
+type Error struct {
 	Code    uint32
 	Message string
-	Error   error
+	Cause   error
 }
 
-func NewDetailError(code uint32, msg string) *SDKError {
+func New(code uint32, format string, a ...interface{}) *Error {
+	msg := fmt.Sprintf(format, a...)
 	err := errors.New(msg)
-	return &SDKError{
+	return &Error{
 		Code:    code,
 		Message: msg,
-		Error:   err,
+		Cause:   err,
 	}
+}
+
+// NewWithError. new dsp error with non-nil error
+func NewWithError(code uint32, err error) *Error {
+	return &Error{
+		Code:    code,
+		Message: err.Error(),
+		Cause:   err,
+	}
+}
+
+func (serr *Error) Error() string {
+	if serr == nil {
+		return "error is nil"
+	}
+	return fmt.Sprintf("code: %d, message: %v", serr.Code, serr.Message)
 }

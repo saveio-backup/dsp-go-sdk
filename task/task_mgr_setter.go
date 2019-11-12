@@ -4,33 +4,42 @@ import (
 	"fmt"
 
 	"github.com/saveio/dsp-go-sdk/common"
+	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/themis/common/log"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 // SetFileInfoWithOptions
-func (this *TaskMgr) SetFileInfoWithOptions(taskId string, opts ...InfoOption) error {
+func (this *TaskMgr) SetTaskInfoWithOptions(taskId string, opts ...InfoOption) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("[TaskMgr SetSessionId] task not found: %s", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetInfoWithOptions(opts...)
+	err := v.SetInfoWithOptions(opts...)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 // SetFileHash. set file hash of task
 func (this *TaskMgr) SetFileHash(taskId, fileHash string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("[TaskMgr SetFileHash] task not found: %s", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetFileHash(fileHash)
+	err := v.SetFileHash(fileHash)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetSessionId(taskId, peerWalletAddr, id string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("[TaskMgr SetSessionId] task not found: %s", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	v.SetSessionId(peerWalletAddr, id)
 	return nil
@@ -42,14 +51,22 @@ func (this *TaskMgr) SetFileName(taskId, fileName string) error {
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetFileName] task not found: %s", taskId)
 	}
-	return v.SetFileName(fileName)
+	err := v.SetFileName(fileName)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 func (this *TaskMgr) SetTotalBlockCount(taskId string, totalBlockCount uint64) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetFileName] task not found: %s", taskId)
 	}
-	return v.SetTotalBlockCnt(totalBlockCount)
+	err := v.SetTotalBlockCnt(totalBlockCount)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 // SetPrefix. set file prefix of task
@@ -58,7 +75,11 @@ func (this *TaskMgr) SetPrefix(taskId string, prefix string) error {
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetFileName] task not found: %s", taskId)
 	}
-	return v.SetPrefix(prefix)
+	err := v.SetPrefix(prefix)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetWalletAddr(taskId, walletAddr string) error {
@@ -66,7 +87,11 @@ func (this *TaskMgr) SetWalletAddr(taskId, walletAddr string) error {
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetWalletAddr] task not found: %s", taskId)
 	}
-	return v.SetWalletaddr(walletAddr)
+	err := v.SetWalletaddr(walletAddr)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetCopyNum(taskId string, copyNum uint64) error {
@@ -74,7 +99,11 @@ func (this *TaskMgr) SetCopyNum(taskId string, copyNum uint64) error {
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetCopyNum] task not found: %s", taskId)
 	}
-	return v.SetCopyNum(copyNum)
+	err := v.SetCopyNum(copyNum)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetOnlyBlock(taskId string, only bool) error {
@@ -82,174 +111,257 @@ func (this *TaskMgr) SetOnlyBlock(taskId string, only bool) error {
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetFileName] task not found: %s", taskId)
 	}
-	return v.SetOnlyBlock(only)
+	err := v.SetOnlyBlock(only)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetTaskState(taskId string, state store.TaskState) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	log.Debugf("set task state: %s %d", taskId, state)
-	return v.SetTaskState(state)
+	err := v.SetTaskState(state)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetWhitelistTx(taskId string, whitelistTx string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetWhiteListTx(whitelistTx)
+	err := v.SetWhiteListTx(whitelistTx)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetFileOwner(taskId, owner string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetFileOwner(owner)
+	err := v.SetFileOwner(owner)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetPrivateKey(taskId string, value []byte) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetPrivateKey(value)
+	err := v.SetPrivateKey(value)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetStoreTx(taskId, tx string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetStoreTx(tx)
+	err := v.SetStoreTx(tx)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetRegUrlTx(taskId, tx string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetRegUrlTx(tx)
+	err := v.SetRegUrlTx(tx)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetBindUrlTx(taskId, tx string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetBindUrlTx(tx)
+	err := v.SetBindUrlTx(tx)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetUrl(taskId, url string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetUrl(url)
+	err := v.SetUrl(url)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetFilePath(taskId, path string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetFilePath(path)
+	err := v.SetFilePath(path)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetSimpleCheckSum(taskId, checksum string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetSimpleCheckSum(checksum)
+	err := v.SetSimpleCheckSum(checksum)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) BatchCommit(taskId string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.BatchCommit()
+	err := v.BatchCommit()
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) AddUploadedBlock(taskId, blockHashStr, nodeAddr string, index uint32, dataSize, offset uint64) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.AddUploadedBlock(taskId, blockHashStr, nodeAddr, index, dataSize, offset)
+	err := v.AddUploadedBlock(taskId, blockHashStr, nodeAddr, index, dataSize, offset)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetBlocksUploaded(taskId, nodeAddr string, blockInfos []*store.BlockInfo) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetBlocksUploaded(taskId, nodeAddr, blockInfos)
+	err := v.SetBlocksUploaded(taskId, nodeAddr, blockInfos)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetFileUploadOptions(taskId string, opt *fs.UploadOption) error {
-	task, ok := this.GetTaskById(taskId)
-	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+	if err := this.db.SetFileUploadOptions(taskId, opt); err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
 	}
-	task.NewBatchSet()
-	task.SetStoreType(opt.StorageType)
-	task.SetCopyNum(opt.CopyNum)
-	task.SetUrl(string(opt.DnsURL))
-	err := task.BatchCommit()
-	if err != nil {
-		return err
-	}
-	return this.db.SetFileUploadOptions(taskId, opt)
+	return nil
 }
 
 func (this *TaskMgr) SetUploadProgressDone(taskId, nodeAddr string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	if v.State() == store.TaskStateCancel || v.State() == store.TaskStateFailed {
 		return nil
 	}
-	return v.SetUploadProgressDone(taskId, nodeAddr)
+	err := v.SetUploadProgressDone(taskId, nodeAddr)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetBlockDownloaded(taskId, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return fmt.Errorf("task: %s, not exist", taskId)
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.SetBlockDownloaded(taskId, blockHashStr, nodeAddr, index, offset, links)
+	err := v.SetBlockDownloaded(taskId, blockHashStr, nodeAddr, index, offset, links)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) AddShareTo(id, walletAddress string) error {
-	return this.db.AddShareTo(id, walletAddress)
+	err := this.db.AddShareTo(id, walletAddress)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) SetFileDownloadOptions(id string, opt *common.DownloadOption) error {
-	return this.db.SetFileDownloadOptions(id, opt)
+	err := this.db.SetFileDownloadOptions(id, opt)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) AddFileSession(fileInfoId string, sessionId, walletAddress, hostAddress string, asset, unitPrice uint64) error {
 	this.SetSessionId(fileInfoId, walletAddress, sessionId)
-	return this.db.AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress, asset, unitPrice)
+	err := this.db.AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress, asset, unitPrice)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) AddFileUnpaid(id, walletAddress string, paymentId, asset int32, amount uint64) error {
-	return this.db.AddFileUnpaid(id, walletAddress, paymentId, asset, amount)
+	err := this.db.AddFileUnpaid(id, walletAddress, paymentId, asset, amount)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) AddFileBlockHashes(id string, blocks []string) error {
-	return this.db.AddFileBlockHashes(id, blocks)
+	err := this.db.AddFileBlockHashes(id, blocks)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) DeleteFileUnpaid(id, walletAddress string, paymentId, asset int32, amount uint64) error {
-	return this.db.DeleteFileUnpaid(id, walletAddress, paymentId, asset, amount)
+	err := this.db.DeleteFileUnpaid(id, walletAddress, paymentId, asset, amount)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }
 
 func (this *TaskMgr) DeleteTaskIds(ids []string) error {
-	return this.db.DeleteTaskIds(ids)
+	err := this.db.DeleteTaskIds(ids)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
 }

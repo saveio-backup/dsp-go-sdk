@@ -1,66 +1,59 @@
-package dsp
+package chain
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strings"
 
-	"github.com/saveio/dsp-go-sdk/config"
-	"github.com/saveio/themis/account"
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 	chainCom "github.com/saveio/themis/common"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/usdt"
 )
 
-func (this *Dsp) CurrentAccount() *account.Account {
-	return this.Chain.Native.Fs.DefAcc
-}
-
-// WalletAddress. get base58 address
-func (this *Dsp) WalletAddress() string {
-	return this.CurrentAccount().Address.ToBase58()
-}
-
 // RegisterNode. register node to chain
-func (this *Dsp) RegisterNode(addr string, volume, serviceTime uint64) (string, error) {
-	txHash, err := this.Chain.Native.Fs.NodeRegister(volume, serviceTime, addr)
+func (this *Chain) RegisterNode(addr string, volume, serviceTime uint64) (string, error) {
+	txHash, err := this.themis.Native.Fs.NodeRegister(volume, serviceTime, addr)
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
 }
 
 // UnregisterNode. unregister node to chain
-func (this *Dsp) UnregisterNode() (string, error) {
-	txHash, err := this.Chain.Native.Fs.NodeCancel()
+func (this *Chain) UnregisterNode() (string, error) {
+	txHash, err := this.themis.Native.Fs.NodeCancel()
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
 }
 
 // QueryNode. query node information by wallet address
-func (this *Dsp) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
+func (this *Chain) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
-	return this.Chain.Native.Fs.NodeQuery(address)
+	info, err := this.themis.Native.Fs.NodeQuery(address)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return info, nil
 }
 
 // UpdateNode. update node information
-func (this *Dsp) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
-	nodeInfo, err := this.QueryNode(this.Chain.Native.Fs.DefAcc.Address.ToBase58())
+func (this *Chain) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
+	nodeInfo, err := this.QueryNode(this.themis.Native.Fs.DefAcc.Address.ToBase58())
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	if volume == 0 {
 		volume = nodeInfo.Volume
 	}
 	if volume < nodeInfo.Volume-nodeInfo.RestVol {
-		return "", fmt.Errorf("volume %d is less than original volume %d - restvol %d", volume, nodeInfo.Volume, nodeInfo.RestVol)
+		return "", dspErr.New(dspErr.CHAIN_ERROR, "volume %d is less than original volume %d - restvol %d", volume, nodeInfo.Volume, nodeInfo.RestVol)
 	}
 	if serviceTime == 0 {
 		serviceTime = nodeInfo.ServiceTime
@@ -68,30 +61,30 @@ func (this *Dsp) UpdateNode(addr string, volume, serviceTime uint64) (string, er
 	if len(addr) == 0 {
 		addr = string(nodeInfo.NodeAddr)
 	}
-	txHash, err := this.Chain.Native.Fs.NodeUpdate(volume, serviceTime, addr)
+	txHash, err := this.themis.Native.Fs.NodeUpdate(volume, serviceTime, addr)
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
 }
 
 // RegisterNode. register node to chain
-func (this *Dsp) NodeWithdrawProfit() (string, error) {
-	txHash, err := this.Chain.Native.Fs.NodeWithDrawProfit()
+func (this *Chain) NodeWithdrawProfit() (string, error) {
+	txHash, err := this.themis.Native.Fs.NodeWithDrawProfit()
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
 }
 
 // CheckFilePrivilege. check if the downloader has privilege to download file
-func (this *Dsp) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
-	if this.Config.FsType == config.FS_FILESTORE {
+func (this *Chain) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
+	if this.isClient {
 		return true
 	}
-	info, err := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
+	info, err := this.themis.Native.Fs.GetFileInfo(fileHashStr)
 	if err != nil || info == nil {
 		return false
 	}
@@ -105,11 +98,11 @@ func (this *Dsp) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
 	if info.Privilege == fs.PRIVATE {
 		return false
 	}
-	whitelist, err := this.Chain.Native.Fs.GetWhiteList(fileHashStr)
+	whitelist, err := this.themis.Native.Fs.GetWhiteList(fileHashStr)
 	if err != nil || whitelist == nil {
 		return true
 	}
-	currentHeight, err := this.Chain.GetCurrentBlockHeight()
+	currentHeight, err := this.themis.GetCurrentBlockHeight()
 	if err != nil {
 		return false
 	}
@@ -125,18 +118,22 @@ func (this *Dsp) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
 }
 
 // GetUserSpace. get user space of client
-func (this *Dsp) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
+func (this *Chain) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
-	return this.Chain.Native.Fs.GetUserSpace(address)
+	us, err := this.themis.Native.Fs.GetUserSpace(address)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return us, nil
 }
 
-func (this *Dsp) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error) {
+func (this *Chain) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	if size == 0 {
 		sizeOpType = uint64(fs.UserSpaceNone)
@@ -144,7 +141,7 @@ func (this *Dsp) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount
 	if blockCount == 0 {
 		countOpType = uint64(fs.UserSpaceNone)
 	}
-	txHash, err := this.Chain.Native.Fs.UpdateUserSpace(address, &fs.UserSpaceOperation{
+	txHash, err := this.themis.Native.Fs.UpdateUserSpace(address, &fs.UserSpaceOperation{
 		Type:  sizeOpType,
 		Value: size,
 	}, &fs.UserSpaceOperation{
@@ -152,16 +149,16 @@ func (this *Dsp) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount
 		Value: blockCount,
 	})
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
 }
 
-func (this *Dsp) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
+func (this *Chain) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	if size == 0 {
 		sizeOpType = uint64(fs.UserSpaceNone)
@@ -169,16 +166,20 @@ func (this *Dsp) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blo
 	if blockCount == 0 {
 		countOpType = uint64(fs.UserSpaceNone)
 	}
-	return this.Chain.Native.Fs.GetUpdateSpaceCost(address, &fs.UserSpaceOperation{
+	state, err := this.themis.Native.Fs.GetUpdateSpaceCost(address, &fs.UserSpaceOperation{
 		Type:  sizeOpType,
 		Value: size,
 	}, &fs.UserSpaceOperation{
 		Type:  countOpType,
 		Value: blockCount,
 	})
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return state, nil
 }
 
-func (this *Dsp) IsFileInfoDeleted(err error) bool {
+func (this *Chain) IsFileInfoDeleted(err error) bool {
 	if err != nil && strings.Contains(err.Error(), "[FS Profit] FsGetFileInfo not found") {
 		return true
 	}

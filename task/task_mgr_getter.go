@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/saveio/dsp-go-sdk/common"
+	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
@@ -13,7 +14,7 @@ import (
 func (this *TaskMgr) GetSessionId(taskId, peerWalletAddr string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	switch v.GetTaskType() {
 	case store.TaskTypeUpload:
@@ -24,30 +25,30 @@ func (this *TaskMgr) GetSessionId(taskId, peerWalletAddr string) (string, error)
 	case store.TaskTypeDownload:
 		return v.GetSessionId(peerWalletAddr), nil
 	}
-	return "", fmt.Errorf("unknown task type %d", v.GetTaskType())
+	return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("unknown task type %d", v.GetTaskType()))
 }
 
-func (this *TaskMgr) FileNameFromTask(taskId string) (string, error) {
+func (this *TaskMgr) GetTaskFileName(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetFileName(), nil
 }
 
 // TaskType.
-func (this *TaskMgr) TaskType(taskId string) (store.TaskType, error) {
+func (this *TaskMgr) GetTaskType(taskId string) (store.TaskType, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return store.TaskTypeNone, fmt.Errorf("task: %s, not exist", taskId)
+		return store.TaskTypeNone, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetTaskType(), nil
 }
 
-func (this *TaskMgr) TaskFileHash(taskId string) (string, error) {
+func (this *TaskMgr) GetTaskFileHash(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetFileHash(), nil
 
@@ -56,7 +57,7 @@ func (this *TaskMgr) TaskFileHash(taskId string) (string, error) {
 func (this *TaskMgr) OnlyBlock(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return false, fmt.Errorf("task: %s, not exist", taskId)
+		return false, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetOnlyblock(), nil
 }
@@ -64,7 +65,7 @@ func (this *TaskMgr) OnlyBlock(taskId string) (bool, error) {
 func (this *TaskMgr) GetTaskState(taskId string) (store.TaskState, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return store.TaskStateNone, fmt.Errorf("task: %s, not exist", taskId)
+		return store.TaskStateNone, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.State(), nil
 }
@@ -72,7 +73,7 @@ func (this *TaskMgr) GetTaskState(taskId string) (store.TaskState, error) {
 func (this *TaskMgr) GetTaskDetailState(taskId string) (TaskProgressState, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return 0, fmt.Errorf("task: %s, not exist", taskId)
+		return 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.TransferingState(), nil
 }
@@ -80,7 +81,7 @@ func (this *TaskMgr) GetTaskDetailState(taskId string) (TaskProgressState, error
 func (this *TaskMgr) GetFileTotalBlockCount(taskId string) (uint64, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return 0, fmt.Errorf("task: %s, not exist", taskId)
+		return 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetTotalBlockCnt(), nil
 }
@@ -88,7 +89,7 @@ func (this *TaskMgr) GetFileTotalBlockCount(taskId string) (uint64, error) {
 func (this *TaskMgr) GetFilePrefix(taskId string) ([]byte, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return nil, fmt.Errorf("task: %s, not exist", taskId)
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetPrefix(), nil
 }
@@ -96,7 +97,7 @@ func (this *TaskMgr) GetFilePrefix(taskId string) ([]byte, error) {
 func (this *TaskMgr) GetTaskUpdatedAt(taskId string) (uint64, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return 0, fmt.Errorf("task: %s, not exist", taskId)
+		return 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetUpdatedAt(), nil
 }
@@ -104,7 +105,7 @@ func (this *TaskMgr) GetTaskUpdatedAt(taskId string) (uint64, error) {
 func (this *TaskMgr) GetFileName(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetFileName(), nil
 }
@@ -112,7 +113,7 @@ func (this *TaskMgr) GetFileName(taskId string) (string, error) {
 func (this *TaskMgr) GetFileOwner(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetFileOwner(), nil
 }
@@ -120,7 +121,7 @@ func (this *TaskMgr) GetFileOwner(taskId string) (string, error) {
 func (this *TaskMgr) GetFilePrivateKey(taskId string) ([]byte, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return nil, fmt.Errorf("task: %s, not exist", taskId)
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetPrivateKey(), nil
 }
@@ -128,7 +129,7 @@ func (this *TaskMgr) GetFilePrivateKey(taskId string) ([]byte, error) {
 func (this *TaskMgr) GetStoreTx(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetStoreTx(), nil
 }
@@ -136,7 +137,7 @@ func (this *TaskMgr) GetStoreTx(taskId string) (string, error) {
 func (this *TaskMgr) GetRegUrlTx(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetRegUrlTx(), nil
 }
@@ -144,7 +145,7 @@ func (this *TaskMgr) GetRegUrlTx(taskId string) (string, error) {
 func (this *TaskMgr) GetBindUrlTx(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetBindUrlTx(), nil
 }
@@ -152,7 +153,7 @@ func (this *TaskMgr) GetBindUrlTx(taskId string) (string, error) {
 func (this *TaskMgr) GetWhitelistTx(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetWhitelistTx(), nil
 }
@@ -160,7 +161,7 @@ func (this *TaskMgr) GetWhitelistTx(taskId string) (string, error) {
 func (this *TaskMgr) GetFilePath(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
-		return "", fmt.Errorf("task: %s, not exist", taskId)
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetFilePath(), nil
 }
@@ -182,23 +183,43 @@ func (this *TaskMgr) GetProgressInfo(taskId string) *ProgressInfo {
 }
 
 func (this *TaskMgr) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint32, error) {
-	return this.db.GetUndownloadedBlockInfo(id, rootBlockHash)
+	undownloadedList, undownloadedMap, err := this.db.GetUndownloadedBlockInfo(id, rootBlockHash)
+	if err != nil {
+		return nil, nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return undownloadedList, undownloadedMap, nil
 }
 
 func (this *TaskMgr) GetFileSessions(fileInfoId string) (map[string]*store.Session, error) {
-	return this.db.GetFileSessions(fileInfoId)
+	sessions, err := this.db.GetFileSessions(fileInfoId)
+	if err != nil {
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return sessions, nil
 }
 
 func (this *TaskMgr) GetFileUploadOptions(id string) (*fs.UploadOption, error) {
-	return this.db.GetFileUploadOptions(id)
+	opt, err := this.db.GetFileUploadOptions(id)
+	if err != nil {
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return opt, nil
 }
 
 func (this *TaskMgr) GetFileDownloadOptions(id string) (*common.DownloadOption, error) {
-	return this.db.GetFileDownloadOptions(id)
+	opt, err := this.db.GetFileDownloadOptions(id)
+	if err != nil {
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return opt, nil
 }
 
 func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint64, error) {
-	return this.db.GetCurrentSetBlock(fileInfoId)
+	hash, index, err := this.db.GetCurrentSetBlock(fileInfoId)
+	if err != nil {
+		return "", 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return hash, index, nil
 }
 
 func (this *TaskMgr) IsFileUploaded(id string) bool {
@@ -210,7 +231,11 @@ func (this *TaskMgr) IsFileDownloaded(id string) bool {
 }
 
 func (this *TaskMgr) GetFileInfo(id string) (*store.TaskInfo, error) {
-	return this.db.GetFileInfo(id)
+	info, err := this.db.GetFileInfo(id)
+	if err != nil {
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return info, nil
 }
 
 func (this *TaskMgr) IsBlockDownloaded(id, blockHashStr string, index uint32) bool {
@@ -241,15 +266,27 @@ func (this *TaskMgr) IsFileInfoExist(id string) bool {
 }
 
 func (this *TaskMgr) AllDownloadFiles() ([]*store.TaskInfo, []string, error) {
-	return this.db.AllDownloadFiles()
+	info, hashes, err := this.db.AllDownloadFiles()
+	if err != nil {
+		return nil, nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return info, hashes, nil
 }
 
 func (this *TaskMgr) GetUnpaidAmount(id, walletAddress string, asset int32) (uint64, error) {
-	return this.db.GetUnpaidAmount(id, walletAddress, asset)
+	amount, err := this.db.GetUnpaidAmount(id, walletAddress, asset)
+	if err != nil {
+		return 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return amount, nil
 }
 
 func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint32) (uint64, error) {
-	return this.db.GetBlockOffset(id, blockHash, index)
+	offset, err := this.db.GetBlockOffset(id, blockHash, index)
+	if err != nil {
+		return 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return offset, nil
 }
 
 func (this *TaskMgr) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse, includeFailed bool) []string {
@@ -258,9 +295,17 @@ func (this *TaskMgr) GetTaskIdList(offset, limit uint32, ft store.TaskType, allT
 
 // GetUnpaidPayments. get unpaid payments
 func (this *TaskMgr) GetUnpaidPayments(id, payToAddress string, asset int32) (map[int32]*store.Payment, error) {
-	return this.db.GetUnpaidPayments(id, payToAddress, asset)
+	m, err := this.db.GetUnpaidPayments(id, payToAddress, asset)
+	if err != nil {
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return m, nil
 }
 
 func (this *TaskMgr) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
-	return this.db.GetTaskIdWithPaymentId(paymentId)
+	id, err := this.db.GetTaskIdWithPaymentId(paymentId)
+	if err != nil {
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return id, nil
 }

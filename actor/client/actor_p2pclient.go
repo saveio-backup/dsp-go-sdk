@@ -1,13 +1,12 @@
 package client
 
 import (
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/ontio/ontology-eventbus/actor"
 	"github.com/saveio/dsp-go-sdk/common"
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
@@ -162,9 +161,9 @@ func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
 		if resp != nil {
 			return resp.Value, resp.Error
 		}
-		return false, fmt.Errorf("[P2pConnectionExist] no response")
+		return false, dspErr.New(dspErr.NETWORK_CONNECT_ERROR, "[P2pConnectionExist] no response")
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return false, fmt.Errorf("[P2pConnectionExist] timeout")
+		return false, dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pConnectionExist] timeout")
 	}
 }
 
@@ -178,11 +177,11 @@ func P2pWaitForConnected(address string, timeout time.Duration) error {
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			return resp.Error
+			return dspErr.NewWithError(dspErr.NETWORK_CONNECT_ERROR, resp.Error)
 		}
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return fmt.Errorf("[P2pWaitForConnected] timeout")
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pWaitForConnected] timeout")
 	}
 }
 
@@ -195,11 +194,11 @@ func P2pConnect(address string) error {
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			return resp.Error
+			return dspErr.NewWithError(dspErr.NETWORK_CONNECT_ERROR, resp.Error)
 		}
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return fmt.Errorf("[P2pConnect] timeout")
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pConnect] timeout")
 	}
 }
 
@@ -213,11 +212,11 @@ func P2pReconnectPeer(address string, netType P2pNetType) error {
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			return resp.Error
+			return dspErr.NewWithError(dspErr.NETWORK_CONNECT_ERROR, resp.Error)
 		}
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return fmt.Errorf("[P2pConnect] timeout")
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pConnect] timeout")
 	}
 }
 
@@ -230,11 +229,11 @@ func P2pClose(address string) error {
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			return resp.Error
+			return dspErr.NewWithError(dspErr.NETWORK_CLOSE_ERROR, resp.Error)
 		}
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return fmt.Errorf("[P2pClose] timeout")
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pClose] timeout")
 	}
 }
 
@@ -248,11 +247,11 @@ func P2pSend(address string, data proto.Message) error {
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			return resp.Error
+			return dspErr.NewWithError(dspErr.NETWORK_SEND_ERROR, resp.Error)
 		}
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return fmt.Errorf("[P2pSend] timeout")
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pSend] timeout")
 	}
 }
 
@@ -269,11 +268,11 @@ func P2pBroadcast(addresses []string, data proto.Message, needReply bool, action
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			return nil, resp.Error
+			return nil, dspErr.NewWithError(dspErr.NETWORK_BROADCAST_ERROR, resp.Error)
 		}
 		return resp.Result, nil
 	case <-time.After(time.Duration(common.P2P_BROADCAST_TIMEOUT*len(addresses)) * time.Second):
-		return nil, fmt.Errorf("[P2pBroadcast] timeout")
+		return nil, dspErr.New(dspErr.NETWORK_TIMEOUT, "p2p broadcast timeout")
 	}
 }
 
@@ -309,11 +308,11 @@ func P2pRequestWithRetry(msg proto.Message, peer string, retry, timeout int) (pr
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
 			log.Errorf("[P2pRequestWithRetry] resp.Error %s", resp.Error)
-			return nil, resp.Error
+			return nil, dspErr.NewWithError(dspErr.NETWORK_REQ_ERROR, resp.Error)
 		}
 		return resp.Data, nil
 	case <-time.After(time.Duration(common.ACTOR_MAX_P2P_REQ_TIMEOUT+1) * time.Second):
-		return nil, fmt.Errorf("[P2pRequestWithRetry] send request msg to %s timeout", peer)
+		return nil, dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pRequestWithRetry] send request msg to %s timeout", peer)
 	}
 }
 
@@ -329,11 +328,11 @@ func P2pCompleteTorrent(hash []byte, ip string, port uint64, targetDnsAddr strin
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			return resp.Error
+			return dspErr.NewWithError(dspErr.DNS_PUSH_TRACKER_ERROR, resp.Error)
 		}
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return fmt.Errorf("[P2pCompleteTorrent] timeout")
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pCompleteTorrent] timeout")
 	}
 }
 
@@ -349,10 +348,10 @@ func P2pTorrentPeers(hash []byte, targetDnsAddr string) ([]string, error) {
 		if resp != nil {
 			return resp.Value, resp.Error
 		}
-		return nil, errors.New("response is nil")
+		return nil, dspErr.New(dspErr.DNS_REQ_TRACKER_ERROR, "response is nil")
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		log.Errorf("[P2pTorrentPeers] timeout")
-		return nil, fmt.Errorf("[P2pTorrentPeers] timeout")
+		return nil, dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pTorrentPeers] timeout")
 	}
 }
 
@@ -368,11 +367,11 @@ func P2pEndpointRegistry(addr chainCom.Address, ip string, port uint64, targetDn
 	select {
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
-			return resp.Error
+			return dspErr.NewWithError(dspErr.DNS_PUSH_TRACKER_ERROR, resp.Error)
 		}
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return fmt.Errorf("[P2pEndpointRegistry] timeout")
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pEndpointRegistry] timeout")
 	}
 }
 
@@ -388,9 +387,9 @@ func P2pGetEndpointAddr(addr chainCom.Address, targetDnsAddr string) (string, er
 		if resp != nil {
 			return resp.Value, resp.Error
 		}
-		return "", errors.New("response is nil")
+		return "", dspErr.New(dspErr.DNS_REQ_TRACKER_ERROR, "response is nil")
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		log.Errorf("[P2pGetEndpointAddr] timeout")
-		return "", fmt.Errorf("[P2pGetEndpointAddr] timeout")
+		return "", dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pGetEndpointAddr] timeout")
 	}
 }

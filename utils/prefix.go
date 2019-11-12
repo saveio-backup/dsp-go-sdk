@@ -33,8 +33,8 @@ type FilePrefix struct {
 	Reserved    [4]byte
 }
 
-// SetSalt. set a random encrypt salt for prefix
-func (p *FilePrefix) SetSalt() error {
+// MakeSalt. make a random encrypt salt for prefix
+func (p *FilePrefix) MakeSalt() error {
 	var salt [4]byte
 	_, err := rand.Read(salt[:])
 	if err != nil {

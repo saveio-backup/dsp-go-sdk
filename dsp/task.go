@@ -7,7 +7,7 @@ import (
 )
 
 func (this *Dsp) RecoverDBLossTask() error {
-	list, err := this.Chain.Native.Fs.GetFileList(this.Account.Address)
+	list, err := this.chain.GetFileList(this.account.Address)
 	if err != nil {
 		log.Errorf("get file list err %s", err)
 	}
@@ -18,12 +18,12 @@ func (this *Dsp) RecoverDBLossTask() error {
 	nameMap := make(map[string]string, 0)
 	for _, h := range list.List {
 		fileHashStr := string(h.Hash)
-		id := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeUpload)
+		id := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeUpload)
 		exist := this.taskMgr.TaskExistInDB(id)
 		if exist {
 			continue
 		}
-		info, _ := this.Chain.Native.Fs.GetFileInfo(fileHashStr)
+		info, _ := this.chain.GetFileInfo(fileHashStr)
 		if info == nil {
 			log.Debugf("info is nil : %v", fileHashStr)
 			continue
@@ -35,7 +35,7 @@ func (this *Dsp) RecoverDBLossTask() error {
 		return nil
 	}
 	log.Debugf("recover task : %v, %v", uploadHashes, nameMap)
-	err = this.taskMgr.RecoverDBLossTask(uploadHashes, nameMap, this.WalletAddress())
+	err = this.taskMgr.RecoverDBLossTask(uploadHashes, nameMap, this.chain.WalletAddress())
 	if err != nil {
 		log.Errorf("recover DB loss task err %s", err)
 	}
@@ -95,26 +95,26 @@ func (this *Dsp) CloseProgressChannel() {
 }
 
 func (this *Dsp) GetTaskFileName(id string) string {
-	fileName, _ := this.taskMgr.FileNameFromTask(id)
+	fileName, _ := this.taskMgr.GetTaskFileName(id)
 	return fileName
 }
 
 func (this *Dsp) GetTaskFileHash(id string) string {
-	fileHash, _ := this.taskMgr.TaskFileHash(id)
+	fileHash, _ := this.taskMgr.GetTaskFileHash(id)
 	return fileHash
 }
 
 func (this *Dsp) GetUploadTaskId(fileHashStr string) string {
-	return this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeUpload)
+	return this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeUpload)
 }
 
 func (this *Dsp) GetDownloadTaskIdByUrl(url string) string {
-	fileHash := this.GetFileHashFromUrl(url)
-	return this.taskMgr.TaskId(fileHash, this.WalletAddress(), store.TaskTypeDownload)
+	fileHash := this.dns.GetFileHashFromUrl(url)
+	return this.taskMgr.TaskId(fileHash, this.chain.WalletAddress(), store.TaskTypeDownload)
 }
 
 func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
-	return this.taskMgr.GetUrlOfUploadedfile(fileHashStr, this.WalletAddress())
+	return this.taskMgr.GetUrlOfUploadedfile(fileHashStr, this.chain.WalletAddress())
 }
 
 func (this *Dsp) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse, includeFailed bool) []string {

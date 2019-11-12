@@ -10,6 +10,7 @@ import (
 	"github.com/ontio/ontology-eventbus/actor"
 	dspcom "github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	ch "github.com/saveio/pylons"
 	ch_actor "github.com/saveio/pylons/actor/server"
@@ -71,19 +72,19 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 	log.Debugf("pylons cfg: %v", channelConfig)
 	err := dspcom.CreateDirIfNeed(channelConfig.DBPath)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.CHANNEL_CREATE_DB_ERROR, err)
 	}
 	//start channel and actor
 	channelActor, err := ch_actor.NewChannelActor(channelConfig, chain.Native.Channel.DefAcc)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.CHANNEL_CREATE_ACTOR_ERROR, err)
 	}
 	hostAddrCallBack := func(addr common.Address) (string, error) {
 		return getHostAddrCallBack(chaincomm.Address(addr))
 	}
 	err = ch_actor.SetGetHostAddrCallback(hostAddrCallBack)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.CHANNEL_CREATE_DB_ERROR, err)
 	}
 	chnPid := channelActor.GetLocalPID()
 	return &Channel{
@@ -101,17 +102,21 @@ func (this *Channel) GetChannelPid() *actor.PID {
 	return this.chActorId
 }
 
+func (this *Channel) NetworkProtocol() string {
+	return this.cfg.ChannelProtocol
+}
+
 // SetHostAddr. set host address for wallet
 func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
 	log.Debugf("[dsp-go-sdk-channel] GetHostAddr %s", walletAddr)
 	addr, err := chaincomm.AddressFromBase58(walletAddr)
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	log.Debugf("GetHostAddr %v", walletAddr)
 	host, err := ch_actor.GetHostAddr(common.Address(addr))
 	if err != nil {
-		return "", err
+		return "", dspErr.NewWithError(dspErr.DNS_GET_HOSTADDR_ERROR, err)
 	}
 	prefix := this.cfg.ChannelProtocol + "://"
 	if strings.Contains(host, prefix) {
@@ -127,11 +132,11 @@ func (this *Channel) StartService() error {
 	err := this.chActor.SyncBlockData()
 	if err != nil {
 		log.Errorf("channel sync block err %s", err)
-		return err
+		return dspErr.NewWithError(dspErr.CHANNEL_SYNC_BLOCK_ERROR, err)
 	}
 	err = ch_actor.StartPylons()
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.CHANNEL_START_INSTANCE_ERROR, err)
 	}
 	log.Debugf("StartService done")
 	this.isStart = true
@@ -193,18 +198,26 @@ func (this *Channel) GetAllPartners() []string {
 }
 
 func (this *Channel) AddChannelInfo(id uint64, partnerAddr string) error {
-	return this.channelDB.AddChannelInfo(id, partnerAddr)
+	err := this.channelDB.AddChannelInfo(id, partnerAddr)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.CHANNEL_SET_DB_ERROR, err)
+	}
+	return nil
 }
 
 func (this *Channel) GetChannelInfoFromDB(targetAddress string) (*store.ChannelInfo, error) {
-	return this.channelDB.GetChannelInfo(targetAddress)
+	info, err := this.channelDB.GetChannelInfo(targetAddress)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHANNEL_GET_DB_ERROR, err)
+	}
+	return info, nil
 }
 
 // OverridePartners. override local partners with neighbors from channel
 func (this *Channel) OverridePartners() error {
 	log.Debugf("[dsp-go-sdk-channel] OverridePartners")
 	if !this.isStart {
-		return errors.New("channel service is not start")
+		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	newPartners := make([]string, 0)
 	neighbors := transfer.GetNeighbours(this.chActor.GetChannelService().Service.StateFromChannel())
@@ -212,7 +225,11 @@ func (this *Channel) OverridePartners() error {
 		newPartners = append(newPartners, common.ToBase58(v))
 	}
 	log.Debugf("override new partners %v\n", newPartners)
-	return this.channelDB.OverridePartners(this.walletAddr, newPartners)
+	err := this.channelDB.OverridePartners(this.walletAddr, newPartners)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.CHANNEL_SET_DB_ERROR, err)
+	}
+	return nil
 }
 
 // WaitForConnected. wait for connected for a period.
@@ -231,7 +248,7 @@ func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) 
 		}
 		<-time.After(interval)
 	}
-	return errors.New("wait for connected timeout")
+	return dspErr.New(dspErr.NETWORK_TIMEOUT, "wait for connected timeout")
 }
 
 // ChannelReachale. is channel open and reachable
@@ -246,29 +263,33 @@ func (this *Channel) HealthyCheckNodeState(walletAddr string) error {
 	log.Debugf("[dsp-go-sdk-channel] HealthyCheckNodeState %s", walletAddr)
 	target, err := chaincomm.AddressFromBase58(walletAddr)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
-	return ch_actor.HealthyCheckNodeState(common.Address(target))
+	err = ch_actor.HealthyCheckNodeState(common.Address(target))
+	if err != nil {
+		return dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return nil
 }
 
 // OpenChannel. open channel for target of token.
 func (this *Channel) OpenChannel(targetAddress string, depositAmount uint64) (common.ChannelID, error) {
 	log.Debugf("[dsp-go-sdk-channel] OpenChannel %s", targetAddress)
 	if !this.isStart {
-		return 0, errors.New("channel service is not start")
+		return 0, dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
-		return 0, err
+		return 0, dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	channelID, err := ch_actor.OpenChannel(token, common.Address(target))
 	log.Debugf("actor open channel id :%v, %s", channelID, err)
 	if err != nil {
-		return 0, err
+		return 0, dspErr.NewWithError(dspErr.CHANNEL_OPEN_FAILED, err)
 	}
 	if channelID == 0 {
-		return 0, errors.New("setup channel failed")
+		return 0, dspErr.New(dspErr.CHANNEL_OPEN_FAILED, "setup channel failed")
 	}
 	log.Infof("connect to dns node :%s, deposit %d", targetAddress, depositAmount)
 	if depositAmount == 0 {
@@ -283,30 +304,37 @@ func (this *Channel) OpenChannel(targetAddress string, depositAmount uint64) (co
 	if err != nil && strings.Index(err.Error(), "totalDeposit must big than contractBalance") == -1 {
 		log.Debugf("deposit result %s", err)
 		// TODO: withdraw and close channel
-		return 0, err
+		return 0, dspErr.NewWithError(dspErr.CHANNEL_DEPOSIT_FAILED, err)
 	}
-	this.channelDB.AddChannelInfo(uint64(channelID), targetAddress)
+	err = this.channelDB.AddChannelInfo(uint64(channelID), targetAddress)
+	if err != nil {
+
+	}
 	return channelID, nil
 }
 
 func (this *Channel) SetChannelIsDNS(targetAddr string, isDNS bool) error {
-	return this.channelDB.SetChannelIsDNS(targetAddr, isDNS)
+	err := this.channelDB.SetChannelIsDNS(targetAddr, isDNS)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.CHANNEL_SET_DB_ERROR, err)
+	}
+	return nil
 }
 
 func (this *Channel) ChannelClose(targetAddress string) error {
 	log.Debugf("[dsp-go-sdk-channel] ChannelClose %s", targetAddress)
 	if !this.isStart {
-		return errors.New("channel service is not start")
+		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	success, err := ch_actor.CloseChannel(common.Address(target))
 	if err == nil && success {
 		this.channelDB.DeleteChannelInfo(targetAddress)
 	}
-	return err
+	return dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
 }
 
 // SetDeposit. deposit money to target
@@ -316,17 +344,17 @@ func (this *Channel) SetDeposit(targetAddress string, amount uint64) error {
 		return nil
 	}
 	if !this.isStart {
-		return errors.New("channel service is not start")
+		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	depositAmount := common.TokenAmount(amount)
 	err = ch_actor.SetTotalChannelDeposit(token, common.Address(target), depositAmount)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.CHANNEL_DEPOSIT_FAILED, err)
 	}
 	return nil
 }
@@ -334,11 +362,11 @@ func (this *Channel) SetDeposit(targetAddress string, amount uint64) error {
 func (this *Channel) CanTransfer(to string, amount uint64) error {
 	log.Debugf("[dsp-go-sdk-channel] CanTransfer %s", to)
 	if !this.isStart {
-		return errors.New("channel service is not start")
+		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	target, err := chaincomm.AddressFromBase58(to)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	interval := time.Duration(dspcom.CHECK_CHANNEL_CAN_TRANSFER_INTERVAL) * time.Second
 	secs := int(dspcom.CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT / interval)
@@ -353,7 +381,7 @@ func (this *Channel) CanTransfer(to string, amount uint64) error {
 		}
 		<-time.After(interval)
 	}
-	return errors.New("check can transfer timeout")
+	return dspErr.New(dspErr.CHANNEL_CHECK_TIMEOUT, "check can transfer timeout")
 }
 
 func (this *Channel) NewPaymentId() int32 {
@@ -364,7 +392,7 @@ func (this *Channel) NewPaymentId() int32 {
 func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) error {
 	log.Debugf("[dsp-go-sdk-channel] DirectTransfer %s", to)
 	if !this.isStart {
-		return errors.New("channel service is not start")
+		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	err := this.CanTransfer(to, amount)
 	if err != nil {
@@ -372,7 +400,7 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 	}
 	target, err := chaincomm.AddressFromBase58(to)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 
 	success, err := ch_actor.DirectTransferAsync(common.Address(target), common.TokenAmount(amount), common.PaymentID(paymentId))
@@ -383,24 +411,24 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 	resp, err := ch_actor.GetPaymentResult(common.Address(target), common.PaymentID(paymentId))
 	if err != nil {
 		if resp != nil {
-			return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t, err: %s", resp.Reason, resp.Result, err)
+			return dspErr.New(dspErr.CHANNEL_MEDIA_TRANSFER_TIMEOUT, "media transfer timeout, getPaymentResult reason: %s, result: %t, err: %s", resp.Reason, resp.Result, err)
 		}
-		return fmt.Errorf("media transfer timeout, getPaymentResult err: %s", err)
+		return dspErr.New(dspErr.CHANNEL_MEDIA_TRANSFER_TIMEOUT, "media transfer timeout, getPaymentResult err: %s", err)
 	}
 	if resp == nil {
-		return errors.New("media transfer timeout, resp and err is both nil")
+		return dspErr.New(dspErr.CHANNEL_MEDIA_TRANSFER_TIMEOUT, "media transfer timeout, resp and err is both nil")
 	}
 	if resp.Result {
 		log.Debugf("media transfer check success: %t", resp.Result)
 		return nil
 	}
-	return fmt.Errorf("media transfer timeout, getPaymentResult reason: %s, result: %t", resp.Reason, resp.Result)
+	return dspErr.New(dspErr.CHANNEL_MEDIA_TRANSFER_TIMEOUT, "media transfer timeout, getPaymentResult reason: %s, result: %t", resp.Reason, resp.Result)
 }
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to string) error {
 	log.Debugf("[dsp-go-sdk-channel] MediaTransfer %s", to)
 	if !this.isStart {
-		return errors.New("channel service is not start")
+		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	err := this.CanTransfer(to, amount)
 	if err != nil {
@@ -411,11 +439,11 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to str
 	tokenAddress := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(to)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	mediaAddr, err := chaincomm.AddressFromBase58(media)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, common.Address(mediaAddr), common.Address(target), common.TokenAmount(amount), common.PaymentID(paymentId))
 	log.Debugf("media transfer success: %t, err: %s", success, err)
@@ -445,9 +473,13 @@ func (this *Channel) GetTotalDepositBalance(targetAddress string) (uint64, error
 	log.Debugf("[dsp-go-sdk-channel] GetTotalDepositBalance %s", targetAddress)
 	partner, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
-		return 0, err
+		return 0, dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
-	return ch_actor.GetTotalDepositBalance(common.Address(partner))
+	bal, err := ch_actor.GetTotalDepositBalance(common.Address(partner))
+	if err != nil {
+		return 0, dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return bal, nil
 }
 
 // GetAvaliableBalance. get avaliable balance
@@ -455,55 +487,75 @@ func (this *Channel) GetAvailableBalance(partnerAddress string) (uint64, error) 
 	log.Debugf("[dsp-go-sdk-channel] GetAvailableBalance %s", partnerAddress)
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)
 	if err != nil {
-		return 0, err
+		return 0, dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
-	return ch_actor.GetAvailableBalance(common.Address(partner))
+	bal, err := ch_actor.GetAvailableBalance(common.Address(partner))
+	if err != nil {
+		return 0, dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return bal, nil
 }
 
 func (this *Channel) GetTotalWithdraw(partnerAddress string) (uint64, error) {
 	log.Debugf("[dsp-go-sdk-channel] GetTotalWithdraw %s", partnerAddress)
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)
 	if err != nil {
-		return 0, err
+		return 0, dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
-	return ch_actor.GetTotalWithdraw(common.Address(partner))
+	bal, err := ch_actor.GetTotalWithdraw(common.Address(partner))
+	if err != nil {
+		return 0, dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return bal, nil
 }
 
 func (this *Channel) GetCurrentBalance(partnerAddress string) (uint64, error) {
 	log.Debugf("[dsp-go-sdk-channel] GetCurrentBalance %s", partnerAddress)
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)
 	if err != nil {
-		return 0, err
+		return 0, dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
-	return ch_actor.GetCurrentBalance(common.Address(partner))
+	bal, err := ch_actor.GetCurrentBalance(common.Address(partner))
+	if err != nil {
+		return 0, dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return bal, nil
 }
 
 // Withdraw. withdraw balance with target address
 func (this *Channel) Withdraw(targetAddress string, amount uint64) (bool, error) {
 	log.Debugf("[dsp-go-sdk-channel] Withdraw %s", targetAddress)
 	if !this.isStart {
-		return false, errors.New("channel service is not start")
+		return false, dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
-		return false, err
+		return false, dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	withdrawAmount := common.TokenAmount(amount)
-	return ch_actor.WithDraw(token, common.Address(target), withdrawAmount)
+	success, err := ch_actor.WithDraw(token, common.Address(target), withdrawAmount)
+	if err != nil {
+		return false, dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return success, nil
 }
 
 // CooperativeSettle. settle channel cooperatively
 func (this *Channel) CooperativeSettle(targetAddress string) error {
 	log.Debugf("[dsp-go-sdk-channel] CooperativeSettle %s", targetAddress)
 	if !this.isStart {
-		return errors.New("channel service is not start")
+		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	target, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
-	return ch_actor.CooperativeSettle(common.Address(target))
+	err = ch_actor.CooperativeSettle(common.Address(target))
+	if err != nil {
+		return dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return nil
 }
 
 // SetUnitPrices
@@ -516,11 +568,11 @@ func (this *Channel) SetUnitPrices(asset int32, price uint64) {
 
 func (this *Channel) GetUnitPrices(asset int32) (uint64, error) {
 	if this.unitPrices == nil {
-		return 0, errors.New("no unit prices")
+		return 0, dspErr.New(dspErr.CHANNEL_INTERNAL_ERROR, "no unit prices")
 	}
 	p, ok := this.unitPrices[asset]
 	if !ok {
-		return 0, errors.New("no unit prices")
+		return 0, dspErr.New(dspErr.CHANNEL_INTERNAL_ERROR, "no unit prices")
 	}
 	return p, nil
 }
@@ -555,7 +607,7 @@ func (this *Channel) GetChannelInfo(walletAddr string) (*ch_actor.ChannelInfo, e
 	}
 	all, _ := ch_actor.GetAllChannels()
 	if all == nil {
-		return nil, errors.New("allchannels nil")
+		return nil, dspErr.New(dspErr.CHANNEL_INTERNAL_ERROR, "channel is nil")
 	}
 
 	for _, ch := range all.Channels {
@@ -563,7 +615,7 @@ func (this *Channel) GetChannelInfo(walletAddr string) (*ch_actor.ChannelInfo, e
 			return ch, nil
 		}
 	}
-	return nil, errors.New("channel not exists")
+	return nil, dspErr.New(dspErr.CHANNEL_NOT_EXIST, "channel not exists")
 }
 
 func (this *Channel) AllChannels() (*ch_actor.ChannelsInfoResp, error) {
@@ -571,5 +623,9 @@ func (this *Channel) AllChannels() (*ch_actor.ChannelsInfoResp, error) {
 	if !this.isStart {
 		return nil, nil
 	}
-	return ch_actor.GetAllChannels()
+	resp, err := ch_actor.GetAllChannels()
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return resp, nil
 }

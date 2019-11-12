@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	ipld "gx/ipfs/Qme5bWv7wtjUNGsK2BNGVUFPKiuxWrsqrtvYwCLRw8YFES/go-ipld-format"
-	"hash/crc32"
-	"io"
 	"os"
 	"strings"
+
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 
 	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
 	blocks "gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
@@ -49,12 +49,12 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 	if len(cfg.FsFileRoot) > 0 {
 		err := common.CreateDirIfNeed(cfg.FsFileRoot)
 		if err != nil {
-			return nil, err
+			return nil, dspErr.NewWithError(dspErr.FS_CREATE_DB_ERROR, err)
 		}
 	}
 	fs, err := max.NewMaxService(fsConfig, chain)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.FS_INIT_SERVICE_ERROR, err)
 	}
 	service := &Fs{
 		fs:      fs,
@@ -67,37 +67,30 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 
 func (this *Fs) Close() error {
 	close(this.closeCh)
-	return this.fs.Close()
-}
-
-func (this *Fs) Crc32HashFile(filePath string, polynomial uint32) (string, error) {
-	f, err := os.Open(filePath)
+	err := this.fs.Close()
 	if err != nil {
-		return "", err
+		return dspErr.NewWithError(dspErr.FS_CLOSE_ERROR, err)
 	}
-	defer f.Close()
-	tablePolynomial := crc32.MakeTable(polynomial)
-	hash := crc32.New(tablePolynomial)
-	if _, err := io.Copy(hash, f); err != nil {
-		return "", err
-	}
-	hashInBytes := hash.Sum(nil)[:]
-	return hex.EncodeToString(hashInBytes), nil
+	return nil
 }
 
 func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) ([]string, error) {
-	return this.fs.NodesFromFile(fileName, filePrefix, encrypt, password)
+	hashes, err := this.fs.NodesFromFile(fileName, filePrefix, encrypt, password)
+	if err != nil {
+		return nil, dspErr.New(dspErr.SHARDING_FAIELD, err.Error())
+	}
+	return hashes, nil
 }
 
 func (this *Fs) GetAllOffsets(rootHash string) (map[string]uint64, error) {
 	rootCid, err := cid.Decode(rootHash)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.FS_DECODE_CID_ERROR, err)
 	}
 	m := make(map[string]uint64)
 	cids, offsets, err := this.fs.GetFileAllCidsWithOffset(context.Background(), rootCid)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.FS_GET_ALL_OFFSET_ERROR, err)
 	}
 	for i, cid := range cids {
 		m[cid.String()] = offsets[i]
@@ -108,11 +101,11 @@ func (this *Fs) GetAllOffsets(rootHash string) (map[string]uint64, error) {
 func (this *Fs) GetFileAllHashes(rootHash string) ([]string, error) {
 	rootCid, err := cid.Decode(rootHash)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.New(dspErr.FS_DECODE_CID_ERROR, err.Error())
 	}
 	ids, err := this.fs.GetFileAllCids(context.Background(), rootCid)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.New(dspErr.FS_GET_ALL_CID_ERROR, err.Error())
 	}
 	hashes := make([]string, 0, len(ids))
 	for _, id := range ids {
@@ -127,7 +120,7 @@ func (this *Fs) GetBlockLinks(block blocks.Block) ([]string, error) {
 	}
 	dagNode, err := merkledag.DecodeProtobufBlock(block)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.FS_DECODE_BLOCK_ERROR, err)
 	}
 	links := make([]string, 0, len(dagNode.Links()))
 	for _, link := range dagNode.Links() {
@@ -171,11 +164,11 @@ func (this *Fs) BlockToBytes(block blocks.Block) ([]byte, error) {
 	}
 	dagNode, err := ml.DecodeProtobufBlock(block)
 	if err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.FS_DECODE_BLOCK_ERROR, err)
 	}
 	pb := new(ftpb.Data)
 	if err := proto.Unmarshal(dagNode.(*ml.ProtoNode).Data(), pb); err != nil {
-		return nil, err
+		return nil, dspErr.NewWithError(dspErr.FS_DECODE_BLOCK_ERROR, err)
 	}
 	return pb.Data, nil
 }
@@ -200,7 +193,7 @@ func (this *Fs) AllBlockHashes(root ipld.Node, list []*helpers.UnixfsNode) ([]st
 	for _, node := range list {
 		dagNode, err := node.GetDagNode()
 		if err != nil {
-			return nil, err
+			return nil, dspErr.NewWithError(dspErr.FS_GET_DAG_NODE_ERROR, err)
 		}
 		if dagNode.Cid().String() != root.Cid().String() {
 			hashes = append(hashes, dagNode.Cid().String())
@@ -214,7 +207,7 @@ func (this *Fs) BlocksListToMap(list []*helpers.UnixfsNode) (map[string]*helpers
 	for i, node := range list {
 		dagNode, err := node.GetDagNode()
 		if err != nil {
-			return nil, err
+			return nil, dspErr.NewWithError(dspErr.FS_GET_DAG_NODE_ERROR, err)
 		}
 		key := fmt.Sprintf("%s-%d", dagNode.Cid().String(), (i + 1))
 		m[key] = node
@@ -223,37 +216,65 @@ func (this *Fs) BlocksListToMap(list []*helpers.UnixfsNode) (map[string]*helpers
 }
 
 func (this *Fs) PutBlock(block blocks.Block) error {
-	return this.fs.PutBlock(block)
+	err := this.fs.PutBlock(block)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_PUT_DATA_ERROR, err)
+	}
+	return nil
 }
 
 func (this *Fs) SetFsFilePrefix(fileName, prefix string) error {
 	log.Debugf("set file prefix %s %v", fileName, hex.EncodeToString([]byte(prefix)))
-	return this.fs.SetFilePrefix(fileName, prefix)
+	err := this.fs.SetFilePrefix(fileName, prefix)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_PUT_DATA_ERROR, err)
+	}
+	return nil
 }
 
 func (this *Fs) PutBlockForFileStore(fileName string, block blocks.Block, offset uint64) error {
-	return this.fs.PutBlockForFilestore(fileName, block, offset)
+	err := this.fs.PutBlockForFilestore(fileName, block, offset)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_PUT_DATA_ERROR, err)
+	}
+	return nil
 }
 
 func (this *Fs) PutTag(blockHash string, fileHash string, index uint64, tag []byte) error {
-	return this.fs.PutTag(blockHash, fileHash, index, tag)
+	err := this.fs.PutTag(blockHash, fileHash, index, tag)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_PUT_DATA_ERROR, err)
+	}
+	return nil
 }
 
 func (this *Fs) GetTag(blockHash string, fileHash string, index uint64) ([]byte, error) {
-	return this.fs.GetTag(blockHash, fileHash, index)
+	tag, err := this.fs.GetTag(blockHash, fileHash, index)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.FS_GET_DATA_ERROR, err)
+	}
+	return tag, nil
 }
 
 func (this *Fs) StartPDPVerify(fileHash string, luckyNum uint64, bakHeight uint64, bakNum uint64, borkenWalletAddr chainCom.Address) error {
-	return this.fs.StartPDPVerify(fileHash, luckyNum, bakHeight, bakNum, borkenWalletAddr)
+	err := this.fs.StartPDPVerify(fileHash, luckyNum, bakHeight, bakNum, borkenWalletAddr)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_INTERNAL_ERROR, err)
+	}
+	return nil
 }
 
 // PinRoot. pin root to prevent GC
 func (this *Fs) PinRoot(ctx context.Context, fileHash string) error {
 	rootCid, err := cid.Decode(fileHash)
 	if err != nil {
-		return err
+		return dspErr.NewWithError(dspErr.FS_DECODE_CID_ERROR, err)
 	}
-	return this.fs.PinRoot(ctx, rootCid)
+	err = this.fs.PinRoot(ctx, rootCid)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_INTERNAL_ERROR, err)
+	}
+	return nil
 }
 
 // GetBlock get blocks
@@ -279,17 +300,29 @@ func (this *Fs) DeleteFile(fileHashStr, filePath string) error {
 			return err
 		}
 	}
-	return this.fs.DeleteFile(fileHashStr)
+	err := this.fs.DeleteFile(fileHashStr)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_DELETE_FILE_ERROR, err)
+	}
+	return nil
 }
 
 // AESDecryptFile. descypt file
 func (this *Fs) AESDecryptFile(file, prefix, password, outputPath string) error {
-	return max.DecryptFile(file, prefix, password, outputPath)
+	err := max.DecryptFile(file, prefix, password, outputPath)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_DECRYPT_ERROR, err)
+	}
+	return nil
 }
 
 // AESEncryptFile. encrypt file
 func (this *Fs) AESEncryptFile(file, password, outputPath string) error {
-	return max.EncryptFile(file, password, outputPath)
+	err := max.EncryptFile(file, password, outputPath)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_ENCRYPT_ERROR, err)
+	}
+	return nil
 }
 
 func (this *Fs) RemovedExpiredFiles() []interface{} {
@@ -316,9 +349,17 @@ func (this *Fs) registerRemoveNotify() {
 }
 
 func (this *Fs) SetFsFileBlockHashes(fileHash string, blockHashes []string) error {
-	return this.fs.SetFileBlockHashes(fileHash, blockHashes)
+	err := this.fs.SetFileBlockHashes(fileHash, blockHashes)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_PUT_DATA_ERROR, err)
+	}
+	return nil
 }
 
 func (this *Fs) ReturnBuffer(buffer []byte) error {
-	return max.ReturnBuffer(buffer)
+	err := max.ReturnBuffer(buffer)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FS_INTERNAL_ERROR, err)
+	}
+	return nil
 }

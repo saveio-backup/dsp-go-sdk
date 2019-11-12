@@ -2,6 +2,7 @@ package dsp
 
 import (
 	"bytes"
+
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
@@ -52,9 +53,8 @@ func (this *Dsp) CloseShareNotificationChannel() {
 func (this *Dsp) registerReceiveNotification() {
 	log.Debugf("registerReceiveNotification")
 	receiveChan, err := chActor.RegisterReceiveNotification()
-	log.Debugf("receiveChan:%v, err %v", receiveChan, err)
 	if err != nil {
-		// panic(err)
+		log.Errorf("register receiveChan:%v, err %v", receiveChan, err)
 	}
 	go func() {
 		for {
@@ -72,7 +72,7 @@ func (this *Dsp) registerReceiveNotification() {
 					log.Errorf("get taskId with payment id failed %s", err)
 					continue
 				}
-				fileHashStr, err := this.taskMgr.TaskFileHash(taskId)
+				fileHashStr, err := this.taskMgr.GetTaskFileHash(taskId)
 				if err != nil {
 					log.Errorf("get fileHash with task id failed %s", err)
 					continue
@@ -88,11 +88,11 @@ func (this *Dsp) registerReceiveNotification() {
 					continue
 				}
 				log.Debugf("delete unpaid success %v", taskId)
-				downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeDownload)
+				downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
 				fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
 				fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
 				this.taskMgr.EmitNotification(taskId, task.ShareStateReceivedPaying, fileHashStr, fileName, fileOwner, addr.ToBase58(), uint64(event.Identifier), uint64(event.Amount))
-			case <-this.Channel.GetCloseCh():
+			case <-this.channel.GetCloseCh():
 				return
 			}
 		}
@@ -101,7 +101,7 @@ func (this *Dsp) registerReceiveNotification() {
 
 func (this *Dsp) canShareTo(taskId, walletAddress string, asset int32) bool {
 	unpaidAmount, err := this.taskMgr.GetUnpaidAmount(taskId, walletAddress, asset)
-	maxUnpaidAmount := uint64(common.CHUNK_SIZE * common.MAX_REQ_BLOCK_COUNT * this.Config.MaxUnpaidPayment)
+	maxUnpaidAmount := uint64(common.CHUNK_SIZE * common.MAX_REQ_BLOCK_COUNT * this.config.MaxUnpaidPayment)
 	if err != nil || unpaidAmount >= maxUnpaidAmount {
 		log.Errorf("cant share to %s for file %s, unpaidAmount: %d err %s", walletAddress, taskId, unpaidAmount, err)
 		return false
@@ -120,7 +120,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	reqWalletAddr := ""
 	reqAsset := int32(0)
 
-	paymentId := this.Channel.NewPaymentId()
+	paymentId := this.channel.NewPaymentId()
 	for _, blockmsg := range req {
 		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare)
 		reqWalletAddr = blockmsg.WalletAddress
@@ -132,13 +132,13 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 			return
 		}
 		// send block if requester has paid all block
-		blk := this.Fs.GetBlock(blockmsg.Hash)
-		blockData := this.Fs.BlockDataOfAny(blk)
+		blk := this.fs.GetBlock(blockmsg.Hash)
+		blockData := this.fs.BlockDataOfAny(blk)
 		if len(blockData) == 0 {
 			log.Errorf("get block data empty %s", blockmsg.Hash)
 			return
 		}
-		downloadTaskKey := this.taskMgr.TaskId(blockmsg.FileHash, this.WalletAddress(), store.TaskTypeDownload)
+		downloadTaskKey := this.taskMgr.TaskId(blockmsg.FileHash, this.chain.WalletAddress(), store.TaskTypeDownload)
 		offset, err := this.taskMgr.GetBlockOffset(downloadTaskKey, blockmsg.Hash, uint32(blockmsg.Index))
 		if err != nil {
 			log.Errorf("share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s", taskId, downloadTaskKey, blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, offset, blockmsg.PeerAddr, err)
@@ -147,8 +147,8 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		// TODO: only send tag with tagflag enabled
 		// TEST: client get tag
 		var tag []byte
-		if this.Config.FsType == config.FS_BLOCKSTORE {
-			tag, _ = this.Fs.GetTag(blockmsg.Hash, blockmsg.FileHash, uint64(blockmsg.Index))
+		if this.config.FsType == config.FS_BLOCKSTORE {
+			tag, _ = this.fs.GetTag(blockmsg.Hash, blockmsg.FileHash, uint64(blockmsg.Index))
 		}
 		sessionId, _ := this.taskMgr.GetSessionId(taskId, "")
 		up, err := this.GetFileUnitPrice(blockmsg.Asset)
