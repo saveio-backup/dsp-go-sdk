@@ -43,7 +43,7 @@ const (
 
 const (
 	MAX_GOROUTINES_IN_LOOP = 10
-	REQUEST_MSG_TIMEOUT    = 30          // 20s
+	REQUEST_MSG_TIMEOUT    = 30          // 30s
 	MSG_OP_CODE            = 2000        // msg op code
 	MAX_SIG_DATA_LEN       = 1024 * 1024 // max sign data length : 1MB
 )
