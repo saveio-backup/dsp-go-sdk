@@ -79,7 +79,7 @@ const (
 	MAX_SAME_UPLOAD_BLOCK_NUM      = 3      // max enable upload same block for same node
 	MAX_TRACKER_REQ_TIMEOUT_NUM    = 5      // max tracker request timeout num
 	MAX_PUBLIC_IP_UPDATE_SECOND    = 5 * 60 // max update second to update peer host addr cache
-	MAX_BLOCK_FETCHED_RETRY        = 2      // max uploading block be fetched retry
+	MAX_BLOCK_FETCHED_RETRY        = 3      // max uploading block be fetched retry
 	MAX_REQ_BLOCK_COUNT            = 8      // max block count when request for download flights
 	MIN_REQ_BLOCK_COUNT            = 4      // min block count when request for download flights
 	MAX_START_PDP_RETRY            = 2      // max start pdp retry

@@ -1143,6 +1143,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 	if err != nil {
 		return err
 	}
+	this.taskMgr.NewWorkers(taskId, map[string]string{addr: peerWalletAddr}, true, nil)
 	pause, cancel := false, false
 	defer func() {
 		if cancel {
