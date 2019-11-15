@@ -58,9 +58,9 @@ func (this *Chain) ProveParamDes(buf []byte) (*fs.ProveParam, error) {
 }
 
 func (this *Chain) StoreFile(fileHashStr string, blockNum, blockSizeInKB, proveInterval, expiredHeight, copyNum uint64,
-	fileDesc []byte, privilege uint64, proveParam []byte, storageType, realFileSize uint64) (string, error) {
+	fileDesc []byte, privilege uint64, proveParam []byte, storageType, realFileSize uint64, primaryNodes, candidateNodes []chainCom.Address) (string, error) {
 	txHash, err := this.themis.Native.Fs.StoreFile(fileHashStr, blockNum, blockSizeInKB, proveInterval,
-		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize)
+		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes)
 	if err != nil {
 		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
@@ -125,4 +125,94 @@ func (this *Chain) WhiteListOp(fileHashStr string, op uint64, whiteList fs.White
 		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
+}
+
+func (this *Chain) GetNodeHostAddrListByWallets(nodeWalletAddrs []chainCom.Address) ([]string, error) {
+	info, err := this.themis.Native.Fs.GetNodeListByAddrs(nodeWalletAddrs)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	if info.NodeNum != uint64(len(nodeWalletAddrs)) {
+		return nil, dspErr.New(dspErr.CHAIN_ERROR, "node num %d is not equal to request wallets length %d", info.NodeNum, len(nodeWalletAddrs))
+	}
+	hostAddrs := make([]string, 0, info.NodeNum)
+	for _, node := range info.NodeInfo {
+		hostAddrs = append(hostAddrs, string(node.NodeAddr))
+	}
+	return hostAddrs, nil
+}
+
+func (this *Chain) GetNodeListWithoutAddrs(nodeWalletAddrs []chainCom.Address, num int) ([]chainCom.Address, error) {
+	list, err := this.themis.Native.Fs.GetNodeList()
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	addrs := make([]chainCom.Address, 0, num)
+	nodeWalletMap := make(map[chainCom.Address]struct{}, 0)
+	for _, addr := range nodeWalletAddrs {
+		nodeWalletMap[addr] = struct{}{}
+	}
+	for _, info := range list.NodeInfo {
+		if _, ok := nodeWalletMap[info.WalletAddr]; ok {
+			continue
+		}
+		addrs = append(addrs, info.WalletAddr)
+		if len(addrs) >= num {
+			break
+		}
+	}
+	return addrs, nil
+}
+
+func (this *Chain) GetUnprovePrimaryFileInfos(walletAddr chainCom.Address) ([]fs.FileInfo, error) {
+	list, err := this.themis.Native.Fs.GetUnprovePrimaryFileList(walletAddr)
+	log.Debugf("get unprove primary list %v %v ", list, err)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	if list.FileNum == 0 || len(list.List) == 0 {
+		return nil, nil
+	}
+	hashes := make([]string, 0, list.FileNum)
+	for _, item := range list.List {
+		hashes = append(hashes, string(item.Hash))
+	}
+	infoList, err := this.themis.Native.Fs.GetFileInfos(hashes)
+	log.Debugf("infoList: %v %v", infoList, err)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return infoList.List, nil
+}
+
+func (this *Chain) GetUnproveCandidateFileInfos(walletAddr chainCom.Address) ([]fs.FileInfo, error) {
+	list, err := this.themis.Native.Fs.GetUnProveCandidateFileList(walletAddr)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	if list.FileNum == 0 || len(list.List) == 0 {
+		return nil, nil
+	}
+	hashes := make([]string, 0, list.FileNum)
+	for _, item := range list.List {
+		hashes = append(hashes, string(item.Hash))
+	}
+	infoList, err := this.themis.Native.Fs.GetFileInfos(hashes)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return infoList.List, nil
+}
+
+func (this *Chain) CheckHasProveFile(fileHashStr string, walletAddr chainCom.Address) bool {
+	details, err := this.themis.Native.Fs.GetFileProveDetails(fileHashStr)
+	if err != nil {
+		return false
+	}
+	for _, d := range details.ProveDetails {
+		if d.WalletAddr.ToBase58() == walletAddr.ToBase58() && d.ProveTimes > 0 {
+			return true
+		}
+	}
+	return false
 }

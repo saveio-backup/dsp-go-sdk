@@ -1,5 +1,9 @@
 package common
 
+import (
+	chainCom "github.com/saveio/themis/common"
+)
+
 type UploadResult struct {
 	Tx             string
 	FileHash       string
@@ -11,9 +15,11 @@ type UploadResult struct {
 }
 
 type PayStoreFileResult struct {
-	Tx         string
-	ParamsBuf  []byte
-	PrivateKey []byte
+	Tx                   string           // pay for store file tx on chain
+	ParamsBuf            []byte           // PDP params buffer
+	PrivateKey           []byte           // PDP verify private key
+	MasterNodeWalletAddr chainCom.Address // master node wallet addr
+	MasterNodeHostAddr   string           // Master node
 }
 
 type PayInfo struct {

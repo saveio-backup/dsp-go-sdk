@@ -81,7 +81,7 @@ func TestChainGetBlockHeight(t *testing.T) {
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg, nil, nil)
-	height, err := d.Chain.GetCurrentBlockHeight()
+	height, err := d.chain.Themis().GetCurrentBlockHeight()
 	if err != nil {
 		fmt.Printf("get block height err: %s", err)
 		return
@@ -266,7 +266,7 @@ func TestStartDspBlockStoreNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	// set price for all file
-	d.Channel.SetUnitPrices(common.ASSET_USDT, common.FILE_DOWNLOAD_UNIT_PRICE)
+	d.channel.SetUnitPrices(common.ASSET_USDT, common.FILE_DOWNLOAD_UNIT_PRICE)
 
 	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
@@ -402,7 +402,7 @@ func TestGetExpiredTaskList(t *testing.T) {
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg, nil, nil)
-	list, err := d.Chain.Native.Fs.GetExpiredProveList()
+	list, err := d.chain.Themis().Native.Fs.GetExpiredProveList()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -471,7 +471,7 @@ func TestDownloadFile(t *testing.T) {
 	// use for testing go routines for tasks are released or not
 	time.Sleep(time.Duration(5) * time.Second)
 	// set price for all file
-	d.Channel.SetUnitPrices(common.ASSET_USDT, common.FILE_DOWNLOAD_UNIT_PRICE)
+	d.channel.SetUnitPrices(common.ASSET_USDT, common.FILE_DOWNLOAD_UNIT_PRICE)
 	go d.StartShareServices()
 	tick := time.NewTicker(time.Second)
 	for {
@@ -548,7 +548,7 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	// set use free peers
 	useFree := false
-	addrs := d.GetPeerFromTracker(fileHashStr, d.DNS.TrackerUrls)
+	addrs := d.GetPeerFromTracker(fileHashStr, d.dns.TrackerUrls)
 	quotation, err := d.GetDownloadQuotation(fileHashStr, "", common.ASSET_USDT, useFree, addrs)
 	if len(quotation) == 0 {
 		log.Errorf("no peer to download")
@@ -591,7 +591,7 @@ func TestStartPDPVerify(t *testing.T) {
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d := NewDsp(dspCfg, acc, nil)
-	d.Fs.StartPDPVerify("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", 0, 0, 0, chainCom.ADDRESS_EMPTY)
+	d.fs.StartPDPVerify("QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib", 0, 0, 0, chainCom.ADDRESS_EMPTY)
 	tick := time.NewTicker(time.Second)
 	for {
 		<-tick.C
@@ -614,7 +614,7 @@ func TestOpenChannel(t *testing.T) {
 		ChannelRevealTimeout: "1000",
 	}
 	d := NewDsp(dspCfg, acc, nil)
-	id, err := d.Channel.OpenChannel("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", 0)
+	id, err := d.channel.OpenChannel("AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -639,7 +639,7 @@ func TestDepositChannel(t *testing.T) {
 	}
 	d := NewDsp(dspCfg, acc, nil)
 	d.Start()
-	err = d.Channel.SetDeposit("AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS", 662144)
+	err = d.channel.SetDeposit("AYMnqA65pJFKAbbpD8hi5gdNDBmeFBy5hS", 662144)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -757,7 +757,7 @@ func TestInitDnsSC(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	tx, err := d.Chain.Native.Dns.RegisterHeader(common.FILE_URL_CUSTOM_HEADER, common.FILE_URL_CUSTOM_HEADER, 1)
+	tx, err := d.chain.Themis().Native.Dns.RegisterHeader(common.FILE_URL_CUSTOM_HEADER, common.FILE_URL_CUSTOM_HEADER, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -781,7 +781,7 @@ func TestRegisterDnsHeader(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	hash, err := d.Chain.Native.Dns.RegisterHeader("oni", "oni", 100000)
+	hash, err := d.chain.Themis().Native.Dns.RegisterHeader("save", "save", 100000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -806,7 +806,7 @@ func TestGetSmartEvent(t *testing.T) {
 		t.Fatal("dsp init failed")
 	}
 
-	event, err := d.Chain.GetSmartContractEventByBlock(1021445)
+	event, err := d.chain.Themis().GetSmartContractEventByBlock(1021445)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -937,10 +937,10 @@ func TestGetSetupDNSNodes(t *testing.T) {
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d := NewDsp(dspCfg, acc, nil)
 	d.Start()
-	if d.Channel == nil {
+	if d.channel == nil {
 		t.Fatal("channel is nil")
 	}
-	err = d.Channel.StartService()
+	err = d.channel.StartService()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -948,10 +948,10 @@ func TestGetSetupDNSNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.DNS.DNSNode == nil {
+	if d.dns.DNSNode == nil {
 		t.Fatal("dns node can't setup")
 	}
-	fmt.Printf("trackers %v, dns %s:%s\n", d.DNS.TrackerUrls, d.DNS.DNSNode.WalletAddr, d.DNS.DNSNode.HostAddr)
+	fmt.Printf("trackers %v, dns %s:%s\n", d.dns.TrackerUrls, d.dns.DNSNode.WalletAddr, d.dns.DNSNode.HostAddr)
 }
 
 func TestGetAllDNSNodes(t *testing.T) {
@@ -959,7 +959,7 @@ func TestGetAllDNSNodes(t *testing.T) {
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg, nil, nil)
-	nodes, err := d.Chain.Native.Dns.GetAllDnsNodes()
+	nodes, err := d.chain.Themis().Native.Dns.GetAllDnsNodes()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -977,7 +977,7 @@ func TestRegEndpoint(t *testing.T) {
 		ChainRpcAddr: rpcAddr,
 	}
 	d := NewDsp(dspCfg, nil, nil)
-	d.DNS.TrackerUrls = []string{"udp://127.0.0.1:6369/announce"}
+	d.dns.TrackerUrls = []string{"udp://127.0.0.1:6369/announce"}
 	addr, err := chainCom.AddressFromBase58("ARH2cGhdhZgMm69XcVVBNjAbEjxvX4ywpV")
 	if err != nil {
 		t.Fatal(err)
@@ -996,9 +996,9 @@ func TestGetPublicIPFromDNS(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		ChannelProtocol: "udp",
 	}
-	d.Config = dspCfg
-	d.DNS.TrackerUrls = make([]string, 0)
-	d.DNS.TrackerUrls = append(d.DNS.TrackerUrls, "udp://40.73.96.40:6369")
+	d.config = dspCfg
+	d.dns.TrackerUrls = make([]string, 0)
+	d.dns.TrackerUrls = append(d.dns.TrackerUrls, "udp://40.73.96.40:6369")
 	publicIP, err := d.GetExternalIP("AZj9LDEP1nhB1PYVtgAaabVKvN1uAKhmHn")
 	if err != nil {
 		t.Fatal(err)
@@ -1024,7 +1024,7 @@ func TestCloseChannel(t *testing.T) {
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d := NewDsp(dspCfg, acc, nil)
-	err = d.Channel.ChannelClose("AdpPG7rjumCogd5cTvpfgZdS2c19cPK335")
+	err = d.channel.ChannelClose("AdpPG7rjumCogd5cTvpfgZdS2c19cPK335")
 	if err != nil {
 		t.Fatal(err)
 	}

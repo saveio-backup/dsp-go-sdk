@@ -289,6 +289,30 @@ func WithBreakpointIndex(index uint64) FileMsgOption {
 	})
 }
 
+func WithTotalBlockCount(totalBlockCount int32) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		f.TotalBlockCount = totalBlockCount
+	})
+}
+
+func ChainId(chainId uint32) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.ChainInfo == nil {
+			f.ChainInfo = &file.Chain{}
+		}
+		f.ChainInfo.Id = chainId
+	})
+}
+
+func ChainHeight(blockHeight uint32) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		if f.ChainInfo == nil {
+			f.ChainInfo = &file.Chain{}
+		}
+		f.ChainInfo.Height = blockHeight
+	})
+}
+
 // NewFileMsg file msg
 func NewFileMsg(fileHashStr string, op int32, opts ...Option) *Message {
 	return NewFileMsgWithError(fileHashStr, op, common.MSG_ERROR_CODE_NONE, "", opts...)

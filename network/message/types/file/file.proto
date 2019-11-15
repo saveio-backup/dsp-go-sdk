@@ -18,6 +18,11 @@ message Breakpoint {
     uint64 index = 2; // breakpoint block index
 }
 
+message Chain {
+    uint32 id = 1; // chain id
+    uint32 height = 2; // block height
+}
+
 message File {
    string sessionId = 1;
    string hash = 2;  
@@ -28,4 +33,6 @@ message File {
    Payment payInfo = 7;
    Tx tx = 8;
    Breakpoint breakpoint = 9;
+   int32 totalBlockCount = 10;
+   Chain chainInfo = 11;
 }

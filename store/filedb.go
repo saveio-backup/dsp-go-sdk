@@ -814,7 +814,7 @@ func (this *FileDB) IsFileUploaded(id string) bool {
 	for _, cnt := range fi.SaveBlockCountMap {
 		sum += cnt
 	}
-	uploaded := sum / (fi.CopyNum + 1)
+	uploaded := sum
 	log.Debugf("IsFileUploaded %d %d, save: %d, copyNum: %d", fi.TotalBlockCount, uploaded, sum, fi.CopyNum)
 	return fi.TotalBlockCount > 0 && fi.TotalBlockCount == uploaded
 }
@@ -1024,7 +1024,6 @@ func (this *FileDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
 		block = &BlockInfo{
-
 			NodeList:   make([]string, 0),
 			LinkHashes: make([]string, 0),
 		}

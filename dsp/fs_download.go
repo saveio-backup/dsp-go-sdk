@@ -25,6 +25,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/utils"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
+	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 // IsFileEncrypted. read prefix of file to check it's encrypted or not
@@ -80,7 +81,7 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		return dspErr.NewWithError(dspErr.DOWNLOAD_FILEHASH_NOT_FOUND, err)
 	}
 	if this.dns.DNSNode == nil {
-		err = errors.New("no online dns node")
+		err = dspErr.New(dspErr.NO_CONNECTED_DNS, "no online dns node")
 		return dspErr.NewWithError(dspErr.NO_CONNECTED_DNS, err)
 	}
 	log.Debugf("download file dns node %s", this.dns.DNSNode.WalletAddr)
@@ -703,25 +704,69 @@ func (this *Dsp) StartBackupFileService() {
 				}
 				backupingCnt++
 				log.Debugf("go backup file:%s, from:%s %s", t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58())
-				// TODO: test back up logic
-				if err := this.downloadFileFromPeers("", string(t.FileHash), common.ASSET_USDT, true, "", false, false, common.MAX_DOWNLOAD_PEERS_NUM, []string{string(t.BakSrvAddr)}); err != nil {
-					log.Errorf("download file err %s", err)
-					backupFailedMap[string(t.FileHash)] = backupFailedMap[string(t.FileHash)] + 1
+				fileInfo, err := this.chain.GetFileInfo(string(t.FileHash))
+				if err != nil {
 					continue
 				}
-				if err := this.fs.PinRoot(context.TODO(), string(t.FileHash)); err != nil {
-					log.Errorf("pin root file err %s", err)
+				if err = this.backupFileFromPeer(fileInfo, string(t.BakSrvAddr), t.LuckyNum, t.BakHeight, t.BakNum, t.BrokenAddr); err != nil {
+					backupFailedMap[string(t.FileHash)]++
 					continue
 				}
-				log.Debugf("prove file %s, luckyNum %d, bakHeight:%d, bakNum:%d", string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum)
-				if err := this.fs.StartPDPVerify(string(t.FileHash), t.LuckyNum, t.BakHeight, t.BakNum, t.BrokenAddr); err != nil {
-					log.Errorf("pdp verify error for backup task")
-					continue
-				}
-				log.Debugf("backup file:%s success", t.FileHash)
 			}
 			// reset
 			backupingCnt = 0
+		}
+	}
+}
+
+// StartFetchFileService. start fetch files from master node when client upload files
+func (this *Dsp) StartFetchFileService() {
+	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
+	for {
+		<-ticker.C
+		if this.isStop {
+			log.Debugf("stop fetch file service")
+			ticker.Stop()
+			return
+		}
+		fileInfos, err := this.chain.GetUnprovePrimaryFileInfos(this.chain.Address())
+		if err != nil {
+			continue
+		}
+		log.Debugf("unprove primary files count: %d", len(fileInfos))
+		for _, fi := range fileInfos {
+			if len(fi.PrimaryNodes.AddrList) < 2 {
+				log.Debugf("primary node list too small %v", fi.PrimaryNodes.AddrList)
+				continue
+			}
+			if fi.PrimaryNodes.AddrList[0].ToBase58() == this.WalletAddress() {
+				// i am the master node, skip..
+				log.Debugf("skip fetch because i am master node")
+				continue
+			}
+			fileHashStr := string(fi.FileHash)
+			// find if i can fetch file
+			if !this.chain.CheckHasProveFile(fileHashStr, fi.PrimaryNodes.AddrList[0]) {
+				log.Debugf("node has not prove %v %v", fileHashStr, fi.PrimaryNodes.AddrList[0])
+				continue
+			}
+			// get host addr from wallet addr
+			hostAddrs, err := this.chain.GetNodeHostAddrListByWallets([]chainCom.Address{fi.PrimaryNodes.AddrList[0]})
+			if err != nil {
+				log.Errorf("get host addr failed of wallet %s", err)
+				continue
+			}
+			if len(hostAddrs) != 1 {
+				log.Errorf("get host addr failed of wallet %s", fi.PrimaryNodes.AddrList[0])
+				continue
+			}
+
+			log.Debugf("go back up file %s from %s", string(fi.FileHash), hostAddrs[0])
+			// start download file
+			if err := this.backupFileFromPeer(&fi, hostAddrs[0], 0, 0, 0, chainCom.ADDRESS_EMPTY); err != nil {
+				log.Errorf("backup file err %s", err)
+			}
+			log.Infof("download file success %s", string(fi.FileHash))
 		}
 	}
 }
@@ -1046,11 +1091,6 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 	if err != nil {
 		return err
 	}
-	blockHashes := this.taskMgr.FileBlockHashes(taskId)
-	if len(blockHashes) == 0 {
-		log.Errorf("block hashes is empty for file :%s", fileHashStr)
-		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "block hashes is empty")
-	}
 	if err = client.P2pConnect(addr); err != nil {
 		return err
 	}
@@ -1065,11 +1105,17 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 			log.Errorf("pin root file err %s", err)
 		}
 	}()
-	// TODO: optimize this with one hash once time
 	downloadQoS := make([]int64, 0)
 	blocks := make([]*block.Block, 0, common.MAX_REQ_BLOCK_COUNT)
 	downloadBlkCap := common.MIN_REQ_BLOCK_COUNT
-	for index, hash := range blockHashes {
+	totalCount, err := this.taskMgr.GetFileTotalBlockCount(taskId)
+	if err != nil {
+		return err
+	}
+	blockHashes := make([]string, 0, totalCount)
+	blockHashes = append(blockHashes, fileHashStr)
+	for index := 0; index < len(blockHashes); index++ {
+		hash := blockHashes[index]
 		pause, cancel, err = this.taskMgr.IsTaskPauseOrCancel(taskId)
 		if err != nil {
 			return err
@@ -1104,7 +1150,6 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 		} else {
 			downloadQoS = append(downloadQoS, time.Now().Unix()-startDownload)
 		}
-
 		if err != nil {
 			return err
 		}
@@ -1135,6 +1180,13 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 				return err
 			}
 			log.Debugf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d", taskId, fileHashStr, value.Hash, value.Index, value.Offset)
+			links, err := this.fs.GetBlockLinks(blk)
+			if err != nil {
+				log.Errorf("get block links err %s", err)
+				return err
+			}
+			blockHashes = append(blockHashes, links...)
+			log.Debugf("blockHashes: %v, len: %d", blockHashes, len(blockHashes))
 		}
 	}
 	if !this.taskMgr.IsFileDownloaded(taskId) {
@@ -1313,6 +1365,68 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 		}
 	}
 	go this.dns.PushToTrackers(fileHashStr, this.dns.TrackerUrls, client.P2pGetPublicAddr())
+	return nil
+}
+
+// backupFileFromPeer. backup a file from peer
+func (this *Dsp) backupFileFromPeer(fileInfo *fs.FileInfo, peer string, luckyNum, bakHeight, bakNum uint64, brokenAddr chainCom.Address) error {
+	fileHashStr := string(fileInfo.FileHash)
+	if fileInfo == nil || len(fileHashStr) == 0 {
+		return dspErr.New(dspErr.DOWNLOAD_FILEHASH_NOT_FOUND, "no filehash for download")
+	}
+	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
+	var err error
+	defer func() {
+		sdkErr, _ := err.(*dspErr.Error)
+		if err != nil {
+			log.Errorf("download file %s err %s", fileHashStr, err)
+		}
+		log.Debugf("emit ret %s %s", taskId, err)
+		if sdkErr != nil {
+			this.taskMgr.EmitResult(taskId, nil, sdkErr)
+		}
+		// delete task from cache in the end
+		if this.taskMgr.IsFileDownloaded(taskId) && sdkErr == nil {
+			this.taskMgr.EmitResult(taskId, "", nil)
+			this.taskMgr.DeleteTask(taskId)
+		}
+	}()
+	if len(taskId) == 0 || !this.taskMgr.TaskExist(taskId) {
+		taskId, err = this.taskMgr.NewTask(store.TaskTypeDownload)
+		if err != nil {
+			return err
+		}
+	}
+	taskDone, _ := this.taskMgr.IsTaskDone(taskId)
+	if taskDone {
+		return nil
+	}
+	if this.dns.DNSNode == nil {
+		err = dspErr.New(dspErr.NO_CONNECTED_DNS, "no online dns node")
+		return dspErr.NewWithError(dspErr.NO_CONNECTED_DNS, err)
+	}
+	log.Debugf("download file dns node %s", this.dns.DNSNode.WalletAddr)
+	if err = this.taskMgr.SetTaskInfoWithOptions(taskId, task.FileHash(fileHashStr), task.FileName(string(fileInfo.FileDesc)),
+		task.FileOwner(fileInfo.FileOwner.ToBase58()), task.Walletaddr(this.chain.WalletAddress())); err != nil {
+		return err
+	}
+	if err = this.taskMgr.BindTaskId(taskId); err != nil {
+		return err
+	}
+	// TODO: test back up logic
+	if err = this.downloadFileFromPeers(taskId, fileHashStr, common.ASSET_USDT, true, "", false, false, common.MAX_DOWNLOAD_PEERS_NUM, []string{peer}); err != nil {
+		log.Errorf("download file err %s", err)
+		return err
+	}
+	if err = this.fs.PinRoot(context.TODO(), fileHashStr); err != nil {
+		log.Errorf("pin root file err %s", err)
+		return err
+	}
+	if err = this.fs.StartPDPVerify(fileHashStr, luckyNum, bakHeight, bakNum, brokenAddr); err != nil {
+		log.Errorf("pdp verify error for backup task")
+		return err
+	}
+	log.Debugf("backup file:%s success", fileHashStr)
 	return nil
 }
 

@@ -132,6 +132,7 @@ func (this *Dsp) Start() error {
 			go this.StartBackupFileService()
 		}
 		go this.StartCheckRemoveFiles()
+		go this.StartFetchFileService()
 	}
 	this.isStop = false
 	return nil
