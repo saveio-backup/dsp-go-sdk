@@ -3,6 +3,7 @@ package dsp
 import (
 	"time"
 
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 	sdkCom "github.com/saveio/themis-go-sdk/common"
 	"github.com/saveio/themis/account"
 	chainCom "github.com/saveio/themis/common"
@@ -82,6 +83,9 @@ func (this *Dsp) IsFileInfoDeleted(err error) bool {
 
 // CalculateUploadFee. pre-calculate upload cost by its upload options
 func (this *Dsp) CalculateUploadFee(opt *fs.UploadOption) (*fs.StorageFee, error) {
+	if opt.ProveInterval == 0 {
+		return nil, dspErr.New(dspErr.INTERNAL_ERROR, "prove interval too small")
+	}
 	return this.chain.GetUploadStorageFee(opt)
 }
 
