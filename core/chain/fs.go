@@ -17,6 +17,14 @@ func (this *Chain) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
 	return info, nil
 }
 
+func (this *Chain) GetFileInfos(fileHashStr []string) (*fs.FileInfoList, error) {
+	list, err := this.themis.Native.Fs.GetFileInfos(fileHashStr)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return list, nil
+}
+
 func (this *Chain) GetExpiredProveList() (*fs.BakTasks, error) {
 	tasks, err := this.themis.Native.Fs.GetExpiredProveList()
 	if err != nil {

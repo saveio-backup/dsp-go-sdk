@@ -670,7 +670,7 @@ func (this *Dsp) StartBackupFileService() {
 	for {
 		select {
 		case <-ticker.C:
-			if this.isStop {
+			if !this.Running() {
 				log.Debugf("stop backup file service")
 				ticker.Stop()
 				return
@@ -724,7 +724,7 @@ func (this *Dsp) StartFetchFileService() {
 	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
 	for {
 		<-ticker.C
-		if this.isStop {
+		if !this.Running() {
 			log.Debugf("stop fetch file service")
 			ticker.Stop()
 			return
@@ -778,7 +778,7 @@ func (this *Dsp) StartCheckRemoveFiles() {
 	for {
 		select {
 		case <-ticker.C:
-			if this.isStop {
+			if !this.Running() {
 				log.Debugf("stop check remove files service")
 				ticker.Stop()
 				return

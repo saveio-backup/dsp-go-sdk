@@ -183,6 +183,10 @@ func (this *Dsp) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
 	return this.chain.GetFileInfo(fileHashStr)
 }
 
+func (this *Dsp) GetFileInfos(fileHashStrs []string) (*fs.FileInfoList, error) {
+	return this.chain.GetFileInfos(fileHashStrs)
+}
+
 func (this *Dsp) GetFileList(addr chainCom.Address) (*fs.FileList, error) {
 	return this.chain.GetFileList(addr)
 }

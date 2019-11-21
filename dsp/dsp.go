@@ -31,7 +31,7 @@ type Dsp struct {
 	channel *channel.Channel  // Channel Component
 	dns     *dns.DNS          // DNS component
 	taskMgr *task.TaskMgr     // Task Mgr
-	isStop  bool              // flag of service status
+	running bool              // flag of service status
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
@@ -134,7 +134,7 @@ func (this *Dsp) Start() error {
 		go this.StartCheckRemoveFiles()
 		go this.StartFetchFileService()
 	}
-	this.isStop = false
+	this.running = true
 	return nil
 }
 
@@ -168,8 +168,12 @@ func (this *Dsp) Stop() error {
 		}
 	}
 	log.Debugf("stop dsp success")
-	this.isStop = true
+	this.running = false
 	return nil
+}
+
+func (this *Dsp) Running() bool {
+	return this.running
 }
 
 func (this *Dsp) UpdateConfig(field string, value interface{}) error {
@@ -192,7 +196,7 @@ func (this *Dsp) StartSeedService() {
 	for {
 		select {
 		case <-tick.C:
-			if this.isStop {
+			if !this.Running() {
 				log.Debugf("stop seed service")
 				return
 			}

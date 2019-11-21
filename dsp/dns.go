@@ -7,7 +7,6 @@ import (
 )
 
 /* DNS API */
-
 func (this *Dsp) HasDNS() bool {
 	return this.dns != nil && this.dns.DNSNode != nil
 }

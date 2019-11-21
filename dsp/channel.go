@@ -52,7 +52,7 @@ func (this *Dsp) HasChannelInstance() bool {
 	return this.channel != nil
 }
 
-func (this *Dsp) Running() bool {
+func (this *Dsp) ChannelRunning() bool {
 	return this.channel.Running()
 }
 func (this *Dsp) GetCurrentFilterBlockHeight() uint32 {
