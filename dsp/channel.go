@@ -55,6 +55,11 @@ func (this *Dsp) HasChannelInstance() bool {
 func (this *Dsp) ChannelRunning() bool {
 	return this.channel.Running()
 }
+
+func (this *Dsp) ChannelFirstSyncing() bool {
+	return this.channel.FirstSyncing()
+}
+
 func (this *Dsp) GetCurrentFilterBlockHeight() uint32 {
 	return this.channel.GetCurrentFilterBlockHeight()
 }

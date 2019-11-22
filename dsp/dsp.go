@@ -24,14 +24,15 @@ import (
 var Version string
 
 type Dsp struct {
-	account *account.Account  // Chain account of current login user
-	config  *config.DspConfig // Dsp global config
-	chain   *chain.Chain      // Chain component
-	fs      *fs.Fs            // FS component
-	channel *channel.Channel  // Channel Component
-	dns     *dns.DNS          // DNS component
-	taskMgr *task.TaskMgr     // Task Mgr
-	running bool              // flag of service status
+	account      *account.Account    // Chain account of current login user
+	config       *config.DspConfig   // Dsp global config
+	chain        *chain.Chain        // Chain component
+	fs           *fs.Fs              // FS component
+	channel      *channel.Channel    // Channel Component
+	dns          *dns.DNS            // DNS component
+	taskMgr      *task.TaskMgr       // Task Mgr
+	levelDBStore *store.LevelDBStore // Level DB
+	running      bool                // flag of service status
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
@@ -45,15 +46,14 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	d.config = c
 	d.chain = chain.NewChain(acc, c.ChainRpcAddrs, chain.IsClient(d.IsClient()))
 	d.account = acc
-	var dbstore *store.LevelDBStore
 	if len(c.DBPath) > 0 {
 		var err error
-		dbstore, err = store.NewLevelDBStore(c.DBPath)
+		d.levelDBStore, err = store.NewLevelDBStore(c.DBPath)
 		if err != nil {
 			log.Errorf("init db err %s", err)
 			return nil
 		}
-		d.taskMgr.SetFileDB(dbstore)
+		d.taskMgr.SetFileDB(d.levelDBStore)
 		err = d.taskMgr.RecoverUndoneTask()
 		if err != nil {
 			log.Errorf("recover undone task err %s", err)
@@ -70,20 +70,11 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	}
 	dspActorClient.SetP2pPid(p2pActor)
 	if len(c.ChannelListenAddr) > 0 && acc != nil {
-		var err error
-		getHostCallBack := func(addr chainCom.Address) (string, error) {
-			return d.dns.GetExternalIP(addr.ToBase58())
-		}
-		d.channel, err = channel.NewChannelService(c, d.chain.Themis(), getHostCallBack)
-		if err != nil {
+		if err := d.initChannelService(); err != nil {
 			log.Errorf("init channel err %s", err)
 			return nil
 		}
 		chActorClient.SetP2pPid(p2pActor)
-		if dbstore != nil {
-			channelDB := store.NewChannelDB(dbstore)
-			d.channel.SetChannelDB(channelDB)
-		}
 	}
 	d.dns = dns.NewDNS(d.chain, d.channel,
 		dns.MaxDNSNodeNum(d.config.DnsNodeMaxNum),
@@ -112,19 +103,20 @@ func (this *Dsp) Start() error {
 		return nil
 	}
 	// start dns service
-	if this.channel != nil {
-		err := this.StartChannelService()
-		if err != nil {
+	if this.channel == nil {
+		if err := this.initChannelService(); err != nil {
 			return err
 		}
-		this.dns.Channel = this.channel
-		this.dns.BootstrapDNS()
 	}
+	if err := this.StartChannelService(); err != nil {
+		return err
+	}
+	this.dns.Channel = this.channel
+	this.dns.BootstrapDNS()
 	// start seed service
 	if this.config.SeedInterval > 0 {
 		go this.StartSeedService()
 	}
-
 	// start backup service
 	if this.IsFs() {
 		if this.config.EnableBackup {
@@ -143,8 +135,7 @@ func (this *Dsp) StartChannelService() error {
 		return dspErr.New(dspErr.CHANNEL_START_SERVICE_ERROR, "channel is nil")
 	}
 	this.registerReceiveNotification()
-	err := this.channel.StartService()
-	if err != nil {
+	if err := this.channel.StartService(); err != nil {
 		return err
 	}
 	time.Sleep(time.Second)
@@ -159,6 +150,7 @@ func (this *Dsp) Stop() error {
 	}
 	if this.channel != nil {
 		this.channel.StopService()
+		this.channel = nil
 	}
 	if this.fs != nil {
 		err := this.fs.Close()
@@ -207,4 +199,20 @@ func (this *Dsp) StartSeedService() {
 			this.dns.PushFilesToTrackers(files)
 		}
 	}
+}
+
+func (this *Dsp) initChannelService() error {
+	getHostCallBack := func(addr chainCom.Address) (string, error) {
+		return this.dns.GetExternalIP(addr.ToBase58())
+	}
+	ch, err := channel.NewChannelService(this.config, this.chain.Themis(), getHostCallBack)
+	if err != nil {
+		log.Errorf("init channel err %s", err)
+		return err
+	}
+	this.channel = ch
+	channelDB := store.NewChannelDB(this.levelDBStore)
+	this.channel.SetChannelDB(channelDB)
+
+	return nil
 }

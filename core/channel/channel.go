@@ -24,16 +24,17 @@ import (
 )
 
 type Channel struct {
-	chActor    *ch_actor.ChannelActorServer
-	chActorId  *actor.PID
-	closeCh    chan struct{}
-	unitPrices map[int32]uint64
-	channelDB  *store.ChannelDB
-	walletAddr string
-	isStart    bool
-	chain      *sdk.Chain
-	cfg        *config.DspConfig
-	r          *rand.Rand
+	chActor      *ch_actor.ChannelActorServer
+	chActorId    *actor.PID
+	closeCh      chan struct{}
+	unitPrices   map[int32]uint64
+	channelDB    *store.ChannelDB
+	walletAddr   string
+	isStart      bool
+	firstSyncing bool // first syncing block
+	chain        *sdk.Chain
+	cfg          *config.DspConfig
+	r            *rand.Rand
 }
 
 type channelInfo struct {
@@ -129,7 +130,9 @@ func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
 func (this *Channel) StartService() error {
 	//start connect target
 	log.Debugf("[dsp-go-sdk-channel] StartService")
+	this.firstSyncing = true
 	err := this.chActor.SyncBlockData()
+	this.firstSyncing = false
 	if err != nil {
 		log.Errorf("channel sync block err %s", err)
 		return dspErr.NewWithError(dspErr.CHANNEL_SYNC_BLOCK_ERROR, err)
@@ -142,6 +145,11 @@ func (this *Channel) StartService() error {
 	this.isStart = true
 	this.OverridePartners()
 	return nil
+}
+
+// FirstSyncing. Is channel first syncing blocks
+func (this *Channel) FirstSyncing() bool {
+	return this.firstSyncing
 }
 
 // Running. Is channel service running
@@ -165,6 +173,7 @@ func (this *Channel) StopService() {
 		this.chActorId.Stop()
 	}
 	if !this.isStart {
+		// if not start, there is no transport to receive for channel service
 		if this.chActor.GetChannelService().Service != nil &&
 			this.chActor.GetChannelService().Service.Wal != nil &&
 			this.chActor.GetChannelService().Service.Wal.Storage != nil {
@@ -189,6 +198,10 @@ func (this *Channel) GetCloseCh() chan struct{} {
 
 func (this *Channel) SetChannelDB(db *store.ChannelDB) {
 	this.channelDB = db
+}
+
+func (this *Channel) GetChannelDB() *store.ChannelDB {
+	return this.channelDB
 }
 
 // GetAllPartners. get all partners from local db
@@ -331,10 +344,16 @@ func (this *Channel) ChannelClose(targetAddress string) error {
 		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
 	}
 	success, err := ch_actor.CloseChannel(common.Address(target))
-	if err == nil && success {
-		this.channelDB.DeleteChannelInfo(targetAddress)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
 	}
-	return dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	if !success {
+		return dspErr.New(dspErr.CHANNEL_INTERNAL_ERROR, "close channel done but no success")
+	}
+	if err := this.channelDB.DeleteChannelInfo(targetAddress); err != nil {
+		return dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return nil
 }
 
 // SetDeposit. deposit money to target

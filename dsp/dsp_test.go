@@ -1,8 +1,10 @@
 package dsp
 
 import (
+	"crypto/rand"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -20,6 +22,7 @@ import (
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/core/types"
 	"github.com/saveio/themis/crypto/keypair"
+	"github.com/saveio/themis/crypto/pdp"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
@@ -1049,4 +1052,92 @@ func TestPubKeyToAdr(t *testing.T) {
 		t.Fatal("no match")
 	}
 	fmt.Printf("addr :%s %s\n", addr.ToBase58(), acc.Address.ToBase58())
+}
+
+func TestPDPVerify(t *testing.T) {
+	fileRoot, err := filepath.Abs(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dspCfg := &config.DspConfig{
+		DBPath:        fileRoot + "/db",
+		FsRepoRoot:    fileRoot + "/max",
+		FsFileRoot:    fileRoot + "/downloads",
+		FsType:        config.FS_FILESTORE,
+		ChainRpcAddrs: []string{rpcAddr},
+	}
+	tempFile := filepath.Join(fileRoot, "fs_temp_big_file")
+	defer func() {
+		// log.Debugf("remove...%s %s %s", dspCfg.DBPath, dspCfg.FsRepoRoot, dspCfg.FsFileRoot)
+		os.RemoveAll(filepath.Join(fileRoot + "Log"))
+		os.RemoveAll(dspCfg.DBPath)
+		os.RemoveAll(dspCfg.FsRepoRoot)
+		os.RemoveAll(dspCfg.FsFileRoot)
+		os.Remove(tempFile)
+	}()
+	d := NewDsp(dspCfg, nil, nil)
+	fi, err := os.OpenFile(tempFile, os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fi.Close()
+	randBuf := make([]byte, 1*1024*1024)
+	rand.Read(randBuf)
+	_, err = fi.Write(randBuf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefix := "123"
+	blks, err := d.fs.NodesFromFile(tempFile, prefix, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("hash: %d\n", len(blks))
+	g, g0, pubKey, privKey, fileID := pdp.Init(tempFile)
+	byteTags := make([]pdp.Element, len(blks))
+	byteBlocks := make([]pdp.Block, len(blks))
+	for i := 0; i < 2; i++ {
+		for index, hash := range blks {
+			block := d.fs.GetBlock(hash)
+			blockData := d.fs.BlockDataOfAny(block)
+			tag, err := pdp.SignGenerate(blockData, fileID, uint32(index+1), g0, privKey)
+			if err != nil {
+				t.Fatal(err)
+			}
+			byteTags[index] = pdp.Element{
+				Buffer: tag,
+			}
+			byteBlocks[index] = pdp.Block{
+				Buffer: blockData,
+			}
+			log.Debugf("index: %d, tag: %x", index, tag)
+			if i == 1 && index == 2 {
+				log.Debugf("break ")
+				break
+			}
+		}
+	}
+
+	for index, tag := range byteTags {
+		log.Debugf("index: %d, tag: %x", index, tag)
+	}
+
+	var challenges []pdp.Challenge
+	challenges = append(challenges, pdp.Challenge{
+		Index: 1,
+		Rand:  1,
+	})
+	challenges = append(challenges, pdp.Challenge{
+		Index: 2,
+		Rand:  2,
+	})
+	challenges = append(challenges, pdp.Challenge{
+		Index: 3,
+		Rand:  3,
+	})
+
+	multiRes, addRes := pdp.ProofGenerate(challenges, byteTags, byteBlocks)
+	if !pdp.Verify(g, g0, pubKey, multiRes, addRes, fileID, challenges) {
+		t.Fatal("verify pdp failed")
+	}
 }

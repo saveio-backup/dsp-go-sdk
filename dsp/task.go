@@ -7,6 +7,9 @@ import (
 )
 
 func (this *Dsp) RecoverDBLossTask() error {
+	if this.chain == nil || this.account == nil {
+		return nil
+	}
 	list, err := this.chain.GetFileList(this.account.Address)
 	if err != nil {
 		log.Errorf("get file list err %s", err)
