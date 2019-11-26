@@ -72,6 +72,7 @@ const (
 	REMOTE_PEER_DELETE_FILE
 	NO_BLOCK_TO_DOWNLOAD
 	PAY_BLOCK_TO_SELF
+	TASK_NOT_EXIST
 )
 
 // delete file error

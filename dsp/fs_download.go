@@ -222,17 +222,7 @@ func (this *Dsp) DownloadFileByLink(link string, asset int32, inOrder bool, decr
 		FileOwner:   fileOwner,
 		MaxPeerCnt:  maxPeerCnt,
 	}
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	if !this.taskMgr.TaskExist(taskId) {
-		log.Debugf("DownloadFileByLink %s, hash %s, opt %v", fileHashStr, fileHashStr, opt)
-		return this.DownloadFile("", fileHashStr, opt)
-	}
-	taskDone, _ := this.taskMgr.IsTaskDone(taskId)
-	if taskDone {
-		log.Debugf("DownloadFileByLink %s, hash %s, opt %v, download a done task", fileHashStr, fileHashStr, opt)
-		return this.DownloadFile("", fileHashStr, opt)
-	}
-	return dspErr.New(dspErr.DOWNLOAD_TASK_EXIST, "task %s has exist, but not finished", taskId)
+	return this.downloadFileWithOpt(fileHashStr, opt)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
@@ -255,19 +245,7 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 		MaxPeerCnt:  maxPeerCnt,
 		Url:         url,
 	}
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	if !this.taskMgr.TaskExist(taskId) {
-		log.Debugf("DownloadFileByUrl %s, hash %s, opt %v", url, fileHashStr, opt)
-		return this.DownloadFile("", fileHashStr, opt)
-	} else {
-		taskDone, _ := this.taskMgr.IsTaskDone(taskId)
-		if taskDone {
-			log.Debugf("DownloadFileByUrl %s, hash %s, opt %v, download a done task", url, fileHashStr, opt)
-			return this.DownloadFile("", fileHashStr, opt)
-		}
-		log.Debugf("task has exist, but not finished %s", taskId)
-		return this.DownloadFile(taskId, fileHashStr, opt)
-	}
+	return this.downloadFileWithOpt(fileHashStr, opt)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
@@ -292,17 +270,7 @@ func (this *Dsp) DownloadFileByHash(fileHashStr string, asset int32, inOrder boo
 		FileOwner:   fileOwner,
 		MaxPeerCnt:  maxPeerCnt,
 	}
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	if !this.taskMgr.TaskExist(taskId) {
-		log.Debugf("DownloadFileByHash %s, hash %s, opt %v", fileHashStr, fileHashStr, opt)
-		return this.DownloadFile("", fileHashStr, opt)
-	}
-	taskDone, _ := this.taskMgr.IsTaskDone(taskId)
-	if taskDone {
-		log.Debugf("DownloadFileByHash %s, hash %s, opt %v, download a done task", fileHashStr, fileHashStr, opt)
-		return this.DownloadFile("", fileHashStr, opt)
-	}
-	return dspErr.New(dspErr.DOWNLOAD_TASK_EXIST, "task %s has exist, but not finished", taskId)
+	return this.downloadFileWithOpt(fileHashStr, opt)
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
@@ -389,6 +357,9 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {
 		return nil, dspErr.New(dspErr.REMOTE_PEER_DELETE_FILE, "remote peer has deleted the file")
+	}
+	if !this.taskMgr.TaskExist(taskId) {
+		return nil, dspErr.New(dspErr.TASK_NOT_EXIST, "task not exist")
 	}
 	totalCount, _ := this.taskMgr.GetFileTotalBlockCount(taskId)
 	log.Debugf("get file total count :%d", totalCount)
@@ -811,6 +782,24 @@ func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.TaskInfo, error)
 	return this.taskMgr.GetFileInfo(fileInfoKey)
 }
 
+// downloadFileWithOpt. internal helper, download or resume file with hash and options
+func (this *Dsp) downloadFileWithOpt(fileHashStr string, opt *common.DownloadOption) error {
+	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
+	if !this.taskMgr.TaskExist(taskId) {
+		log.Debugf("task not exist, start a new download task of id: %s, file %s", taskId, fileHashStr)
+		return this.DownloadFile("", fileHashStr, opt)
+	}
+	if taskDone, _ := this.taskMgr.IsTaskDone(taskId); taskDone {
+		log.Debugf("task has done, start a new download task of id: %s, file %s", taskId, fileHashStr)
+		return this.DownloadFile("", fileHashStr, opt)
+	}
+	if taskPreparing, taskDoing, _ := this.taskMgr.IsTaskPreparingOrDoing(taskId); taskPreparing || taskDoing {
+		return dspErr.New(dspErr.DOWNLOAD_REFUSED, "task exists, and it is preparing or doing")
+	}
+	log.Debugf("task has done, resume the download task of id: %s, file %s", taskId, fileHashStr)
+	return this.DownloadFile(taskId, fileHashStr, opt)
+}
+
 // getPeersForDownload. get peers for download from tracker and fs contract
 func (this *Dsp) getPeersForDownload(fileHashStr string) ([]string, error) {
 	addrs := this.dns.GetPeerFromTracker(fileHashStr, this.dns.TrackerUrls)
@@ -1126,6 +1115,13 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 		}
 		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {
 			log.Debugf("block has downloaded %s %d", hash, index)
+			blk := this.fs.GetBlock(hash)
+			links, err := this.fs.GetBlockLinks(blk)
+			if err != nil {
+				log.Errorf("get block links err %s", err)
+				return err
+			}
+			blockHashes = append(blockHashes, links...)
 			continue
 		}
 		blocks = append(blocks, &block.Block{
