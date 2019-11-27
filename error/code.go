@@ -73,6 +73,7 @@ const (
 	NO_BLOCK_TO_DOWNLOAD
 	PAY_BLOCK_TO_SELF
 	TASK_NOT_EXIST
+	NO_PRIVILEGE_TO_DOWNLOAD
 )
 
 // delete file error

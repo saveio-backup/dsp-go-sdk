@@ -331,10 +331,6 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *networ
 
 // handleFileDownloadAskMsg. client send download ask msg to peers for download
 func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *network.PeerClient, fileMsg *file.File) {
-	if !this.chain.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
-		log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
-		return
-	}
 	replyErr := func(sessionId, fileHash string, errorCode uint32, errorMsg string, ctx *network.ComponentContext) {
 		replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK, errorCode, errorMsg,
 			message.WithSessionId(sessionId),
@@ -349,6 +345,11 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 			log.Errorf("reply download ack err msg failed", err)
 		}
 	}
+	if !this.chain.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
+		log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
+		replyErr("", fileMsg.Hash, serr.NO_PRIVILEGE_TO_DOWNLOAD, fmt.Sprintf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress), ctx)
+		return
+	}
 	downloadInfoId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	price, err := this.GetFileUnitPrice(fileMsg.PayInfo.Asset)
 	if err != nil {
@@ -359,6 +360,11 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 	log.Debugf("get prefix from local: %s", prefix)
 	if err != nil {
 		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
+		return
+	}
+	dnsBalance, err := this.channel.GetAvailableBalance(this.dns.DNSNode.WalletAddr)
+	if err != nil || dnsBalance == 0 {
+		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, "no enough balance with dns"+this.dns.DNSNode.WalletAddr, ctx)
 		return
 	}
 	localId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, store.TaskTypeShare)
