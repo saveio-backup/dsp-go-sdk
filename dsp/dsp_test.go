@@ -54,7 +54,7 @@ var channel4Addr = "127.0.0.1:13004"
 var channel5Addr = "127.0.0.1:13005"
 
 func init() {
-	log.InitLog(1, log.PATH, log.Stdout)
+	log.InitLog(2, log.PATH, log.Stdout)
 	log.AddIgnore("oniChannel")
 }
 
@@ -1140,4 +1140,34 @@ func TestPDPVerify(t *testing.T) {
 	if !pdp.Verify(g, g0, pubKey, multiRes, addRes, fileID, challenges) {
 		t.Fatal("verify pdp failed")
 	}
+}
+
+func TestGetFsBlocks(t *testing.T) {
+	fileRoot, err := filepath.Abs(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dspCfg := &config.DspConfig{
+		DBPath:        fileRoot + "/db",
+		FsRepoRoot:    fileRoot + "/max",
+		FsFileRoot:    fileRoot + "/downloads",
+		FsType:        config.FS_FILESTORE,
+		ChainRpcAddrs: []string{rpcAddr},
+	}
+	defer func() {
+		os.RemoveAll(filepath.Join(fileRoot + "Log"))
+		os.RemoveAll(dspCfg.DBPath)
+		os.RemoveAll(dspCfg.FsRepoRoot)
+		os.RemoveAll(dspCfg.FsFileRoot)
+	}()
+	d := NewDsp(dspCfg, nil, nil)
+	prefix := "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADd1hCkwGLz1wBgG/VJRSj2RMBMOgAAAAAAACd+AAAAAHiE5fA="
+	blks, err := d.fs.NodesFromFile("/Users/zhijie/Desktop/SeekLogs/filmlabtest1128_01.zip", prefix, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, hash := range blks {
+		fmt.Println(hash)
+	}
+	fmt.Printf("hash: %d\n", len(blks))
 }

@@ -716,23 +716,29 @@ func (this *Dsp) StartFetchFileService() {
 				continue
 			}
 			fileHashStr := string(fi.FileHash)
+			taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeDownload)
+			if len(taskId) > 0 {
+				// already has task, skip
+				log.Debugf("skip fetch because %s is running", taskId)
+				continue
+			}
 			// find if i can fetch file
 			if !this.chain.CheckHasProveFile(fileHashStr, fi.PrimaryNodes.AddrList[0]) {
-				log.Debugf("node has not prove %v %v", fileHashStr, fi.PrimaryNodes.AddrList[0])
+				log.Debugf("node %v has not proved %v", fi.PrimaryNodes.AddrList[0], fileHashStr)
 				continue
 			}
 			// get host addr from wallet addr
 			hostAddrs, err := this.chain.GetNodeHostAddrListByWallets([]chainCom.Address{fi.PrimaryNodes.AddrList[0]})
 			if err != nil {
-				log.Errorf("get host addr failed of wallet %s", err)
+				log.Errorf("get host addr of primary node %s", err)
 				continue
 			}
 			if len(hostAddrs) != 1 {
-				log.Errorf("get host addr failed of wallet %s", fi.PrimaryNodes.AddrList[0])
+				log.Errorf("hostAddrs is empty %s", fi.PrimaryNodes.AddrList[0])
 				continue
 			}
 
-			log.Debugf("go back up file %s from %s", string(fi.FileHash), hostAddrs[0])
+			log.Debugf("back up file %s from %s", string(fi.FileHash), hostAddrs[0])
 			// start download file
 			if err := this.backupFileFromPeer(&fi, hostAddrs[0], 0, 0, 0, chainCom.ADDRESS_EMPTY); err != nil {
 				log.Errorf("backup file err %s", err)
@@ -871,6 +877,9 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			links, err := this.fs.GetBlockLinks(block)
 			if err != nil {
 				return err
+			}
+			if block.Cid().String() != value.Hash {
+				log.Warnf("receive a unmatched hash block %s %s", block.Cid().String(), value.Hash)
 			}
 			if block.Cid().String() == fileHashStr && this.config.FsType == config.FS_FILESTORE {
 				if !filePrefix.Encrypt {
@@ -1387,7 +1396,7 @@ func (this *Dsp) backupFileFromPeer(fileInfo *fs.FileInfo, peer string, luckyNum
 			this.taskMgr.DeleteTask(taskId)
 		}
 	}()
-	if len(taskId) == 0 || !this.taskMgr.TaskExist(taskId) {
+	if len(taskId) == 0 {
 		taskId, err = this.taskMgr.NewTask(store.TaskTypeDownload)
 		if err != nil {
 			return err
