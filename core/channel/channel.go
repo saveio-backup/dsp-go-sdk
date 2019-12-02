@@ -169,9 +169,6 @@ func (this *Channel) StopService() {
 	if this.channelDB != nil {
 		this.channelDB.Close()
 	}
-	if this.chActorId != nil {
-		this.chActorId.Stop()
-	}
 	if !this.isStart {
 		// if not start, there is no transport to receive for channel service
 		if this.chActor.GetChannelService().Service != nil &&
@@ -184,9 +181,13 @@ func (this *Channel) StopService() {
 	}
 	log.Debug("[dsp-go-sdk-channel] StopService")
 	err := ch_actor.StopPylons()
+	log.Debug("[dsp-go-sdk-channel] StopService done")
 	if err != nil {
 		log.Errorf("stop pylons err %s", err)
 		return
+	}
+	if this.chActorId != nil {
+		this.chActorId.Stop()
 	}
 	close(this.closeCh)
 	this.isStart = false

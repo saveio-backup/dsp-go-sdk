@@ -738,7 +738,7 @@ func (this *Dsp) StartFetchFileService() {
 				continue
 			}
 
-			log.Debugf("back up file %s from %s", string(fi.FileHash), hostAddrs[0])
+			log.Debugf("backup file %s from %s", string(fi.FileHash), hostAddrs[0])
 			// start download file
 			if err := this.backupFileFromPeer(&fi, hostAddrs[0], 0, 0, 0, chainCom.ADDRESS_EMPTY); err != nil {
 				log.Errorf("backup file err %s", err)

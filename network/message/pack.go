@@ -13,6 +13,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/themis-go-sdk/utils"
 	"github.com/saveio/themis/account"
+	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/crypto/keypair"
 )
 
@@ -335,6 +336,7 @@ func NewFileMsgWithError(fileHashStr string, op int32, errorCode uint32, errorMs
 		}
 		fOpt.apply(f)
 	}
+	log.Debugf("new file msg id %s, type %d", msg.MessageId, f.Operation)
 	msg.Payload = f
 	if errorCode != common.MSG_ERROR_CODE_NONE {
 		msg.Error = &Error{
