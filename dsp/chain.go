@@ -172,10 +172,16 @@ func (this *Dsp) PreExecInvokeNativeContract(contractAddress chainCom.Address, v
 }
 
 func (this *Dsp) GetChannelInfoFromChain(channelID uint64, participant1, participant2 chainCom.Address) (*micropayment.ChannelInfo, error) {
+	if this.chain == nil {
+		return nil, dspErr.New(dspErr.CHAIN_ERROR, "no chain")
+	}
 	return this.chain.GetChannelInfo(channelID, participant1, participant2)
 }
 
 func (this *Dsp) GetDnsNodeByAddr(wallet chainCom.Address) (*dns.DNSNodeInfo, error) {
+	if this.chain == nil {
+		return nil, dspErr.New(dspErr.CHAIN_ERROR, "no chain")
+	}
 	return this.chain.GetDnsNodeByAddr(wallet)
 }
 

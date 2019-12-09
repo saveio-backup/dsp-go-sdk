@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ontio/ontology-eventbus/actor"
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	ch_actor "github.com/saveio/pylons/actor/server"
 	"github.com/saveio/pylons/common"
@@ -79,6 +80,9 @@ func (this *Dsp) AddChannelInfo(id uint64, partnerAddr string) error {
 	return this.channel.AddChannelInfo(id, partnerAddr)
 }
 func (this *Dsp) GetChannelInfoFromDB(targetAddress string) (*store.ChannelInfo, error) {
+	if this.channel == nil {
+		return nil, dspErr.New(dspErr.CHANNEL_INTERNAL_ERROR, "no channel")
+	}
 	return this.channel.GetChannelInfoFromDB(targetAddress)
 }
 func (this *Dsp) OverridePartners() error {

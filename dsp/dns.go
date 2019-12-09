@@ -2,6 +2,7 @@ package dsp
 
 import (
 	"github.com/saveio/dsp-go-sdk/core/dns"
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
@@ -79,6 +80,9 @@ func (this *Dsp) RegNodeEndpoint(walletAddr chainCom.Address, endpointAddr strin
 }
 
 func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {
+	if this.dns == nil {
+		return "", dspErr.New(dspErr.NO_CONNECTED_DNS, "no dns")
+	}
 	return this.dns.GetExternalIP(walletAddr)
 }
 
