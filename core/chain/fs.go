@@ -46,6 +46,9 @@ func (this *Chain) GetNodeList() (*fs.FsNodesInfo, error) {
 	if err != nil {
 		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
+	this.r.Shuffle(len(list.NodeInfo), func(i, j int) {
+		list.NodeInfo[i], list.NodeInfo[j] = list.NodeInfo[j], list.NodeInfo[i]
+	})
 	return list, nil
 }
 

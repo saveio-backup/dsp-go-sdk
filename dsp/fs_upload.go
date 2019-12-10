@@ -918,22 +918,25 @@ func (this *Dsp) findReceivers(taskId, fileHashStr, filePath string, primaryNode
 		message.WithSign(this.chain.CurrentAccount()),
 	)
 	log.Debugf("broadcast fetch_ask msg of file: %s to %v", fileHashStr, nodeList)
-	walletAddrs, hostAddrs, err := this.broadcastAskMsg(msg, nodeList, receiverCount)
+	this.taskMgr.SetTaskNetPhase(taskId, nodeList, int(common.WorkerSendFileAsk))
+	walletAddrs, hostAddrs, err := this.broadcastAskMsg(taskId, msg, nodeList, receiverCount)
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(walletAddrs) < receiverCount {
 		return nil, nil, dspErr.New(dspErr.RECEIVERS_NOT_ENOUGH, "file receivers is not enough")
 	}
+	this.taskMgr.SetTaskNetPhase(taskId, hostAddrs, int(common.WorkerRecvFileAck))
 	return walletAddrs, hostAddrs, nil
 }
 
 // broadcastAskMsg. send ask msg to nodelist, and expect min response count of node to response a ack msg
 // return the host addr list in order
-func (this *Dsp) broadcastAskMsg(msg *message.Message, nodeList []string, minResponse int) ([]chainCom.Address, []string, error) {
+func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList []string, minResponse int) ([]chainCom.Address, []string, error) {
 	lock := new(sync.Mutex)
 	walletAddrs := make([]chainCom.Address, 0)
 	hostAddrs := make([]string, 0)
+	backupAddrs := make(map[chainCom.Address]string, 0)
 	stop := false
 	breakpoint := make(map[string]*file.Breakpoint, 0)
 	height, _ := this.chain.GetCurrentBlockHeight()
@@ -956,11 +959,24 @@ func (this *Dsp) broadcastAskMsg(msg *message.Message, nodeList []string, minRes
 		}
 		// compare chain info
 		if height > 0 && int(math.Abs(float64(fileMsg.ChainInfo.Height-height))) > common.MAX_BLOCK_HEIGHT_DIFF {
+			log.Debugf("remote node block height is %d, but current block height is %d", fileMsg.ChainInfo.Height, height)
+			return false
+		}
+		breakpoint[addr] = fileMsg.Breakpoint
+		log.Debugf("recv file ack msg from %s file %s", addr, fileMsg.Hash)
+		// lower priority node, put to backup list
+		if this.taskMgr.IsWorkerBusy(taskId, addr, int(common.WorkerSendFileAsk)) {
+			log.Debugf("peer %s is busy, put to backup list", addr)
+			backupAddrs[receiverWalletAddr] = addr
+			return false
+		}
+		if bad, err := client.P2pIsPeerNetQualityBad(addr, client.P2pNetTypeDsp); bad || err != nil {
+			log.Debugf("peer %s network quality is bad, put to backup list", addr)
+			backupAddrs[receiverWalletAddr] = addr
 			return false
 		}
 		walletAddrs = append(walletAddrs, receiverWalletAddr)
 		hostAddrs = append(hostAddrs, addr)
-		breakpoint[addr] = fileMsg.Breakpoint
 		log.Debugf("send file_ask msg success of file: %s, to: %s  receivers: %v", fileMsg.Hash, addr, walletAddrs)
 		if len(walletAddrs) >= minResponse || len(walletAddrs) >= len(nodeList) {
 			log.Debugf("break receiver goroutine")
@@ -974,6 +990,22 @@ func (this *Dsp) broadcastAskMsg(msg *message.Message, nodeList []string, minRes
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err")
 		return nil, nil, err
+	}
+	if len(walletAddrs) >= minResponse {
+		log.Debugf("receives :%v, ret %v", walletAddrs, ret)
+		return walletAddrs, hostAddrs, nil
+	}
+	if len(walletAddrs)+len(backupAddrs) < minResponse {
+		return nil, nil, dspErr.New(dspErr.RECEIVERS_NOT_ENOUGH, "no enough backup nodes")
+	}
+	// append backup nodes to tail with random range
+	log.Debugf("backup list %v", backupAddrs)
+	for walletAddr, hostAddr := range backupAddrs {
+		walletAddrs = append(walletAddrs, walletAddr)
+		hostAddrs = append(hostAddrs, hostAddr)
+		if len(walletAddrs) >= minResponse {
+			break
+		}
 	}
 	log.Debugf("receives :%v, ret %v", walletAddrs, ret)
 	return walletAddrs, hostAddrs, nil
@@ -1086,7 +1118,7 @@ func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyN
 	}
 	cancelFetch := make(chan struct{})
 	addrs := []string{payRet.MasterNodeHostAddr}
-	log.Debugf("open %d go routines for fetched file taskId: %s, %s", len(addrs), taskId, fileHashStr)
+	log.Debugf("wait for %v fetched file taskId: %s, %s", addrs, taskId, fileHashStr)
 	this.taskMgr.NewWorkers(taskId, utils.StringSliceToKeyMap(addrs), true, nil)
 
 	reqForPeers := make(map[string]chan []*task.GetBlockReq)

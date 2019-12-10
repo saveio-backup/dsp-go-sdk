@@ -52,3 +52,35 @@ type DownloadOption struct {
 	MaxPeerCnt  int
 	Url         string
 }
+
+type WorkerNetMsgPhase int
+
+const (
+	WorkNetPhaseNone WorkerNetMsgPhase = iota
+	WorkerSendFileAsk
+	WorkerRecvFileAsk
+	WorkerSendFileAck
+	WorkerRecvFileAck
+	WorkerSendFileRdy
+	WorkerRecvFileRdy
+	WorkerSendFilePause
+	WorkerRecvFilePause
+	WorkerSendFileResume
+	WorkerRecvFileResume
+	WorkerSendFileCancel
+	WorkerRecvFileCancel
+	WorkerSendFetchDone
+	WorkerRecvFileDone
+	WorkerSendDownloadAsk
+	WorkerRecvDownloadAsk
+	WorkerSendDownloadAck
+	WorkerRecvDownloadAck
+	WorkerSendDownloadDone
+	WorkerRecvDownloadDone
+	WorkerSendDownloadCancel
+	WorkerRecvDownloadCancel
+	WorkerSendFileDelete
+	WorkerRecvDownloadDelete
+	WorkerSendFileDeleteDone
+	WorkerRecvFileDeleteDone
+)

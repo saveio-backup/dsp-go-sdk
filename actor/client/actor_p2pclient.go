@@ -149,6 +149,12 @@ type GetEndpointReq struct {
 	Response   chan *P2pStringResp
 }
 
+type IsPeerNetQualityBadReq struct {
+	NetType  P2pNetType
+	Address  string
+	Response chan *P2pBoolResp
+}
+
 func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
 	chReq := &ConnectionExistReq{
 		Address:  address,
@@ -391,5 +397,23 @@ func P2pGetEndpointAddr(addr chainCom.Address, targetDnsAddr string) (string, er
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		log.Errorf("[P2pGetEndpointAddr] timeout")
 		return "", dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pGetEndpointAddr] timeout")
+	}
+}
+
+func P2pIsPeerNetQualityBad(address string, netType P2pNetType) (bool, error) {
+	chReq := &IsPeerNetQualityBadReq{
+		Address:  address,
+		NetType:  netType,
+		Response: make(chan *P2pBoolResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil {
+			return resp.Value, resp.Error
+		}
+		return false, dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pIsPeerNetQualityBad] no response")
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return false, dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pIsPeerNetQualityBad] timeout")
 	}
 }

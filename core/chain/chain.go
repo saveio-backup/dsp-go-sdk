@@ -2,6 +2,7 @@ package chain
 
 import (
 	"encoding/hex"
+	"math/rand"
 	"time"
 
 	dspErr "github.com/saveio/dsp-go-sdk/error"
@@ -17,6 +18,7 @@ type Chain struct {
 	account  *account.Account // account for chain
 	themis   *themisSDK.Chain // chain sdk
 	isClient bool             // flag of is client or max node
+	r        *rand.Rand
 }
 
 type ChainOption interface {
@@ -44,6 +46,7 @@ func NewChain(acc *account.Account, rpcAddrs []string, opts ...ChainOption) *Cha
 	ch := &Chain{
 		account: acc,
 		themis:  themis,
+		r:       rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	for _, opt := range opts {
 		opt.apply(ch)

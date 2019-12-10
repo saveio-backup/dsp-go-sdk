@@ -906,3 +906,27 @@ func (this *TaskMgr) GetTaskWorkerIdleDuration(taskId, peerAddr string) (uint64,
 	}
 	return tsk.WorkerIdleDuration(peerAddr), nil
 }
+
+// IsWorkerBusy. check if the worker is busy in 1 min, or net phase not equal to expected phase
+func (this *TaskMgr) IsWorkerBusy(taskId, peerAddr string, excludePhase int) bool {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	for id, t := range this.tasks {
+		if id == taskId {
+			continue
+		}
+		phase := t.GetWorkerNetPhase(peerAddr)
+		if phase == excludePhase {
+			log.Debugf("%s included phase %d", peerAddr, excludePhase)
+			return true
+		}
+		if !t.HasWorker(peerAddr) {
+			continue
+		}
+		if t.WorkerIdleDuration(peerAddr) > 0 && t.WorkerIdleDuration(peerAddr) < 60*1000 {
+			log.Debugf("%s is active", peerAddr)
+			return true
+		}
+	}
+	return false
+}

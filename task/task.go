@@ -84,8 +84,8 @@ type WorkerState struct {
 }
 
 type Task struct {
-	id           string // id
-	info         *store.TaskInfo
+	id           string            // id
+	info         *store.TaskInfo   // task info from local DB
 	peerSenIds   map[string]string // request peerAddr <=> session id
 	transferring bool              // fetch is transferring flag
 	// TODO: refactor, delete below two channels, use request and reply
@@ -100,6 +100,7 @@ type Task struct {
 	lastWorkerIdx       int                          // last worker index
 	batch               bool                         // flag of batch set
 	db                  *store.FileDB                // db
+	workerNetPhase      map[string]int               // network msg interact phase, used to check msg transaction, host addr <=> phase
 }
 
 // NewTask. new task for file, and set the task info to DB.
@@ -984,6 +985,14 @@ func (this *Task) IsTimeout() bool {
 	return true
 }
 
+// HasWorker. check if worker exist
+func (this *Task) HasWorker(addr string) bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	_, ok := this.workers[addr]
+	return ok
+}
+
 // WorkerIdleDuration. worker idle duration
 func (this *Task) WorkerIdleDuration(addr string) uint64 {
 	this.lock.RLock()
@@ -996,16 +1005,29 @@ func (this *Task) WorkerIdleDuration(addr string) uint64 {
 	return now - w.ActiveTime()
 }
 
+func (this *Task) SetWorkerNetPhase(addr string, phase int) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	this.workerNetPhase[addr] = phase
+}
+
+func (this *Task) GetWorkerNetPhase(addr string) int {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.workerNetPhase[addr]
+}
+
 func newTask(id string, info *store.TaskInfo, db *store.FileDB) *Task {
 	t := &Task{
-		id:            id,
-		info:          info,
-		blockReq:      make(chan []*GetBlockReq, common.MAX_TASK_BLOCK_REQ),
-		notify:        make(chan *BlockResp, common.MAX_TASK_BLOCK_NOTIFY),
-		lastWorkerIdx: -1,
-		peerSenIds:    make(map[string]string, common.MAX_TASK_SESSION_NUM),
-		db:            db,
-		lock:          new(sync.RWMutex),
+		id:             id,
+		info:           info,
+		blockReq:       make(chan []*GetBlockReq, common.MAX_TASK_BLOCK_REQ),
+		notify:         make(chan *BlockResp, common.MAX_TASK_BLOCK_NOTIFY),
+		lastWorkerIdx:  -1,
+		peerSenIds:     make(map[string]string, common.MAX_TASK_SESSION_NUM),
+		db:             db,
+		lock:           new(sync.RWMutex),
+		workerNetPhase: make(map[string]int),
 	}
 	return t
 }

@@ -365,3 +365,14 @@ func (this *TaskMgr) DeleteTaskIds(ids []string) error {
 	}
 	return nil
 }
+
+func (this *TaskMgr) SetTaskNetPhase(taskId string, addrs []string, phase int) error {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
+	}
+	for _, addr := range addrs {
+		v.SetWorkerNetPhase(addr, phase)
+	}
+	return nil
+}

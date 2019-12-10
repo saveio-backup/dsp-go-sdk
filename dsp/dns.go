@@ -3,6 +3,7 @@ package dsp
 import (
 	"github.com/saveio/dsp-go-sdk/core/dns"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
+	"github.com/saveio/dsp-go-sdk/utils"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
@@ -61,6 +62,10 @@ func (this *Dsp) RegisterFileUrl(url, link string) (string, error) {
 
 func (this *Dsp) BindFileUrl(url, link string) (string, error) {
 	return this.dns.BindFileUrl(url, link)
+}
+
+func (this *Dsp) GenLink(fileHashStr, fileName string, fileSize, totalCount uint64) string {
+	return utils.GenOniLink(fileHashStr, fileName, this.chain.WalletAddress(), fileSize, totalCount, this.dns.TrackerUrls)
 }
 
 func (this *Dsp) GetLinkFromUrl(url string) string {
