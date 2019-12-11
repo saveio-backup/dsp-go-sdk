@@ -1,7 +1,7 @@
 package ticker
 
 import (
-	"fmt"
+	"context"
 	"sync"
 	"time"
 )
@@ -10,6 +10,7 @@ type Ticker struct {
 	duration time.Duration
 	running  bool
 	l        *sync.Mutex
+	ctx      context.Context
 	f        func() bool
 }
 
@@ -18,19 +19,24 @@ func NewTicker(duration time.Duration, f func() bool) *Ticker {
 		duration: duration,
 		l:        new(sync.Mutex),
 		f:        f,
+		ctx:      context.Background(),
 	}
+}
+
+func (t *Ticker) Context() context.Context {
+	return t.ctx
 }
 
 func (t *Ticker) Run() {
 	if t.isRunning() {
 		return
 	}
-	fmt.Println("is running is false")
 	t.setRunning(true)
 	go func() {
-		fmt.Printf("gogogo\n")
 		tick := time.NewTicker(t.duration)
-		defer tick.Stop()
+		defer func() {
+			tick.Stop()
+		}()
 		for {
 			select {
 			case <-tick.C:

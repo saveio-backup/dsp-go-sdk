@@ -14,6 +14,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/utils"
+	"github.com/saveio/dsp-go-sdk/utils/ticker"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -27,14 +28,16 @@ type TaskMgr struct {
 	progress       chan *ProgressInfo  // progress channel
 	shareNoticeCh  chan *ShareNotification
 	db             *store.FileDB
+	progressTicker *ticker.Ticker // get upload progress ticker
 }
 
-func NewTaskMgr() *TaskMgr {
+func NewTaskMgr(t *ticker.Ticker) *TaskMgr {
 	ts := make(map[string]*Task, 0)
 	tmgr := &TaskMgr{
 		tasks: ts,
 	}
 	tmgr.blockReqCh = make(chan []*GetBlockReq, common.MAX_GOROUTINES_FOR_WORK_TASK)
+	tmgr.progressTicker = t
 	return tmgr
 }
 
@@ -369,12 +372,16 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *dspErr.E
 		if err != nil {
 			log.Errorf("set task state err %s, %s", taskId, err)
 		}
-		log.Debugf("EmitResult, err %v, %v", err, sdkErr)
+		log.Debugf("EmitResult err %v, %v", err, sdkErr)
 	} else {
 		log.Debugf("EmitResult ret %v ret == nil %t", ret, ret == nil)
 		err := v.SetResult(ret, 0, "")
 		if err != nil {
 			log.Errorf("set task result err %s, %s", taskId, err)
+		}
+		if v.GetTaskType() == store.TaskTypeUpload && this.progressTicker != nil && v.GetCopyNum() > 0 {
+			log.Debugf("run progress ticker")
+			this.progressTicker.Run()
 		}
 	}
 	pInfo := v.GetProgressInfo()
@@ -842,8 +849,8 @@ func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
 }
 
 func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	this.lock.RLock()
+	defer this.lock.RUnlock()
 	for id, t := range this.tasks {
 		if t.GetTaskType() != store.TaskTypeDownload {
 			continue
@@ -909,8 +916,8 @@ func (this *TaskMgr) GetTaskWorkerIdleDuration(taskId, peerAddr string) (uint64,
 
 // IsWorkerBusy. check if the worker is busy in 1 min, or net phase not equal to expected phase
 func (this *TaskMgr) IsWorkerBusy(taskId, peerAddr string, excludePhase int) bool {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	this.lock.RLock()
+	defer this.lock.RUnlock()
 	for id, t := range this.tasks {
 		if id == taskId {
 			continue
@@ -929,4 +936,25 @@ func (this *TaskMgr) IsWorkerBusy(taskId, peerAddr string, excludePhase int) boo
 		}
 	}
 	return false
+}
+
+func (this *TaskMgr) GetUnSlavedTasks() ([]string, error) {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.db.UnSlavedList(store.TaskTypeUpload)
+}
+
+func (this *TaskMgr) GetUploadDoneNodeAddr(taskId string) (string, error) {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	info, err := this.db.GetFileInfo(taskId)
+	if err != nil {
+		return "", err
+	}
+	for addr, count := range info.SaveBlockCountMap {
+		if count == info.TotalBlockCount {
+			return addr, nil
+		}
+	}
+	return "", dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "no done node")
 }

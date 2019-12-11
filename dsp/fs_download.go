@@ -790,6 +790,13 @@ func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.TaskInfo, error)
 
 // downloadFileWithOpt. internal helper, download or resume file with hash and options
 func (this *Dsp) downloadFileWithOpt(fileHashStr string, opt *common.DownloadOption) error {
+	if len(opt.FileName) == 0 {
+		// TODO: get file name from chain if the file exists on chain
+		info, _ := this.chain.GetFileInfo(fileHashStr)
+		if info != nil {
+			opt.FileName = string(info.FileDesc)
+		}
+	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
 	if !this.taskMgr.TaskExist(taskId) {
 		log.Debugf("task not exist, start a new download task of id: %s, file %s", taskId, fileHashStr)

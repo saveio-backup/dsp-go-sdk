@@ -182,6 +182,10 @@ func (this *FileDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = this.batchAddToUnSlavedList(batch, id, ft)
+	if err != nil {
+		return nil, err
+	}
 	// store task info
 	err = this.batchSaveFileInfo(batch, fi)
 	if err != nil {
@@ -551,6 +555,12 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 		return err
 	}
 
+	// delete from un salved list
+	err = this.RemoveFromUnSalvedList(batch, id, fi.Type)
+	if err != nil {
+		return err
+	}
+
 	// delete options
 	optionKey := FileOptionsKey(id)
 	this.db.BatchDelete(batch, []byte(optionKey))
@@ -776,6 +786,43 @@ func (this *FileDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 	}
 	this.db.BatchPut(batch, []byte(TaskInfoKey(fi.Id)), fiBuf)
 	return this.db.BatchCommit(batch)
+}
+
+// UpdateTaskPeerProgress. increase count of progress for a peer
+func (this *FileDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	batch := this.db.NewBatch()
+	// save upload progress info
+	progressKey := FileProgressKey(id, nodeAddr)
+	progress, _ := this.getProgressInfo(progressKey)
+	if progress == nil {
+		progress = &FileProgress{
+			FileInfoId:   id,
+			NodeHostAddr: nodeAddr,
+		}
+	}
+	progress.Progress = count
+	log.Debugf("%s, nodeAddr %s progress %v", id, nodeAddr, progress)
+	progressBuf, err := json.Marshal(progress)
+	if err != nil {
+		return err
+	}
+	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
+	return this.db.BatchCommit(batch)
+}
+
+// GetTaskPeerProgress. get progress for a peer
+func (this *FileDB) GetTaskPeerProgress(id, nodeAddr string) uint64 {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	// save upload progress info
+	progressKey := FileProgressKey(id, nodeAddr)
+	progress, _ := this.getProgressInfo(progressKey)
+	if progress == nil {
+		return 0
+	}
+	return progress.Progress
 }
 
 // GetCurrentSetBlock.
@@ -1525,6 +1572,69 @@ func (this *FileDB) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
 	return string(buf), nil
 }
 
+func (this *FileDB) RemoveFromUnSalvedList(batch *leveldb.Batch, id string, ft TaskType) error {
+	var list []string
+	var key string
+	switch ft {
+	case TaskTypeUpload:
+		key = FileUploadUnSalvedKey()
+	case TaskTypeDownload:
+	case TaskTypeShare:
+		return nil
+	}
+	data, err := this.db.Get([]byte(key))
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	err = json.Unmarshal(data, &list)
+	if err != nil {
+		return err
+	}
+	for i, v := range list {
+		if id == v {
+			list = append(list[:i], list[i+1:]...)
+			break
+		}
+	}
+	newData, err := json.Marshal(list)
+	if err != nil {
+		return err
+	}
+	if batch == nil {
+		return this.db.Put([]byte(key), newData)
+	} else {
+		this.db.BatchPut(batch, []byte(key), newData)
+		return nil
+	}
+}
+
+func (this *FileDB) UnSlavedList(ft TaskType) ([]string, error) {
+	var list []string
+	var key string
+	switch ft {
+	case TaskTypeUpload:
+		key = FileUploadUnSalvedKey()
+	case TaskTypeDownload:
+	case TaskTypeShare:
+		return nil, nil
+	}
+	data, err := this.db.Get([]byte(key))
+	if err != nil && err != leveldb.ErrNotFound {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, nil
+	}
+	err = json.Unmarshal(data, &list)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 func (this *FileDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {
 	var list []string
 	var undoneKey string
@@ -1566,6 +1676,57 @@ func (this *FileDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft Tas
 	}
 	this.db.BatchPut(batch, []byte(undoneKey), newData)
 	return nil
+}
+
+func (this *FileDB) batchAddToUnSlavedList(batch *leveldb.Batch, id string, ft TaskType) error {
+	var key string
+	switch ft {
+	case TaskTypeUpload:
+		key = FileUploadUnSalvedKey()
+	case TaskTypeDownload:
+	case TaskTypeShare:
+		return nil
+	}
+	data, err := this.db.Get([]byte(key))
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
+	}
+	newData, err := appendToStringSlice(data, id)
+	if err != nil {
+		return err
+	}
+	if newData == nil {
+		return nil
+	}
+	this.db.BatchPut(batch, []byte(key), newData)
+	return nil
+}
+
+func appendToStringSlice(data []byte, value string) ([]byte, error) {
+	list := make([]string, 0)
+	if len(data) == 0 {
+		list = append(list, value)
+		newData, err := json.Marshal(list)
+		if err != nil {
+			return nil, err
+		}
+		return newData, nil
+	}
+	err := json.Unmarshal(data, &list)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range list {
+		if value == v {
+			return nil, nil
+		}
+	}
+	list = append(list, value)
+	newData, err := json.Marshal(list)
+	if err != nil {
+		return nil, err
+	}
+	return newData, nil
 }
 
 func (this *FileDB) batchSaveFileInfo(batch *leveldb.Batch, info *TaskInfo) error {

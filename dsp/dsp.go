@@ -14,6 +14,7 @@ import (
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
+	"github.com/saveio/dsp-go-sdk/utils/ticker"
 	chActorClient "github.com/saveio/pylons/actor/client"
 
 	"github.com/saveio/themis/account"
@@ -37,13 +38,17 @@ type Dsp struct {
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
 	d := &Dsp{
-		taskMgr: task.NewTaskMgr(),
-		dns:     &dns.DNS{},
+		dns: &dns.DNS{},
 	}
 	if c == nil {
 		return d
 	}
 	d.config = c
+	if d.IsClient() {
+		d.taskMgr = task.NewTaskMgr(ticker.NewTicker(time.Duration(common.TASK_PROGRESS_TICKER_DURATION)*time.Second, d.RunGetProgressTicker))
+	} else {
+		d.taskMgr = task.NewTaskMgr(nil)
+	}
 	d.chain = chain.NewChain(acc, c.ChainRpcAddrs, chain.IsClient(d.IsClient()))
 	d.account = acc
 	if len(c.DBPath) > 0 {

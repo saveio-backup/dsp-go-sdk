@@ -21,6 +21,7 @@ const (
 	TASK_SESSIONS_COUNT_PREFIX   = DB_PREFIX + "_" + "task_session_count" + "_" + DB_VERSION
 	TASK_SESSIONS_PREFIX         = DB_PREFIX + "_" + "task_sessions" + "_" + DB_VERSION
 	TASK_OF_PAYMENT_ID_PREFIX    = DB_PREFIX + "_" + "task_payment_id" + "_" + DB_VERSION
+	TASK_UPLOAD_NOSLAVED_PREFIX  = DB_PREFIX + "_" + "task_upload_no_salved" + "_" + DB_VERSION
 )
 
 const (
@@ -133,4 +134,9 @@ func ChannelInfoKeyPrefix() string {
 
 func TaskIdOfPaymentIDKey(paymentId int32) string {
 	return fmt.Sprintf("[%s]%d", TASK_OF_PAYMENT_ID_PREFIX, paymentId)
+}
+
+// FileUploadUnSalvedKey. Key of has upload to master node but no finish slaving task
+func FileUploadUnSalvedKey() string {
+	return fmt.Sprintf("[%s]", TASK_UPLOAD_NOSLAVED_PREFIX)
 }

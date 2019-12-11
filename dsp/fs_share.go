@@ -123,6 +123,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	paymentId := this.channel.NewPaymentId()
 	for _, blockmsg := range req {
 		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare)
+		log.Debugf("share block task id %v %v %v %v", blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare, taskId)
 		reqWalletAddr = blockmsg.WalletAddress
 		reqAsset = blockmsg.Asset
 		// check if has unpaid block request
@@ -185,7 +186,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		TimeStamp: req[0].TimeStamp,
 		Blocks:    blocks,
 	}
-	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s", taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[0].WalletAddress, req[0].PeerAddr,
+	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s", taskId, req[0].FileHash, req[0].Hash, req[0].Index,
 		req[len(req)-1].FileHash, req[len(req)-1].Hash, req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
 	msg := message.NewBlockFlightsMsg(flights)
 	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), req[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
@@ -195,5 +196,10 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		if !common.ConntextTimeoutErr(err) {
 			this.taskMgr.DeleteFileUnpaid(taskId, reqWalletAddr, paymentId, reqAsset, totalAmount)
 		}
+		return
 	}
+
+	// update share progress
+	oldProgress := this.taskMgr.GetTaskPeerProgress(taskId, req[0].PeerAddr)
+	this.taskMgr.UpdateTaskPeerProgress(taskId, req[0].PeerAddr, oldProgress+uint64(len(req)))
 }

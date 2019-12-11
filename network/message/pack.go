@@ -2,6 +2,7 @@ package message
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -11,15 +12,16 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
+	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
 	"github.com/saveio/themis-go-sdk/utils"
 	"github.com/saveio/themis/account"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/crypto/keypair"
 )
 
-func GenMessageId() uint64 {
+func GenMessageId() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return r.Uint64()
+	return fmt.Sprintf("%d%d", time.Now().UnixNano(), 100000+r.Int31n(900000))
 }
 
 func MessageHeader() *Header {
@@ -382,6 +384,50 @@ func NewPaymentMsgWithError(sender, receiver string, paymentId int32, asset int3
 		FileHash:  fileHash,
 	}
 	msg.Payload = pay
+	if errorCode != common.MSG_ERROR_CODE_NONE {
+		errorMsg, ok := common.MSG_ERROR_MSG[errorCode]
+		if !ok {
+			errorMsg = "error"
+		}
+		msg.Error = &Error{
+			Code:    errorCode,
+			Message: errorMsg,
+		}
+	}
+	for _, opt := range opts {
+		mOpt, ok := opt.(SignOption)
+		if !ok {
+			continue
+		}
+		mOpt.sign(msg)
+	}
+	if msg.Header.MsgLength > 0 {
+		return msg
+	}
+	data, err := proto.Marshal(msg.ToProtoMsg())
+	if err != nil {
+		return nil
+	}
+	msg.Header.MsgLength = int32(len(data))
+	return msg
+}
+
+func NewProgressMsg(sender, fileHash string, operation int32, infos []*progress.ProgressInfo, opts ...Option) *Message {
+	return NewProgressMsgWithError(sender, fileHash, operation, infos, 0, opts...)
+}
+
+func NewProgressMsgWithError(sender, fileHash string, operation int32, infos []*progress.ProgressInfo, errorCode uint32, opts ...Option) *Message {
+	msg := &Message{
+		MessageId: GenMessageId(),
+		Header:    MessageHeader(),
+	}
+	msg.Header.Type = common.MSG_TYPE_PROGRESS
+	msg.Payload = &progress.Progress{
+		Hash:      fileHash,
+		Sender:    sender,
+		Operation: operation,
+		Infos:     infos,
+	}
 	if errorCode != common.MSG_ERROR_CODE_NONE {
 		errorMsg, ok := common.MSG_ERROR_MSG[errorCode]
 		if !ok {

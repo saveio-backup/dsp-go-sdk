@@ -1,6 +1,13 @@
 package dsp
 
 import (
+	"github.com/saveio/dsp-go-sdk/common"
+	dspErr "github.com/saveio/dsp-go-sdk/error"
+	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
+
+	"github.com/saveio/dsp-go-sdk/actor/client"
+	netcomm "github.com/saveio/dsp-go-sdk/network/common"
+	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
@@ -126,4 +133,108 @@ func (this *Dsp) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType,
 
 func (this *Dsp) DeleteTaskIds(ids []string) error {
 	return this.taskMgr.DeleteTaskIds(ids)
+}
+
+// GetFileUploadSize. get file upload size
+func (this *Dsp) GetFileUploadSize(fileHashStr, nodeAddr string) (uint64, error) {
+	id := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeUpload)
+	if len(id) == 0 {
+		return 0, dspErr.New(dspErr.TASK_NOT_EXIST, "task id is empty")
+	}
+	progressInfo := this.taskMgr.GetProgressInfo(id)
+	if progressInfo == nil {
+		return 0, nil
+	}
+	progress, ok := progressInfo.Count[nodeAddr]
+	if ok {
+		return progress * common.CHUNK_SIZE, nil
+	}
+	return progressInfo.SlaveProgress[nodeAddr] * common.CHUNK_SIZE, nil
+}
+
+func (this *Dsp) RunGetProgressTicker() bool {
+	ids, err := this.taskMgr.GetUnSlavedTasks()
+	if err != nil {
+		return false
+	}
+	log.Debugf("un slaved task %v", ids)
+	taskHasDone := 0
+	for _, id := range ids {
+		nodeAddr, _ := this.taskMgr.GetUploadDoneNodeAddr(id)
+		if len(nodeAddr) == 0 {
+			continue
+		}
+		fileHash, err := this.taskMgr.GetTaskFileHash(id)
+		if err != nil {
+			continue
+		}
+
+		// TODO: use mem cache instread of request rpc
+		info, err := this.chain.GetFileInfo(fileHash)
+		if err != nil || info == nil {
+			continue
+		}
+		if info.PrimaryNodes.AddrNum == 1 {
+			taskHasDone++
+			this.taskMgr.RemoveUnSlavedTasks(id)
+			continue
+		}
+		proveDetail, _ := this.chain.GetFileProveDetails(fileHash)
+		if proveDetail != nil && proveDetail.ProveDetailNum == proveDetail.CopyNum+1 {
+			taskHasDone++
+			this.taskMgr.RemoveUnSlavedTasks(id)
+			continue
+		}
+
+		toReqPeers := make([]*progress.ProgressInfo, 0)
+		hostAddrs, err := this.chain.GetNodeHostAddrListByWallets(info.PrimaryNodes.AddrList)
+		if err != nil || len(hostAddrs) == 0 {
+			continue
+		}
+		for i := 0; i < len(hostAddrs); i++ {
+			if i == 0 {
+				continue
+			}
+			toReqPeers = append(toReqPeers, &progress.ProgressInfo{
+				WalletAddr: info.PrimaryNodes.AddrList[i].ToBase58(),
+				NodeAddr:   hostAddrs[i],
+			})
+		}
+		log.Debugf("send req progress msg to %v for %s", toReqPeers, fileHash)
+		msg := message.NewProgressMsg(this.WalletAddress(), fileHash, netcomm.FILE_OP_PROGRESS_REQ, toReqPeers, message.WithSign(this.CurrentAccount()))
+		// send req progress msg
+		resp, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), nodeAddr, 1, netcomm.REQUEST_MSG_TIMEOUT)
+		if err != nil {
+			continue
+		}
+		p2pMsg := message.ReadMessage(resp)
+		progress := p2pMsg.Payload.(*progress.Progress)
+		if progress.Hash != fileHash {
+			continue
+		}
+		// update progress
+		progressSum := uint64(0)
+		for _, info := range progress.Infos {
+			log.Debugf("receive %s-%s progress wallet: %v, progress: %d", progress.Hash, fileHash, info.NodeAddr, info.Count)
+			oldCount := this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
+			if oldCount > uint64(info.Count) {
+				progressSum += oldCount
+				continue
+			}
+			if err := this.taskMgr.UpdateTaskPeerProgress(id, info.NodeAddr, uint64(info.Count)); err != nil {
+				continue
+			}
+			progressSum += uint64(info.Count)
+		}
+		log.Debugf("progressSum: %d, total: %d", progressSum, uint64(len(toReqPeers))*info.FileBlockNum)
+		if progressSum != uint64(len(toReqPeers))*info.FileBlockNum {
+			continue
+		}
+		taskHasDone++
+		this.taskMgr.RemoveUnSlavedTasks(id)
+	}
+	if taskHasDone == len(ids) {
+		return true
+	}
+	return false
 }

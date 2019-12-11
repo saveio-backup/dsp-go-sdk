@@ -42,6 +42,7 @@ type ProgressInfo struct {
 	CopyNum       uint64            // copyNum
 	Total         uint64            // total file's blocks count
 	Count         map[string]uint64 // address <=> count
+	SlaveProgress map[string]uint64 // progress for slave nodes
 	TaskState     store.TaskState   // task state
 	ProgressState TaskProgressState // TaskProgressState
 	Result        interface{}       // finish result
@@ -709,6 +710,36 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 		ErrorCode:     this.info.ErrorCode,
 		ErrorMsg:      this.info.ErrorMsg,
 	}
+	if this.info.Type != store.TaskTypeUpload {
+		return pInfo
+	}
+	if len(this.info.SaveBlockCountMap) == 0 {
+		return pInfo
+	}
+	// find master node
+	masterNode := ""
+	for nodeAddr, count := range this.info.SaveBlockCountMap {
+		if count == this.info.TotalBlockCount && count > 0 {
+			masterNode = nodeAddr
+			break
+		}
+	}
+
+	if len(masterNode) == 0 {
+		return pInfo
+	}
+
+	masterNodeProgress := make(map[string]uint64, 0)
+	pInfo.SlaveProgress = make(map[string]uint64, 0)
+	for node, progress := range pInfo.Count {
+		if node == masterNode {
+			masterNodeProgress[node] = progress
+			continue
+		}
+		pInfo.SlaveProgress[node] = progress
+	}
+	// only show master node progress here
+	pInfo.Count = masterNodeProgress
 	return pInfo
 }
 

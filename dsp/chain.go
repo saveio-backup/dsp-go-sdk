@@ -244,3 +244,7 @@ func (this *Dsp) GetPeerPoolItem(pubKey string) (*dns.PeerPoolItem, error) {
 func (this *Dsp) GetAllDnsNodes() (map[string]dns.DNSNodeInfo, error) {
 	return this.chain.GetAllDnsNodes()
 }
+
+func (this *Dsp) GetNodeHostAddrListByWallets(wallets []chainCom.Address) ([]string, error) {
+	return this.chain.GetNodeHostAddrListByWallets(wallets)
+}

@@ -376,3 +376,21 @@ func (this *TaskMgr) SetTaskNetPhase(taskId string, addrs []string, phase int) e
 	}
 	return nil
 }
+
+func (this *TaskMgr) RemoveUnSlavedTasks(id string) error {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	err := this.db.RemoveFromUnSalvedList(nil, id, store.TaskTypeUpload)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
+}
+
+func (this *TaskMgr) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) error {
+	err := this.db.UpdateTaskPeerProgress(id, nodeAddr, count)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
+}

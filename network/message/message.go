@@ -9,6 +9,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
+	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
 	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/themis/common/log"
 )
@@ -30,7 +31,7 @@ type Signature struct {
 }
 
 type Message struct {
-	MessageId uint64
+	MessageId string
 	Header    *Header
 	Payload   proto.Message
 	Sig       *Signature
@@ -105,6 +106,22 @@ func ReadMessage(msg proto.Message) *Message {
 				return nil
 			}
 			newMsg.Payload = pay
+		case common.MSG_TYPE_PROGRESS:
+			// verify signature
+			if valid := isMsgVerified(pbMsg); !valid {
+				log.Debugf("payment msg has wrong signature")
+				return nil
+			}
+			progress := &progress.Progress{}
+			err := proto.Unmarshal(data, progress)
+			if err != nil {
+				return nil
+			}
+			if err := utils.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, progress.Sender); err != nil {
+				log.Debugf("receive a invalid payment msg")
+				return nil
+			}
+			newMsg.Payload = progress
 		}
 	}
 	if pbMsg.GetError() != nil {

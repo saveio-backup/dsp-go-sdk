@@ -25,6 +25,9 @@ const (
 
 	FILE_OP_DELETE     = 4000 // client delete file of peers
 	FILE_OP_DELETE_ACK = 4001 // server delete file ack
+
+	FILE_OP_PROGRESS_REQ = 5000 // request progress of task
+	FILE_OP_PROGRESS     = 5001 // request progress of task
 )
 
 const (
@@ -39,6 +42,7 @@ const (
 	MSG_TYPE_BLOCK_FLIGHTS = "blockflights"
 	MSG_TYPE_FILE          = "file"
 	MSG_TYPE_PAYMENT       = "payment"
+	MSG_TYPE_PROGRESS      = "progress"
 )
 
 const (

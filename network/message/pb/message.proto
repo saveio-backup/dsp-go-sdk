@@ -19,7 +19,7 @@ message Signature {
 }
 
 message Message {
-    uint64 msgId  = 1;
+    string msgId  = 1;
     Header header = 2;
     bytes  data = 3;
     Signature sig = 4;

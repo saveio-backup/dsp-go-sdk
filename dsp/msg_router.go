@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
+
 	"github.com/saveio/carrier/network"
 	"github.com/saveio/dsp-go-sdk/common"
 	serr "github.com/saveio/dsp-go-sdk/error"
@@ -37,6 +39,8 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 		this.handleFileMsg(ctx, peer, msg)
 	case netcom.MSG_TYPE_BLOCK_FLIGHTS:
 		this.handleBlockFlightsMsg(ctx, peer, msg)
+	case netcom.MSG_TYPE_PROGRESS:
+		this.handleProgressMsg(ctx, peer, msg)
 	default:
 		log.Debugf("unrecognized msg type %s", msg.Header.Type)
 	}
@@ -72,6 +76,15 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.Peer
 	case netcom.FILE_OP_DOWNLOAD_CANCEL:
 		this.handleFileDownloadCancelMsg(ctx, peer, fileMsg)
 	default:
+	}
+}
+
+func (this *Dsp) handleProgressMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
+	progressMsg := msg.Payload.(*progress.Progress)
+	log.Debugf("handleProgressMsg %d of file %s from peer:%s, length:%d", progressMsg.Operation, progressMsg.Hash, peer.Address, msg.Header.MsgLength)
+	switch progressMsg.Operation {
+	case netcom.FILE_OP_PROGRESS_REQ:
+		this.handleReqProgressMsg(ctx, peer, progressMsg)
 	}
 }
 
@@ -642,6 +655,25 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 		}
 	default:
 	}
+}
+
+// handleReqProgressMsg.
+func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext, peer *network.PeerClient, progressMsg *progress.Progress) {
+	nodeInfos := make([]*progress.ProgressInfo, 0)
+	for _, info := range progressMsg.Infos {
+		id := this.taskMgr.TaskId(progressMsg.Hash, info.WalletAddr, store.TaskTypeShare)
+		if len(id) == 0 {
+			log.Errorf("task id is empty of hash %s, wallet %s, type %d", progressMsg.Hash, info.WalletAddr, store.TaskTypeShare)
+		}
+		prog := this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
+		log.Debugf("handle req progress msg, get progress of id %s, addr %s, count %d", id, info.NodeAddr, prog)
+		nodeInfos = append(nodeInfos, &progress.ProgressInfo{
+			NodeAddr: info.NodeAddr,
+			Count:    int32(prog),
+		})
+	}
+	resp := message.NewProgressMsg(this.WalletAddress(), progressMsg.Hash, netcom.FILE_OP_PROGRESS, nodeInfos, message.WithSign(this.CurrentAccount()))
+	ctx.Reply(context.Background(), resp.ToProtoMsg())
 }
 
 func (this *Dsp) waitForTxConfirmed(blockHeight uint64) error {

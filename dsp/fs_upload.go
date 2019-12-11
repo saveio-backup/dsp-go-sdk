@@ -692,6 +692,9 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 		// TODO: check confirmed on receivers
 		confirmed, err := this.chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
 		if err != nil || !confirmed {
+			log.Debugf("store file params fileHash:%v, blockNum:%v, blockSize:%v, proveInterval:%v, expiredHeight:%v, copyNum:%v, fileName:%v, privilege:%v, params:%x, storeType:%v, fileSize:%v, primary:%v, candidates:%v", fileHashStr, blockNum, blockSizeInKB, opt.ProveInterval,
+				opt.ExpiredHeight, uint64(opt.CopyNum), []byte(opt.FileDesc), uint64(opt.Privilege),
+				paramsBuf, uint64(opt.StorageType), opt.FileSize, walletAddrs, candidateNodes)
 			log.Errorf("poll tx failed %s", err)
 			return nil, err
 		}

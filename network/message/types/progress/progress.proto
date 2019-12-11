@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package progress;
+
+message ProgressInfo {
+    string walletAddr = 1;
+    string nodeAddr = 2;
+    int32 count = 3;
+}
+
+message Progress {
+   string id = 1;
+   string hash = 2;  
+   int32 operation = 3;
+   string sender = 4;
+   repeated ProgressInfo infos = 5;
+}
