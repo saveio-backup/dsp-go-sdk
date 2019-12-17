@@ -349,7 +349,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithSign(this.chain.CurrentAccount()),
 	)
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, true, nil)
 	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
 	resp, err := this.DeleteUploadedFileByIds([]string{taskId})
 	if err != nil {
@@ -527,7 +527,7 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string) ([]*common.DeleteUploadFi
 			})
 			return false
 		}
-		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), true, reply)
+		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), msg.MessageId, true, reply)
 		resp.Nodes = nodeStatus
 		log.Debugf("send delete msg done ret: %v, nodeStatus: %v, err: %s", m, nodeStatus, err)
 		err = this.taskMgr.CleanTask(taskId)
@@ -562,7 +562,7 @@ func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, error) {
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithSign(this.chain.CurrentAccount()),
 	)
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, true, nil)
 	if err != nil {
 		return false, err
 	}
@@ -635,7 +635,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithSign(this.chain.CurrentAccount()),
 	)
-	_, err = client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, nil)
+	_, err = client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, true, nil)
 	if err != nil {
 		return err
 	}
@@ -989,7 +989,7 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 		log.Debugf("continue....")
 		return false
 	}
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), true, action)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, true, action)
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err")
 		return nil, nil, err

@@ -340,7 +340,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 		return false
 	}
-	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), true, reply)
+	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), msg.MessageId, true, reply)
 	log.Debugf("broadcast file download msg result %v err %s", ret, err)
 	if err != nil {
 		return nil, err
@@ -533,7 +533,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 				message.WithSign(this.account),
 			)
 			log.Debugf("broadcast file_download msg to %v", a)
-			broadcastRet, err := client.P2pBroadcast([]string{a}, msg.ToProtoMsg(), true, nil)
+			broadcastRet, err := client.P2pBroadcast([]string{a}, msg.ToProtoMsg(), msg.MessageId, true, nil)
 			log.Debugf("brocast file download msg %v err %v", broadcastRet, err)
 			wg.Done()
 		}(addr)
@@ -998,7 +998,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				message.WithAsset(asset),
 				message.WithSign(this.account),
 			)
-			client.P2pBroadcast([]string{a}, fileDownloadOkMsg.ToProtoMsg(), true, nil)
+			client.P2pBroadcast([]string{a}, fileDownloadOkMsg.ToProtoMsg(), fileDownloadOkMsg.MessageId, true, nil)
 		}(addr, walletAddr, sessionId)
 	}
 	return nil
@@ -1238,7 +1238,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithSign(this.account),
 	)
-	client.P2pSend(addr, doneMsg.ToProtoMsg())
+	client.P2pSend(addr, doneMsg.MessageId, doneMsg.ToProtoMsg())
 	log.Debugf("fetch file done, send done msg to %s", addr)
 	return nil
 }
@@ -1267,7 +1267,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	for i := uint32(0); i < retry; i++ {
 		log.Debugf("send download block flights msg sessionId %s of %s from %s,  retry: %d", sessionId, fileHashStr, ipAddr, i)
 		// TODO: refactor send msg with request-reply model
-		err = client.P2pSend(ipAddr, msg.ToProtoMsg())
+		err = client.P2pSend(ipAddr, msg.MessageId, msg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("send download block flights msg err: %s", err)
 			continue

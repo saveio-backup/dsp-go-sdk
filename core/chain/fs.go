@@ -177,7 +177,6 @@ func (this *Chain) GetNodeListWithoutAddrs(nodeWalletAddrs []chainCom.Address, n
 
 func (this *Chain) GetUnprovePrimaryFileInfos(walletAddr chainCom.Address) ([]fs.FileInfo, error) {
 	list, err := this.themis.Native.Fs.GetUnprovePrimaryFileList(walletAddr)
-	log.Debugf("get unprove primary list %v %v ", list, err)
 	if err != nil {
 		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
@@ -189,7 +188,6 @@ func (this *Chain) GetUnprovePrimaryFileInfos(walletAddr chainCom.Address) ([]fs
 		hashes = append(hashes, string(item.Hash))
 	}
 	infoList, err := this.themis.Native.Fs.GetFileInfos(hashes)
-	log.Debugf("infoList: %v %v", infoList, err)
 	if err != nil {
 		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}

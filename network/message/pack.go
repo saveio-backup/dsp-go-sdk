@@ -2,9 +2,6 @@ package message
 
 import (
 	"crypto/sha256"
-	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/network/common"
@@ -13,6 +10,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
+	dspUtils "github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/themis-go-sdk/utils"
 	"github.com/saveio/themis/account"
 	"github.com/saveio/themis/common/log"
@@ -20,8 +18,7 @@ import (
 )
 
 func GenMessageId() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return fmt.Sprintf("%d%d", time.Now().UnixNano(), 100000+r.Int31n(900000))
+	return dspUtils.GenIdByTimestamp()
 }
 
 func MessageHeader() *Header {

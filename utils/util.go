@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"net"
 	"regexp"
 	"sort"
@@ -139,4 +140,9 @@ func StringSliceToKeyMap(input []string) map[string]string {
 		m[key] = ""
 	}
 	return m
+}
+
+func GenIdByTimestamp() string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return fmt.Sprintf("%d%d", time.Now().UnixNano(), 100000+r.Int31n(900000))
 }

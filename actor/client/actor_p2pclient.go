@@ -48,6 +48,7 @@ type CloseReq struct {
 
 type SendReq struct {
 	Address  string
+	MsgId    string
 	Data     proto.Message
 	Response chan *P2pResp
 }
@@ -59,6 +60,7 @@ type RecvMsg struct {
 
 type BroadcastReq struct {
 	Addresses []string
+	MsgId     string
 	Data      proto.Message
 	NeedReply bool
 	Action    func(proto.Message, string) bool
@@ -243,9 +245,10 @@ func P2pClose(address string) error {
 	}
 }
 
-func P2pSend(address string, data proto.Message) error {
+func P2pSend(address, msgId string, data proto.Message) error {
 	chReq := &SendReq{
 		Address:  address,
+		MsgId:    msgId,
 		Data:     data,
 		Response: make(chan *P2pResp, 1),
 	}
@@ -262,9 +265,10 @@ func P2pSend(address string, data proto.Message) error {
 }
 
 // P2pBroadcast. broadcast one msg to different addresses
-func P2pBroadcast(addresses []string, data proto.Message, needReply bool, action func(proto.Message, string) bool) (map[string]error, error) {
+func P2pBroadcast(addresses []string, data proto.Message, msgId string, needReply bool, action func(proto.Message, string) bool) (map[string]error, error) {
 	chReq := &BroadcastReq{
 		Addresses: addresses,
+		MsgId:     msgId,
 		Data:      data,
 		NeedReply: needReply,
 		Action:    action,
