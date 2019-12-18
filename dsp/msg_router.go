@@ -393,9 +393,11 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 			replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, fmt.Sprintf("can't share %s to, err: %v", fileMsg.Hash, err), ctx)
 			return
 		}
+		totalCount, _ := this.taskMgr.GetFileTotalBlockCount(downloadInfoId)
 		replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK,
 			message.WithSessionId(sessionId),
 			message.WithBlockHashes(this.taskMgr.FileBlockHashes(downloadInfoId)),
+			message.WithTotalBlockCount(int32(totalCount)),
 			message.WithWalletAddress(this.chain.WalletAddress()),
 			message.WithPrefix(prefix),
 			message.WithUnitPrice(price),

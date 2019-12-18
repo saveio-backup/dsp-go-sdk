@@ -1143,7 +1143,7 @@ func (this *FileDB) IsFileDownloaded(id string) bool {
 	for _, cnt := range fi.SaveBlockCountMap {
 		sum += cnt
 	}
-	return sum == fi.TotalBlockCount
+	return sum == fi.TotalBlockCount && fi.TotalBlockCount > 0
 }
 
 // GetUndownloadedBlockInfo. check undownloaded block in-order

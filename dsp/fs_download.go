@@ -334,9 +334,13 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 			return false
 		}
 		blockHashes = fileMsg.BlockHashes
+		if int32(len(blockHashes)) != fileMsg.TotalBlockCount {
+			return false
+		}
 		peerPayInfos[addr] = fileMsg.PayInfo
 		prefix = string(fileMsg.Prefix)
-		log.Debugf("prefix hex: %s", fileMsg.Prefix)
+		log.Debugf("prefix hex: %s %d", fileMsg.Prefix, fileMsg.TotalBlockCount)
+		this.taskMgr.SetTotalBlockCount(taskId, uint64(fileMsg.TotalBlockCount))
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 		return false
 	}
@@ -363,7 +367,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 	}
 	totalCount, _ := this.taskMgr.GetFileTotalBlockCount(taskId)
 	log.Debugf("get file total count :%d", totalCount)
-	if uint64(len(blockHashes)) == totalCount {
+	if uint64(len(this.taskMgr.FileBlockHashes(taskId))) == totalCount {
 		return peerPayInfos, nil
 	}
 	log.Debugf("AddFileBlockHashes id %v hashes %s-%s, prefix %s, len: %d", taskId, blockHashes[0], blockHashes[len(blockHashes)-1], prefix, len(prefix))
@@ -561,9 +565,6 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		if err := this.taskMgr.SetFilePath(taskId, fullFilePath); err != nil {
 			return err
 		}
-	}
-	if err := this.taskMgr.SetTotalBlockCount(taskId, uint64(len(blockHashes))); err != nil {
-		return err
 	}
 	if stop, err := this.taskMgr.IsTaskStop(taskId); err != nil || stop {
 		return err
