@@ -334,13 +334,10 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 			return false
 		}
 		blockHashes = fileMsg.BlockHashes
-		if int32(len(blockHashes)) != fileMsg.TotalBlockCount {
-			return false
-		}
+		log.Debugf("prefix hex: %s %d, hash len %d", fileMsg.Prefix, fileMsg.TotalBlockCount, len(blockHashes))
 		peerPayInfos[addr] = fileMsg.PayInfo
 		prefix = string(fileMsg.Prefix)
-		log.Debugf("prefix hex: %s %d", fileMsg.Prefix, fileMsg.TotalBlockCount)
-		this.taskMgr.SetTotalBlockCount(taskId, uint64(fileMsg.TotalBlockCount))
+		this.taskMgr.SetTotalBlockCount(taskId, uint64(len(blockHashes)))
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 		return false
 	}

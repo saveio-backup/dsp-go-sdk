@@ -444,11 +444,11 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		replyErr(sessionId, fileMsg.Hash, serr.TOO_MANY_TASKS, "", ctx)
 		return
 	}
-
 	log.Debugf("sessionId %s blockCount %v %s prefix %s", sessionId, len(this.taskMgr.FileBlockHashes(downloadInfoId)), downloadInfoId, prefix)
 	replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK,
 		message.WithSessionId(sessionId),
 		message.WithBlockHashes(this.taskMgr.FileBlockHashes(downloadInfoId)),
+		message.WithTotalBlockCount(int32(len(this.taskMgr.FileBlockHashes(downloadInfoId)))),
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithPrefix(prefix),
 		message.WithUnitPrice(price),
