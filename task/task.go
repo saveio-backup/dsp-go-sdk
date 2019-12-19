@@ -771,9 +771,17 @@ func (this *Task) PushGetBlockFlights(sessionId string, blocks []*BlockResp, tim
 		log.Errorf("get block resp channel is nil with key %s", key)
 		return
 	}
-
+	if len(ch) > 0 {
+		log.Warnf("block has pushing, ignore the new coming blocks")
+		return
+	}
 	go func() {
 		log.Debugf("send block to channel: %s", key)
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("recover in push block flights to channel %v", r)
+			}
+		}()
 		ch <- blocks
 		log.Debugf("send block to channel done: %s", key)
 	}()
@@ -825,11 +833,7 @@ func (this *Task) DropBlockFlightsRespCh(sessionId string, timeStamp int64) {
 	defer this.lock.Unlock()
 	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.info.FileHash, timeStamp)
 	log.Debugf("drop block resp channel key: %s", key)
-	ch := this.blockFlightRespsMap[key]
 	delete(this.blockFlightRespsMap, key)
-	if ch != nil {
-		close(ch)
-	}
 }
 
 func (this *Task) GetTotalBlockCnt() uint64 {

@@ -548,6 +548,8 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext, peer *netw
 			log.Debugf("task %s not exist", blockFlightsMsg.Blocks[0].FileHash)
 			return
 		}
+		// active worker
+		this.taskMgr.ActiveDownloadTaskPeer(peer.Address)
 		blocks := make([]*task.BlockResp, 0)
 		for _, blockMsg := range blockFlightsMsg.Blocks {
 			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
