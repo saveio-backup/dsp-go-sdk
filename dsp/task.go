@@ -203,7 +203,7 @@ func (this *Dsp) RunGetProgressTicker() bool {
 		log.Debugf("send req progress msg to %v for %s", toReqPeers, fileHash)
 		msg := message.NewProgressMsg(this.WalletAddress(), fileHash, netcomm.FILE_OP_PROGRESS_REQ, toReqPeers, message.WithSign(this.CurrentAccount()))
 		// send req progress msg
-		resp, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), nodeAddr, 1, netcomm.REQUEST_MSG_TIMEOUT)
+		resp, err := client.P2pSendAndWaitReply(nodeAddr, msg.MessageId, msg.ToProtoMsg())
 		if err != nil {
 			continue
 		}
@@ -237,4 +237,16 @@ func (this *Dsp) RunGetProgressTicker() bool {
 		return true
 	}
 	return false
+}
+
+func (this *Dsp) GetDownloadTaskRemainSize(taskId string) uint64 {
+	progress := this.taskMgr.GetProgressInfo(taskId)
+	sum := uint64(0)
+	for _, c := range progress.Count {
+		sum += c
+	}
+	if progress.Total > sum {
+		return progress.Total - sum
+	}
+	return 0
 }

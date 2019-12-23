@@ -6,6 +6,7 @@ import (
 
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	chainCom "github.com/saveio/themis/common"
+	"github.com/saveio/themis/common/log"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/usdt"
 )
@@ -86,6 +87,7 @@ func (this *Chain) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
 	}
 	info, err := this.themis.Native.Fs.GetFileInfo(fileHashStr)
 	if err != nil || info == nil {
+		log.Errorf("file info not exist %s", fileHashStr)
 		return false
 	}
 	// TODO: check sinature

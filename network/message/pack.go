@@ -1,8 +1,6 @@
 package message
 
 import (
-	"crypto/sha256"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/pb"
@@ -11,10 +9,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
 	dspUtils "github.com/saveio/dsp-go-sdk/utils"
-	"github.com/saveio/themis-go-sdk/utils"
-	"github.com/saveio/themis/account"
 	"github.com/saveio/themis/common/log"
-	"github.com/saveio/themis/crypto/keypair"
 )
 
 func GenMessageId() string {
@@ -27,10 +22,22 @@ func MessageHeader() *Header {
 	}
 }
 
-func NewEmptyMsg() *Message {
+func NewEmptyMsg(opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
+	}
+	for _, opt := range opts {
+		mOpt, ok := opt.(MsgOption)
+		if ok {
+			mOpt.apply(msg)
+			continue
+		}
+		sOpt, ok := opt.(SignOption)
+		if ok {
+			sOpt.sign(msg)
+			continue
+		}
 	}
 	msg.Header.Type = common.MSG_TYPE_NONE
 	data, err := msg.ToProtoMsg().(*pb.Message).XXX_Marshal(nil, false)
@@ -42,7 +49,7 @@ func NewEmptyMsg() *Message {
 }
 
 // NewBlockMsg block req msg
-func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAddress string, asset int32) *Message {
+func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAddress string, asset int32, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
@@ -60,6 +67,18 @@ func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAd
 		},
 	}
 	msg.Payload = b
+	for _, opt := range opts {
+		mOpt, ok := opt.(MsgOption)
+		if ok {
+			mOpt.apply(msg)
+			continue
+		}
+		sOpt, ok := opt.(SignOption)
+		if ok {
+			sOpt.sign(msg)
+			continue
+		}
+	}
 	data, err := msg.ToProtoMsg().(*pb.Message).XXX_Marshal(nil, false)
 	if err != nil {
 		return nil
@@ -69,7 +88,7 @@ func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAd
 }
 
 // NewBlockMsg block ack msg
-func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData, tag []byte, offset int64) *Message {
+func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData, tag []byte, offset int64, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
@@ -86,6 +105,18 @@ func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData
 		Offset:    offset,
 	}
 	msg.Payload = b
+	for _, opt := range opts {
+		mOpt, ok := opt.(MsgOption)
+		if ok {
+			mOpt.apply(msg)
+			continue
+		}
+		sOpt, ok := opt.(SignOption)
+		if ok {
+			sOpt.sign(msg)
+			continue
+		}
+	}
 	data, err := proto.Marshal(msg.ToProtoMsg())
 	if err != nil {
 		return nil
@@ -95,7 +126,7 @@ func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData
 }
 
 // NewBlockFlightsReqMsg blockflights req msg
-func NewBlockFlightsReqMsg(blocks []*block.Block, timeStamp int64) *Message {
+func NewBlockFlightsReqMsg(blocks []*block.Block, timeStamp int64, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
@@ -106,6 +137,18 @@ func NewBlockFlightsReqMsg(blocks []*block.Block, timeStamp int64) *Message {
 		Blocks:    blocks,
 	}
 	msg.Payload = flights
+	for _, opt := range opts {
+		mOpt, ok := opt.(MsgOption)
+		if ok {
+			mOpt.apply(msg)
+			continue
+		}
+		sOpt, ok := opt.(SignOption)
+		if ok {
+			sOpt.sign(msg)
+			continue
+		}
+	}
 	data, err := msg.ToProtoMsg().(*pb.Message).XXX_Marshal(nil, false)
 	if err != nil {
 		return nil
@@ -115,202 +158,31 @@ func NewBlockFlightsReqMsg(blocks []*block.Block, timeStamp int64) *Message {
 }
 
 // NewBlockFlightsMsg block ack msg
-func NewBlockFlightsMsg(flights *block.BlockFlights) *Message {
+func NewBlockFlightsMsg(flights *block.BlockFlights, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_BLOCK_FLIGHTS
 	msg.Payload = flights
+	for _, opt := range opts {
+		mOpt, ok := opt.(MsgOption)
+		if ok {
+			mOpt.apply(msg)
+			continue
+		}
+		sOpt, ok := opt.(SignOption)
+		if ok {
+			sOpt.sign(msg)
+			continue
+		}
+	}
 	data, err := proto.Marshal(msg.ToProtoMsg())
 	if err != nil {
 		return nil
 	}
 	msg.Header.MsgLength = int32(len(data))
 	return msg
-}
-
-type Option interface{}
-
-type FileMsgOption interface {
-	apply(*file.File)
-}
-
-type PaymentMsgOption interface {
-	apply(*payment.Payment)
-}
-
-type SignOption interface {
-	sign(*Message)
-}
-
-type msgOptionFunc func(*Message)
-
-func (f msgOptionFunc) sign(m *Message) {
-	f(m)
-}
-
-type optionFunc func(*file.File)
-
-func (f optionFunc) apply(o *file.File) {
-	f(o)
-}
-
-type paymentOptionFunc func(*payment.Payment)
-
-func (f paymentOptionFunc) apply(p *payment.Payment) {
-	f(p)
-}
-
-func WithSign(acc *account.Account) SignOption {
-	return msgOptionFunc(func(msg *Message) {
-		data, err := proto.Marshal(msg.Payload)
-		if err != nil {
-			return
-		}
-		msg.Header.MsgLength = int32(len(data))
-		var sigData []byte
-		if msg.Header.MsgLength < common.MAX_SIG_DATA_LEN {
-			sigData, err = utils.Sign(acc, data)
-			if err != nil {
-				return
-			}
-		} else {
-			hashData := sha256.Sum256(data[:common.MAX_SIG_DATA_LEN])
-			sigData, err = utils.Sign(acc, hashData[:])
-			if err != nil {
-				return
-			}
-		}
-		msg.Sig = &Signature{
-			SigData:   sigData,
-			PublicKey: keypair.SerializePublicKey(acc.PublicKey),
-		}
-		return
-	})
-}
-
-func WithSessionId(sessionId string) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		f.SessionId = sessionId
-	})
-}
-
-func WithHash(hash string) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		f.Hash = hash
-	})
-}
-
-func WithBlockHashes(blockHashes []string) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		f.BlockHashes = blockHashes
-	})
-}
-
-func WithOperation(operation int32) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		f.Operation = operation
-	})
-}
-
-func WithPrefix(prefix []byte) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		f.Prefix = prefix
-	})
-}
-
-func WithChunkSize(chunkSize int32) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		f.ChunkSize = chunkSize
-	})
-}
-
-func WithWalletAddress(walletAddr string) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.PayInfo == nil {
-			f.PayInfo = &file.Payment{}
-		}
-		f.PayInfo.WalletAddress = walletAddr
-	})
-}
-
-func WithAsset(asset int32) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.PayInfo == nil {
-			f.PayInfo = &file.Payment{}
-		}
-		f.PayInfo.Asset = asset
-	})
-}
-
-func WithUnitPrice(unitPrice uint64) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.PayInfo == nil {
-			f.PayInfo = &file.Payment{}
-		}
-		f.PayInfo.UnitPrice = unitPrice
-	})
-}
-
-func WithTxHash(txHash string) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.Tx == nil {
-			f.Tx = &file.Tx{}
-		}
-		f.Tx.Hash = txHash
-	})
-}
-
-func WithTxHeight(txHeight uint64) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.Tx == nil {
-			f.Tx = &file.Tx{}
-		}
-		f.Tx.Height = txHeight
-	})
-}
-
-func WithBreakpointHash(hash string) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.Breakpoint == nil {
-			f.Breakpoint = &file.Breakpoint{}
-		}
-		f.Breakpoint.Hash = hash
-	})
-}
-
-func WithBreakpointIndex(index uint64) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.Breakpoint == nil {
-			f.Breakpoint = &file.Breakpoint{}
-		}
-		f.Breakpoint.Index = index
-	})
-}
-
-func WithTotalBlockCount(totalBlockCount int32) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		f.TotalBlockCount = totalBlockCount
-	})
-}
-
-func ChainId(chainId uint32) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.ChainInfo == nil {
-			f.ChainInfo = &file.Chain{}
-		}
-		f.ChainInfo.Id = chainId
-	})
-}
-
-func ChainHeight(blockHeight uint32) FileMsgOption {
-	return optionFunc(func(f *file.File) {
-		if f.ChainInfo == nil {
-			f.ChainInfo = &file.Chain{}
-		}
-		f.ChainInfo.Height = blockHeight
-	})
 }
 
 // NewFileMsg file msg
@@ -328,8 +200,20 @@ func NewFileMsgWithError(fileHashStr string, op int32, errorCode uint32, errorMs
 		Operation: op,
 		Hash:      fileHashStr,
 	}
+	signOpts := make([]SignOption, 0)
+	msgOpts := make([]MsgOption, 0)
 	for _, opt := range opts {
 		fOpt, ok := opt.(FileMsgOption)
+		sOpt, ok2 := opt.(SignOption)
+		mOpt, ok3 := opt.(MsgOption)
+		if ok2 {
+			signOpts = append(signOpts, sOpt)
+			continue
+		}
+		if ok3 {
+			msgOpts = append(msgOpts, mOpt)
+			continue
+		}
 		if !ok {
 			continue
 		}
@@ -343,12 +227,11 @@ func NewFileMsgWithError(fileHashStr string, op int32, errorCode uint32, errorMs
 			Message: errorMsg,
 		}
 	}
-	for _, opt := range opts {
-		mOpt, ok := opt.(SignOption)
-		if !ok {
-			continue
-		}
-		mOpt.sign(msg)
+	for _, opt := range signOpts {
+		opt.sign(msg)
+	}
+	for _, opt := range msgOpts {
+		opt.apply(msg)
 	}
 	if msg.Header.MsgLength > 0 {
 		return msg

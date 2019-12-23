@@ -349,7 +349,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithSign(this.chain.CurrentAccount()),
 	)
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, true, nil)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId)
 	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
 	resp, err := this.DeleteUploadedFileByIds([]string{taskId})
 	if err != nil {
@@ -527,7 +527,7 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string) ([]*common.DeleteUploadFi
 			})
 			return false
 		}
-		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), msg.MessageId, true, reply)
+		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), msg.MessageId, reply)
 		resp.Nodes = nodeStatus
 		log.Debugf("send delete msg done ret: %v, nodeStatus: %v, err: %s", m, nodeStatus, err)
 		err = this.taskMgr.CleanTask(taskId)
@@ -562,7 +562,7 @@ func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, error) {
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithSign(this.chain.CurrentAccount()),
 	)
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, true, nil)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId)
 	if err != nil {
 		return false, err
 	}
@@ -635,7 +635,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithSign(this.chain.CurrentAccount()),
 	)
-	_, err = client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, true, nil)
+	_, err = client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId)
 	if err != nil {
 		return err
 	}
@@ -989,9 +989,9 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 		log.Debugf("continue....")
 		return false
 	}
-	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, true, action)
+	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, action)
 	if err != nil {
-		log.Errorf("wait file receivers broadcast err")
+		log.Errorf("wait file receivers broadcast err", err)
 		return nil, nil, err
 	}
 	if len(walletAddrs) >= minResponse {
@@ -1031,7 +1031,7 @@ func (this *Dsp) sendFetchReadyMsg(taskId, fileHashStr, receiverHostAddr, prefix
 		message.WithSign(this.chain.CurrentAccount()),
 	)
 	log.Debugf("waitFileReceivers sessionId: %s prefix  %s", sessionId, prefixStr)
-	if _, err = client.P2pRequestWithRetry(msg.ToProtoMsg(), receiverHostAddr, 1, netcomm.REQUEST_MSG_TIMEOUT); err != nil {
+	if err := client.P2pSend(receiverHostAddr, msg.MessageId, msg.ToProtoMsg()); err != nil {
 		return err
 	}
 	return nil
@@ -1314,8 +1314,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 	sendLogMsg := fmt.Sprintf("file: %s, block %s-%s, index:%d-%d to %s", fileHashStr, reqInfos[0].Hash, reqInfos[len(reqInfos)-1].Hash, reqInfos[0].Index, reqInfos[len(reqInfos)-1].Index, reqInfos[0].PeerAddr)
 	sendingTime := time.Now().Unix()
 	log.Debugf("sending %s", sendLogMsg)
-	_, err := client.P2pRequestWithRetry(msg.ToProtoMsg(), reqInfos[0].PeerAddr, common.MAX_SEND_BLOCK_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
-	if err != nil {
+	if err := client.P2pSend(reqInfos[0].PeerAddr, msg.MessageId, msg.ToProtoMsg()); err != nil {
 		log.Errorf("%v, err %s", sendLogMsg, err)
 		return false, err
 	}

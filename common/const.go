@@ -44,6 +44,7 @@ const (
 	CHANNEL_TRANSFER_TIMEOUT            = 20      // 60s
 	CHANNEL_WITHDRAW_TIMEOUT            = 60      // 60s
 	ACTOR_P2P_REQ_TIMEOUT               = 15      // 15s
+	MAX_ACTOR_P2P_REQ_TIMEOUT           = 600     // max actor timeout 600s
 	P2P_BROADCAST_TIMEOUT               = 10      // 30s
 	P2P_REQUEST_WAIT_REPLY_TIMEOUT      = 20      // 30s
 	TRACKER_SERVICE_TIMEOUT             = 15      // 5s

@@ -32,6 +32,7 @@ type Signature struct {
 
 type Message struct {
 	MessageId string
+	Syn       string
 	Header    *Header
 	Payload   proto.Message
 	Sig       *Signature
@@ -131,6 +132,7 @@ func ReadMessage(msg proto.Message) *Message {
 		}
 	}
 	newMsg.MessageId = pbMsg.GetMsgId()
+	newMsg.Syn = pbMsg.GetSyn()
 	return newMsg
 }
 
@@ -160,6 +162,7 @@ func (this *Message) ToProtoMsg() proto.Message {
 		msg.Error.Message = this.Error.Message
 	}
 	msg.MsgId = this.MessageId
+	msg.Syn = this.Syn
 	return msg
 }
 

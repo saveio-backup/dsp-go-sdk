@@ -195,7 +195,7 @@ func (this *Dsp) CancelDownload(taskId string) error {
 				message.WithAsset(int32(ses.Asset)),
 				message.WithSign(this.account),
 			)
-			client.P2pRequestWithRetry(msg.ToProtoMsg(), a, common.MAX_NETWORK_REQUEST_RETRY, common.P2P_REQUEST_WAIT_REPLY_TIMEOUT)
+			client.P2pSend(a, msg.MessageId, msg.ToProtoMsg())
 			wg.Done()
 		}(hostAddr, session)
 	}
@@ -341,7 +341,7 @@ func (this *Dsp) GetDownloadQuotation(fileHashStr, decryptPwd string, asset int3
 		this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, addr, uint64(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 		return false
 	}
-	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), msg.MessageId, true, reply)
+	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), msg.MessageId, reply)
 	log.Debugf("broadcast file download msg result %v err %s", ret, err)
 	if err != nil {
 		return nil, err
@@ -534,7 +534,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 				message.WithSign(this.account),
 			)
 			log.Debugf("broadcast file_download msg to %v", a)
-			broadcastRet, err := client.P2pBroadcast([]string{a}, msg.ToProtoMsg(), msg.MessageId, true, nil)
+			broadcastRet, err := client.P2pBroadcast([]string{a}, msg.ToProtoMsg(), msg.MessageId)
 			log.Debugf("brocast file download msg %v err %v", broadcastRet, err)
 			wg.Done()
 		}(addr)
@@ -996,7 +996,7 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				message.WithAsset(asset),
 				message.WithSign(this.account),
 			)
-			client.P2pBroadcast([]string{a}, fileDownloadOkMsg.ToProtoMsg(), fileDownloadOkMsg.MessageId, true, nil)
+			client.P2pBroadcast([]string{a}, fileDownloadOkMsg.ToProtoMsg(), fileDownloadOkMsg.MessageId)
 		}(addr, walletAddr, sessionId)
 	}
 	return nil

@@ -20,8 +20,9 @@ message Signature {
 
 message Message {
     string msgId  = 1;
-    Header header = 2;
-    bytes  data = 3;
-    Signature sig = 4;
-    Error error = 5;
+    string syn = 2;
+    Header header = 3;
+    bytes  data = 4;
+    Signature sig = 5;
+    Error error = 6;
 }
