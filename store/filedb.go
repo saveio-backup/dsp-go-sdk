@@ -556,9 +556,11 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 	}
 
 	// delete from un salved list
-	err = this.RemoveFromUnSalvedList(batch, id, fi.Type)
-	if err != nil {
-		return err
+	if fi != nil {
+		err = this.RemoveFromUnSalvedList(batch, id, fi.Type)
+		if err != nil {
+			return err
+		}
 	}
 
 	// delete options

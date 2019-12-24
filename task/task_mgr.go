@@ -944,6 +944,13 @@ func (this *TaskMgr) GetUnSlavedTasks() ([]string, error) {
 	return this.db.UnSlavedList(store.TaskTypeUpload)
 }
 
+func (this *TaskMgr) RunGetProgress() {
+	if this.progressTicker == nil {
+		return
+	}
+	this.progressTicker.Run()
+}
+
 func (this *TaskMgr) GetUploadDoneNodeAddr(taskId string) (string, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()

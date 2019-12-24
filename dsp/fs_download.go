@@ -466,7 +466,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 			return 0, err
 		}
 	}
-	log.Debugf("paying to %s, id %v, dns:%s", payInfo.WalletAddress, paymentId, this.dns.DNSNode.WalletAddr)
+	log.Debugf("paying to %s, id %v, use dns: %s", payInfo.WalletAddress, paymentId, this.dns.DNSNode.WalletAddr)
 	if err := this.channel.MediaTransfer(paymentId, amount, this.dns.DNSNode.WalletAddr, payInfo.WalletAddress); err != nil {
 		log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s", paymentId, payInfo.WalletAddress, err)
 		return 0, err
@@ -588,11 +588,11 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		}
 		this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocks)
 		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(totalBytes), resp[0].PaymentId, true)
-		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d", fHash, pAddr, walletAddr, paymentId)
 		if err != nil {
 			log.Errorf("pay for blocks err %s", err)
 			return nil, err
 		}
+		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d", fHash, pAddr, walletAddr, paymentId)
 		this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksDone)
 		return resp, nil
 	}
