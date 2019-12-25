@@ -75,6 +75,9 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 	}
 	log.Debugf("download file id: %s, fileHash: %s, option: %v", taskId, fileHashStr, opt)
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileStart)
+	if err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
+		return err
+	}
 	if len(fileHashStr) == 0 {
 		log.Errorf("taskId %s no filehash for download", taskId)
 		err = errors.New("no filehash for download")
@@ -587,6 +590,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 			return nil, dspErr.New(dspErr.DOWNLOAD_BLOCK_FAILED, "request total bytes count 0")
 		}
 		this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocks)
+		log.Debugf("download block of file %s from %s success, start paying to it, size is %d", fHash, pAddr, totalBytes)
 		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(totalBytes), resp[0].PaymentId, true)
 		if err != nil {
 			log.Errorf("pay for blocks err %s", err)
@@ -717,8 +721,11 @@ func (this *Dsp) StartFetchFileService() {
 			taskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeDownload)
 			if len(taskId) > 0 {
 				// already has task, skip
-				log.Debugf("skip fetch because %s is running", taskId)
-				continue
+				preparing, doing, _ := this.taskMgr.IsTaskPreparingOrDoing(taskId)
+				if preparing || doing {
+					log.Debugf("skip fetch because %s is running", taskId)
+					continue
+				}
 			}
 			// find if i can fetch file
 			if !this.chain.CheckHasProveFile(fileHashStr, fi.PrimaryNodes.AddrList[0]) {
@@ -740,6 +747,7 @@ func (this *Dsp) StartFetchFileService() {
 			// start download file
 			if err := this.backupFileFromPeer(&fi, hostAddrs[0], 0, 0, 0, chainCom.ADDRESS_EMPTY); err != nil {
 				log.Errorf("backup file err %s", err)
+				continue
 			}
 			log.Infof("download file success %s", string(fi.FileHash))
 		}
@@ -1415,6 +1423,9 @@ func (this *Dsp) backupFileFromPeer(fileInfo *fs.FileInfo, peer string, luckyNum
 	if this.dns.DNSNode == nil {
 		err = dspErr.New(dspErr.NO_CONNECTED_DNS, "no online dns node")
 		return dspErr.NewWithError(dspErr.NO_CONNECTED_DNS, err)
+	}
+	if err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
+		return err
 	}
 	log.Debugf("download file dns node %s", this.dns.DNSNode.WalletAddr)
 	if err = this.taskMgr.SetTaskInfoWithOptions(taskId, task.FileHash(fileHashStr), task.FileName(string(fileInfo.FileDesc)),

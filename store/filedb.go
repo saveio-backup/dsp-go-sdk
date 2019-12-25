@@ -1581,6 +1581,7 @@ func (this *FileDB) RemoveFromUnSalvedList(batch *leveldb.Batch, id string, ft T
 	case TaskTypeUpload:
 		key = FileUploadUnSalvedKey()
 	case TaskTypeDownload:
+		return nil
 	case TaskTypeShare:
 		return nil
 	}
@@ -1620,6 +1621,7 @@ func (this *FileDB) UnSlavedList(ft TaskType) ([]string, error) {
 	case TaskTypeUpload:
 		key = FileUploadUnSalvedKey()
 	case TaskTypeDownload:
+		return nil, nil
 	case TaskTypeShare:
 		return nil, nil
 	}
@@ -1686,6 +1688,7 @@ func (this *FileDB) batchAddToUnSlavedList(batch *leveldb.Batch, id string, ft T
 	case TaskTypeUpload:
 		key = FileUploadUnSalvedKey()
 	case TaskTypeDownload:
+		return nil
 	case TaskTypeShare:
 		return nil
 	}

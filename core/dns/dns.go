@@ -153,6 +153,7 @@ func (d *DNS) SetupTrackers() error {
 			continue
 		}
 		d.TrackerUrls = append(d.TrackerUrls, trackerUrl)
+		existDNSMap[trackerUrl] = struct{}{}
 	}
 	d.TrackerUrls = append(d.TrackerUrls, d.TrackersFromCfg...)
 	log.Debugf("d.TrackerUrls %v", d.TrackerUrls)

@@ -171,6 +171,10 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 			return nil, err
 		}
 	}
+	if len(prefixStr) == 0 {
+		err = dspErr.New(dspErr.SHARDING_FAIELD, "missing file prefix")
+		return nil, err
+	}
 	if totalCount = uint64(len(hashes)); totalCount == 0 {
 		err = dspErr.New(dspErr.SHARDING_FAIELD, "no blocks to upload")
 		return nil, err
@@ -179,7 +183,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSliceDone)
 	fileHashStr = hashes[0]
 	log.Debugf("after bind task id")
-	if err = this.taskMgr.SetTaskInfoWithOptions(taskId, task.FileHash(fileHashStr), task.TotalBlockCnt(totalCount)); err != nil {
+	if err = this.taskMgr.SetTaskInfoWithOptions(taskId, task.FileHash(fileHashStr), task.TotalBlockCnt(totalCount), task.Prefix(prefixStr)); err != nil {
 		return nil, err
 	}
 	// bind task id with file hash
