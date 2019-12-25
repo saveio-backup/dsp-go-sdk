@@ -1090,7 +1090,9 @@ func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyN
 		if ok {
 			return data
 		}
-		offset, _ := allOffset[hash]
+
+		offsetKey := fmt.Sprintf("%s-%d", hash,index)
+		offset, _ := allOffset[offsetKey]
 		var err error
 		data, err = this.generateBlockMsgData(hash, index, offset, copyNum, fileID, g0, payRet.PrivateKey)
 		if err != nil {

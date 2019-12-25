@@ -88,12 +88,18 @@ func (this *Fs) GetAllOffsets(rootHash string) (map[string]uint64, error) {
 		return nil, dspErr.NewWithError(dspErr.FS_DECODE_CID_ERROR, err)
 	}
 	m := make(map[string]uint64)
-	cids, offsets, err := this.fs.GetFileAllCidsWithOffset(context.Background(), rootCid)
+	cids, offsets, indexes, err := this.fs.GetFileAllCidsWithOffset(context.Background(), rootCid)
 	if err != nil {
 		return nil, dspErr.NewWithError(dspErr.FS_GET_ALL_OFFSET_ERROR, err)
 	}
+
+	if len(cids) != len(offsets) || len(cids) != len(indexes) {
+		return nil, dspErr.NewWithError(dspErr.FS_GET_ALL_OFFSET_ERROR,fmt.Errorf("length of cids, offsets, indexes no matching"))
+	}
+
 	for i, cid := range cids {
-		m[cid.String()] = offsets[i]
+		key := fmt.Sprintf("%s-%d", cid.String(), indexes[i])
+		m[key] = offsets[i]
 	}
 	return m, nil
 }

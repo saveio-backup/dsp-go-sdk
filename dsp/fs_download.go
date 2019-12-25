@@ -1368,7 +1368,8 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 		if err != nil {
 			return err
 		}
-		offset := offsets[hash]
+		offsetKey := fmt.Sprintf("%s-%d", hash,index)
+		offset := offsets[offsetKey]
 		log.Debugf("hash: %s-%s-%d , offset: %d, links count %d", fileHashStr, hash, index, offset, len(links))
 		if err := this.taskMgr.SetBlockDownloaded(taskId, fileHashStr, client.P2pGetPublicAddr(), uint32(index), int64(offset), links); err != nil {
 			return err
