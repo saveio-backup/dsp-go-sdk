@@ -163,6 +163,12 @@ type IsPeerNetQualityBadReq struct {
 	Response chan *P2pBoolResp
 }
 
+type AppendAddrToHealthCheckReq struct {
+	NetType  P2pNetType
+	Address  string
+	Response chan *P2pResp
+}
+
 func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
 	chReq := &ConnectionExistReq{
 		Address:  address,
@@ -447,5 +453,23 @@ func P2pIsPeerNetQualityBad(address string, netType P2pNetType) (bool, error) {
 		return false, dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pIsPeerNetQualityBad] no response")
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return false, dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pIsPeerNetQualityBad] timeout")
+	}
+}
+
+func P2pAppendAddrForHealthCheck(address string, netType P2pNetType) error {
+	chReq := &AppendAddrToHealthCheckReq{
+		Address:  address,
+		NetType:  netType,
+		Response: make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil {
+			return resp.Error
+		}
+		return dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pAppendAddrForHealthCheck] no response")
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pAppendAddrForHealthCheck] timeout")
 	}
 }

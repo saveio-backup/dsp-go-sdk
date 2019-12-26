@@ -958,6 +958,9 @@ func (this *TaskMgr) GetUploadDoneNodeAddr(taskId string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if info == nil {
+		return "", dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "upload file info not found")
+	}
 	for addr, count := range info.SaveBlockCountMap {
 		if count == info.TotalBlockCount {
 			return addr, nil

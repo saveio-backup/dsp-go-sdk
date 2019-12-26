@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ontio/ontology-eventbus/actor"
+	"github.com/saveio/dsp-go-sdk/actor/client"
 	dspActorClient "github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
@@ -135,6 +136,10 @@ func (this *Dsp) Start() error {
 		}
 		go this.StartCheckRemoveFiles()
 		go this.StartFetchFileService()
+		go this.startDNSHealthCheckService()
+	}
+	if this.IsClient() && this.config.HealthCheckDNS {
+		go this.startDNSHealthCheckService()
 	}
 	this.running = true
 	return nil
@@ -208,6 +213,12 @@ func (this *Dsp) StartSeedService() {
 			}
 			this.dns.PushFilesToTrackers(files)
 		}
+	}
+}
+
+func (this *Dsp) startDNSHealthCheckService() {
+	for _, dnsHostAddr := range this.dns.OnlineDNS {
+		client.P2pAppendAddrForHealthCheck(dnsHostAddr, client.P2pNetTypeChannel)
 	}
 }
 

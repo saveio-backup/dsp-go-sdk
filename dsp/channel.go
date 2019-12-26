@@ -4,10 +4,12 @@ import (
 	"time"
 
 	"github.com/ontio/ontology-eventbus/actor"
+	"github.com/saveio/dsp-go-sdk/actor/client"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	ch_actor "github.com/saveio/pylons/actor/server"
 	"github.com/saveio/pylons/common"
+	chainCom "github.com/saveio/themis/common"
 )
 
 // SetUnitPriceForAllFile. set unit price for block sharing for all files
@@ -98,7 +100,27 @@ func (this *Dsp) HealthyCheckNodeState(walletAddr string) error {
 	return this.channel.HealthyCheckNodeState(walletAddr)
 }
 func (this *Dsp) OpenChannel(targetAddress string, depositAmount uint64) (common.ChannelID, error) {
-	return this.channel.OpenChannel(targetAddress, depositAmount)
+	// add dns to health check list
+	if this.IsClient() {
+		return this.channel.OpenChannel(targetAddress, depositAmount)
+	}
+	chId, err := this.channel.OpenChannel(targetAddress, depositAmount)
+	if err != nil {
+		return chId, err
+	}
+	addr, err := chainCom.AddressFromBase58(targetAddress)
+	if err != nil {
+		return chId, err
+	}
+	info, _ := this.GetDnsNodeByAddr(addr)
+	if info == nil {
+		return chId, nil
+	}
+	hostAddr, _ := this.GetExternalIP(targetAddress)
+	if len(hostAddr) > 0 {
+		client.P2pAppendAddrForHealthCheck(hostAddr, client.P2pNetTypeChannel)
+	}
+	return chId, nil
 }
 func (this *Dsp) SetChannelIsDNS(targetAddr string, isDNS bool) error {
 	return this.channel.SetChannelIsDNS(targetAddr, isDNS)

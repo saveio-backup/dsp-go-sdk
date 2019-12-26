@@ -37,6 +37,7 @@ type DspConfig struct {
 	TrackerProtocol    string   // tracker protocol
 	Trackers           []string // tracker address list
 	DNSWalletAddrs     []string // DNS wallet ADDRESS
+	HealthCheckDNS     bool     // health check dns
 }
 
 func DefaultDspConfig() *DspConfig {
