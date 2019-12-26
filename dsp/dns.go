@@ -113,6 +113,9 @@ func (this *Dsp) UpdateDNS(walletAddr, hostAddr string) {
 		WalletAddr: walletAddr,
 		HostAddr:   hostAddr,
 	}
+	if err := this.channel.SelectDNSChannel(walletAddr); err != nil {
+		log.Errorf("update selecting new dns channel err %s", err)
+	}
 }
 
 func (this *Dsp) GetTrackerList() []string {

@@ -27,6 +27,7 @@ type ChannelInfo struct {
 	ID          uint64 `json:"id"`
 	PartnerAddr string `json:"partner_address"`
 	IsDNS       bool   `json:"is_dns"`
+	UsedAt      uint64 `json:"usedAt"`
 	CreatedAt   uint64 `json:"createdAt"`
 }
 
@@ -50,6 +51,60 @@ func (this *ChannelDB) AddChannelInfo(id uint64, partnerAddr string) error {
 		return err
 	}
 	return this.db.Put(key, buf)
+}
+
+func (this *ChannelDB) SelectChannel(partnerAddr string) error {
+	key := []byte(ChannelInfoKey(partnerAddr))
+	value, err := this.db.Get(key)
+	if err != nil && err != leveldb.ErrNotFound {
+		return err
+	}
+	if len(value) == 0 {
+		return nil
+	}
+	ch := &ChannelInfo{}
+	err = json.Unmarshal(value, &ch)
+	if err != nil {
+		return err
+	}
+	ch.UsedAt = utils.GetMilliSecTimestamp()
+	buf, err := json.Marshal(ch)
+	if err != nil {
+		return err
+	}
+	return this.db.Put(key, buf)
+}
+
+func (this *ChannelDB) GetLastUsedDNSChannel() (string, error) {
+	prefix := []byte(ChannelInfoKey(""))
+	keys, err := this.db.QueryStringKeysByPrefix(prefix)
+	if err != nil {
+		return "", err
+	}
+	lastUsedAt := uint64(0)
+	dnsWalletAddr := ""
+	for _, key := range keys {
+		value, err := this.db.Get([]byte(key))
+		if err != nil && err != leveldb.ErrNotFound {
+			return "", err
+		}
+		if len(value) == 0 {
+			continue
+		}
+		ch := &ChannelInfo{}
+		err = json.Unmarshal(value, &ch)
+		if err != nil {
+			continue
+		}
+		if !ch.IsDNS {
+			continue
+		}
+		if ch.UsedAt > lastUsedAt {
+			lastUsedAt = ch.UsedAt
+			dnsWalletAddr = ch.PartnerAddr
+		}
+	}
+	return dnsWalletAddr, nil
 }
 
 func (this *ChannelDB) SetChannelIsDNS(partnerAddr string, isDNS bool) error {
@@ -98,13 +153,13 @@ func (this *ChannelDB) DeleteChannelInfo(partnerAddr string) error {
 
 func (this *ChannelDB) GetPartners() ([]string, error) {
 	prefix := ChannelInfoKeyPrefix()
-	keys, err := this.db.QueryKeysByPrefix([]byte(prefix))
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
 		return nil, err
 	}
 	ps := make([]string, 0, len(keys))
 	for _, key := range keys {
-		value, err := this.db.Get(key)
+		value, err := this.db.Get([]byte(key))
 		if err != nil || len(value) == 0 {
 			continue
 		}
@@ -120,7 +175,7 @@ func (this *ChannelDB) GetPartners() ([]string, error) {
 
 func (this *ChannelDB) OverridePartners(walletAddr string, partnerAddrs []string) error {
 	prefix := ChannelInfoKeyPrefix()
-	keys, err := this.db.QueryKeysByPrefix([]byte(prefix))
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
 		return err
 	}
@@ -130,7 +185,7 @@ func (this *ChannelDB) OverridePartners(walletAddr string, partnerAddrs []string
 	}
 	deleteChannels := make([]string, 0, len(keys))
 	for _, key := range keys {
-		value, err := this.db.Get(key)
+		value, err := this.db.Get([]byte(key))
 		if err != nil || len(value) == 0 {
 			continue
 		}

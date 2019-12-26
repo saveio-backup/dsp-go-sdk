@@ -601,9 +601,9 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 
 		// delete unpaid info
 		if fi.Type == TaskTypeDownload {
-			unpaidKeys, _ := this.db.QueryKeysByPrefix([]byte(FileUnpaidQueryKey(id)))
+			unpaidKeys, _ := this.db.QueryStringKeysByPrefix([]byte(FileUnpaidQueryKey(id)))
 			for _, unpaidKey := range unpaidKeys {
-				this.db.BatchDelete(batch, unpaidKey)
+				this.db.BatchDelete(batch, []byte(unpaidKey))
 			}
 		}
 		taskIdWithFilekey := TaskIdWithFile(fi.FileHash, fi.WalletAddress, fi.Type)

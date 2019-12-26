@@ -181,7 +181,8 @@ func (d *DNS) BootstrapDNS() {
 	if channels == nil || len(channels.Channels) == 0 {
 		return
 	}
-	log.Debugf("will set online dns")
+	lastUsedDns, _ := d.Channel.GetLastUsedDNSWalletAddr()
+	log.Debugf("last used dns %s", lastUsedDns)
 	for _, channel := range channels.Channels {
 		url, ok := d.OnlineDNS[channel.Address]
 		if !ok {
@@ -192,13 +193,17 @@ func (d *DNS) BootstrapDNS() {
 			log.Errorf("open channel failed, err %s", err)
 			continue
 		}
+		if len(lastUsedDns) > 0 && channel.Address != lastUsedDns {
+			continue
+		}
 		d.DNSNode = &DNSNodeInfo{
 			WalletAddr: channel.Address,
 			HostAddr:   url,
 		}
+		d.Channel.SelectDNSChannel(channel.Address)
 		break
 	}
-	log.Debugf("set online DNSDNS %v", d.DNSNode)
+	log.Debugf("use this dns %v", d.DNSNode)
 }
 
 // SetupDNSChannels. open channel with DNS automatically. [Deprecated]
@@ -215,6 +220,7 @@ func (d *DNS) SetupDNSChannels() error {
 		return dspErr.New(dspErr.DNS_NO_REGISTER_DNS, "no dns nodes from chain")
 	}
 	dnsDeposit := uint64(100)
+	lastUsedDNS, _ := d.Channel.GetLastUsedDNSWalletAddr()
 	setDNSNodeFunc := func(dnsUrl, walletAddr string) error {
 		log.Debugf("set dns node func %s %s", dnsUrl, walletAddr)
 		if strings.Index(dnsUrl, "0.0.0.0:0") != -1 {
@@ -243,10 +249,14 @@ func (d *DNS) SetupDNSChannels() error {
 				}
 			}
 		}
+		if len(lastUsedDNS) > 0 && walletAddr != lastUsedDNS {
+			return nil
+		}
 		d.DNSNode = &DNSNodeInfo{
 			WalletAddr: walletAddr,
 			HostAddr:   dnsUrl,
 		}
+		d.Channel.SelectDNSChannel(walletAddr)
 		log.Debugf("DNSNode wallet: %v, addr: %v", d.DNSNode.WalletAddr, d.DNSNode.HostAddr)
 		return nil
 	}

@@ -649,3 +649,21 @@ func (this *Channel) AllChannels() (*ch_actor.ChannelsInfoResp, error) {
 	}
 	return resp, nil
 }
+
+// SelectDNSChannel. select a dns channel and update it's record timestamp
+func (this *Channel) SelectDNSChannel(dnsWalletAddr string) error {
+	log.Debugf("select dns wallet %s", dnsWalletAddr)
+	err := this.channelDB.SelectChannel(dnsWalletAddr)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return nil
+}
+
+func (this *Channel) GetLastUsedDNSWalletAddr() (string, error) {
+	walletAddr, err := this.channelDB.GetLastUsedDNSChannel()
+	if err != nil {
+		return "", dspErr.NewWithError(dspErr.CHANNEL_INTERNAL_ERROR, err)
+	}
+	return walletAddr, nil
+}
