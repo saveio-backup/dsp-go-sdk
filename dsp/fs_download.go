@@ -707,7 +707,8 @@ func (this *Dsp) StartFetchFileService() {
 			continue
 		}
 		log.Debugf("unprove primary files count: %d", len(fileInfos))
-		for _, fi := range fileInfos {
+		for i := len(fileInfos) - 1; i >= 0; i-- {
+			fi := fileInfos[i]
 			if len(fi.PrimaryNodes.AddrList) < 2 {
 				log.Debugf("primary node list too small %v", fi.PrimaryNodes.AddrList)
 				continue
@@ -1376,7 +1377,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 		if err != nil {
 			return err
 		}
-		offsetKey := fmt.Sprintf("%s-%d", hash,index)
+		offsetKey := fmt.Sprintf("%s-%d", hash, index)
 		offset := offsets[offsetKey]
 		log.Debugf("hash: %s-%s-%d , offset: %d, links count %d", fileHashStr, hash, index, offset, len(links))
 		if err := this.taskMgr.SetBlockDownloaded(taskId, fileHashStr, client.P2pGetPublicAddr(), uint32(index), int64(offset), links); err != nil {

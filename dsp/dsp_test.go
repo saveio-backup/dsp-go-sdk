@@ -1193,10 +1193,13 @@ func TestGetUnproveFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fi := range fileInfos {
-		fmt.Printf("hash %s, primary %s\n", fi.FileHash, fi.PrimaryNodes.AddrList[0].ToBase58())
+	fmt.Printf("len = %d\n", len(fileInfos))
+
+	for i := len(fileInfos) - 1; i >= 0; i-- {
+		fi := fileInfos[i]
+		fmt.Printf("%d hash %s, height: %d primary %s\n", i, fi.FileHash, fi.BlockHeight, fi.PrimaryNodes.AddrList[0].ToBase58())
 	}
-	details, err := d.chain.GetFileProveDetails("QmYabcUtDNRga8ajFYs8ZH18xAqLbfBnyGzcst7heegQdU")
+	details, err := d.chain.GetFileProveDetails("QmX5K5LkH68qXVwmQvmdEr1Xhcc2Ecg2MK81oayd6GSaa8")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1205,16 +1208,5 @@ func TestGetUnproveFiles(t *testing.T) {
 		fmt.Printf("addr: %s, %s, %d \n", d.NodeAddr, d.WalletAddr.ToBase58(), d.ProveTimes)
 	}
 
-	// 	2019/12/19 16:06:44.803527 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:721 skip fetch because 7968c670-0c4b-11ea-bb5b-000d3aa0effb
-	// 2019/12/19 16:06:44.803579 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:714 skip fetch because i am master node
-	// 2019/12/19 16:06:44.803639 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:721 skip fetch because 5f2b9d00-0c4c-11ea-bb5b-000d3aa0effb
-	// 2019/12/19 16:06:44.803674 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:714 skip fetch because i am master node
-	// 2019/12/19 16:06:44.803728 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:721 skip fetch because 6acdd1b1-0c51-11ea-bb5b-000d3aa0effb
-	// 2019/12/19 16:06:44.803781 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:721 skip fetch because c08b8ab1-1030-11ea-9536-000d3aa0effb
-	// 2019/12/19 16:06:44.803835 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:721 skip fetch because 9548593e-2215-11ea-a992-000d3aa0effb
-	// 2019/12/19 16:06:44.803887 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:721 skip fetch because be3af852-10d1-11ea-8472-000d3aa0effb
-	// 2019/12/19 16:06:44.803922 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:714 skip fetch because i am master node
-	// 2019/12/19 16:06:44.803955 [0;32m[DEBUG][m GID 778, github.com/saveio/dsp-go-sdk/dsp.(*Dsp).StartFetchFileService fs_download.go:714 skip fetch because i am master node
-	// fmt.Println(filepath.Base(".") + "/Log")
 	os.RemoveAll(filepath.Base(".") + "/Log")
 }
