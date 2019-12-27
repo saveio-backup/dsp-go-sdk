@@ -965,7 +965,11 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 			return false
 		}
 		// compare chain info
-		if height > 0 && int(math.Abs(float64(fileMsg.ChainInfo.Height-height))) > common.MAX_BLOCK_HEIGHT_DIFF {
+		if fileMsg.ChainInfo.Height > height && fileMsg.ChainInfo.Height > height+common.MAX_BLOCK_HEIGHT_DIFF {
+			log.Debugf("remote node block height is %d, but current block height is %d", fileMsg.ChainInfo.Height, height)
+			return false
+		}
+		if height > fileMsg.ChainInfo.Height && height > fileMsg.ChainInfo.Height+common.MAX_BLOCK_HEIGHT_DIFF {
 			log.Debugf("remote node block height is %d, but current block height is %d", fileMsg.ChainInfo.Height, height)
 			return false
 		}
@@ -1095,7 +1099,7 @@ func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyN
 			return data
 		}
 
-		offsetKey := fmt.Sprintf("%s-%d", hash,index)
+		offsetKey := fmt.Sprintf("%s-%d", hash, index)
 		offset, _ := allOffset[offsetKey]
 		var err error
 		data, err = this.generateBlockMsgData(hash, index, offset, copyNum, fileID, g0, payRet.PrivateKey)
