@@ -1285,10 +1285,13 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 			select {
 			case value, ok := <-ch:
 				if !ok {
+					log.Errorf("receive blocks channel closed")
 					err = dspErr.New(dspErr.INTERNAL_ERROR, "receiving block channel close")
 					continue
 				}
-				log.Debugf("receive blocks len: %d", len(value))
+				if len(value) > 0 {
+					log.Debugf("receive blocks of %s-%d ~ %s-%d from", value[0].Hash, value[0].Index, value[len(value)-1].Hash, value[len(value)-1].Index)
+				}
 				this.taskMgr.ActiveDownloadTaskPeer(ipAddr)
 				return value, nil
 			case <-ticker.C:
