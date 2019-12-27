@@ -276,24 +276,22 @@ func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext, peer *n
 // handleFileDeleteMsg. client send delete msg to storage nodes for telling them to delete the file and release the resources.
 func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	if fileMsg.Tx == nil || fileMsg.Tx.Height == 0 {
-		log.Debugf("filemsg tx is missing")
-		return
-	}
-	if err := this.waitForTxConfirmed(fileMsg.Tx.Height); err != nil {
-		log.Errorf("get block height err %s", err)
-		replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK, serr.DELETE_FILE_TX_UNCONFIRMED, err.Error(),
-			message.WithSessionId(fileMsg.SessionId),
-			message.WithWalletAddress(this.chain.WalletAddress()),
-			message.WithSign(this.account),
-			message.WithSyn(msg.MessageId),
-		)
-		if err := client.P2pSend(peer.Address, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
-			log.Errorf("reply delete ok msg failed", err)
+	if fileMsg.Tx != nil && fileMsg.Tx.Height > 0 {
+		if err := this.waitForTxConfirmed(fileMsg.Tx.Height); err != nil {
+			log.Errorf("get block height err %s", err)
+			replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK, serr.DELETE_FILE_TX_UNCONFIRMED, err.Error(),
+				message.WithSessionId(fileMsg.SessionId),
+				message.WithWalletAddress(this.chain.WalletAddress()),
+				message.WithSign(this.account),
+				message.WithSyn(msg.MessageId),
+			)
+			if err := client.P2pSend(peer.Address, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+				log.Errorf("reply delete ok msg failed", err)
+				return
+			}
+			log.Debugf("reply delete ack msg success")
 			return
 		}
-		log.Debugf("reply delete ack msg success")
-		return
 	}
 	info, err := this.chain.GetFileInfo(fileMsg.Hash)
 	if info != nil || (err != nil && strings.Index(err.Error(), "FsGetFileInfo not found") == -1) {
