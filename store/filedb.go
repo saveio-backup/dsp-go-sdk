@@ -1364,7 +1364,6 @@ func (this *FileDB) SaveFileDownloaded(id string) error {
 func (this *FileDB) AllDownloadFiles() ([]*TaskInfo, []string, error) {
 	countKey := FileDownloadedCountKey()
 	countBuf, err := this.db.Get([]byte(countKey))
-	log.Debugf("countkey:%v, countBuf:%v, err %s", countKey, countBuf, err)
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, nil, err
 	}
@@ -1375,12 +1374,12 @@ func (this *FileDB) AllDownloadFiles() ([]*TaskInfo, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Debugf("count :%v", count)
+	log.Debugf("all download files count :%v", count)
 	all := make([]string, 0, count)
+	existFileHash := make(map[string]struct{}, 0)
 	infos := make([]*TaskInfo, 0, count)
 	for i := uint32(0); i < uint32(count); i++ {
 		downloadedKey := FileDownloadedKey(i)
-		log.Debugf("download key %v", downloadedKey)
 		idBuf, err := this.db.Get([]byte(downloadedKey))
 		if err != nil || len(idBuf) == 0 {
 			continue
@@ -1392,9 +1391,14 @@ func (this *FileDB) AllDownloadFiles() ([]*TaskInfo, []string, error) {
 		if len(fi.FileHash) == 0 {
 			continue
 		}
+		if _, ok := existFileHash[fi.FileHash]; ok {
+			continue
+		}
+		existFileHash[fi.FileHash] = struct{}{}
 		all = append(all, fi.FileHash)
 		infos = append(infos, fi)
 	}
+	log.Debugf("all different download files count %d", len(infos))
 	return infos, all, nil
 }
 
