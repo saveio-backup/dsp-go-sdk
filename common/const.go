@@ -51,7 +51,7 @@ const (
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT      = 10      // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT              = 20      // media transfer timeout
 
-	NETWORK_STREAM_WRITE_TIMEOUT  = 8                                                                                               // network write stream timeout for 128KB (128KB/8s)
+	NETWORK_STREAM_WRITE_TIMEOUT  = 64                                                                                              // network write stream timeout for 128KB (128KB/64s)
 	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT = (CHUNK_SIZE / network.PER_SEND_BLOCK_SIZE) * NETWORK_STREAM_WRITE_TIMEOUT * MAX_REQ_BLOCK_COUNT // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2, 128s
 	DOWNLOAD_FILE_TIMEOUT         = DOWNLOAD_BLOCKFLIGHTS_TIMEOUT * MAX_BLOCK_FETCHED_RETRY                                         // download file time out, 256s
 	ACTOR_MAX_P2P_REQ_TIMEOUT     = DOWNLOAD_FILE_TIMEOUT                                                                           // max p2p request timeout

@@ -1319,7 +1319,8 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 		Blocks:    blocks,
 	}
 	msg := message.NewBlockFlightsMsg(flights)
-	sendLogMsg := fmt.Sprintf("file: %s, block %s-%s, index:%d-%d to %s", fileHashStr, reqInfos[0].Hash, reqInfos[len(reqInfos)-1].Hash, reqInfos[0].Index, reqInfos[len(reqInfos)-1].Index, reqInfos[0].PeerAddr)
+	sendLogMsg := fmt.Sprintf("file: %s, block %s-%s, index:%d-%d to %s with msg id %s", fileHashStr, reqInfos[0].Hash, reqInfos[len(reqInfos)-1].Hash,
+		reqInfos[0].Index, reqInfos[len(reqInfos)-1].Index, reqInfos[0].PeerAddr, msg.MessageId)
 	sendingTime := time.Now().Unix()
 	log.Debugf("sending %s", sendLogMsg)
 	if err := client.P2pSend(reqInfos[0].PeerAddr, msg.MessageId, msg.ToProtoMsg()); err != nil {
@@ -1327,7 +1328,7 @@ func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
 		return false, err
 	}
 	this.taskMgr.ActiveUploadTaskPeer(reqInfos[0].PeerAddr)
-	log.Debugf("send block success %s\n used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
+	log.Debugf("sending %s success\n, used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
 	// TODO: add pause here
 
 	// stored
