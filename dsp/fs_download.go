@@ -727,6 +727,11 @@ func (this *Dsp) StartFetchFileService() {
 					log.Debugf("skip fetch because %s is running", taskId)
 					continue
 				}
+				taskDone, _ := this.taskMgr.IsTaskDone(taskId)
+				if taskDone {
+					log.Debugf("skip fetch because %s is done", taskId)
+					continue
+				}
 			}
 			// find if i can fetch file
 			if !this.chain.CheckHasProveFile(fileHashStr, fi.PrimaryNodes.AddrList[0]) {
