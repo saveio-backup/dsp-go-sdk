@@ -999,7 +999,7 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 	}
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, action)
 	if err != nil {
-		log.Errorf("wait file receivers broadcast err", err)
+		log.Errorf("wait file receivers broadcast err %s", err)
 		return nil, nil, err
 	}
 	if len(walletAddrs) >= minResponse {

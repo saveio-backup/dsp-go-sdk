@@ -376,7 +376,7 @@ func (d *DNS) GetPeerFromTracker(hash string, trackerUrls []string) []string {
 }
 
 func (d *DNS) PushFilesToTrackers(files []string) {
-	log.Debugf("PushLocalFilesToTrackers %v", d.TrackerUrls)
+	log.Debugf("PushLocalFilesToTrackers %v, files: %d", d.TrackerUrls, len(files))
 	if len(d.TrackerUrls) == 0 {
 		return
 	}
@@ -415,6 +415,7 @@ func (d *DNS) PushFilesToTrackers(files []string) {
 		reqArgs = append(reqArgs, []interface{}{fileHashStr})
 	}
 	utils.CallRequestWithArgs(req, reqArgs)
+	log.Debugf("PushLocalFilesToTrackers done%v", d.TrackerUrls)
 }
 
 func (d *DNS) RegisterFileUrl(url, link string) (string, error) {
