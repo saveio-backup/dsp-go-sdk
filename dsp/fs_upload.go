@@ -1238,7 +1238,7 @@ func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyN
 				break
 			}
 			// check all blocks has sent
-			log.Infof("all block has sent %s, return nil", taskId)
+			log.Infof("all block has sent %s file %s", taskId, fileHashStr)
 			this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocksDone)
 			return nil
 		case <-checkStopTimer.C:
@@ -1252,6 +1252,7 @@ func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyN
 				return nil
 			}
 			if timeout, _ := this.taskMgr.IsTaskTimeout(taskId); !timeout {
+				// FIXME: check has done here?
 				continue
 			}
 			if !closeCancelFetch {
