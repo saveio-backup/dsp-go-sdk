@@ -906,7 +906,6 @@ func (this *FileDB) UploadedBlockCount(id string) uint64 {
 	for _, cnt := range fi.SaveBlockCountMap {
 		sum += cnt
 	}
-	log.Debugf("get sent %d", sum)
 	return sum
 }
 

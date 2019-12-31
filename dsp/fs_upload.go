@@ -1252,15 +1252,20 @@ func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyN
 				return nil
 			}
 			if timeout, _ := this.taskMgr.IsTaskTimeout(taskId); !timeout {
-				// FIXME: check has done here?
-				continue
+				if time.Now().Second()%10 != 0 {
+					continue
+				}
+				// check if file has sent every 10s (could be any other interval)
+				if totalCount != uint64(this.taskMgr.UploadedBlockCount(taskId)) {
+					continue
+				}
 			}
 			if !closeCancelFetch {
 				closeCancelFetch = true
 				close(cancelFetch)
 			}
 			sent := uint64(this.taskMgr.UploadedBlockCount(taskId))
-			log.Debugf("timeout check totalCount %d != sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))
+			log.Debugf("check totalCount %d, has sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))
 			if totalCount != sent {
 				return dspErr.New(dspErr.TASK_WAIT_TIMEOUT, "wait for fetch file: %s timeout", fileHashStr)
 			}

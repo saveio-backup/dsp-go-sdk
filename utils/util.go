@@ -142,7 +142,9 @@ func StringSliceToKeyMap(input []string) map[string]string {
 	return m
 }
 
-func GenIdByTimestamp() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+func GenIdByTimestamp(r *rand.Rand) string {
+	if r == nil {
+		r = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
 	return fmt.Sprintf("%d%d", time.Now().UnixNano(), 100000+r.Int31n(900000))
 }

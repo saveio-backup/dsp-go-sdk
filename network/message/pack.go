@@ -1,6 +1,9 @@
 package message
 
 import (
+	"math/rand"
+	"time"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/pb"
@@ -12,8 +15,10 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
+var msgRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 func GenMessageId() string {
-	return dspUtils.GenIdByTimestamp()
+	return dspUtils.GenIdByTimestamp(msgRand)
 }
 
 func MessageHeader() *Header {
