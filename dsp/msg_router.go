@@ -224,6 +224,14 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 	this.taskMgr.SetFileOwner(taskId, info.FileOwner.ToBase58())
 	if err := this.startFetchBlocks(fileMsg.Hash, peer.Address, fileMsg.PayInfo.WalletAddress); err != nil {
 		log.Errorf("start fetch blocks for file %s failed, err:%s", fileMsg.Hash, err)
+	} else {
+		doneMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_FETCH_DONE,
+			message.WithSessionId(taskId),
+			message.WithWalletAddress(this.chain.WalletAddress()),
+			message.WithSign(this.account),
+		)
+		client.P2pSend(peer.Address, doneMsg.MessageId, doneMsg.ToProtoMsg())
+		log.Debugf("fetch file done, send done msg to %s", peer.Address)
 	}
 }
 
@@ -346,7 +354,8 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 	}
 	if !this.chain.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
 		log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
-		replyErr("", fileMsg.Hash, serr.NO_PRIVILEGE_TO_DOWNLOAD, fmt.Sprintf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress), ctx)
+		replyErr("", fileMsg.Hash, serr.NO_PRIVILEGE_TO_DOWNLOAD,
+			fmt.Sprintf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress), ctx)
 		return
 	}
 	downloadInfoId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)

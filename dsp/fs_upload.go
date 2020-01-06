@@ -1002,8 +1002,8 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 		log.Errorf("wait file receivers broadcast err %s", err)
 		return nil, nil, err
 	}
+	log.Debugf("receives :%v, ret %v", walletAddrs, ret)
 	if len(walletAddrs) >= minResponse {
-		log.Debugf("receives :%v, ret %v", walletAddrs, ret)
 		return walletAddrs, hostAddrs, nil
 	}
 	if len(walletAddrs)+len(backupAddrs) < minResponse {
