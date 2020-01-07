@@ -846,7 +846,12 @@ func (this *Dsp) downloadFileWithOpt(fileHashStr string, opt *common.DownloadOpt
 	}
 	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
 	if !this.taskMgr.TaskExist(taskId) {
-		log.Debugf("task not exist, start a new download task of id: %s, file %s", taskId, fileHashStr)
+		if len(taskId) > 0 {
+			log.Debugf("task not exist in memory, but has downloaded, start a new download task of id: %s, file %s",
+				taskId, fileHashStr)
+		} else {
+			log.Debugf("start a new download task of file %s", fileHashStr)
+		}
 		return this.DownloadFile("", fileHashStr, opt)
 	}
 	if taskDone, _ := this.taskMgr.IsTaskDone(taskId); taskDone {
@@ -1340,8 +1345,9 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 					continue
 				}
 				err = dspErr.New(dspErr.DOWNLOAD_BLOCK_FAILED, "receiving blockflight %s timeout", blocks[0].GetHash())
-				// TODO: why err is nil here
 				downloadTimeout = true
+				// TODO: case 3? no channel and no timeout, needed stop ?
+
 			}
 			if downloadTimeout {
 				break

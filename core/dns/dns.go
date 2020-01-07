@@ -748,7 +748,7 @@ func (d *DNS) connectDNS(maxDNSNum uint32) (map[string]string, error) {
 	// handle response
 	connectedDNS := make(map[string]string, 0)
 	for _, resp := range connectResps {
-		if resp.Code != 0 {
+		if resp == nil || resp.Code != 0 {
 			continue
 		}
 		dnsInfo, ok := resp.Result.(*DNSNodeInfo)

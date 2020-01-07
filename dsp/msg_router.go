@@ -49,31 +49,50 @@ func (this *Dsp) Receive(ctx *network.ComponentContext) {
 // handleFileMsg handle all file msg
 func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	log.Debugf("handleFileMsg %d of file %s from peer:%s, length:%d", fileMsg.Operation, fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 	switch fileMsg.Operation {
 	case netcom.FILE_OP_FETCH_ASK:
+		log.Debugf("handleFileMsg fetchAsk file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileAskMsg(ctx, peer, msg)
 	case netcom.FILE_OP_FETCH_RDY:
+		log.Debugf("handleFileMsg fetchRdy file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileRdyMsg(ctx, peer, msg)
 	case netcom.FILE_OP_FETCH_PAUSE:
+		log.Debugf("handleFileMsg fetchPause file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileFetchPauseMsg(ctx, peer, msg)
 	case netcom.FILE_OP_FETCH_RESUME:
+		log.Debugf("handleFileMsg fetchResume file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileFetchResumeMsg(ctx, peer, msg)
 	case netcom.FILE_OP_FETCH_DONE:
+		log.Debugf("handleFileMsg fetchDone file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileFetchDoneMsg(ctx, peer, msg)
 	case netcom.FILE_OP_FETCH_CANCEL:
+		log.Debugf("handleFileMsg fetchCancel file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileFetchCancelMsg(ctx, peer, msg)
-
 	case netcom.FILE_OP_DELETE:
+		log.Debugf("handleFileMsg delete file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileDeleteMsg(ctx, peer, msg)
-
 	case netcom.FILE_OP_DOWNLOAD_ASK:
+		log.Debugf("handleFileMsg downloadAsk file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileDownloadAskMsg(ctx, peer, msg)
 	case netcom.FILE_OP_DOWNLOAD:
+		log.Debugf("handleFileMsg download file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileDownloadMsg(ctx, peer, msg)
 	case netcom.FILE_OP_DOWNLOAD_OK:
+		log.Debugf("handleFileMsg downloadOk file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileDownloadOkMsg(ctx, peer, msg)
 	case netcom.FILE_OP_DOWNLOAD_CANCEL:
+		log.Debugf("handleFileMsg downloadCancel file %s from peer:%s, length:%d",
+			fileMsg.Hash, peer.Address, msg.Header.MsgLength)
 		this.handleFileDownloadCancelMsg(ctx, peer, msg)
 	default:
 	}
