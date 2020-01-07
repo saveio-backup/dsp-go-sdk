@@ -737,6 +737,7 @@ func (this *Dsp) StartFetchFileService() {
 		}
 		fileInfos, err := this.chain.GetUnprovePrimaryFileInfos(this.chain.Address())
 		if err != nil {
+			log.Errorf("get unprove primary files err %s", err)
 			continue
 		}
 		log.Debugf("unprove primary files count: %d", len(fileInfos))
