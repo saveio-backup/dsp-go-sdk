@@ -182,6 +182,7 @@ func (d *DNS) BootstrapDNS() {
 		return
 	}
 	lastUsedDns, _ := d.Channel.GetLastUsedDNSWalletAddr()
+	_, lastUsedDNSOnline := connetedDNS[lastUsedDns]
 	log.Debugf("last used dns %s", lastUsedDns)
 	for _, channel := range channels.Channels {
 		url, ok := d.OnlineDNS[channel.Address]
@@ -193,7 +194,7 @@ func (d *DNS) BootstrapDNS() {
 			log.Errorf("open channel failed, err %s", err)
 			continue
 		}
-		if len(lastUsedDns) > 0 && channel.Address != lastUsedDns {
+		if lastUsedDNSOnline && len(lastUsedDns) > 0 && channel.Address != lastUsedDns {
 			continue
 		}
 		d.DNSNode = &DNSNodeInfo{
