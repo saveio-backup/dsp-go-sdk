@@ -370,11 +370,16 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return
 	}
-	dnsBalance, err := this.channel.GetAvailableBalance(this.dns.DNSNode.WalletAddr)
-	if err != nil || dnsBalance == 0 {
-		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, "no enough balance with dns"+this.dns.DNSNode.WalletAddr, ctx)
-		return
+	if this.channel != nil && this.dns != nil && this.dns.DNSNode != nil {
+		dnsBalance, err := this.channel.GetAvailableBalance(this.dns.DNSNode.WalletAddr)
+		if err != nil || dnsBalance == 0 {
+			replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, "no enough balance with dns"+this.dns.DNSNode.WalletAddr, ctx)
+			return
+		}
+	} else {
+		log.Errorf("channel is nil %t or dns is nil %t", this.channel == nil, this.dns == nil)
 	}
+
 	localId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, store.TaskTypeShare)
 	if this.taskMgr.TaskExist(localId) {
 		// old task
