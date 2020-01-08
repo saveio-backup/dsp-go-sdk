@@ -163,11 +163,6 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		log.Errorf("reply file_ack msg failed", err)
 		return
 	}
-	if state != store.TaskStateDone {
-		// set a new task state
-		err = this.taskMgr.SetTaskState(existTaskId, store.TaskStateDoing)
-		log.Debugf("set task state err: %s", err)
-	}
 	log.Debugf("reply exist task file_ack msg success")
 }
 
@@ -205,6 +200,13 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		if err != nil {
 			log.Errorf("new task failed %s", err)
 			return
+		}
+	} else {
+		state, _ := this.taskMgr.GetTaskState(taskId)
+		if state != store.TaskStateDone {
+			// set a new task state
+			err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
+			log.Debugf("set task state err: %s", err)
 		}
 	}
 	if !this.taskMgr.IsFileInfoExist(taskId) {
