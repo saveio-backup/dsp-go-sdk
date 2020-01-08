@@ -114,7 +114,6 @@ func (this *ShareRecordDB) FineShareRecordsByCreatedAt(beginedAt, endedAt, offse
 	if err != nil {
 		return nil, err
 	}
-
 	srs := make([]*ShareRecord, 0, limit)
 	skip := int64(0)
 	for _, k := range keys {
@@ -125,6 +124,9 @@ func (this *ShareRecordDB) FineShareRecordsByCreatedAt(beginedAt, endedAt, offse
 		}
 		err := json.Unmarshal(data, &sr)
 		if err != nil {
+			continue
+		}
+		if sr.CreatedAt < uint64(beginedAt) || sr.CreatedAt > uint64(endedAt) {
 			continue
 		}
 		if offset > skip {

@@ -29,4 +29,5 @@ const (
 	TaskDownloadPayForBlocks // 23
 	TaskDownloadPayForBlocksDone
 	TaskDownloadFileMakeSeed
+	TaskDownloadPayForBlocksFailed
 )

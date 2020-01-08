@@ -630,10 +630,11 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(totalBytes), resp[0].PaymentId, true)
 		if err != nil {
 			log.Errorf("pay for blocks err %s", err)
+			this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksFailed)
 			return nil, err
 		}
-		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d", fHash, pAddr, walletAddr, paymentId)
 		this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksDone)
+		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d", fHash, pAddr, walletAddr, paymentId)
 		return resp, nil
 	}
 	this.taskMgr.NewWorkers(taskId, peerAddrWallet, inOrder, job)
