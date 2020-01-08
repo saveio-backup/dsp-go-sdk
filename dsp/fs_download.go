@@ -87,7 +87,7 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		err = dspErr.New(dspErr.NO_CONNECTED_DNS, "no online dns node")
 		return dspErr.NewWithError(dspErr.NO_CONNECTED_DNS, err)
 	}
-	log.Debugf("download file dns node %s", this.dns.DNSNode.WalletAddr)
+	log.Debugf("download file dns node %s %s", this.dns.DNSNode.WalletAddr, opt.Url)
 	if err = this.taskMgr.SetTaskInfoWithOptions(taskId, task.FileHash(fileHashStr), task.FileName(opt.FileName),
 		task.FileOwner(opt.FileOwner), task.Url(opt.Url), task.Walletaddr(this.chain.WalletAddress())); err != nil {
 		return err
@@ -253,7 +253,7 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
 func (this *Dsp) DownloadFileByHash(fileHashStr string, asset int32, inOrder bool, decryptPwd string, free, setFileName bool, maxPeerCnt int) error {
-	// TODO: get file name
+	// TODO: get file name, fix url
 	info, _ := this.chain.GetFileInfo(fileHashStr)
 	var fileName, fileOwner string
 	if info != nil {

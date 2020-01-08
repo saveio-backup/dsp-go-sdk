@@ -1174,7 +1174,6 @@ func TestGetFsBlocks(t *testing.T) {
 
 func TestGetUnproveFiles(t *testing.T) {
 	dspCfg := &config.DspConfig{
-		ChainRpcAddrs: []string{"http://10.0.1.201:20336"},
 	}
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
@@ -1199,7 +1198,7 @@ func TestGetUnproveFiles(t *testing.T) {
 		fi := fileInfos[i]
 		fmt.Printf("%d hash %s, height: %d primary %s\n", i, fi.FileHash, fi.BlockHeight, fi.PrimaryNodes.AddrList[0].ToBase58())
 	}
-	details, err := d.chain.GetFileProveDetails("QmX5K5LkH68qXVwmQvmdEr1Xhcc2Ecg2MK81oayd6GSaa8")
+	details, err := d.chain.GetFileProveDetails("QmT8DH1Pbfc5JBXFX5Guff2RmytoFPsvxxjCpXDFVJRmtL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1209,4 +1208,28 @@ func TestGetUnproveFiles(t *testing.T) {
 	}
 
 	os.RemoveAll(filepath.Base(".") + "/Log")
+}
+
+func TestGetFileInfo(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddrs: []string{"http://106.75.10.25:20336"},
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc, nil)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	info, err := d.chain.GetFileInfo("QmdWzFz5LLsfrZXvjPuC3hz4pKnSn549VBfyvgBLFK2jTG")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("info: %v\n", info.PrimaryNodes)
 }

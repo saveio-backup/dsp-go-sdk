@@ -65,11 +65,6 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 			log.Errorf("recover undone task err %s", err)
 		}
 		go d.RecoverDBLossTask()
-
-		unSalve, _ := d.taskMgr.GetUnSlavedTasks()
-		if len(unSalve) > 0 {
-			d.taskMgr.RunGetProgress()
-		}
 	}
 	if len(c.FsRepoRoot) > 0 {
 		var err error
@@ -140,6 +135,10 @@ func (this *Dsp) Start() error {
 	}
 	if this.IsClient() && this.config.HealthCheckDNS {
 		go this.startDNSHealthCheckService()
+	}
+	unSalve, _ := this.taskMgr.GetUnSlavedTasks()
+	if len(unSalve) > 0 {
+		this.taskMgr.RunGetProgress()
 	}
 	this.running = true
 	return nil
