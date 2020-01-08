@@ -497,10 +497,6 @@ func (this *Dsp) handleFileDownloadMsg(ctx *network.ComponentContext, peer *netw
 	this.taskMgr.AddShareTo(taskKey, fileMsg.PayInfo.WalletAddress)
 	hostAddr, _ := this.dns.GetExternalIP(fileMsg.PayInfo.WalletAddress)
 	log.Debugf("Set host addr after recv file download %s - %s", fileMsg.PayInfo.WalletAddress, hostAddr)
-	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
-	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
-	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
-	this.taskMgr.EmitNotification(taskKey, task.ShareStateBegin, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
 func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer *network.PeerClient, msg *message.Message) {
@@ -513,10 +509,6 @@ func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer
 	// TODO: check unpaid amount
 	this.taskMgr.CleanTask(taskId)
 	log.Debugf("delete share task of %s", taskId)
-	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
-	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
-	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
-	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
 // handleFileDownloadOkMsg. client send download ok msg to remove peers for telling them the task is finished
@@ -530,10 +522,6 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext, peer *ne
 	// TODO: check unpaid amount
 	this.taskMgr.CleanTask(taskId)
 	log.Debugf("delete share task of %s", taskId)
-	downloadTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
-	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
-	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
-	this.taskMgr.EmitNotification(taskId, task.ShareStateEnd, fileMsg.Hash, fileName, fileOwner, fileMsg.PayInfo.WalletAddress, 0, 0)
 }
 
 // handleBlockFlightsMsg handle block flight msg

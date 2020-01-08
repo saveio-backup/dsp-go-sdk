@@ -87,11 +87,11 @@ func (this *Dsp) registerReceiveNotification() {
 					log.Errorf("delete share file info %s", err)
 					continue
 				}
-				log.Debugf("delete unpaid success %v", taskId)
 				downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
 				fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
 				fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
-				this.taskMgr.EmitNotification(taskId, task.ShareStateReceivedPaying, fileHashStr, fileName, fileOwner, addr.ToBase58(), uint64(event.Identifier), uint64(event.Amount))
+				log.Debugf("delete unpaid success %v %v %v %v %v %v", taskId, fileHashStr, fileName, fileOwner, addr.ToBase58(), uint64(event.Amount))
+				this.shareRecordDB.InsertShareRecord(taskId, fileHashStr, fileName, fileOwner, addr.ToBase58(), uint64(event.Amount))
 			case <-this.channel.GetCloseCh():
 				return
 			}

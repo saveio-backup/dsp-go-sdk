@@ -496,15 +496,20 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		}
 	}
 	log.Debugf("selected dns wallet list %v", dnsWalletList)
+	paySuccess := false
 	for _, dnsWalletAddr := range dnsWalletList {
 		log.Debugf("paying to %s, id %v, use dns: %s", payInfo.WalletAddress, paymentId, dnsWalletAddr)
 		if err := this.channel.MediaTransfer(paymentId, amount, dnsWalletAddr, payInfo.WalletAddress); err != nil {
 			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s", paymentId, payInfo.WalletAddress, err)
 			continue
 		}
+		paySuccess = true
+		log.Debugf("paying to %s, id %v success", payInfo.WalletAddress, paymentId)
 		break
 	}
-	log.Debugf("paying to %s, id %v success", payInfo.WalletAddress, paymentId)
+	if !paySuccess {
+		return 0, fmt.Errorf("pay %d failed", paymentId)
+	}
 	// clean unpaid order
 	if err := this.taskMgr.DeleteFileUnpaid(taskId, payInfo.WalletAddress, paymentId, payInfo.Asset, amount); err != nil {
 		return 0, err
@@ -1554,4 +1559,32 @@ func (this *Dsp) AESEncryptFile(file, password, outputPath string) error {
 
 func (this *Dsp) AESDecryptFile(file, prefix, password, outputPath string) error {
 	return this.fs.AESDecryptFile(file, prefix, password, outputPath)
+}
+
+func (this *Dsp) InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr string, profit uint64) error {
+	return this.shareRecordDB.InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr, profit)
+}
+func (this *Dsp) IncreaseShareRecordProfit(id string, profit uint64) error {
+	return this.shareRecordDB.IncreaseShareRecordProfit(id, profit)
+}
+func (this *Dsp) FindShareRecordById(id string) (*store.ShareRecord, error) {
+	return this.shareRecordDB.FindShareRecordById(id)
+}
+func (this *Dsp) FineShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit int64) ([]*store.ShareRecord, error) {
+	return this.shareRecordDB.FineShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit)
+}
+func (this *Dsp) FindLastShareTime(fileHash string) (uint64, error) {
+	return this.shareRecordDB.FindLastShareTime(fileHash)
+}
+func (this *Dsp) CountRecordByFileHash(fileHash string) (uint64, error) {
+	return this.shareRecordDB.CountRecordByFileHash(fileHash)
+}
+func (this *Dsp) SumRecordsProfit() (uint64, error) {
+	return this.shareRecordDB.SumRecordsProfit()
+}
+func (this *Dsp) SumRecordsProfitByFileHash(fileHashStr string) (uint64, error) {
+	return this.shareRecordDB.SumRecordsProfitByFileHash(fileHashStr)
+}
+func (this *Dsp) SumRecordsProfitById(id string) (uint64, error) {
+	return this.shareRecordDB.SumRecordsProfitById(id)
 }

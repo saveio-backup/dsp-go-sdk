@@ -406,23 +406,6 @@ func (this *TaskMgr) CloseShareNotification() {
 	this.shareNoticeCh = nil
 }
 
-// EmitNotification. emit notification
-func (this *TaskMgr) EmitNotification(taskId string, state ShareState, fileHashStr, fileName, fileOwner, toWalletAddr string, paymentId, paymentAmount uint64) {
-	n := &ShareNotification{
-		TaskKey:       taskId,
-		State:         state,
-		FileHash:      fileHashStr,
-		FileName:      fileName,
-		FileOwner:     fileOwner,
-		ToWalletAddr:  toWalletAddr,
-		PaymentId:     paymentId,
-		PaymentAmount: paymentAmount,
-	}
-	go func() {
-		this.shareNoticeCh <- n
-	}()
-}
-
 func (this *TaskMgr) NewWorkers(taskId string, addrToWalletMap map[string]string, inOrder bool, job jobFunc) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

@@ -28,6 +28,7 @@ const (
 	PAYMENT_ID          = DB_PREFIX + "_" + "payment" + "_" + DB_VERSION
 	CHANNEL_LIST        = DB_PREFIX + "_" + "channel_list" + "_" + DB_VERSION
 	CHANNEL_INFO_PREFIX = DB_PREFIX + "_" + "channel_info" + "_" + DB_VERSION
+	SHARE_RECORD_PREFIX = DB_PREFIX + "_" + "share_record" + "_" + DB_VERSION
 )
 
 // TaskInfoKey. Key of task
@@ -139,4 +140,8 @@ func TaskIdOfPaymentIDKey(paymentId int32) string {
 // FileUploadUnSalvedKey. Key of has upload to master node but no finish slaving task
 func FileUploadUnSalvedKey() string {
 	return fmt.Sprintf("[%s]", TASK_UPLOAD_NOSLAVED_PREFIX)
+}
+
+func ShareRecordKey(id string) string {
+	return fmt.Sprintf("[%s]%s", SHARE_RECORD_PREFIX, id)
 }

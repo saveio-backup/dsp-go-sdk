@@ -26,15 +26,16 @@ import (
 var Version string
 
 type Dsp struct {
-	account      *account.Account    // Chain account of current login user
-	config       *config.DspConfig   // Dsp global config
-	chain        *chain.Chain        // Chain component
-	fs           *fs.Fs              // FS component
-	channel      *channel.Channel    // Channel Component
-	dns          *dns.DNS            // DNS component
-	taskMgr      *task.TaskMgr       // Task Mgr
-	levelDBStore *store.LevelDBStore // Level DB
-	running      bool                // flag of service status
+	account       *account.Account     // Chain account of current login user
+	config        *config.DspConfig    // Dsp global config
+	chain         *chain.Chain         // Chain component
+	fs            *fs.Fs               // FS component
+	channel       *channel.Channel     // Channel Component
+	dns           *dns.DNS             // DNS component
+	taskMgr       *task.TaskMgr        // Task Mgr
+	levelDBStore  *store.LevelDBStore  // Level DB
+	shareRecordDB *store.ShareRecordDB // share_record db
+	running       bool                 // flag of service status
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
@@ -59,6 +60,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 			log.Errorf("init db err %s", err)
 			return nil
 		}
+		d.shareRecordDB = store.NewShareRecordDB(d.levelDBStore)
 		d.taskMgr.SetFileDB(d.levelDBStore)
 		err = d.taskMgr.RecoverUndoneTask()
 		if err != nil {

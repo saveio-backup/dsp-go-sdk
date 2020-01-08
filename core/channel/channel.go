@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ontio/ontology-eventbus/actor"
@@ -35,6 +36,7 @@ type Channel struct {
 	chain        *sdk.Chain
 	cfg          *config.DspConfig
 	r            *rand.Rand
+	lock         *sync.Mutex
 }
 
 type channelInfo struct {
@@ -96,6 +98,7 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 		chain:      chain,
 		cfg:        cfg,
 		r:          rand.New(rand.NewSource(time.Now().UnixNano())),
+		lock:       new(sync.Mutex),
 	}, nil
 }
 
@@ -447,6 +450,8 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to string) error {
 	log.Debugf("[dsp-go-sdk-channel] MediaTransfer %s", to)
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	if !this.isStart {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
