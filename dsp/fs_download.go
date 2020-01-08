@@ -1282,6 +1282,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 		}
 		return err
 	}
+	log.Debugf("push to trackers %v", this.dns.TrackerUrls)
 	this.dns.PushToTrackers(fileHashStr, this.dns.TrackerUrls, client.P2pGetPublicAddr())
 	// TODO: remove unused file info fields after prove pdp success
 	this.taskMgr.EmitResult(taskId, "", nil)

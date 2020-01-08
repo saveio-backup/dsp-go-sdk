@@ -310,6 +310,7 @@ func (d *DNS) PushToTrackers(hash string, trackerUrls []string, listenAddr strin
 		return dspErr.NewWithError(dspErr.INTERNAL_ERROR, err)
 	}
 
+	log.Debugf("will push file of %s", hash)
 	request := func(trackerUrl string, resp chan *trackerResp) {
 		err := client.P2pCompleteTorrent([]byte(hash), host, uint64(netPort), trackerUrl)
 		if err == nil {
