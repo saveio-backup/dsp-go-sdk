@@ -25,10 +25,11 @@ const (
 )
 
 const (
-	PAYMENT_ID          = DB_PREFIX + "_" + "payment" + "_" + DB_VERSION
-	CHANNEL_LIST        = DB_PREFIX + "_" + "channel_list" + "_" + DB_VERSION
-	CHANNEL_INFO_PREFIX = DB_PREFIX + "_" + "channel_info" + "_" + DB_VERSION
-	SHARE_RECORD_PREFIX = DB_PREFIX + "_" + "share_record" + "_" + DB_VERSION
+	PAYMENT_ID              = DB_PREFIX + "_" + "payment" + "_" + DB_VERSION
+	CHANNEL_LIST            = DB_PREFIX + "_" + "channel_list" + "_" + DB_VERSION
+	CHANNEL_INFO_PREFIX     = DB_PREFIX + "_" + "channel_info" + "_" + DB_VERSION
+	SHARE_RECORD_PREFIX     = DB_PREFIX + "_" + "share_record" + "_" + DB_VERSION
+	USERSPACE_RECORD_PREFIX = DB_PREFIX + "_" + "userspace_record" + "_" + DB_VERSION
 )
 
 // TaskInfoKey. Key of task
@@ -144,4 +145,8 @@ func FileUploadUnSalvedKey() string {
 
 func ShareRecordKey(id string) string {
 	return fmt.Sprintf("[%s]%s", SHARE_RECORD_PREFIX, id)
+}
+
+func UserspaceRecordKey(id string) string {
+	return fmt.Sprintf("[%s]%s", USERSPACE_RECORD_PREFIX, id)
 }

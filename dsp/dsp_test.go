@@ -1173,8 +1173,7 @@ func TestGetFsBlocks(t *testing.T) {
 }
 
 func TestGetUnproveFiles(t *testing.T) {
-	dspCfg := &config.DspConfig{
-	}
+	dspCfg := &config.DspConfig{}
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
 		t.Fatal(err)

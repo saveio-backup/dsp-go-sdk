@@ -250,3 +250,17 @@ func (this *Dsp) GetDownloadTaskRemainSize(taskId string) uint64 {
 	}
 	return 0
 }
+
+func (this *Dsp) InsertUserspaceRecord(id, walletAddr string, size uint64,
+	sizeOp store.UserspaceOperation, second uint64, secondOp store.UserspaceOperation, amount uint64,
+	transferType store.UserspaceTransferType) error {
+	return this.userspaceRecordDB.InsertUserspaceRecord(id, walletAddr, size,
+		sizeOp, second, secondOp, amount,
+		transferType)
+}
+
+// SelectUserspaceRecordByWalletAddr.
+func (this *Dsp) SelectUserspaceRecordByWalletAddr(
+	walletAddr string, offset, limit uint64) ([]*store.UserspaceRecord, error) {
+	return this.userspaceRecordDB.SelectUserspaceRecordByWalletAddr(walletAddr, offset, limit)
+}
