@@ -644,7 +644,9 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		if err := this.receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix, peerAddrWallet, asset); err != nil {
 			return err
 		}
-		if this.IsClient() {
+		log.Debugf("will check file hash task id %s, file hash %s, downloaded %t",
+			taskId, fileHashStr, this.taskMgr.IsFileDownloaded(taskId))
+		if this.IsClient() && this.taskMgr.IsFileDownloaded(taskId) {
 			this.taskMgr.EmitProgress(taskId, task.TaskDownloadCheckingFile)
 			checkFileList, err := this.fs.NodesFromFile(fullFilePath, prefix, false, "")
 			if err != nil {
