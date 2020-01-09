@@ -132,14 +132,16 @@ func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
 // StartService. start channel service
 func (this *Channel) StartService() error {
 	//start connect target
-	log.Debugf("[dsp-go-sdk-channel] StartService")
+	log.Debugf("StartService")
 	this.firstSyncing = true
 	err := this.chActor.SyncBlockData()
+	log.Debugf("sync block data done")
 	this.firstSyncing = false
 	if err != nil {
 		log.Errorf("channel sync block err %s", err)
 		return dspErr.NewWithError(dspErr.CHANNEL_SYNC_BLOCK_ERROR, err)
 	}
+	log.Debugf("start pylons")
 	err = ch_actor.StartPylons()
 	if err != nil {
 		return dspErr.NewWithError(dspErr.CHANNEL_START_INSTANCE_ERROR, err)

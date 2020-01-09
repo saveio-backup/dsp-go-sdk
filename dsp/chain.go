@@ -21,17 +21,34 @@ func (this *Dsp) SetAccount(acc *account.Account) {
 }
 
 func (this *Dsp) CurrentAccount() *account.Account {
+	if this == nil || this.chain == nil {
+		return nil
+	}
 	return this.chain.CurrentAccount()
 }
 
 // WalletAddress. get base58 address
 func (this *Dsp) Address() chainCom.Address {
-	return this.CurrentAccount().Address
+	if this == nil {
+		return chainCom.ADDRESS_EMPTY
+	}
+	acc := this.CurrentAccount()
+	if acc == nil {
+		return chainCom.ADDRESS_EMPTY
+	}
+	return acc.Address
 }
 
 // WalletAddress. get base58 address
 func (this *Dsp) WalletAddress() string {
-	return this.CurrentAccount().Address.ToBase58()
+	if this == nil {
+		return ""
+	}
+	acc := this.CurrentAccount()
+	if acc == nil {
+		return ""
+	}
+	return acc.Address.ToBase58()
 }
 
 // RegisterNode. register node to chain

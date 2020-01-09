@@ -644,6 +644,20 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		if err := this.receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix, peerAddrWallet, asset); err != nil {
 			return err
 		}
+		if this.IsClient() {
+			this.taskMgr.EmitProgress(taskId, task.TaskDownloadCheckingFile)
+			checkFileList, err := this.fs.NodesFromFile(fullFilePath, prefix, false, "")
+			if err != nil {
+				return err
+			}
+			log.Debugf("checking file hash %s", checkFileList[0])
+			if len(checkFileList) == 0 || checkFileList[0] != fileHashStr {
+				this.taskMgr.EmitProgress(taskId, task.TaskDownloadCheckingFileFailed)
+				err = dspErr.New(dspErr.CHECK_FILE_FAILED, "file hash not match")
+				return err
+			}
+			this.taskMgr.EmitProgress(taskId, task.TaskDownloadCheckingFileDone)
+		}
 		if len(decryptPwd) == 0 {
 			return nil
 		}

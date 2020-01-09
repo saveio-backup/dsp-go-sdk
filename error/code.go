@@ -74,6 +74,7 @@ const (
 	PAY_BLOCK_TO_SELF
 	TASK_NOT_EXIST
 	NO_PRIVILEGE_TO_DOWNLOAD
+	CHECK_FILE_FAILED
 )
 
 // delete file error

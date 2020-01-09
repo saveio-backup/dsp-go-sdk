@@ -26,8 +26,11 @@ const (
 	TaskDownloadFileDownloading
 	TaskDownloadRequestBlocks
 	TaskDownloadReceiveBlocks
-	TaskDownloadPayForBlocks // 23
-	TaskDownloadPayForBlocksDone
-	TaskDownloadFileMakeSeed
-	TaskDownloadPayForBlocksFailed
+	TaskDownloadPayForBlocks       // 23
+	TaskDownloadPayForBlocksDone   // 24
+	TaskDownloadFileMakeSeed       // 25
+	TaskDownloadPayForBlocksFailed // 26
+	TaskDownloadCheckingFile       // 27
+	TaskDownloadCheckingFileFailed // 28
+	TaskDownloadCheckingFileDone   // 29
 )
