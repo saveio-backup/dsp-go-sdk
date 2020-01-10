@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/saveio/dsp-go-sdk/common"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
@@ -474,28 +473,26 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	go func() {
 		for {
 			if tsk.State() == store.TaskStateDone {
-				log.Debugf("distribute job task is done break")
+				log.Debugf("task job break because task is done")
 				close(jobCh)
 				atomic.AddUint32(&dropDoneCh, 1)
 				close(done)
 				break
 			}
 			if tsk.State() == store.TaskStatePause || tsk.State() == store.TaskStateFailed {
-				log.Debugf("distribute job break at pause")
+				log.Debugf("task job break because task is pause or failed")
 				close(jobCh)
 				break
 			}
 			// check pool has item or no
+			<-tsk.blockReqPoolNotify
 			reqPoolLen := tsk.GetBlockReqPoolLen()
 			if reqPoolLen == 0 {
-				log.Debug("sleeping for no request block in pool")
-				time.Sleep(time.Duration(3) * time.Second)
 				continue
 			}
 			// check all pool items are in request flights
 			if getFlightMapLen()+getBlockCacheLen() >= reqPoolLen {
-				log.Debug("sleeping for all request are on flights")
-				time.Sleep(time.Duration(3) * time.Second)
+				log.Debug("all requests are on flights ")
 				continue
 			}
 			// get the idle request
@@ -524,8 +521,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			worker := tsk.GetIdleWorker(addrs, fileHash, req[0].Hash)
 			if worker == nil {
 				// can't find a valid worker
-				log.Debugf("no worker... of flights %s-%s to %s-%s", fileHash, flights[0], fileHash, flights[len(flights)-1])
-				time.Sleep(time.Duration(3) * time.Second)
+				log.Debugf("no idle workers of flights %s-%s to %s-%s", fileHash, flights[0], fileHash, flights[len(flights)-1])
 				continue
 			}
 			for _, v := range flights {
@@ -534,7 +530,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			if len(flights) > 0 {
 				log.Debugf("add flight %s-%s to %s-%s, worker %s", fileHash, flights[0], fileHash, flights[len(flights)-1], worker.RemoteAddress())
 			}
-
 			tsk.SetWorkerUnPaid(worker.remoteAddr, true)
 			jobCh <- &job{
 				req:       req,

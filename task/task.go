@@ -84,6 +84,9 @@ type WorkerState struct {
 	TotalFailed map[string]uint32
 }
 
+type blockReqPool struct {
+}
+
 type Task struct {
 	id           string            // id
 	info         *store.TaskInfo   // task info from local DB
@@ -94,6 +97,7 @@ type Task struct {
 	blockRespsMap       map[string]chan *BlockResp   // map key <=> *BlockResp
 	blockFlightRespsMap map[string]chan []*BlockResp // map key <=> []*BlockResp
 	blockReqPool        []*GetBlockReq               // get block request pool
+	blockReqPoolNotify  chan *blockReqPool           // block req pool change notify
 	workers             map[string]*Worker           // workers to request block
 	notify              chan *BlockResp              // notify download block
 	backupOpt           *BackupFileOpt               // backup file options
@@ -330,12 +334,7 @@ func (this *Task) SetTaskState(newState store.TaskState) error {
 		if oldState == store.TaskStateFailed || oldState == store.TaskStateDone {
 			return fmt.Errorf("can't stop a failed or completed task")
 		}
-		log.Debugf("CleanBlockReqPool")
-		if this.blockReqPool == nil {
-			this.blockReqPool = make([]*GetBlockReq, 0)
-		} else {
-			this.blockReqPool = this.blockReqPool[:0]
-		}
+		this.cleanBlockReqPool()
 	case store.TaskStateDoing:
 		log.Debugf("oldstate:%d, newstate: %d", oldState, newState)
 		if oldState == store.TaskStateDone {
@@ -898,6 +897,7 @@ func (this *Task) AddBlockReqToPool(blockHash string, index int32) {
 		Hash:     blockHash,
 		Index:    index,
 	})
+	go this.notifyBlockReqPoolLen()
 }
 
 func (this *Task) DelBlockReqFromPool(blockHash string, index int32) {
@@ -914,6 +914,7 @@ func (this *Task) DelBlockReqFromPool(blockHash string, index int32) {
 		}
 	}
 	log.Debugf("block req pool len: %d", len(this.blockReqPool))
+	go this.notifyBlockReqPoolLen()
 }
 
 func (this *Task) GetBlockReqPool() []*GetBlockReq {
@@ -1052,17 +1053,36 @@ func (this *Task) GetWorkerNetPhase(addr string) int {
 	return this.workerNetPhase[addr]
 }
 
+// cleanBlockReqPool. clean all block req pool. non thread-safe
+func (this *Task) cleanBlockReqPool() {
+	log.Debugf("CleanBlockReqPool")
+	if this.blockReqPool == nil {
+		this.blockReqPool = make([]*GetBlockReq, 0)
+		return
+	}
+	this.blockReqPool = this.blockReqPool[:0]
+	go this.notifyBlockReqPoolLen()
+}
+
+// notifyBlockReqPoolLen. notify block req pool len
+func (this *Task) notifyBlockReqPoolLen() {
+	log.Debugf("notify block req update")
+	this.blockReqPoolNotify <- &blockReqPool{}
+	log.Debugf("notify block req update done")
+}
+
 func newTask(id string, info *store.TaskInfo, db *store.FileDB) *Task {
 	t := &Task{
-		id:             id,
-		info:           info,
-		blockReq:       make(chan []*GetBlockReq, common.MAX_TASK_BLOCK_REQ),
-		notify:         make(chan *BlockResp, common.MAX_TASK_BLOCK_NOTIFY),
-		lastWorkerIdx:  -1,
-		peerSenIds:     make(map[string]string, common.MAX_TASK_SESSION_NUM),
-		db:             db,
-		lock:           new(sync.RWMutex),
-		workerNetPhase: make(map[string]int),
+		id:                 id,
+		info:               info,
+		blockReq:           make(chan []*GetBlockReq, common.MAX_TASK_BLOCK_REQ),
+		notify:             make(chan *BlockResp, common.MAX_TASK_BLOCK_NOTIFY),
+		lastWorkerIdx:      -1,
+		peerSenIds:         make(map[string]string, common.MAX_TASK_SESSION_NUM),
+		db:                 db,
+		lock:               new(sync.RWMutex),
+		workerNetPhase:     make(map[string]int),
+		blockReqPoolNotify: make(chan *blockReqPool),
 	}
 	return t
 }

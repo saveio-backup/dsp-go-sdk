@@ -249,9 +249,9 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 	if count.TotalCount == 0 {
 		return nil
 	}
-	if limit == 0 || limit > 100 {
-		limit = 100
-	}
+	// if limit == 0 || limit > 100 {
+	// 	limit = 100
+	// }
 	list := make([]string, 0, limit)
 	reach := uint32(0)
 
