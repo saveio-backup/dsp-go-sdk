@@ -373,7 +373,14 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext, peer *n
 			log.Errorf("reply download ack err msg failed", err)
 		}
 	}
-	if !this.chain.CheckFilePrivilege(fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
+	info, err := this.chain.GetFileInfo(fileMsg.Hash)
+	if err != nil || info == nil {
+		log.Errorf("file info not exist %s", fileMsg.Hash)
+		replyErr("", fileMsg.Hash, serr.FILEINFO_NOT_EXIST,
+			fmt.Sprintf("file %s is deleted", fileMsg.Hash), ctx)
+		return
+	}
+	if !this.chain.CheckFilePrivilege(info, fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
 		log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
 		replyErr("", fileMsg.Hash, serr.NO_PRIVILEGE_TO_DOWNLOAD,
 			fmt.Sprintf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress), ctx)
@@ -651,10 +658,10 @@ func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext, peer *netwo
 	nodeInfos := make([]*progress.ProgressInfo, 0)
 	for _, info := range progressMsg.Infos {
 		id := this.taskMgr.TaskId(progressMsg.Hash, info.WalletAddr, store.TaskTypeShare)
-		if len(id) == 0 {
-			log.Errorf("task id is empty of hash %s, wallet %s, type %d", progressMsg.Hash, info.WalletAddr, store.TaskTypeShare)
+		prog := uint64(0)
+		if len(id) != 0 {
+			prog = this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
 		}
-		prog := this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
 		log.Debugf("handle req progress msg, get progress of id %s, addr %s, count %d", id, info.NodeAddr, prog)
 		nodeInfos = append(nodeInfos, &progress.ProgressInfo{
 			NodeAddr: info.NodeAddr,

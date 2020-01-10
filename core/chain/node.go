@@ -6,7 +6,6 @@ import (
 
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	chainCom "github.com/saveio/themis/common"
-	"github.com/saveio/themis/common/log"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/usdt"
 )
@@ -81,14 +80,9 @@ func (this *Chain) NodeWithdrawProfit() (string, error) {
 }
 
 // CheckFilePrivilege. check if the downloader has privilege to download file
-func (this *Chain) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
+func (this *Chain) CheckFilePrivilege(info *fs.FileInfo, fileHashStr, walletAddr string) bool {
 	if this.isClient {
 		return true
-	}
-	info, err := this.themis.Native.Fs.GetFileInfo(fileHashStr)
-	if err != nil || info == nil {
-		log.Errorf("file info not exist %s", fileHashStr)
-		return false
 	}
 	// TODO: check sinature
 	if info.FileOwner.ToBase58() == walletAddr {
@@ -112,7 +106,7 @@ func (this *Chain) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
 		if r.Addr.ToBase58() != walletAddr {
 			continue
 		}
-		if r.BaseHeight >= uint64(currentHeight) && uint64(currentHeight) <= r.ExpireHeight {
+		if r.BaseHeight <= uint64(currentHeight) && uint64(currentHeight) <= r.ExpireHeight {
 			return true
 		}
 	}

@@ -77,8 +77,8 @@ func (this *Dsp) NodeWithdrawProfit() (string, error) {
 }
 
 // CheckFilePrivilege. check if the downloader has privilege to download file
-func (this *Dsp) CheckFilePrivilege(fileHashStr, walletAddr string) bool {
-	return this.chain.CheckFilePrivilege(fileHashStr, walletAddr)
+func (this *Dsp) CheckFilePrivilege(info *fs.FileInfo, fileHashStr, walletAddr string) bool {
+	return this.chain.CheckFilePrivilege(info, fileHashStr, walletAddr)
 }
 
 // GetUserSpace. get user space of client

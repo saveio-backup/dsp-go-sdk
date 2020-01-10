@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/saveio/dsp-go-sdk/utils"
+	themisSDK "github.com/saveio/themis-go-sdk"
 
 	"github.com/saveio/themis-go-sdk/usdt"
 	"github.com/saveio/themis-go-sdk/wallet"
@@ -1226,12 +1227,17 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	info, err := d.chain.GetFileInfo("zb2rhhAkiAVaHBmsMDthgQQybrm4kRdSURg6jG8nNv2WNSv4i")
+	info, err := d.chain.GetFileInfo("QmQUDC3nh2ZhWo1oz41MXXEdrj1AMnNRSDecP3Chdh1DaU")
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("info: %v\n", info.PrimaryNodes)
-	details, err := d.chain.GetFileProveDetails("zb2rhhAkiAVaHBmsMDthgQQybrm4kRdSURg6jG8nNv2WNSv4i")
+	whiteList, err := d.chain.GetWhiteList("QmQUDC3nh2ZhWo1oz41MXXEdrj1AMnNRSDecP3Chdh1DaU")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("info: %v\n", info.Privilege)
+	fmt.Printf("whitelist: %v\n", whiteList.List[0].Addr.ToBase58())
+	details, err := d.chain.GetFileProveDetails("QmQUDC3nh2ZhWo1oz41MXXEdrj1AMnNRSDecP3Chdh1DaU")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1239,5 +1245,47 @@ func TestGetFileInfo(t *testing.T) {
 	for _, d := range details.ProveDetails {
 		fmt.Printf("addr: %s, %s, %d \n", d.NodeAddr, d.WalletAddr.ToBase58(), d.ProveTimes)
 	}
+	if CheckFilePrivilege(d.chain.Themis(), "QmQUDC3nh2ZhWo1oz41MXXEdrj1AMnNRSDecP3Chdh1DaU", "APEoBSphUAJ5VhT2CoEApzFVsgsW3Hk3Zy") {
+		fmt.Printf("can download")
+	} else {
+		panic("can't download")
+	}
 	os.RemoveAll(filepath.Base(".") + "/Log")
+}
+
+// CheckFilePrivilege. check if the downloader has privilege to download file
+func CheckFilePrivilege(themis *themisSDK.Chain, fileHashStr, walletAddr string) bool {
+	info, err := themis.Native.Fs.GetFileInfo(fileHashStr)
+	if err != nil || info == nil {
+		log.Errorf("file info not exist %s", fileHashStr)
+		return false
+	}
+	// TODO: check sinature
+	if info.FileOwner.ToBase58() == walletAddr {
+		return true
+	}
+	if info.Privilege == fs.PUBLIC {
+		return true
+	}
+	if info.Privilege == fs.PRIVATE {
+		return false
+	}
+	whitelist, err := themis.Native.Fs.GetWhiteList(fileHashStr)
+	if err != nil || whitelist == nil {
+		return true
+	}
+	currentHeight, err := themis.GetCurrentBlockHeight()
+	if err != nil {
+		return false
+	}
+	for _, r := range whitelist.List {
+		if r.Addr.ToBase58() != walletAddr {
+			continue
+		}
+		if r.BaseHeight <= uint64(currentHeight) && uint64(currentHeight) <= r.ExpireHeight {
+			return true
+		}
+	}
+	fmt.Println("here")
+	return false
 }
