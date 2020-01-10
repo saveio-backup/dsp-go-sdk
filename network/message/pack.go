@@ -2,6 +2,7 @@ package message
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -17,7 +18,12 @@ import (
 
 var msgRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
+// https://github.com/golang/go/issues/21835
+var mu = new(sync.Mutex)
+
 func GenMessageId() string {
+	mu.Lock()
+	defer mu.Unlock()
 	return dspUtils.GenIdByTimestamp(msgRand)
 }
 

@@ -109,3 +109,13 @@ func GzipEncode(in []byte) ([]byte, error) {
 
 	return buffer.Bytes(), nil
 }
+
+func TestMsgId(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		go func() {
+			fmt.Printf("msgid = %s\n", GenMessageId())
+		}()
+	}
+	for {
+	}
+}
