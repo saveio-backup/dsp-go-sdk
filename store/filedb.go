@@ -252,7 +252,12 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 	// if limit == 0 || limit > 100 {
 	// 	limit = 100
 	// }
-	list := make([]string, 0, limit)
+	var list []string
+	if limit > 0 {
+		list = make([]string, 0, limit)
+	} else {
+		list = make([]string, 0)
+	}
 	reach := uint32(0)
 
 	start := func() int32 {
@@ -303,7 +308,7 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 			continue
 		}
 		list = append(list, id)
-		if uint32(len(list)) >= limit {
+		if limit > 0 && uint32(len(list)) >= limit {
 			break
 		}
 	}
