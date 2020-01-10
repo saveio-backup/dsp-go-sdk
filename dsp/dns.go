@@ -109,6 +109,10 @@ func (this *Dsp) GetOnlineDNSHostAddr(walletAddr string) string {
 }
 
 func (this *Dsp) UpdateDNS(walletAddr, hostAddr string) {
+	log.Debugf("reachable %t host %s", this.channel.ChannelReachale(walletAddr), hostAddr)
+	if this.channel.ChannelReachale(walletAddr) && len(hostAddr) > 0 {
+		this.dns.OnlineDNS[walletAddr] = hostAddr
+	}
 	this.dns.DNSNode = &dns.DNSNodeInfo{
 		WalletAddr: walletAddr,
 		HostAddr:   hostAddr,

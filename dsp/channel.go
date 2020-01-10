@@ -122,9 +122,11 @@ func (this *Dsp) OpenChannel(targetAddress string, depositAmount uint64) (common
 	}
 	return chId, nil
 }
+
 func (this *Dsp) SetChannelIsDNS(targetAddr string, isDNS bool) error {
 	return this.channel.SetChannelIsDNS(targetAddr, isDNS)
 }
+
 func (this *Dsp) ChannelClose(targetAddress string) error {
 	return this.channel.ChannelClose(targetAddress)
 }
