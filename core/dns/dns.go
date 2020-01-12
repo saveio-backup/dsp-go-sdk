@@ -3,6 +3,7 @@ package dns
 import (
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,7 +42,7 @@ type DNS struct {
 	Channel               *channel.Channel  // core channel
 	TrackerProtocol       string            // tracker network protocol
 	TrackerUrls           []string          // tracker host addrs
-	TrackerFailedCnt      *sync.Map         // tracker failed counter
+	TrackerScore          *sync.Map         // tracker failed counter
 	TrackersFromCfg       []string          // trackers from global config
 	AutoBootstrap         bool              // auto bootstrap to DNS and open channel
 	DNSNode               *DNSNodeInfo      // current select DNS info
@@ -101,13 +102,13 @@ func ChannelProtocol(protocol string) DNSOption {
 func NewDNS(chain *chain.Chain, channel *channel.Channel, opts ...DNSOption) *DNS {
 	cache, _ := lru.NewARC(common.MAX_PUBLICADDR_CACHE_LEN)
 	d := &DNS{
-		Chain:            chain,
-		TrackerProtocol:  "tcp",
-		TrackerUrls:      make([]string, 0, common.MAX_TRACKERS_NUM),
-		TrackerFailedCnt: new(sync.Map),
-		PublicAddrCache:  cache,
-		OnlineDNS:        make(map[string]string),
-		channelProtocol:  "tcp",
+		Chain:           chain,
+		TrackerProtocol: "tcp",
+		TrackerUrls:     make([]string, 0, common.MAX_TRACKERS_NUM),
+		TrackerScore:    new(sync.Map),
+		PublicAddrCache: cache,
+		OnlineDNS:       make(map[string]string),
+		channelProtocol: "tcp",
 	}
 	for _, opt := range opts {
 		opt.apply(d)
@@ -637,7 +638,7 @@ func (d *DNS) requestTrackers(request func(string, chan *trackerResp)) interface
 				log.Errorf("tracker: %s request timeout", trackerUrl)
 				resp <- &utils.RequestResponse{
 					Result: trackerUrl,
-					Code:   dspErr.INTERNAL_ERROR,
+					Code:   dspErr.DNS_TRACKER_TIMEOUT,
 					Error:  fmt.Sprintf("tracker: %s request timeout", trackerUrl),
 				}
 				return false
@@ -659,14 +660,21 @@ func (d *DNS) requestTrackers(request func(string, chan *trackerResp)) interface
 		if !ok {
 			continue
 		}
-		errCnt, ok := d.TrackerFailedCnt.Load(trackerUrl)
+		scoreVal, ok := d.TrackerScore.Load(trackerUrl)
+		var score *TrackerScore
 		if !ok {
-			d.TrackerFailedCnt.Store(trackerUrl, 1)
+			score = &TrackerScore{url: trackerUrl}
 		} else {
-			errCntVal, _ := errCnt.(uint64)
-			d.TrackerFailedCnt.Store(trackerUrl, errCntVal+1)
+			score, _ = scoreVal.(*TrackerScore)
 		}
-		d.removeLowQoSTracker()
+		if r.Code == dspErr.DNS_TRACKER_TIMEOUT {
+			score.timeout++
+		} else {
+			score.failed++
+		}
+		log.Debugf("update tracker %s score is %s", trackerUrl, score)
+		d.TrackerScore.Store(trackerUrl, score)
+		d.sortTrackers()
 	}
 	if len(results) > 0 {
 		return results[0]
@@ -765,26 +773,24 @@ func (d *DNS) connectDNS(maxDNSNum uint32) (map[string]string, error) {
 	return connectedDNS, nil
 }
 
-func (d *DNS) removeLowQoSTracker() {
-	newTrackers := d.TrackerUrls[:0]
-	for _, url := range d.TrackerUrls {
-		errCnt, ok := d.TrackerFailedCnt.Load(url)
-		if !ok {
-			continue
+func (d *DNS) sortTrackers() {
+	scores := make(TrackerScores, 0)
+	for _, u := range d.TrackerUrls {
+		scoreVal, ok := d.TrackerScore.Load(u)
+		score := &TrackerScore{
+			url: u,
 		}
-		errCntVal, _ := errCnt.(uint64)
-		if errCntVal >= common.MAX_TRACKER_REQ_TIMEOUT_NUM {
-			d.TrackerFailedCnt.Delete(url)
-			log.Debugf("remove low QoS tracker %s", url)
-			continue
+		if ok {
+			score = scoreVal.(*TrackerScore)
 		}
-		newTrackers = append(newTrackers, url)
+		scores = append(scores, *score)
 	}
-	log.Debugf("new tracker cnt: %d", len(newTrackers))
-	if len(newTrackers) > 0 {
-		d.TrackerUrls = newTrackers
-	} else {
-		log.Debugf("set up trackers because of all tracker provide low QoS")
-		d.SetupTrackers()
+	sort.Sort(sort.Reverse(scores))
+	newTrackers := make([]string, 0)
+	for _, s := range scores {
+		newTrackers = append(newTrackers, s.url)
 	}
+	d.TrackerUrls = newTrackers
+	log.Debugf("after sort, new track urls %v", d.TrackerUrls)
+	// d.SetupTrackers()
 }

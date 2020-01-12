@@ -1275,7 +1275,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 				return err
 			}
 			blockHashes = append(blockHashes, links...)
-			log.Debugf("blockHashes: %v, len: %d", blockHashes, len(blockHashes))
+			log.Debugf("blockHashes len: %d", len(blockHashes))
 		}
 	}
 	if !this.taskMgr.IsFileDownloaded(taskId) {
