@@ -6,6 +6,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
+	dspErr "github.com/saveio/dsp-go-sdk/error"
 	netcomm "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
@@ -119,33 +120,42 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	taskId := ""
 	reqWalletAddr := ""
 	reqAsset := int32(0)
-
 	paymentId := this.channel.NewPaymentId()
+	var shareErr *dspErr.Error
+
 	for _, blockmsg := range req {
 		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare)
-		log.Debugf("share block task id %v %v %v %v",
-			blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare, taskId)
+		log.Debugf("+++++share block task id %v, file hash %v, peer wallet address %v",
+			taskId, blockmsg.FileHash, blockmsg.WalletAddress)
 		reqWalletAddr = blockmsg.WalletAddress
 		reqAsset = blockmsg.Asset
 		// check if has unpaid block request
 		canShareTo := this.canShareTo(taskId, blockmsg.WalletAddress, blockmsg.Asset)
 		if !canShareTo {
-			log.Errorf("cant share to %s for file %s", blockmsg.WalletAddress, blockmsg.FileHash)
-			return
+			shareErr = dspErr.New(dspErr.EXIST_UNPAID_BLOCKS,
+				"cant share to %s for file %s", blockmsg.WalletAddress, blockmsg.FileHash)
+			break
 		}
 		// send block if requester has paid all block
 		blk := this.fs.GetBlock(blockmsg.Hash)
 		blockData := this.fs.BlockDataOfAny(blk)
 		if len(blockData) == 0 {
-			log.Errorf("get block data empty %s", blockmsg.Hash)
-			return
+			shareErr = dspErr.New(dspErr.BLOCK_NOT_FOUND,
+				"get block %s failed, its data is empty ", blockmsg.Hash)
+			break
 		}
-		downloadTaskKey := this.taskMgr.TaskId(blockmsg.FileHash, this.chain.WalletAddress(), store.TaskTypeDownload)
-		offset, err := this.taskMgr.GetBlockOffset(downloadTaskKey, blockmsg.Hash, uint32(blockmsg.Index))
+		downloadTaskId, err := this.taskMgr.GetShareTaskReferId(taskId)
 		if err != nil {
-			log.Errorf("share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s",
-				taskId, downloadTaskKey, blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, offset, blockmsg.PeerAddr, err)
-			return
+			shareErr = dspErr.New(dspErr.REFER_ID_NOT_FOUND,
+				"get download task id of task %s not found", taskId)
+			break
+		}
+		offset, err := this.taskMgr.GetBlockOffset(downloadTaskId, blockmsg.Hash, uint32(blockmsg.Index))
+		if err != nil {
+			shareErr = dspErr.New(dspErr.GET_TASK_PROPERTY_ERROR,
+				"share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s",
+				taskId, downloadTaskId, blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, offset, blockmsg.PeerAddr, err)
+			break
 		}
 		// TODO: only send tag with tagflag enabled
 		// TEST: client get tag
@@ -156,18 +166,22 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		sessionId, _ := this.taskMgr.GetSessionId(taskId, "")
 		up, err := this.GetFileUnitPrice(blockmsg.Asset)
 		if err != nil {
-			log.Errorf("get file unit price err after send block, err: %s", err)
-			return
+			shareErr = dspErr.New(dspErr.GET_TASK_PROPERTY_ERROR,
+				"get file unit price err after send block, err: %s", err)
+			break
 		}
 		// add new unpaid block request to store
 		err = this.taskMgr.AddFileUnpaid(taskId, blockmsg.WalletAddress, paymentId,
 			blockmsg.Asset, uint64(len(blockData))*up)
 		if err != nil {
-			log.Errorf("add file unpaid failed err : %s", err)
-			return
+			shareErr = dspErr.New(dspErr.ADD_FILE_UNPAID_ERROR,
+				"add file unpaid failed err : %s", err)
+			break
 		}
 		totalAmount += uint64(len(blockData)) * up
-		log.Debugf("add file unpaid success %d", totalAmount)
+		log.Debugf("share block task id %v, file hash %v, peer wallet address %v, "+
+			"downloadId %s, offset %d, total amount %d",
+			taskId, blockmsg.FileHash, blockmsg.WalletAddress, downloadTaskId, offset, totalAmount)
 		b := &block.Block{
 			SessionId: sessionId,
 			Index:     blockmsg.Index,
@@ -179,6 +193,15 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 			Offset:    int64(offset),
 		}
 		blocks = append(blocks, b)
+	}
+	if shareErr != nil {
+		log.Error(shareErr.Error())
+		msg := message.NewBlockFlightsMsgWithError(nil, shareErr.Code, shareErr.Error())
+		err := client.P2pSend(req[0].PeerAddr, msg.MessageId, msg.ToProtoMsg())
+		if err != nil {
+			log.Errorf("send share block err msg failed, err: %s", err)
+		}
+		return
 	}
 	if len(blocks) == 0 {
 		log.Warn("no block shared")

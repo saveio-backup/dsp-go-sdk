@@ -289,6 +289,14 @@ func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint32) (uint64,
 	return offset, nil
 }
 
+func (this *TaskMgr) GetShareTaskReferId(id string) (string, error) {
+	info, err := this.db.GetFileInfo(id)
+	if err != nil {
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return info.ReferId, nil
+}
+
 func (this *TaskMgr) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse, includeFailed bool) []string {
 	return this.db.GetTaskIdList(offset, limit, ft, allType, reverse, includeFailed)
 }
@@ -313,4 +321,13 @@ func (this *TaskMgr) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
 // GetTaskPeerProgress. get task peer progress
 func (this *TaskMgr) GetTaskPeerProgress(id, nodeAddr string) uint64 {
 	return this.db.GetTaskPeerProgress(id, nodeAddr)
+}
+
+// GetDownloadedTaskId. get a downloaded task id with file hash str
+func (this *TaskMgr) GetDownloadedTaskId(fileHashStr string) (string, error) {
+	id, err := this.db.GetDownloadedTaskId(fileHashStr)
+	if err != nil {
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return id, nil
 }

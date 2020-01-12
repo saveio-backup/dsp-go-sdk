@@ -114,6 +114,7 @@ type TaskInfo struct {
 	InOrder           bool              `json:"in_order"`               // is in order
 	OnlyBlock         bool              `json:"only_block"`             // send only raw block data
 	TranferState      uint64            `json:"transfer_state"`         // transfer state
+	ReferId           string            `json:"refer_id"`               // refer task id
 	CreatedAt         uint64            `json:"createdAt"`              // createAt, unit ms
 	CreatedAtHeight   uint64            `json:"createdAt_block_height"` // created at block height
 	UpdatedAt         uint64            `json:"updatedAt"`              // updatedAt, unit ms
@@ -325,6 +326,32 @@ func (this *FileDB) GetFileInfoId(key string) (string, error) {
 		return "", err
 	}
 	return string(id), nil
+}
+
+func (this *FileDB) GetDownloadedTaskId(fileHashStr string) (string, error) {
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		log.Errorf("query task failed %s", err)
+		return "", err
+	}
+	for _, key := range keys {
+		info, _ := this.getFileInfoByKey(key)
+		if info == nil {
+			continue
+		}
+		if info.Type != TaskTypeDownload {
+			continue
+		}
+		if info.TaskState != uint64(TaskStateDone) {
+			continue
+		}
+		if info.FileHash != fileHashStr {
+			continue
+		}
+		return info.Id, nil
+	}
+	return "", fmt.Errorf("no downloaded task for file %s", fileHashStr)
 }
 
 func (this *FileDB) DeleteFileInfoId(key string) error {
@@ -1438,6 +1465,24 @@ func (this *FileDB) GetUnpaidAmount(id, walletAddress string, asset int32) (uint
 func (this *FileDB) GetFileInfo(id string) (*TaskInfo, error) {
 	key := []byte(TaskInfoKey(id))
 	value, err := this.db.Get(key)
+	if err != nil && err != leveldb.ErrNotFound {
+		return nil, err
+	}
+	if len(value) == 0 {
+		log.Debugf("get file info value is empty %s", key)
+		return nil, nil
+	}
+
+	info := &TaskInfo{}
+	err = json.Unmarshal(value, info)
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
+}
+
+func (this *FileDB) getFileInfoByKey(key string) (*TaskInfo, error) {
+	value, err := this.db.Get([]byte(key))
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, err
 	}

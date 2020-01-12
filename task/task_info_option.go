@@ -131,6 +131,12 @@ func BindUrlTx(bindUrlTx string) InfoOption {
 	})
 }
 
+func ReferId(referId string) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.ReferId = referId
+	})
+}
+
 func (this *Task) SetInfoWithOptions(opts ...InfoOption) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()

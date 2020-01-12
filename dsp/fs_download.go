@@ -520,6 +520,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 
 // PayUnpaidFile. pay unpaid order for file
 func (this *Dsp) PayUnpaidPayments(taskId, fileHashStr string, quotation map[string]*file.Payment) error {
+	this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocks)
 	for hostAddr, payInfo := range quotation {
 		payments, _ := this.taskMgr.GetUnpaidPayments(taskId, payInfo.WalletAddress, payInfo.Asset)
 		if len(payments) == 0 {
@@ -533,6 +534,7 @@ func (this *Dsp) PayUnpaidPayments(taskId, fileHashStr string, quotation map[str
 			}
 		}
 	}
+	this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksDone)
 	return nil
 }
 
@@ -1165,7 +1167,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 	log.Debugf("startFetchBlocks taskId: %s, fileHash: %s", taskId, fileHashStr)
 	if this.taskMgr.IsFileDownloaded(taskId) {
 		log.Debugf("file has downloaded: %s", fileHashStr)
-		return nil
+		return this.fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
 	}
 	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
 	if err != nil {

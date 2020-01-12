@@ -785,11 +785,12 @@ func TestRegisterDnsHeader(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	hash, err := d.chain.Themis().Native.Dns.RegisterHeader("save", "save", 100000)
+	hash, err := d.chain.Themis().Native.Dns.RegisterHeader("oni", "oni", 100000)
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Printf("hash: %v\n", hash)
+	os.RemoveAll(filepath.Base(".") + "/Log")
 }
 
 func TestGetSmartEvent(t *testing.T) {

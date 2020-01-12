@@ -60,7 +60,8 @@ func NewEmptyMsg(opts ...Option) *Message {
 }
 
 // NewBlockMsg block req msg
-func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAddress string, asset int32, opts ...Option) *Message {
+func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAddress string, asset int32,
+	opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
@@ -99,7 +100,8 @@ func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAd
 }
 
 // NewBlockMsg block ack msg
-func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData, tag []byte, offset int64, opts ...Option) *Message {
+func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData, tag []byte, offset int64,
+	opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
@@ -170,12 +172,25 @@ func NewBlockFlightsReqMsg(blocks []*block.Block, timeStamp int64, opts ...Optio
 
 // NewBlockFlightsMsg block ack msg
 func NewBlockFlightsMsg(flights *block.BlockFlights, opts ...Option) *Message {
+	return NewBlockFlightsMsgWithError(flights, 0, "", opts...)
+}
+
+func NewBlockFlightsMsgWithError(flights *block.BlockFlights, errorCode uint32,
+	errorMsg string, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
 	}
 	msg.Header.Type = common.MSG_TYPE_BLOCK_FLIGHTS
-	msg.Payload = flights
+	if errorCode != 0 {
+		msg.Error = &Error{
+			Code:    errorCode,
+			Message: errorMsg,
+		}
+	}
+	if flights != nil {
+		msg.Payload = flights
+	}
 	for _, opt := range opts {
 		mOpt, ok := opt.(MsgOption)
 		if ok {
@@ -256,11 +271,14 @@ func NewFileMsgWithError(fileHashStr string, op int32, errorCode uint32, errorMs
 }
 
 // NewPaymentMsg. new payment msg
-func NewPaymentMsg(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, opts ...Option) *Message {
-	return NewPaymentMsgWithError(sender, receiver, paymentId, asset, amount, fileHash, common.MSG_ERROR_CODE_NONE, opts...)
+func NewPaymentMsg(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string,
+	opts ...Option) *Message {
+	return NewPaymentMsgWithError(sender, receiver, paymentId, asset, amount,
+		fileHash, common.MSG_ERROR_CODE_NONE, opts...)
 }
 
-func NewPaymentMsgWithError(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string, errorCode uint32, opts ...Option) *Message {
+func NewPaymentMsgWithError(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string,
+	errorCode uint32, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
@@ -303,11 +321,13 @@ func NewPaymentMsgWithError(sender, receiver string, paymentId int32, asset int3
 	return msg
 }
 
-func NewProgressMsg(sender, fileHash string, operation int32, infos []*progress.ProgressInfo, opts ...Option) *Message {
+func NewProgressMsg(sender, fileHash string, operation int32, infos []*progress.ProgressInfo,
+	opts ...Option) *Message {
 	return NewProgressMsgWithError(sender, fileHash, operation, infos, 0, opts...)
 }
 
-func NewProgressMsgWithError(sender, fileHash string, operation int32, infos []*progress.ProgressInfo, errorCode uint32, opts ...Option) *Message {
+func NewProgressMsgWithError(sender, fileHash string, operation int32, infos []*progress.ProgressInfo,
+	errorCode uint32, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
 		Header:    MessageHeader(),
