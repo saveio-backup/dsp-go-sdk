@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
@@ -107,6 +108,19 @@ func (this *ShareRecordDB) FindShareRecordById(id string) (*ShareRecord, error) 
 	return nil, fmt.Errorf("id not found %s", id)
 }
 
+type ShareRecords []*ShareRecord
+
+func (s ShareRecords) Len() int {
+	return len(s)
+}
+func (s ShareRecords) Less(i, j int) bool {
+	return s[i].UpdatedAt < s[j].UpdatedAt
+}
+
+func (s ShareRecords) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
 // // FineShareRecordsByCreatedAt. find miner record by createdat interval
 func (this *ShareRecordDB) FineShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit int64) ([]*ShareRecord, error) {
 	prefix := []byte(ShareRecordKey(""))
@@ -114,8 +128,7 @@ func (this *ShareRecordDB) FineShareRecordsByCreatedAt(beginedAt, endedAt, offse
 	if err != nil {
 		return nil, err
 	}
-	srs := make([]*ShareRecord, 0, limit)
-	skip := int64(0)
+	srs := make(ShareRecords, 0, limit)
 	for _, k := range keys {
 		sr := &ShareRecord{}
 		data, _ := this.db.Get([]byte(k))
@@ -129,16 +142,17 @@ func (this *ShareRecordDB) FineShareRecordsByCreatedAt(beginedAt, endedAt, offse
 		if sr.CreatedAt < uint64(beginedAt) || sr.CreatedAt > uint64(endedAt) {
 			continue
 		}
-		if offset > skip {
-			skip++
-			continue
-		}
 		srs = append(srs, sr)
-		if int64(len(srs)) >= limit {
-			break
-		}
 	}
-	return srs, nil
+	sort.Sort(sort.Reverse(srs))
+	if limit == 0 {
+		return srs[offset:], nil
+	}
+	end := offset + limit
+	if end > int64(len(srs)) {
+		end = int64(len(srs))
+	}
+	return srs[offset:end], nil
 }
 
 func (this *ShareRecordDB) FindLastShareTime(fileHash string) (uint64, error) {

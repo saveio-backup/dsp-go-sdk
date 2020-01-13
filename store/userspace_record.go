@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"sort"
 	"sync"
 	"time"
 )
@@ -109,6 +110,19 @@ func (this *UserspaceRecordDB) InsertUserspaceRecord(id, walletAddr string, size
 	return this.db.Put(key, data)
 }
 
+type UserspaceRecords []*UserspaceRecord
+
+func (s UserspaceRecords) Len() int {
+	return len(s)
+}
+func (s UserspaceRecords) Less(i, j int) bool {
+	return s[i].UpdatedAt < s[j].UpdatedAt
+}
+
+func (s UserspaceRecords) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
 // SelectUserspaceRecordByWalletAddr.
 func (this *UserspaceRecordDB) SelectUserspaceRecordByWalletAddr(walletAddr string, offset, limit uint64) ([]*UserspaceRecord, error) {
 	prefix := []byte(UserspaceRecordKey(""))
@@ -116,8 +130,7 @@ func (this *UserspaceRecordDB) SelectUserspaceRecordByWalletAddr(walletAddr stri
 	if err != nil {
 		return nil, err
 	}
-	srs := make([]*UserspaceRecord, 0, limit)
-	skip := uint64(0)
+	srs := make(UserspaceRecords, 0, limit)
 	for _, k := range keys {
 		sr := &UserspaceRecord{}
 		data, _ := this.db.Get([]byte(k))
@@ -131,14 +144,15 @@ func (this *UserspaceRecordDB) SelectUserspaceRecordByWalletAddr(walletAddr stri
 		if sr.WalletAddr != walletAddr {
 			continue
 		}
-		if offset > skip {
-			skip++
-			continue
-		}
 		srs = append(srs, sr)
-		if uint64(len(srs)) >= limit {
-			break
-		}
 	}
-	return srs, nil
+	sort.Sort(sort.Reverse(srs))
+	if limit == 0 {
+		return srs[offset:], nil
+	}
+	end := offset + limit
+	if end > uint64(len(srs)) {
+		end = uint64(len(srs))
+	}
+	return srs[offset:end], nil
 }
