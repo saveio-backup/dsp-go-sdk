@@ -134,7 +134,7 @@ func (this *Dsp) Start() error {
 			go this.StartBackupFileService()
 		}
 		go this.StartCheckRemoveFiles()
-		go this.StartFetchFileService()
+		go this.startDispatchFileService()
 		go this.startDNSHealthCheckService()
 	}
 	if this.IsClient() && this.config.HealthCheckDNS {

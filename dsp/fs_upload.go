@@ -5,7 +5,6 @@ import (
 	"math"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -87,10 +86,10 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	defer func() {
 		sdkErr, _ := err.(*dspErr.Error)
 		if uploadRet == nil {
-			log.Errorf("emit result finally id %v, ret %v, err: %v", taskId, uploadRet, err)
+			log.Errorf("task %s upload finish %v, err: %v", err)
 			this.taskMgr.EmitResult(taskId, nil, sdkErr)
 		} else {
-			log.Debugf("emit result finally id %v, ret %v", taskId, uploadRet)
+			log.Debugf("task %v upload finish, result %v", taskId, uploadRet)
 			this.taskMgr.EmitResult(taskId, uploadRet, sdkErr)
 		}
 		// delete task from cache in the end when success
@@ -117,8 +116,8 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		return nil, dspErr.New(dspErr.INVALID_PARAMS, err.Error())
 	}
 	if err = this.taskMgr.SetTaskInfoWithOptions(taskId, task.FilePath(filePath), task.SimpleCheckSum(checksum),
-		task.StoreType(opt.StorageType), task.Url(string(opt.DnsURL)), task.FileName(string(opt.FileDesc)),
-		task.Walletaddr(this.chain.WalletAddress()), task.CopyNum(uint64(opt.CopyNum))); err != nil {
+		task.StoreType(uint32(opt.StorageType)), task.Url(string(opt.DnsURL)), task.FileName(string(opt.FileDesc)),
+		task.Walletaddr(this.chain.WalletAddress()), task.CopyNum(uint32(opt.CopyNum))); err != nil {
 		return nil, err
 	}
 	// save other upload options
@@ -132,7 +131,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
 	var tx, fileHashStr, prefixStr string
 	var totalCount uint64
-	log.Debugf("upload task: %s, will split for file", taskId)
+	log.Debugf("upload task %s, will split for file", taskId)
 	// split file to pieces
 	if pause, err := this.checkIfPause(taskId, ""); err != nil || pause {
 		return nil, err
@@ -163,6 +162,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 			return nil, err
 		}
 		prefixStr = string(prefixBuf)
+		log.Debugf("prefix of file %s is %v, its len: %d", fileHashStr, prefixStr, len(prefixStr))
 		fileHashStr, err = this.taskMgr.GetTaskFileHash(taskId)
 		if err != nil {
 			return nil, err
@@ -184,9 +184,8 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		taskId, filePath, hashes[0], totalCount)
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSliceDone)
 	fileHashStr = hashes[0]
-	log.Debugf("after bind task id")
 	if err = this.taskMgr.SetTaskInfoWithOptions(taskId, task.FileHash(fileHashStr),
-		task.TotalBlockCnt(totalCount), task.Prefix(prefixStr)); err != nil {
+		task.TotalBlockCnt(uint32(totalCount)), task.Prefix(prefixStr)); err != nil {
 		return nil, err
 	}
 	// bind task id with file hash
@@ -198,16 +197,14 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		err = dspErr.New(dspErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
 		return nil, err
 	}
-	log.Debugf("check if pause after node from file")
 	if pause, err := this.checkIfPause(taskId, fileHashStr); err != nil || pause {
 		return nil, err
 	}
 	// check has uploaded this file
-	if this.taskMgr.IsFileUploaded(taskId) {
+	if this.taskMgr.IsFileUploaded(taskId, false) {
 		uploadRet, err = this.finishUpload(taskId, fileHashStr, opt, totalCount)
 		return uploadRet, err
 	}
-	log.Debugf("root:%s, list.len:%d", fileHashStr, totalCount)
 	// pay file
 	payRet, err := this.payForSendFile(filePath, taskId, fileHashStr, totalCount, opt)
 	if err != nil {
@@ -243,12 +240,12 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 		return nil, err
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileFindReceiversDone)
-	if err = this.waitForFetchBlock(taskId, prefixStr, hashes, int(opt.CopyNum), p.G0, p.FileId,
+	if err = this.sendBlocks(taskId, prefixStr, hashes, p.G0, p.FileId,
 		payRet); err != nil {
-		log.Errorf("wait for fetch block err %s", err)
+		log.Errorf("send blocks err %s", err)
 		return nil, err
 	}
-	log.Debugf("waitForFetchBlock finish id: %s ", taskId)
+	log.Debugf("wait for fetch blocks finish id: %s ", taskId)
 	if pause, err := this.checkIfPause(taskId, fileHashStr); err != nil || pause {
 		return nil, err
 	}
@@ -256,7 +253,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (*com
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("upload success uploadRet: %v!!", uploadRet)
+	log.Debug("upload success result %v", uploadRet)
 	return uploadRet, nil
 }
 
@@ -615,10 +612,8 @@ func (this *Dsp) checkIfResume(taskId string) error {
 			return dspErr.New(dspErr.FILE_IS_EXPIRED, "file:%s has expired", fileHashStr)
 		}
 		hasProvedFile := uint64(len(this.getFileProvedNode(fileHashStr))) == opt.CopyNum+1
-		hasSentAllBlock := uint64(this.taskMgr.UploadedBlockCount(taskId)) ==
-			fileInfo.FileBlockNum*(fileInfo.CopyNum+1)
-		if hasProvedFile || hasSentAllBlock {
-			log.Debugf("hasProvedFile: %t, hasSentAllBlock: %t", hasProvedFile, hasSentAllBlock)
+		if hasProvedFile || this.taskMgr.IsFileUploaded(taskId, false) {
+			log.Debugf("hasProvedFile: %t ", hasProvedFile)
 			uploadRet, err := this.finishUpload(taskId, fileHashStr, opt, fileInfo.FileBlockNum)
 			sdkerr, _ := err.(*dspErr.Error)
 			if uploadRet == nil {
@@ -707,6 +702,7 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 			log.Errorf("pay store file order failed:%s", err)
 			return nil, err
 		}
+		this.taskMgr.EmitProgress(taskId, task.TaskWaitForBlockConfirmed)
 		// TODO: check confirmed on receivers
 		confirmed, err := this.chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
 		if err != nil || !confirmed {
@@ -727,7 +723,9 @@ func (this *Dsp) payForSendFile(filePath, taskId, fileHashStr string, blockNum u
 				return nil, err
 			}
 		}
+		this.taskMgr.EmitProgress(taskId, task.TaskWaitForBlockConfirmedDone)
 		if err = this.taskMgr.SetTaskInfoWithOptions(taskId, task.StoreTx(tx),
+			task.PrimaryNodes(hostAddrs),
 			task.PrivateKey(privateKey)); err != nil {
 			log.Errorf("set task info err %s", err)
 			return nil, err
@@ -972,7 +970,6 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 	hostAddrs := make([]string, 0)
 	backupAddrs := make(map[chainCom.Address]string, 0)
 	stop := false
-	breakpoint := make(map[string]*file.Breakpoint, 0)
 	height, _ := this.chain.GetCurrentBlockHeight()
 	action := func(res proto.Message, addr string) bool {
 		p2pMsg := message.ReadMessage(res)
@@ -987,6 +984,7 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 			return true
 		}
 		fileMsg := p2pMsg.Payload.(*file.File)
+		log.Debugf("recv file ack msg from %s file %s", addr, fileMsg.Hash)
 		receiverWalletAddr, err := chainCom.AddressFromBase58(fileMsg.PayInfo.WalletAddress)
 		if err != nil {
 			return false
@@ -1002,8 +1000,7 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 				fileMsg.ChainInfo.Height, height)
 			return false
 		}
-		breakpoint[addr] = fileMsg.Breakpoint
-		log.Debugf("recv file ack msg from %s file %s", addr, fileMsg.Hash)
+
 		// lower priority node, put to backup list
 		if this.taskMgr.IsWorkerBusy(taskId, addr, int(common.WorkerSendFileAsk)) {
 			log.Debugf("peer %s is busy, put to backup list", addr)
@@ -1036,7 +1033,9 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 		return walletAddrs, hostAddrs, nil
 	}
 	if len(walletAddrs)+len(backupAddrs) < minResponse {
-		return nil, nil, dspErr.New(dspErr.RECEIVERS_NOT_ENOUGH, "no enough backup nodes")
+		return nil, nil, dspErr.New(dspErr.RECEIVERS_NOT_ENOUGH,
+			"find %d primary nodes and %d back up nodes, but the file need %d nodes",
+			len(walletAddrs), len(backupAddrs), minResponse)
 	}
 	// append backup nodes to tail with random range
 	log.Debugf("backup list %v", backupAddrs)
@@ -1052,31 +1051,36 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 }
 
 // notifyFetchReady send fetch_rdy msg to receivers
-func (this *Dsp) sendFetchReadyMsg(taskId, fileHashStr, receiverHostAddr, prefixStr, tx string, totalBlockCnt,
-	txHeight uint64) error {
+func (this *Dsp) sendFetchReadyMsg(taskId, fileHashStr, peerAddr, prefixStr, tx string, totalBlockCnt,
+	txHeight uint32) (*message.Message, error) {
 	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Debugf("send ready msg %s %d", tx, txHeight)
 	msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_RDY,
 		message.WithSessionId(sessionId),
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithTxHash(tx),
-		message.WithTxHeight(txHeight),
+		message.WithTxHeight(uint64(txHeight)),
 		message.WithPrefix([]byte(prefixStr)),
 		message.WithTotalBlockCount(int32(totalBlockCnt)),
 		message.WithSign(this.chain.CurrentAccount()),
 	)
 	log.Debugf("waitFileReceivers sessionId: %s prefix  %s", sessionId, prefixStr)
-	if err := client.P2pSend(receiverHostAddr, msg.MessageId, msg.ToProtoMsg()); err != nil {
-		return err
+	resp, err := client.P2pSendAndWaitReply(peerAddr, msg.MessageId, msg.ToProtoMsg())
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	p2pMsg := message.ReadMessage(resp)
+	if p2pMsg == nil {
+		return nil, dspErr.New(dspErr.INTERNAL_ERROR, "read msg failed")
+	}
+	return p2pMsg, nil
 }
 
 // generateBlockMsgData. generate blockdata, blockEncodedData, tagData with prove params
-func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64, copyNum int,
+func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64,
 	fileID, g0, privateKey []byte) (*blockMsgData, error) {
 	// TODO: use disk fetch rather then memory access
 	block := this.fs.GetBlock(hash)
@@ -1094,32 +1098,25 @@ func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64, 
 	return msgData, nil
 }
 
-// waitForFetchBlock. wait for fetched blocks concurrent
-func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyNum int, g0, fileID []byte,
+// sendBlocks. prepare block data and tags, send blocks to the node
+func (this *Dsp) sendBlocks(taskId, prefix string, hashes []string, g0, fileID []byte,
 	payRet *common.PayStoreFileResult) error {
+	if len(payRet.MasterNodeHostAddr) == 0 {
+		return dspErr.New(dspErr.GET_TASK_PROPERTY_ERROR, "master node host addr is nil")
+	}
 	payTxHeight, err := this.chain.GetBlockHeightByTxHash(payRet.Tx)
 	if err != nil {
 		return dspErr.NewWithError(dspErr.PAY_FOR_STORE_FILE_FAILED, err)
 	}
 	log.Debugf("pay for send file success %v %d", payRet, payTxHeight)
-	req, err := this.taskMgr.TaskBlockReq(taskId)
-	if err != nil {
-		return dspErr.New(dspErr.PREPARE_UPLOAD_ERROR, err.Error())
-	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileGeneratePDPData)
 	allOffset, err := this.fs.GetAllOffsets(hashes[0])
 	if err != nil {
 		return dspErr.New(dspErr.PREPARE_UPLOAD_ERROR, err.Error())
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
-	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
-	if err != nil {
-		return dspErr.New(dspErr.GET_SESSION_ID_FAILED, err.Error())
-	}
 	fileHashStr, _ := this.taskMgr.GetTaskFileHash(taskId)
 	totalCount := uint64(len(hashes))
-	doneCh := make(chan *fetchedDone)
-	closeDoneChannel := uint32(0)
 	var getMsgDataLock sync.Mutex
 	blockMsgDataMap := make(map[string]*blockMsgData)
 	getMsgData := func(hash string, index uint32) *blockMsgData {
@@ -1130,18 +1127,17 @@ func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyN
 		if ok {
 			return data
 		}
-
 		offsetKey := fmt.Sprintf("%s-%d", hash, index)
 		offset, _ := allOffset[offsetKey]
 		var err error
-		data, err = this.generateBlockMsgData(hash, index, offset, copyNum, fileID, g0, payRet.PrivateKey)
+		data, err = this.generateBlockMsgData(hash, index, offset, fileID, g0, payRet.PrivateKey)
 		if err != nil {
 			return nil
 		}
 		blockMsgDataMap[key] = data
 		return data
 	}
-	cleanMsgData := func(reqInfos []*task.GetBlockReq) {
+	cleanMsgData := func(reqInfos []*block.Block) {
 		getMsgDataLock.Lock()
 		defer getMsgDataLock.Unlock()
 		for _, reqInfo := range reqInfos {
@@ -1161,233 +1157,130 @@ func (this *Dsp) waitForFetchBlock(taskId, prefix string, hashes []string, copyN
 			this.fs.ReturnBuffer(data.blockData)
 		}
 	}
-	cancelFetch := make(chan struct{})
-	addrs := []string{payRet.MasterNodeHostAddr}
-	log.Debugf("wait for %v fetched file taskId: %s, %s", addrs, taskId, fileHashStr)
-	this.taskMgr.NewWorkers(taskId, utils.StringSliceToKeyMap(addrs), true, nil)
-
-	reqForPeers := make(map[string]chan []*task.GetBlockReq)
-	for _, p := range addrs {
-		reqForPeers[p] = make(chan []*task.GetBlockReq, 1)
-	}
-	// notify fetch ready to all receivers
-	go func() {
-		if len(addrs) == 0 {
-			return
-		}
-		receiverHostAddr := addrs[0]
-		err := this.sendFetchReadyMsg(taskId, fileHashStr, receiverHostAddr, prefix, payRet.Tx, totalCount,
-			uint64(payTxHeight))
-		if err != nil {
-			log.Errorf("notify fetch ready msg failed, err %s", err)
-		}
-	}()
-	go func() {
-		for {
-			select {
-			case reqInfo := <-req:
-				if len(reqInfo) == 0 {
-					continue
-				}
-				ch := reqForPeers[reqInfo[0].PeerAddr]
-				go func() {
-					ch <- reqInfo
-				}()
-			case <-cancelFetch:
-				log.Debugf("fetch cancel")
-				return
-			}
-		}
-	}()
-	// TODO: add max go routines check
-	for _, ch := range reqForPeers {
-		go func(req chan []*task.GetBlockReq) {
-			for {
-				select {
-				case reqInfos := <-req:
-					stop, _ := this.taskMgr.IsTaskStop(taskId)
-					if stop {
-						log.Debugf("stop handle request because task is stop: %t", stop)
-						return
-					}
-					msgDataM := make(map[string]*blockMsgData, 0)
-					for _, reqInfo := range reqInfos {
-						this.taskMgr.ActiveUploadTaskPeer(reqInfo.PeerAddr)
-						key := keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))
-						log.Debugf("handle request key:%s, %s-%s-%d from peer: %s",
-							key, fileHashStr, reqInfo.Hash, reqInfo.Index, reqInfo.PeerAddr)
-						msgData := getMsgData(reqInfo.Hash, uint32(reqInfo.Index))
-						msgDataM[key] = msgData
-					}
-					// handle fetch request async
-					done, err := this.handleFetchBlockRequests(taskId, sessionId, fileHashStr, reqInfos, copyNum,
-						totalCount, msgDataM)
-					stop, _ = this.taskMgr.IsTaskStop(taskId)
-					if stop {
-						log.Debugf("stop handle request because task is stop: %t", stop)
-						return
-					}
-					if err != nil {
-						log.Errorf("handle fetch file %s err %s", fileHashStr, err)
-						continue
-					}
-					// because of the network transfer time consuming, reset timer here after sending blocks finish.
-					if done == false && err == nil {
-						cleanMsgData(reqInfos)
-						continue
-					}
-					swapped := atomic.CompareAndSwapUint32(&closeDoneChannel, 0, 1)
-					if !swapped {
-						log.Debugf("stop because done channel has close")
-						return
-					}
-					doneCh <- &fetchedDone{done: done, err: err}
-					log.Debugf("stop because fetching has finish %t, err %s", done, err)
-					return
-				case <-cancelFetch:
-					log.Debugf("fetch cancel")
-					return
-				}
-			}
-		}(ch)
-	}
-	checkStopTimer := time.NewTicker(time.Duration(common.TASK_STATE_CHECK_DURATION) * time.Second)
-	defer checkStopTimer.Stop()
-	closeCancelFetch := false
-	for {
-		select {
-		case ret, ok := <-doneCh:
-			log.Debugf("receive fetch file done channel: %v, ok: %t", ret, ok)
-			if !ok {
-				log.Debugf("done channel has close")
-			}
-			if ret.err != nil {
-				if !closeCancelFetch {
-					closeCancelFetch = true
-					close(cancelFetch)
-				}
-				return dspErr.New(dspErr.TASK_INTERNAL_ERROR, ret.err.Error())
-			}
-			if !ret.done {
-				log.Debugf("no done break")
-				break
-			}
-			// check all blocks has sent
-			log.Infof("all block has sent %s file %s", taskId, fileHashStr)
-			this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocksDone)
-			return nil
-		case <-checkStopTimer.C:
-			stop, _ := this.taskMgr.IsTaskStop(taskId)
-			if stop {
-				log.Debugf("stop wait for fetch because task is stop: %t", stop)
-				if !closeCancelFetch {
-					closeCancelFetch = true
-					close(cancelFetch)
-				}
-				return nil
-			}
-			if timeout, _ := this.taskMgr.IsTaskTimeout(taskId); !timeout {
-				if time.Now().Second()%10 != 0 {
-					continue
-				}
-				// check if file has sent every 10s (could be any other interval)
-				if totalCount != uint64(this.taskMgr.UploadedBlockCount(taskId)) {
-					continue
-				}
-			}
-			if !closeCancelFetch {
-				closeCancelFetch = true
-				close(cancelFetch)
-			}
-			sent := uint64(this.taskMgr.UploadedBlockCount(taskId))
-			log.Debugf("check totalCount %d, has sent %d %d", totalCount, sent,
-				this.taskMgr.UploadedBlockCount(taskId))
-			if totalCount != sent {
-				return dspErr.New(dspErr.TASK_WAIT_TIMEOUT, "wait for fetch file: %s timeout", fileHashStr)
-			}
-			return nil
-		}
-	}
+	return this.sendBlocksToPeer(taskId, fileHashStr, payRet.MasterNodeHostAddr, prefix,
+		payRet.Tx, hashes, uint32(totalCount), payTxHeight, getMsgData, cleanMsgData)
 }
 
-// handleFetchBlockRequest. handle fetch request and send block
-func (this *Dsp) handleFetchBlockRequests(taskId, sessionId, fileHashStr string,
-	reqInfos []*task.GetBlockReq,
-	copyNum int,
-	totalCount uint64,
-	blockMsgDataM map[string]*blockMsgData) (bool, error) {
-	// send block
-	if len(reqInfos) == 0 {
-		log.Warnf("no request to handle of file: %s", fileHashStr)
-		return true, nil
+// sendBlocksToPeer. send rdy msg, wait its response, and send blocks to the node
+func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx string,
+	blockHashes []string,
+	totalCount, txHeight uint32,
+	getMsgData func(hash string, index uint32) *blockMsgData, cleanMsgData func(reqInfos []*block.Block)) error {
+	log.Debugf("sendBlocksToPeer %v, taskId: %s, file: %s", peerAddr, taskId, fileHashStr)
+	this.taskMgr.NewWorkers(taskId, utils.StringSliceToKeyMap([]string{peerAddr}), true, nil)
+	// notify fetch ready to all receivers
+	resp, err := this.sendFetchReadyMsg(taskId, fileHashStr, peerAddr,
+		prefix, tx, totalCount, txHeight)
+	if err != nil {
+		log.Errorf("notify fetch ready msg failed, err %s", err)
+		return err
 	}
-	blocks := make([]*block.Block, 0, len(reqInfos))
-	blockInfos := make([]*store.BlockInfo, 0, len(reqInfos))
-	nodeAddr := reqInfos[0].PeerAddr
-	for _, reqInfo := range reqInfos {
-		log.Debugf("receive fetch block msg of %s-%s-%d-%d from %s",
-			reqInfo.FileHash, reqInfo.Hash, reqInfo.Index, totalCount, reqInfo.PeerAddr)
-		blockMsgData := blockMsgDataM[keyOfUnixNode(reqInfo.Hash, uint32(reqInfo.Index))]
-		if len(blockMsgData.blockData) == 0 || len(blockMsgData.tag) == 0 {
-			log.Errorf("block len %d, tag len %d hash %s, peer %s failed",
-				len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
-			return false, dspErr.New(dspErr.FS_GET_DATA_ERROR, "block len %d, tag len %d hash %s, peer %s failed",
-				len(blockMsgData.blockData), len(blockMsgData.tag), reqInfo.Hash, reqInfo.PeerAddr)
+	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
+	if err != nil {
+		return dspErr.New(dspErr.GET_SESSION_ID_FAILED, err.Error())
+	}
+	respFileMsg := resp.Payload.(*file.File)
+	log.Debugf("blockHashes :%d", len(blockHashes))
+	startIndex := uint64(0)
+	if respFileMsg.Breakpoint != nil && len(respFileMsg.Breakpoint.Hash) != 0 &&
+		respFileMsg.Breakpoint.Index != 0 && respFileMsg.Breakpoint.Index < uint64(len(blockHashes)) &&
+		blockHashes[respFileMsg.Breakpoint.Index] == respFileMsg.Breakpoint.Hash {
+		startIndex = respFileMsg.Breakpoint.Index + 1
+		if err := this.taskMgr.UpdateTaskProgress(taskId, peerAddr,
+			uint32(respFileMsg.Breakpoint.Index+1)); err != nil {
+			return err
 		}
-		isStored := this.taskMgr.IsBlockUploaded(taskId, reqInfo.Hash, reqInfo.PeerAddr, uint32(reqInfo.Index))
+	}
+	log.Debugf("task %s, start at %d", taskId, startIndex)
+	if stop, err := this.taskMgr.IsTaskStop(taskId); stop || err != nil {
+		log.Debugf("stop handle request because task is stop: %t", stop)
+		return nil
+	}
+	blocks := make([]*block.Block, 0, common.MAX_SEND_BLOCK_COUNT)
+	blockInfos := make([]*store.BlockInfo, 0, common.MAX_SEND_BLOCK_COUNT)
+	for index, hash := range blockHashes {
+		if uint64(index) < startIndex {
+			continue
+		}
+		blockMsgData := getMsgData(hash, uint32(index))
+		if blockMsgData == nil {
+			return dspErr.New(dspErr.DISPATCH_FILE_ERROR, "no block msg data to send")
+		}
+		isStored := this.taskMgr.IsBlockUploaded(taskId, hash, peerAddr, uint32(index))
 		if !isStored {
 			bi := &store.BlockInfo{
-				Hash:       reqInfo.Hash,
-				Index:      uint32(reqInfo.Index),
+				Hash:       hash,
+				Index:      uint32(index),
 				DataSize:   blockMsgData.dataLen,
 				DataOffset: blockMsgData.offset,
 			}
 			blockInfos = append(blockInfos, bi)
 		}
 		b := &block.Block{
-			SessionId: taskId,
-			Index:     reqInfo.Index,
+			SessionId: sessionId,
+			Index:     int32(index),
 			FileHash:  fileHashStr,
-			Hash:      reqInfo.Hash,
+			Hash:      hash,
 			Data:      blockMsgData.blockData,
 			Tag:       blockMsgData.tag,
 			Operation: netcomm.BLOCK_OP_NONE,
 			Offset:    int64(blockMsgData.offset),
 		}
 		blocks = append(blocks, b)
+		if index != len(blockHashes)-1 && len(blocks) < common.MAX_SEND_BLOCK_COUNT {
+			continue
+		}
+		log.Debugf("will send blocks %d", len(blocks))
+		this.taskMgr.ActiveUploadTaskPeer(peerAddr)
+		// handle fetch request async
+		if err := this.sendBlockFlightMsg(taskId, fileHashStr, peerAddr, blocks); err != nil {
+			return err
+		}
+		if cleanMsgData != nil {
+			cleanMsgData(blocks)
+		}
+		// update progress
+		this.taskMgr.SetBlocksUploaded(taskId, peerAddr, blockInfos)
+		this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
+		this.taskMgr.ActiveUploadTaskPeer(peerAddr)
+		blocks = blocks[:0]
+		blockInfos = blockInfos[:0]
+		if stop, err := this.taskMgr.IsTaskStop(taskId); stop || err != nil {
+			log.Debugf("stop handle request because task is stop: %t", stop)
+			return nil
+		}
+		fileOwner, _ := this.taskMgr.GetFileOwner(taskId)
+		if !this.taskMgr.IsFileUploaded(taskId, fileOwner != this.WalletAddress()) {
+			continue
+		}
+		log.Debugf("task %s send blocks done", taskId)
 	}
+	return nil
+}
+
+// sendBlockFlightMsg. send block flight msg to peer
+func (this *Dsp) sendBlockFlightMsg(taskId, fileHashStr, peerAddr string, blocks []*block.Block) error {
+	// send block
 	if len(blocks) == 0 {
-		return false, dspErr.New(dspErr.BLOCK_HAS_SENT, "no block to send of file: %s", fileHashStr)
+		log.Warnf("task %s has no block to send", taskId)
+		return nil
 	}
 	flights := &block.BlockFlights{
-		TimeStamp: reqInfos[0].TimeStamp,
+		TimeStamp: time.Now().UnixNano(),
 		Blocks:    blocks,
 	}
 	msg := message.NewBlockFlightsMsg(flights)
 	sendLogMsg := fmt.Sprintf("file: %s, block %s-%s, index:%d-%d to %s with msg id %s",
-		fileHashStr, reqInfos[0].Hash, reqInfos[len(reqInfos)-1].Hash,
-		reqInfos[0].Index, reqInfos[len(reqInfos)-1].Index, reqInfos[0].PeerAddr, msg.MessageId)
+		fileHashStr, blocks[0].Hash, blocks[len(blocks)-1].Hash,
+		blocks[0].Index, blocks[len(blocks)-1].Index, peerAddr, msg.MessageId)
 	sendingTime := time.Now().Unix()
 	log.Debugf("sending %s", sendLogMsg)
-	if err := client.P2pSend(reqInfos[0].PeerAddr, msg.MessageId, msg.ToProtoMsg()); err != nil {
+	if err := client.P2pSend(peerAddr, msg.MessageId, msg.ToProtoMsg()); err != nil {
 		log.Errorf("%v, err %s", sendLogMsg, err)
-		return false, err
+		return err
 	}
-	this.taskMgr.ActiveUploadTaskPeer(reqInfos[0].PeerAddr)
 	log.Debugf("sending %s success\n, used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
-	// TODO: add pause here
-
-	// stored
-	this.taskMgr.SetBlocksUploaded(taskId, nodeAddr, blockInfos)
-	// update progress
-	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileTransferBlocks)
-	sent := uint64(this.taskMgr.UploadedBlockCount(taskId))
-	if totalCount != sent {
-		log.Debugf("totalCount %d != sent %d %d", totalCount, sent, this.taskMgr.UploadedBlockCount(taskId))
-		return false, nil
-	}
-	log.Debugf("fetched job done of id %s  %s", taskId, sendLogMsg)
-	return true, nil
+	return nil
 }
 
 func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, totalCount uint64) (
@@ -1438,6 +1331,178 @@ func (this *Dsp) finishUpload(taskId, fileHashStr string, opt *fs.UploadOption, 
 		return nil, err
 	}
 	return uploadRet, nil
+}
+
+// dispatchBlocks. dispatch blocks to other primary nodes
+func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
+	log.Debugf("task %s dispatch blocks, refer to %s, file %s", taskId, referId, fileHashStr)
+	fileInfo, err := this.chain.GetFileInfo(fileHashStr)
+	if err != nil {
+		return dspErr.NewWithError(dspErr.FILEINFO_NOT_EXIST, err)
+	}
+	if len(fileInfo.PrimaryNodes.AddrList) == 0 {
+		return dspErr.New(dspErr.INTERNAL_ERROR, "primary node is nil")
+	}
+	if fileInfo.PrimaryNodes.AddrList[0].ToBase58() != this.WalletAddress() {
+		log.Debugf("no need to dispatch file %s, because i am not the master node", fileHashStr)
+		return nil
+	}
+	details, err := this.chain.GetFileProveDetails(fileHashStr)
+	if err != nil || details == nil {
+		log.Errorf("dispatch file, but file prove detail not exist %s, err %s", fileHashStr, err)
+		return dspErr.New(dspErr.INTERNAL_ERROR,
+			"dispatch file, but file prove detail not exist %s, err %s", fileHashStr, err)
+	}
+	nodesToDispatch := make([]*common.NodeInfo, 0)
+	provedNodes := make(map[string]struct{}, 0)
+	for _, d := range details.ProveDetails {
+		log.Debugf("wallet %v, node %v, prove times %d", d.WalletAddr.ToBase58(),
+			string(d.NodeAddr), d.ProveTimes)
+		if d.ProveTimes > 0 {
+			provedNodes[d.WalletAddr.ToBase58()] = struct{}{}
+		}
+	}
+	hostAddrs, err := this.chain.GetNodeHostAddrListByWallets(fileInfo.PrimaryNodes.AddrList)
+	if err != nil {
+		return dspErr.New(dspErr.INTERNAL_ERROR,
+			"dispatch file, get node host addr failed %s, err %s", fileHashStr, err)
+	}
+	for idx, n := range fileInfo.PrimaryNodes.AddrList {
+		if n.ToBase58() == this.WalletAddress() {
+			continue
+		}
+		if _, ok := provedNodes[n.ToBase58()]; ok {
+			continue
+		}
+		if len(taskId) > 0 {
+			doingOrDone, _ := this.taskMgr.IsNodeTaskDoingOrDone(taskId, hostAddrs[idx])
+			log.Debugf("upload task %s transfer to %s is doing or done %t",
+				taskId, hostAddrs[idx], doingOrDone)
+			if doingOrDone {
+				continue
+			}
+		}
+		nodesToDispatch = append(nodesToDispatch, &common.NodeInfo{
+			HostAddr:   hostAddrs[idx],
+			WalletAddr: n.ToBase58(),
+		})
+	}
+	log.Debugf("nodes to dispatch %v", nodesToDispatch)
+	if len(nodesToDispatch) == 0 {
+		return nil
+	}
+	if len(taskId) == 0 {
+		var err error
+		taskId, err = this.taskMgr.NewTask(store.TaskTypeUpload)
+		log.Debugf("new task id %s upload task", taskId)
+		if err != nil {
+			return err
+		}
+		if err := this.taskMgr.BindTaskId(taskId); err != nil {
+			return err
+		}
+	}
+	refTaskInfo, err := this.taskMgr.GetTaskInfoClone(referId)
+	if err != nil {
+		return err
+	}
+	blockHashes := this.taskMgr.FileBlockHashes(referId)
+	totalCount := len(blockHashes)
+	getMsgData := func(hash string, index uint32) *blockMsgData {
+		block := this.fs.GetBlock(hash)
+		blockData := this.fs.BlockDataOfAny(block)
+		tag, err := this.fs.GetTag(hash, fileHashStr, uint64(index))
+		if err != nil {
+			log.Errorf("get tag err %v", err)
+			return nil
+		}
+		offset, err := this.taskMgr.GetBlockOffset(referId, hash, index)
+		if err != nil {
+			log.Errorf("get block offset err %v", err)
+			return nil
+		}
+		return &blockMsgData{
+			blockData: blockData,
+			tag:       tag,
+			offset:    offset,
+		}
+	}
+	if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
+		task.ReferId(referId),
+		task.CopyNum(uint32(fileInfo.CopyNum)),
+		task.FileOwner(fileInfo.FileOwner.ToBase58()),
+		task.TotalBlockCnt(uint32(totalCount))); err != nil {
+		return err
+	}
+	for _, node := range nodesToDispatch {
+		go func(peerAddr string) {
+			sessionId, _ := this.taskMgr.GetSessionId(taskId, "")
+			msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_ASK,
+				message.WithSessionId(sessionId),
+				message.WithWalletAddress(this.chain.WalletAddress()),
+				message.WithSign(this.chain.CurrentAccount()),
+			)
+			log.Debugf("task %s, file %s send file ask msg to %s", taskId, fileHashStr, peerAddr)
+			resp, err := client.P2pSendAndWaitReply(peerAddr, msg.MessageId, msg.ToProtoMsg())
+			if err != nil {
+				log.Errorf("send file ask msg err %s", err)
+				return
+			}
+			p2pMsg := message.ReadMessage(resp)
+			if p2pMsg.Error != nil && p2pMsg.Error.Code != dspErr.SUCCESS {
+				log.Errorf("get file fetch_ack msg err %s", p2pMsg.Error.Message)
+				return
+			}
+			// compare chain info
+			fileMsg := p2pMsg.Payload.(*file.File)
+			if fileMsg.ChainInfo.Height < refTaskInfo.StoreTxHeight {
+				return
+			}
+			log.Debugf("taskId %s, fileHashStr %s, peerAddr %s, prefix %s, storeTx %s, "+
+				"totalCount %d, storeTxHeight %d", taskId, fileHashStr, peerAddr, string(refTaskInfo.Prefix),
+				refTaskInfo.StoreTx, uint32(totalCount), refTaskInfo.StoreTxHeight)
+			this.taskMgr.UpdateTaskNodeState(taskId, peerAddr, store.TaskStateDoing)
+			if err := this.sendBlocksToPeer(taskId, fileHashStr, peerAddr, string(refTaskInfo.Prefix),
+				refTaskInfo.StoreTx, blockHashes, uint32(totalCount), refTaskInfo.StoreTxHeight,
+				getMsgData, nil); err != nil {
+				log.Errorf("send block err %s", err)
+				this.taskMgr.EmitResult(taskId, nil, dspErr.NewWithError(dspErr.DISPATCH_FILE_ERROR, err))
+				this.taskMgr.UpdateTaskNodeState(taskId, peerAddr, store.TaskStateFailed)
+				return
+			}
+			this.taskMgr.UpdateTaskNodeState(taskId, peerAddr, store.TaskStateDone)
+		}(node.HostAddr)
+	}
+	return nil
+}
+
+func (this *Dsp) startDispatchFileService() {
+	ticker := time.NewTicker(time.Duration(common.DISPATCH_FILE_DURATION) * time.Second)
+	for {
+		<-ticker.C
+		if !this.Running() {
+			log.Debugf("stop fetch file service")
+			ticker.Stop()
+			return
+		}
+		tasks, err := this.taskMgr.GetUnDispatchTaskInfos(this.WalletAddress())
+		if err != nil {
+			log.Errorf("get no dispatched task failed %s", err)
+			continue
+		}
+		for _, t := range tasks {
+			if len(t.ReferId) == 0 {
+				continue
+			}
+			if this.taskMgr.IsFileUploaded(t.Id, true) {
+				// update task state
+				this.taskMgr.SetTaskState(t.Id, store.TaskStateDone)
+				continue
+			}
+			log.Debugf("get task %s to dispatch %t", t.Id, this.taskMgr.IsFileUploaded(t.Id, true))
+			go this.dispatchBlocks(t.Id, t.ReferId, t.FileHash)
+		}
+	}
 }
 
 // uploadOptValid check upload opt valid

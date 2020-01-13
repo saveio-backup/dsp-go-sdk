@@ -147,9 +147,9 @@ func (this *Dsp) GetFileUploadSize(fileHashStr, nodeAddr string) (uint64, error)
 	}
 	progress, ok := progressInfo.Count[nodeAddr]
 	if ok {
-		return progress * common.CHUNK_SIZE, nil
+		return uint64(progress) * common.CHUNK_SIZE, nil
 	}
-	return progressInfo.SlaveProgress[nodeAddr] * common.CHUNK_SIZE, nil
+	return uint64(progressInfo.SlaveProgress[nodeAddr]) * common.CHUNK_SIZE, nil
 }
 
 func (this *Dsp) RunGetProgressTicker() bool {
@@ -213,21 +213,21 @@ func (this *Dsp) RunGetProgressTicker() bool {
 			continue
 		}
 		// update progress
-		progressSum := uint64(0)
+		progressSum := uint32(0)
 		for _, info := range progress.Infos {
 			log.Debugf("receive %s-%s progress wallet: %v, progress: %d", progress.Hash, fileHash, info.NodeAddr, info.Count)
 			oldCount := this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
-			if oldCount > uint64(info.Count) {
+			if oldCount > uint32(info.Count) {
 				progressSum += oldCount
 				continue
 			}
-			if err := this.taskMgr.UpdateTaskPeerProgress(id, info.NodeAddr, uint64(info.Count)); err != nil {
+			if err := this.taskMgr.UpdateTaskPeerProgress(id, info.NodeAddr, uint32(info.Count)); err != nil {
 				continue
 			}
-			progressSum += uint64(info.Count)
+			progressSum += uint32(info.Count)
 		}
 		log.Debugf("progressSum: %d, total: %d", progressSum, uint64(len(toReqPeers))*info.FileBlockNum)
-		if progressSum != uint64(len(toReqPeers))*info.FileBlockNum {
+		if progressSum != uint32(len(toReqPeers))*uint32(info.FileBlockNum) {
 			continue
 		}
 		taskHasDone++
@@ -239,9 +239,9 @@ func (this *Dsp) RunGetProgressTicker() bool {
 	return false
 }
 
-func (this *Dsp) GetDownloadTaskRemainSize(taskId string) uint64 {
+func (this *Dsp) GetDownloadTaskRemainSize(taskId string) uint32 {
 	progress := this.taskMgr.GetProgressInfo(taskId)
-	sum := uint64(0)
+	sum := uint32(0)
 	for _, c := range progress.Count {
 		sum += c
 	}

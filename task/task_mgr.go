@@ -27,7 +27,7 @@ type TaskMgr struct {
 	blockReqCh     chan []*GetBlockReq // used for share blocks
 	progress       chan *ProgressInfo  // progress channel
 	shareNoticeCh  chan *ShareNotification
-	db             *store.FileDB
+	db             *store.TaskDB
 	progressTicker *ticker.Ticker // get upload progress ticker
 }
 
@@ -42,7 +42,7 @@ func NewTaskMgr(t *ticker.Ticker) *TaskMgr {
 }
 
 func (this *TaskMgr) SetFileDB(d *store.LevelDBStore) {
-	this.db = store.NewFileDB(d)
+	this.db = store.NewTaskDB(d)
 }
 
 func (this *TaskMgr) CloseDB() error {
@@ -183,7 +183,7 @@ func (this *TaskMgr) CleanTask(taskId string) error {
 	delete(this.tasks, taskId)
 	this.lock.Unlock()
 	log.Debugf("clean task %s", debug.Stack())
-	err := this.db.DeleteFileInfo(taskId)
+	err := this.db.DeleteTaskInfo(taskId)
 	if err != nil {
 		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
 	}
@@ -244,7 +244,7 @@ func (this *TaskMgr) TaskExist(taskId string) bool {
 func (this *TaskMgr) TaskExistInDB(taskId string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	tsk, err := this.db.GetFileInfo(taskId)
+	tsk, err := this.db.GetTaskInfo(taskId)
 	if err != nil || tsk == nil {
 		return false
 	}
@@ -293,6 +293,14 @@ func (this *TaskMgr) PushGetBlockFlights(taskId, sessionId string, blocks []*Blo
 		return
 	}
 	v.PushGetBlockFlights(sessionId, blocks, timeStamp)
+}
+
+func (this *TaskMgr) BlockFlightsChannelExists(taskId, sessionId string, timeStamp int64) bool {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false
+	}
+	return v.BlockFlightsChannelExists(sessionId, timeStamp)
 }
 
 func (this *TaskMgr) NewBlockRespCh(taskId, sessionId, blockHash string, index int32) chan *BlockResp {
@@ -352,7 +360,7 @@ func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 	if this.progress == nil {
 		return
 	}
-	v.SetTransferState(uint64(state))
+	v.SetTransferState(uint32(state))
 	pInfo := v.GetProgressInfo()
 	log.Debugf("EmitProgress taskId: %s, state: %v pInfo: %v", taskId, state, pInfo)
 	this.progress <- pInfo
@@ -935,17 +943,9 @@ func (this *TaskMgr) RunGetProgress() {
 func (this *TaskMgr) GetUploadDoneNodeAddr(taskId string) (string, error) {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	info, err := this.db.GetFileInfo(taskId)
+	nodeAddr, err := this.db.GetUploadDoneNodeAddr(taskId)
 	if err != nil {
-		return "", err
-	}
-	if info == nil {
 		return "", dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "upload file info not found")
 	}
-	for addr, count := range info.SaveBlockCountMap {
-		if count == info.TotalBlockCount {
-			return addr, nil
-		}
-	}
-	return "", dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "no done node")
+	return nodeAddr, nil
 }

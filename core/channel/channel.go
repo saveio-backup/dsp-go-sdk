@@ -523,6 +523,36 @@ func (this *Channel) GetAvailableBalance(partnerAddress string) (uint64, error) 
 	return bal, nil
 }
 
+func (this *Channel) GetNextNonce(partnerAddress string) uint64 {
+	partner, err := chaincomm.AddressFromBase58(partnerAddress)
+	if err != nil {
+		return 0
+	}
+	if this.chActor == nil || this.chActor.GetChannelService() == nil ||
+		this.chActor.GetChannelService().Service == nil {
+		return 0
+	}
+	chainState := this.chActor.GetChannelService().Service.StateFromChannel()
+	microAddress := common.Address(utils.MicroPayContractAddress)
+	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
+	paymentNetworkID := common.PaymentNetworkID(microAddress)
+	channelState := transfer.GetChannelStateFor(chainState, paymentNetworkID, token, common.Address(partner))
+	if channelState == nil {
+		log.Warnf("channel state is nil")
+		return 0
+	}
+	senderState := channelState.GetChannelEndState(0)
+	if senderState == nil {
+		log.Warnf("senderState is nil")
+		return 0
+	}
+	if senderState.BalanceProof == nil {
+		log.Warnf("senderState balanceProof is nil")
+		return 0
+	}
+	return uint64(senderState.BalanceProof.Nonce)
+}
+
 func (this *Channel) GetTotalWithdraw(partnerAddress string) (uint64, error) {
 	log.Debugf("[dsp-go-sdk-channel] GetTotalWithdraw %s", partnerAddress)
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)

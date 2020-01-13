@@ -89,3 +89,7 @@ type Gas struct {
 	GasPrice uint64
 	GasLimit uint64
 }
+type NodeInfo struct {
+	HostAddr   string
+	WalletAddr string
+}

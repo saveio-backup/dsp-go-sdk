@@ -66,6 +66,7 @@ const (
 	MAX_TASKS_NUM                  = 50     // max task number
 	MAX_GOROUTINES_FOR_WORK_TASK   = 8      // max goroutines for choose worker to do job
 	BACKUP_FILE_DURATION           = 10     // 10s check
+	DISPATCH_FILE_DURATION         = 30     // 10s check
 	REMOVE_FILES_DURATION          = 10     // 10s for remove files check
 	MAX_EXPIRED_PROVE_TASK_NUM     = 10     // max backup tasks one time
 	MAX_WORKER_BLOCK_FAILED_NUM    = 1      // max failed count from a worker to request block
@@ -84,6 +85,8 @@ const (
 	MAX_BLOCK_FETCHED_RETRY        = 3      // max uploading block be fetched retry
 	MAX_REQ_BLOCK_COUNT            = 32     // max block count when request for download flights
 	MIN_REQ_BLOCK_COUNT            = 16     // min block count when request for download flights
+	MAX_SEND_BLOCK_COUNT           = 16     // max send block count for send flights
+	MIN_SEND_BLOCK_COUNT           = 16     // max send block count for send flights
 	MAX_START_PDP_RETRY            = 2      // max start pdp retry
 	START_PDP_RETRY_DELAY          = 5      // delay pdp retry
 	MAX_PEERCNT_FOR_DOWNLOAD       = 100    // max peer count (threads) for download file

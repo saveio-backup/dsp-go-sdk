@@ -53,13 +53,13 @@ func SimpleCheckSum(checksum string) InfoOption {
 	})
 }
 
-func StoreType(storeType uint64) InfoOption {
+func StoreType(storeType uint32) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.StoreType = storeType
 	})
 }
 
-func CopyNum(copyNum uint64) InfoOption {
+func CopyNum(copyNum uint32) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.CopyNum = copyNum
 	})
@@ -89,13 +89,13 @@ func OnlyBlock(onlyBlock bool) InfoOption {
 	})
 }
 
-func TransferState(transferState uint64) InfoOption {
+func TransferState(transferState uint32) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.TranferState = transferState
 	})
 }
 
-func TotalBlockCnt(cnt uint64) InfoOption {
+func TotalBlockCnt(cnt uint32) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.TotalBlockCount = cnt
 	})
@@ -110,6 +110,12 @@ func PrivateKey(priKey []byte) InfoOption {
 func StoreTx(tx string) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.StoreTx = tx
+	})
+}
+
+func StoreTxHeight(storeTxHeight uint32) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.StoreTxHeight = storeTxHeight
 	})
 }
 
@@ -137,11 +143,23 @@ func ReferId(referId string) InfoOption {
 	})
 }
 
+func PrimaryNodes(pm []string) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.PrimaryNodes = pm
+	})
+}
+
+func CandidateNodes(cn []string) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.CandidateNodes = cn
+	})
+}
+
 func (this *Task) SetInfoWithOptions(opts ...InfoOption) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	for _, opt := range opts {
 		opt.apply(this.info)
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }

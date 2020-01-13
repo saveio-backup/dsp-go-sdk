@@ -35,14 +35,14 @@ type ProgressInfo struct {
 	TaskId        string
 	Type          store.TaskType    // task type
 	Url           string            // task url
-	StoreType     uint64            // store type
+	StoreType     uint32            // store type
 	FileName      string            // file name
 	FileHash      string            // file hash
 	FilePath      string            // file path
-	CopyNum       uint64            // copyNum
-	Total         uint64            // total file's blocks count
-	Count         map[string]uint64 // address <=> count
-	SlaveProgress map[string]uint64 // progress for slave nodes
+	CopyNum       uint32            // copyNum
+	Total         uint32            // total file's blocks count
+	Count         map[string]uint32 // address <=> count
+	SlaveProgress map[string]uint32 // progress for slave nodes
 	TaskState     store.TaskState   // task state
 	ProgressState TaskProgressState // TaskProgressState
 	Result        interface{}       // finish result
@@ -104,12 +104,12 @@ type Task struct {
 	lock                *sync.RWMutex                // lock
 	lastWorkerIdx       int                          // last worker index
 	batch               bool                         // flag of batch set
-	db                  *store.FileDB                // db
+	db                  *store.TaskDB                // db
 	workerNetPhase      map[string]int               // network msg interact phase, used to check msg transaction, host addr <=> phase
 }
 
 // NewTask. new task for file, and set the task info to DB.
-func NewTask(taskT store.TaskType, db *store.FileDB) *Task {
+func NewTask(taskT store.TaskType, db *store.TaskDB) *Task {
 	id, _ := uuid.NewUUID()
 	info, err := db.NewTaskInfo(id.String(), taskT)
 	if err != nil {
@@ -117,8 +117,8 @@ func NewTask(taskT store.TaskType, db *store.FileDB) *Task {
 		return nil
 	}
 	t := newTask(id.String(), info, db)
-	t.info.TaskState = uint64(store.TaskStatePrepare)
-	err = db.SaveFileInfo(t.info)
+	t.info.TaskState = uint32(store.TaskStatePrepare)
+	err = db.SaveTaskInfo(t.info)
 	if err != nil {
 		log.Debugf("save file info failed err %s", err)
 		return nil
@@ -127,8 +127,8 @@ func NewTask(taskT store.TaskType, db *store.FileDB) *Task {
 }
 
 // GetTaskFromDB. get a task object from DB with file info id
-func GetTaskFromDB(id string, db *store.FileDB) (*Task, error) {
-	info, err := db.GetFileInfo(id)
+func GetTaskFromDB(id string, db *store.TaskDB) (*Task, error) {
+	info, err := db.GetTaskInfo(id)
 	if err != nil {
 		log.Errorf("[Task GetTaskFromDB] get file info failed, id: %s", id)
 		return nil, err
@@ -142,8 +142,8 @@ func GetTaskFromDB(id string, db *store.FileDB) (*Task, error) {
 }
 
 // NewTaskFromDB. Read file info from DB and recover a task by the file info.
-func NewTaskFromDB(id string, db *store.FileDB) (*Task, error) {
-	info, err := db.GetFileInfo(id)
+func NewTaskFromDB(id string, db *store.TaskDB) (*Task, error) {
+	info, err := db.GetTaskInfo(id)
 	if err != nil {
 		log.Errorf("[Task NewTaskFromDB] get file info failed, id: %s", id)
 		return nil, err
@@ -152,7 +152,9 @@ func NewTaskFromDB(id string, db *store.FileDB) (*Task, error) {
 		log.Warnf("[Task NewTaskFromDB] recover task get file info is nil, id: %v", id)
 		return nil, nil
 	}
-	if (store.TaskState(info.TaskState) == store.TaskStatePause || store.TaskState(info.TaskState) == store.TaskStateDoing) && info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT*1000 < utils.GetMilliSecTimestamp() {
+	if (store.TaskState(info.TaskState) == store.TaskStatePause ||
+		store.TaskState(info.TaskState) == store.TaskStateDoing) &&
+		info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT*1000 < utils.GetMilliSecTimestamp() {
 		log.Warnf("[Task NewTaskFromDB] task: %s is expired, type: %d, updatedAt: %d", id, info.Type, info.UpdatedAt)
 	}
 	sessions, err := db.GetFileSessions(id)
@@ -165,9 +167,9 @@ func NewTaskFromDB(id string, db *store.FileDB) (*Task, error) {
 		state = store.TaskStatePause
 	}
 	t := newTask(id, info, db)
-	t.info.TaskState = uint64(state)
-	t.info.TranferState = uint64(TaskPause)
-	err = db.SaveFileInfo(t.info)
+	t.info.TaskState = uint32(state)
+	t.info.TranferState = uint32(TaskPause)
+	err = db.SaveTaskInfo(t.info)
 	if err != nil {
 		log.Errorf("[Task NewTaskFromDB] set file info failed: %s", err)
 		return nil, err
@@ -219,7 +221,7 @@ func (this *Task) SetFileName(fileName string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetFileHash(fileHash string) error {
@@ -229,7 +231,7 @@ func (this *Task) SetFileHash(fileHash string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetPrefix(prefix string) error {
@@ -239,7 +241,7 @@ func (this *Task) SetPrefix(prefix string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 func (this *Task) SetFileOwner(fileOwner string) error {
 	this.lock.Lock()
@@ -248,7 +250,7 @@ func (this *Task) SetFileOwner(fileOwner string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetWalletaddr(walletAddr string) error {
@@ -258,7 +260,7 @@ func (this *Task) SetWalletaddr(walletAddr string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetFilePath(filePath string) error {
@@ -268,7 +270,7 @@ func (this *Task) SetFilePath(filePath string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetSimpleCheckSum(checksum string) error {
@@ -278,27 +280,27 @@ func (this *Task) SetSimpleCheckSum(checksum string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
-func (this *Task) SetStoreType(storeType uint64) error {
+func (this *Task) SetStoreType(storeType uint32) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	this.info.StoreType = storeType
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
-func (this *Task) SetCopyNum(copyNum uint64) error {
+func (this *Task) SetCopyNum(copyNum uint32) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	this.info.CopyNum = copyNum
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetUrl(url string) error {
@@ -308,7 +310,7 @@ func (this *Task) SetUrl(url string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetOwner(owner string) error {
@@ -318,7 +320,7 @@ func (this *Task) SetOwner(owner string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetTaskState(newState store.TaskState) error {
@@ -346,7 +348,7 @@ func (this *Task) SetTaskState(newState store.TaskState) error {
 		log.Debugf("task: %s has done", this.id)
 	case store.TaskStateCancel:
 	}
-	this.info.TaskState = uint64(newState)
+	this.info.TaskState = uint32(newState)
 	changeFromPause := (oldState == store.TaskStatePause && (newState == store.TaskStateDoing || newState == store.TaskStateCancel))
 	changeFromDoing := (oldState == store.TaskStateDoing && (newState == store.TaskStatePause || newState == store.TaskStateCancel))
 	if changeFromPause {
@@ -358,7 +360,7 @@ func (this *Task) SetTaskState(newState store.TaskState) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetInorder(inOrder bool) error {
@@ -368,7 +370,7 @@ func (this *Task) SetInorder(inOrder bool) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetOnlyBlock(onlyBlock bool) error {
@@ -378,27 +380,27 @@ func (this *Task) SetOnlyBlock(onlyBlock bool) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
-func (this *Task) SetTransferState(transferState uint64) error {
+func (this *Task) SetTransferState(transferState uint32) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	this.info.TranferState = transferState
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
-func (this *Task) SetTotalBlockCnt(cnt uint64) error {
+func (this *Task) SetTotalBlockCnt(cnt uint32) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	this.info.TotalBlockCount = cnt
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetPrivateKey(priKey []byte) error {
@@ -408,7 +410,7 @@ func (this *Task) SetPrivateKey(priKey []byte) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetStoreTx(tx string) error {
@@ -418,7 +420,7 @@ func (this *Task) SetStoreTx(tx string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg string) error {
@@ -427,11 +429,11 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	this.info.ErrorCode = errorCode
 	this.info.ErrorMsg = errorMsg
 	if errorCode != 0 {
-		this.info.TaskState = uint64(store.TaskStateFailed)
+		this.info.TaskState = uint32(store.TaskStateFailed)
 	} else if result != nil {
 		log.Debugf("task: %s has done", this.id)
 		this.info.Result = result
-		this.info.TaskState = uint64(store.TaskStateDone)
+		this.info.TaskState = uint32(store.TaskStateDone)
 		switch this.info.Type {
 		case store.TaskTypeUpload:
 			err := this.db.SaveFileUploaded(this.id)
@@ -448,7 +450,7 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetWhiteListTx(whiteListTx string) error {
@@ -458,7 +460,7 @@ func (this *Task) SetWhiteListTx(whiteListTx string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetRegUrlTx(regUrlTx string) error {
@@ -468,7 +470,7 @@ func (this *Task) SetRegUrlTx(regUrlTx string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) SetBindUrlTx(bindUrlTx string) error {
@@ -478,7 +480,7 @@ func (this *Task) SetBindUrlTx(bindUrlTx string) error {
 	if this.batch {
 		return nil
 	}
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 func (this *Task) BatchCommit() error {
@@ -488,7 +490,7 @@ func (this *Task) BatchCommit() error {
 		return nil
 	}
 	this.batch = false
-	return this.db.SaveFileInfo(this.info)
+	return this.db.SaveTaskInfo(this.info)
 }
 
 // BindIdWithWalletAddr. set key to taskId, for upload task, if fileHash is empty, use Hex(filePath) instead.
@@ -523,21 +525,6 @@ func (this *Task) BindIdWithWalletAddr() error {
 	}
 }
 
-func (this *Task) AddUploadedBlock(id, blockHashStr, nodeAddr string, index uint32, dataSize, offset uint64) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	err := this.db.AddUploadedBlock(id, blockHashStr, nodeAddr, index, dataSize, offset)
-	if err != nil {
-		return err
-	}
-	newInfo, err := this.db.GetFileInfo(id)
-	if err != nil {
-		return err
-	}
-	this.info = newInfo
-	return nil
-}
-
 func (this *Task) SetBlocksUploaded(id, nodeAddr string, blockInfos []*store.BlockInfo) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -545,7 +532,7 @@ func (this *Task) SetBlocksUploaded(id, nodeAddr string, blockInfos []*store.Blo
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.db.GetFileInfo(id)
+	newInfo, err := this.db.GetTaskInfo(id)
 	if err != nil {
 		return err
 	}
@@ -560,7 +547,7 @@ func (this *Task) SetUploadProgressDone(id, nodeAddr string) error {
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.db.GetFileInfo(id)
+	newInfo, err := this.db.GetTaskInfo(id)
 	if err != nil {
 		return err
 	}
@@ -575,12 +562,20 @@ func (this *Task) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index ui
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.db.GetFileInfo(id)
+	newInfo, err := this.db.GetTaskInfo(id)
 	if err != nil {
 		return err
 	}
 	this.info = newInfo
 	return nil
+}
+
+// GetTaskInfoClone. get task info deep copy object.
+// clone it for read-only
+func (this *Task) GetTaskInfoClone() *store.TaskInfo {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.db.CopyTask(this.info)
 }
 
 func (this *Task) GetInorder() bool {
@@ -712,24 +707,15 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 	if this.info.Type != store.TaskTypeUpload {
 		return pInfo
 	}
-	if len(this.info.SaveBlockCountMap) == 0 {
+	if len(pInfo.Count) == 0 {
 		return pInfo
 	}
-	// find master node
-	masterNode := ""
-	for nodeAddr, count := range this.info.SaveBlockCountMap {
-		if count == this.info.TotalBlockCount && count > 0 {
-			masterNode = nodeAddr
-			break
-		}
-	}
-
-	if len(masterNode) == 0 {
+	if len(this.info.PrimaryNodes) == 0 {
 		return pInfo
 	}
-
-	masterNodeProgress := make(map[string]uint64, 0)
-	pInfo.SlaveProgress = make(map[string]uint64, 0)
+	masterNode := this.info.PrimaryNodes[0]
+	masterNodeProgress := make(map[string]uint32, 0)
+	pInfo.SlaveProgress = make(map[string]uint32, 0)
 	for node, progress := range pInfo.Count {
 		if node == masterNode {
 			masterNodeProgress[node] = progress
@@ -758,6 +744,14 @@ func (this *Task) PushGetBlock(sessionId, blockHash string, index int32, block *
 		ch <- block
 		log.Debugf("send block to channel done: %s", key)
 	}()
+}
+
+func (this *Task) BlockFlightsChannelExists(sessionId string, timeStamp int64) bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.id, sessionId, this.info.FileHash, timeStamp)
+	_, ok := this.blockFlightRespsMap[key]
+	return ok
 }
 
 func (this *Task) PushGetBlockFlights(sessionId string, blocks []*BlockResp, timeStamp int64) {
@@ -835,7 +829,7 @@ func (this *Task) DropBlockFlightsRespCh(sessionId string, timeStamp int64) {
 	delete(this.blockFlightRespsMap, key)
 }
 
-func (this *Task) GetTotalBlockCnt() uint64 {
+func (this *Task) GetTotalBlockCnt() uint32 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.info.TotalBlockCount
@@ -853,7 +847,7 @@ func (this *Task) GetCreatedAt() uint64 {
 	return this.info.CreatedAt
 }
 
-func (this *Task) GetCopyNum() uint64 {
+func (this *Task) GetCopyNum() uint32 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.info.CopyNum
@@ -979,7 +973,7 @@ func (this *Task) NotifyBlock(blk *BlockResp) {
 	this.notify <- blk
 }
 
-func (this *Task) GetStoreType() uint64 {
+func (this *Task) GetStoreType() uint32 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.info.StoreType
@@ -1071,7 +1065,7 @@ func (this *Task) notifyBlockReqPoolLen() {
 	log.Debugf("notify block req update done")
 }
 
-func newTask(id string, info *store.TaskInfo, db *store.FileDB) *Task {
+func newTask(id string, info *store.TaskInfo, db *store.TaskDB) *Task {
 	t := &Task{
 		id:                 id,
 		info:               info,

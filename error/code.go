@@ -80,6 +80,11 @@ const (
 	REFER_ID_NOT_FOUND                                        // 50063
 	GET_TASK_PROPERTY_ERROR                                   // 50064
 	ADD_FILE_UNPAID_ERROR                                     // 50065
+	MISS_UPLOADED_FILE_TX                                     // 50066
+	CHECK_UPLOADED_TX_ERROR                                   // 50067
+	NO_PRIVILEGE_TO_UPLOAD                                    // 50068
+	SET_TASK_PROPERTY_ERROR                                   // 50069
+	DISPATCH_FILE_ERROR                                       // 50070
 )
 
 // delete file error

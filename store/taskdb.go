@@ -16,8 +16,8 @@ import (
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
-// FileDB. implement a db storage for save information of sending/downloading/downloaded files
-type FileDB struct {
+// TaskDB. implement a db storage for save information of sending/downloading/downloaded files
+type TaskDB struct {
 	db   *LevelDBStore
 	lock *sync.RWMutex
 }
@@ -46,14 +46,14 @@ const (
 
 // blockInfo record a block infomation of a file
 type BlockInfo struct {
-	FileInfoId string            `json:"file_info_id"`
+	TaskId     string            `json:"task_id"`
 	FileHash   string            `json:"file_hash"`
 	Hash       string            `json:"hash"`                  // block  hash
 	Index      uint32            `json:"index"`                 // block index of file
 	DataOffset uint64            `json:"data_offset"`           // block raw data offset
 	DataSize   uint64            `json:"data_size"`             // block data size
 	NodeList   []string          `json:"node_list,omitempty"`   // uploaded node list
-	ReqTimes   map[string]uint64 `json:"block_req_times"`       // record block request times for peer
+	ReqTimes   map[string]uint32 `json:"block_req_times"`       // record block request times for peer
 	LinkHashes []string          `json:"link_hashes,omitempty"` // child link hashes slice
 }
 
@@ -64,76 +64,83 @@ type Payment struct {
 	PaymentId     int32  `json:"paymentId"`
 }
 
-const (
-	FILEINFO_FIELD_FILENAME int = iota
-	FILEINFO_FIELD_FILEHASH
-	FILEINFO_FIELD_STORETX
-	FILEINFO_FIELD_WHITELISTTX
-	FILEINFO_FIELD_PROVE_PRIVATEKEY
-	FILEINFO_FIELD_PREFIX
-	FILEINFO_FIELD_TOTALCOUNT
-	FILEINFO_FIELD_COPYNUM
-	FILEINFO_FIELD_URL
-	FILEINFO_FIELD_LINK
-	FILEINFO_FIELD_FILEPATH
-	FILEINFO_FIELD_WALLETADDR
-	FILEINFO_FIELD_REGURL_TX
-	FILEINFO_FIELD_BIND_TX
-	FILEINFO_FIELD_TASKSTATE
-	FILEINFO_FIELD_OWNER
-)
+// const (
+// 	FILEINFO_FIELD_FILENAME int = iota
+// 	FILEINFO_FIELD_FILEHASH
+// 	FILEINFO_FIELD_STORETX
+// 	FILEINFO_FIELD_WHITELISTTX
+// 	FILEINFO_FIELD_PROVE_PRIVATEKEY
+// 	FILEINFO_FIELD_PREFIX
+// 	FILEINFO_FIELD_TOTALCOUNT
+// 	FILEINFO_FIELD_COPYNUM
+// 	FILEINFO_FIELD_URL
+// 	FILEINFO_FIELD_LINK
+// 	FILEINFO_FIELD_FILEPATH
+// 	FILEINFO_FIELD_WALLETADDR
+// 	FILEINFO_FIELD_REGURL_TX
+// 	FILEINFO_FIELD_BIND_TX
+// 	FILEINFO_FIELD_TASKSTATE
+// 	FILEINFO_FIELD_OWNER
+// )
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type TaskInfo struct {
-	Id                string            `json:"id"`                     // task id
-	Index             uint32            `json:"index"`                  // task index
-	FileHash          string            `json:"file_hash"`              // file hash
-	FileName          string            `json:"file_name"`              // file name
-	FilePath          string            `json:"file_path"`              // file absolute path
-	FileOwner         string            `json:"file_owner"`             // file owner wallet address
-	SimpleChecksum    string            `json:"simple_checksum"`        // hash of first 128 KB and last 128 KB from file content
-	WalletAddress     string            `json:"wallet_address"`         // task belong to
-	CopyNum           uint64            `json:"copy_num"`               // copy num
-	Type              TaskType          `json:"file_info_type"`         // task type
-	StoreTx           string            `json:"store_tx"`               // store tx hash
-	RegisterDNSTx     string            `json:"register_dns_tx"`        // register dns tx
-	BindDNSTx         string            `json:"bind_dns_tx"`            // bind dns tx
-	WhitelistTx       string            `json:"whitelist_tx"`           // first op whitelist tx
-	TotalBlockCount   uint64            `json:"total_block_count"`      // total block count
-	SaveBlockCountMap map[string]uint64 `json:"save_block_count_map"`   // receivers block count map
-	TaskState         uint64            `json:"task_state"`             // task state
-	ProvePrivKey      []byte            `json:"prove_private_key"`      // prove private key params
-	Prefix            []byte            `json:"prefix"`                 // file prefix
-	EncryptHash       string            `json:"encrypt_hash"`           // encrypt hash
-	EncryptSalt       string            `json:"encrypt_salt"`           // encrypt salt
-	Url               string            `json:"url"`                    // url
-	Link              string            `json:"link"`                   // link
-	CurrentBlock      string            `json:"current_block_hash"`     // current transferred block
-	CurrentIndex      uint64            `json:"current_block_index"`    // current transferred block index
-	StoreType         uint64            `json:"store_type"`             // store type
-	InOrder           bool              `json:"in_order"`               // is in order
-	OnlyBlock         bool              `json:"only_block"`             // send only raw block data
-	TranferState      uint64            `json:"transfer_state"`         // transfer state
-	ReferId           string            `json:"refer_id"`               // refer task id
-	CreatedAt         uint64            `json:"createdAt"`              // createAt, unit ms
-	CreatedAtHeight   uint64            `json:"createdAt_block_height"` // created at block height
-	UpdatedAt         uint64            `json:"updatedAt"`              // updatedAt, unit ms
-	UpdatedAtHeight   uint64            `json:"updatedAt_block_height"` // updatedAt block height
-	ExpiredHeight     uint64            `json:"expired_block_height"`   // expiredAt block height
-	ErrorCode         uint32            `json:"error_code"`             // error code
-	ErrorMsg          string            `json:"error_msg"`              // error msg
-	Result            interface{}       `json:"result"`                 // task complete result
+	Id              string      `json:"id"`                     // task id
+	Index           uint32      `json:"index"`                  // task index
+	FileHash        string      `json:"file_hash"`              // file hash
+	FileName        string      `json:"file_name"`              // file name
+	FilePath        string      `json:"file_path"`              // file absolute path
+	FileOwner       string      `json:"file_owner"`             // file owner wallet address
+	SimpleChecksum  string      `json:"simple_checksum"`        // hash of first 128 KB and last 128 KB from file content
+	WalletAddress   string      `json:"wallet_address"`         // task belong to
+	CopyNum         uint32      `json:"copy_num"`               // copy num
+	Type            TaskType    `json:"file_info_type"`         // task type
+	StoreTx         string      `json:"store_tx"`               // store tx hash
+	StoreTxHeight   uint32      `json:"store_tx_height"`        // store tx height
+	RegisterDNSTx   string      `json:"register_dns_tx"`        // register dns tx
+	BindDNSTx       string      `json:"bind_dns_tx"`            // bind dns tx
+	WhitelistTx     string      `json:"whitelist_tx"`           // first op whitelist tx
+	TotalBlockCount uint32      `json:"total_block_count"`      // total block count
+	TaskState       uint32      `json:"task_state"`             // task state
+	ProvePrivKey    []byte      `json:"prove_private_key"`      // prove private key params
+	Prefix          []byte      `json:"prefix"`                 // file prefix
+	EncryptHash     string      `json:"encrypt_hash"`           // encrypt hash
+	EncryptSalt     string      `json:"encrypt_salt"`           // encrypt salt
+	Url             string      `json:"url"`                    // url
+	Link            string      `json:"link"`                   // link
+	CurrentBlock    string      `json:"current_block_hash"`     // current transferred block
+	CurrentIndex    uint32      `json:"current_block_index"`    // current transferred block index
+	StoreType       uint32      `json:"store_type"`             // store type
+	InOrder         bool        `json:"in_order"`               // is in order
+	OnlyBlock       bool        `json:"only_block"`             // send only raw block data
+	TranferState    uint32      `json:"transfer_state"`         // transfer state
+	ReferId         string      `json:"refer_id"`               // refer task id
+	PrimaryNodes    []string    `json:"primary_nodes"`          // primary nodes
+	CandidateNodes  []string    `json:"candidate_nodes"`        // candidate nodes
+	CreatedAt       uint64      `json:"createdAt"`              // createAt, unit ms
+	CreatedAtHeight uint32      `json:"createdAt_block_height"` // created at block height
+	UpdatedAt       uint64      `json:"updatedAt"`              // updatedAt, unit ms
+	UpdatedAtHeight uint32      `json:"updatedAt_block_height"` // updatedAt block height
+	ExpiredHeight   uint64      `json:"expired_block_height"`   // expiredAt block height
+	ErrorCode       uint32      `json:"error_code"`             // error code
+	ErrorMsg        string      `json:"error_msg"`              // error msg
+	Result          interface{} `json:"result"`                 // task complete result
 }
 
 type FileProgress struct {
-	FileInfoId     string `json:"file_info_id"`
-	NodeHostAddr   string `json:"node_host_addr"`
-	NodeWalletAddr string `json:"node_wallet_addr"`
-	Progress       uint64 `json:"progress"`
+	TaskId         string    `json:"task_id"`
+	NodeHostAddr   string    `json:"node_host_addr"`
+	NodeWalletAddr string    `json:"node_wallet_addr"`
+	Progress       uint32    `json:"progress"`
+	TransferCount  uint32    `json:"transfer_count"`
+	State          TaskState `json:"progress_state"`
+	CreatedAt      uint64    `json:"createdAt"`
+	UpdatedAt      uint64    `json:"updatedAt"`
+	NextUpdatedAt  uint64    `json:"next_updatedAt"`
 }
 
 type FileDownloadUnPaid struct {
-	FileInfoId   string             `json:"file_info_id"`
+	TaskId       string             `json:"task_id"`
 	NodeHostAddr string             `json:"node_host_addr"`
 	Payments     map[int32]*Payment `json:"payments"`
 }
@@ -142,7 +149,7 @@ type Session struct {
 	SessionId  string `json:"session_id"`
 	WalletAddr string `json:"wallet_addr"`
 	HostAddr   string `json:"host_addr"`
-	Asset      uint64 `json:"asset"`
+	Asset      uint32 `json:"asset"`
 	UnitPrice  uint64 `json:"unit_price"`
 }
 
@@ -154,28 +161,27 @@ type TaskCount struct {
 	ShareCount    uint32 `json:"share_count"`
 }
 
-func NewFileDB(db *LevelDBStore) *FileDB {
-	return &FileDB{
+func NewTaskDB(db *LevelDBStore) *TaskDB {
+	return &TaskDB{
 		db:   db,
 		lock: new(sync.RWMutex),
 	}
 }
 
-func (this *FileDB) Close() error {
+func (this *TaskDB) Close() error {
 	return this.db.Close()
 }
 
-func (this *FileDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
+func (this *TaskDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
 	taskCount, err := this.GetTaskCount()
 	if err != nil {
 		return nil, err
 	}
 	fi := &TaskInfo{
-		Id:                id,
-		Index:             taskCount.Index,
-		Type:              ft,
-		CreatedAt:         utils.GetMilliSecTimestamp(),
-		SaveBlockCountMap: make(map[string]uint64, 0),
+		Id:        id,
+		Index:     taskCount.Index,
+		Type:      ft,
+		CreatedAt: utils.GetMilliSecTimestamp(),
 	}
 	batch := this.db.NewBatch()
 	// store to undone task list
@@ -188,7 +194,7 @@ func (this *FileDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
 		return nil, err
 	}
 	// store task info
-	err = this.batchSaveFileInfo(batch, fi)
+	err = this.batchSaveTaskInfo(batch, fi)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +222,7 @@ func (this *FileDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
 	return fi, nil
 }
 
-func (this *FileDB) GetTaskCount() (*TaskCount, error) {
+func (this *TaskDB) GetTaskCount() (*TaskCount, error) {
 	countBuf, err := this.db.Get([]byte(TaskCountKey()))
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, err
@@ -229,7 +235,7 @@ func (this *FileDB) GetTaskCount() (*TaskCount, error) {
 	return taskCount, err
 }
 
-func (this *FileDB) GetTaskIdByIndex(index uint32) (string, error) {
+func (this *TaskDB) GetTaskIdByIndex(index uint32) (string, error) {
 	idKey := TaskIdIndexKey(index)
 	buf, err := this.db.Get([]byte(idKey))
 	if err != nil && err != leveldb.ErrNotFound {
@@ -242,7 +248,7 @@ func (this *FileDB) GetTaskIdByIndex(index uint32) (string, error) {
 }
 
 // GetTaskIdList. Get all task id list with offset, limit, task type
-func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, reverse, includeFailed bool) []string {
+func (this *TaskDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, reverse, includeFailed bool) []string {
 	count, err := this.GetTaskCount()
 	if err != nil {
 		return nil
@@ -250,9 +256,6 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 	if count.TotalCount == 0 {
 		return nil
 	}
-	// if limit == 0 || limit > 100 {
-	// 	limit = 100
-	// }
 	var list []string
 	if limit > 0 {
 		list = make([]string, 0, limit)
@@ -292,7 +295,7 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 			reach++
 			continue
 		}
-		info, err := this.GetFileInfo(id)
+		info, err := this.GetTaskInfo(id)
 		if err != nil || info == nil {
 			log.Warnf("get file info of id %s failed", id)
 			continue
@@ -301,11 +304,11 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 			if info.Type != ft {
 				continue
 			}
-			if info.TaskState == uint64(TaskStateDone) {
+			if info.TaskState == uint32(TaskStateDone) {
 				continue
 			}
 		}
-		if !includeFailed && info.TaskState == uint64(TaskStateFailed) {
+		if !includeFailed && info.TaskState == uint32(TaskStateFailed) {
 			continue
 		}
 		list = append(list, id)
@@ -316,11 +319,11 @@ func (this *FileDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 	return list
 }
 
-func (this *FileDB) SaveFileInfoId(key, id string) error {
+func (this *TaskDB) SaveFileInfoId(key, id string) error {
 	return this.db.Put([]byte(TaskInfoIdWithFile(key)), []byte(id))
 }
 
-func (this *FileDB) GetFileInfoId(key string) (string, error) {
+func (this *TaskDB) GetFileInfoId(key string) (string, error) {
 	id, err := this.db.Get([]byte(TaskInfoIdWithFile(key)))
 	if err != nil {
 		return "", err
@@ -328,7 +331,7 @@ func (this *FileDB) GetFileInfoId(key string) (string, error) {
 	return string(id), nil
 }
 
-func (this *FileDB) GetDownloadedTaskId(fileHashStr string) (string, error) {
+func (this *TaskDB) GetDownloadedTaskId(fileHashStr string) (string, error) {
 	prefix := TaskInfoKey("")
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
@@ -336,14 +339,14 @@ func (this *FileDB) GetDownloadedTaskId(fileHashStr string) (string, error) {
 		return "", err
 	}
 	for _, key := range keys {
-		info, _ := this.getFileInfoByKey(key)
+		info, _ := this.getTaskInfoByKey(key)
 		if info == nil {
 			continue
 		}
 		if info.Type != TaskTypeDownload {
 			continue
 		}
-		if info.TaskState != uint64(TaskStateDone) {
+		if info.TaskState != uint32(TaskStateDone) {
 			continue
 		}
 		if info.FileHash != fileHashStr {
@@ -354,58 +357,58 @@ func (this *FileDB) GetDownloadedTaskId(fileHashStr string) (string, error) {
 	return "", fmt.Errorf("no downloaded task for file %s", fileHashStr)
 }
 
-func (this *FileDB) DeleteFileInfoId(key string) error {
+func (this *TaskDB) DeleteFileInfoId(key string) error {
 	return this.db.Delete([]byte(key))
 }
 
-func (this *FileDB) SetFileInfoField(id string, field int, value interface{}) error {
-	fi, err := this.GetFileInfo(id)
-	if err != nil {
-		return err
-	}
-	if fi == nil {
-		return fmt.Errorf("fileinfo not found of %s", id)
-	}
-	switch field {
-	case FILEINFO_FIELD_FILENAME:
-		fi.FileName = value.(string)
-	case FILEINFO_FIELD_STORETX:
-		fi.StoreTx = value.(string)
-	case FILEINFO_FIELD_WHITELISTTX:
-		fi.WhitelistTx = value.(string)
-	case FILEINFO_FIELD_PROVE_PRIVATEKEY:
-		fi.ProvePrivKey = value.([]byte)
-	case FILEINFO_FIELD_PREFIX:
-		fi.Prefix = value.([]byte)
-	case FILEINFO_FIELD_TOTALCOUNT:
-		fi.TotalBlockCount = value.(uint64)
-	case FILEINFO_FIELD_COPYNUM:
-		fi.CopyNum = value.(uint64)
-	case FILEINFO_FIELD_URL:
-		fi.Url = value.(string)
-	case FILEINFO_FIELD_LINK:
-		fi.Link = value.(string)
-	case FILEINFO_FIELD_FILEHASH:
-		fi.FileHash = value.(string)
-	case FILEINFO_FIELD_FILEPATH:
-		fi.FilePath = value.(string)
-	case FILEINFO_FIELD_WALLETADDR:
-		fi.WalletAddress = value.(string)
-	case FILEINFO_FIELD_REGURL_TX:
-		fi.RegisterDNSTx = value.(string)
-	case FILEINFO_FIELD_BIND_TX:
-		fi.BindDNSTx = value.(string)
-	case FILEINFO_FIELD_TASKSTATE:
-		fi.TaskState = value.(uint64)
-	case FILEINFO_FIELD_OWNER:
-		fi.FileOwner = value.(string)
-	}
-	return this.batchSaveFileInfo(nil, fi)
-}
+// func (this *TaskDB) SetFileInfoField(id string, field int, value interface{}) error {
+// 	fi, err := this.GetTaskInfo(id)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if fi == nil {
+// 		return fmt.Errorf("fileinfo not found of %s", id)
+// 	}
+// 	switch field {
+// 	case FILEINFO_FIELD_FILENAME:
+// 		fi.FileName = value.(string)
+// 	case FILEINFO_FIELD_STORETX:
+// 		fi.StoreTx = value.(string)
+// 	case FILEINFO_FIELD_WHITELISTTX:
+// 		fi.WhitelistTx = value.(string)
+// 	case FILEINFO_FIELD_PROVE_PRIVATEKEY:
+// 		fi.ProvePrivKey = value.([]byte)
+// 	case FILEINFO_FIELD_PREFIX:
+// 		fi.Prefix = value.([]byte)
+// 	case FILEINFO_FIELD_TOTALCOUNT:
+// 		fi.TotalBlockCount = value.(uint64)
+// 	case FILEINFO_FIELD_COPYNUM:
+// 		fi.CopyNum = value.(uint64)
+// 	case FILEINFO_FIELD_URL:
+// 		fi.Url = value.(string)
+// 	case FILEINFO_FIELD_LINK:
+// 		fi.Link = value.(string)
+// 	case FILEINFO_FIELD_FILEHASH:
+// 		fi.FileHash = value.(string)
+// 	case FILEINFO_FIELD_FILEPATH:
+// 		fi.FilePath = value.(string)
+// 	case FILEINFO_FIELD_WALLETADDR:
+// 		fi.WalletAddress = value.(string)
+// 	case FILEINFO_FIELD_REGURL_TX:
+// 		fi.RegisterDNSTx = value.(string)
+// 	case FILEINFO_FIELD_BIND_TX:
+// 		fi.BindDNSTx = value.(string)
+// 	case FILEINFO_FIELD_TASKSTATE:
+// 		fi.TaskState = value.(uint64)
+// 	case FILEINFO_FIELD_OWNER:
+// 		fi.FileOwner = value.(string)
+// 	}
+// 	return this.batchSaveTaskInfo(nil, fi)
+// }
 
-func (this *FileDB) SetFileName(id string, fileName string) error {
+func (this *TaskDB) SetFileName(id string, fileName string) error {
 
-	fi, err := this.GetFileInfo(id)
+	fi, err := this.GetTaskInfo(id)
 	if err != nil {
 		return err
 	}
@@ -413,130 +416,130 @@ func (this *FileDB) SetFileName(id string, fileName string) error {
 		return fmt.Errorf("fileinfo not found of %s", id)
 	}
 	fi.FileName = fileName
-	return this.batchSaveFileInfo(nil, fi)
+	return this.batchSaveTaskInfo(nil, fi)
 }
 
-func (this *FileDB) SetFileInfoFields(id string, m map[int]interface{}) error {
+// func (this *TaskDB) SetFileInfoFields(id string, m map[int]interface{}) error {
 
-	fi, err := this.GetFileInfo(id)
-	if err != nil {
-		return err
-	}
-	if fi == nil {
-		return fmt.Errorf("fileinfo not found of %s", id)
-	}
-	for field, value := range m {
-		switch field {
-		case FILEINFO_FIELD_FILENAME:
-			fi.FileName = value.(string)
-		case FILEINFO_FIELD_STORETX:
-			fi.StoreTx = value.(string)
-		case FILEINFO_FIELD_WHITELISTTX:
-			fi.WhitelistTx = value.(string)
-		case FILEINFO_FIELD_PROVE_PRIVATEKEY:
-			fi.ProvePrivKey = value.([]byte)
-		case FILEINFO_FIELD_PREFIX:
-			fi.Prefix = value.([]byte)
-		case FILEINFO_FIELD_TOTALCOUNT:
-			fi.TotalBlockCount = value.(uint64)
-		case FILEINFO_FIELD_COPYNUM:
-			fi.CopyNum = value.(uint64)
-		case FILEINFO_FIELD_URL:
-			fi.Url = value.(string)
-		case FILEINFO_FIELD_LINK:
-			fi.Link = value.(string)
-		case FILEINFO_FIELD_FILEHASH:
-			fi.FileHash = value.(string)
-		case FILEINFO_FIELD_FILEPATH:
-			fi.FilePath = value.(string)
-		case FILEINFO_FIELD_WALLETADDR:
-			fi.WalletAddress = value.(string)
-		case FILEINFO_FIELD_REGURL_TX:
-			fi.RegisterDNSTx = value.(string)
-		case FILEINFO_FIELD_BIND_TX:
-			fi.BindDNSTx = value.(string)
-		case FILEINFO_FIELD_TASKSTATE:
-			fi.TaskState = value.(uint64)
-		case FILEINFO_FIELD_OWNER:
-			fi.FileOwner = value.(string)
-		}
-	}
-	return this.batchSaveFileInfo(nil, fi)
-}
+// 	fi, err := this.GetTaskInfo(id)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if fi == nil {
+// 		return fmt.Errorf("fileinfo not found of %s", id)
+// 	}
+// 	for field, value := range m {
+// 		switch field {
+// 		case FILEINFO_FIELD_FILENAME:
+// 			fi.FileName = value.(string)
+// 		case FILEINFO_FIELD_STORETX:
+// 			fi.StoreTx = value.(string)
+// 		case FILEINFO_FIELD_WHITELISTTX:
+// 			fi.WhitelistTx = value.(string)
+// 		case FILEINFO_FIELD_PROVE_PRIVATEKEY:
+// 			fi.ProvePrivKey = value.([]byte)
+// 		case FILEINFO_FIELD_PREFIX:
+// 			fi.Prefix = value.([]byte)
+// 		case FILEINFO_FIELD_TOTALCOUNT:
+// 			fi.TotalBlockCount = value.(uint64)
+// 		case FILEINFO_FIELD_COPYNUM:
+// 			fi.CopyNum = value.(uint64)
+// 		case FILEINFO_FIELD_URL:
+// 			fi.Url = value.(string)
+// 		case FILEINFO_FIELD_LINK:
+// 			fi.Link = value.(string)
+// 		case FILEINFO_FIELD_FILEHASH:
+// 			fi.FileHash = value.(string)
+// 		case FILEINFO_FIELD_FILEPATH:
+// 			fi.FilePath = value.(string)
+// 		case FILEINFO_FIELD_WALLETADDR:
+// 			fi.WalletAddress = value.(string)
+// 		case FILEINFO_FIELD_REGURL_TX:
+// 			fi.RegisterDNSTx = value.(string)
+// 		case FILEINFO_FIELD_BIND_TX:
+// 			fi.BindDNSTx = value.(string)
+// 		case FILEINFO_FIELD_TASKSTATE:
+// 			fi.TaskState = value.(uint64)
+// 		case FILEINFO_FIELD_OWNER:
+// 			fi.FileOwner = value.(string)
+// 		}
+// 	}
+// 	return this.batchSaveTaskInfo(nil, fi)
+// }
 
-func (this *FileDB) GetFileInfoStringValue(id string, field int) (string, error) {
-	fi, err := this.GetFileInfo(id)
-	if err != nil {
-		return "", err
-	}
-	if fi == nil {
-		return "", fmt.Errorf("fileinfo not found of %s", id)
-	}
-	switch field {
-	case FILEINFO_FIELD_FILENAME:
-		return fi.FileName, nil
-	case FILEINFO_FIELD_STORETX:
-		return fi.StoreTx, nil
-	case FILEINFO_FIELD_WHITELISTTX:
-		return fi.WhitelistTx, nil
-	case FILEINFO_FIELD_URL:
-		return fi.Url, nil
-	case FILEINFO_FIELD_LINK:
-		return fi.Link, nil
-	case FILEINFO_FIELD_FILEPATH:
-		return fi.FilePath, nil
-	case FILEINFO_FIELD_WALLETADDR:
-		return fi.WalletAddress, nil
-	case FILEINFO_FIELD_REGURL_TX:
-		return fi.RegisterDNSTx, nil
-	case FILEINFO_FIELD_BIND_TX:
-		return fi.BindDNSTx, nil
-	}
-	return "", fmt.Errorf("fileinfo field not found %s %d", id, field)
-}
+// func (this *TaskDB) GetFileInfoStringValue(id string, field int) (string, error) {
+// 	fi, err := this.GetTaskInfo(id)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	if fi == nil {
+// 		return "", fmt.Errorf("fileinfo not found of %s", id)
+// 	}
+// 	switch field {
+// 	case FILEINFO_FIELD_FILENAME:
+// 		return fi.FileName, nil
+// 	case FILEINFO_FIELD_STORETX:
+// 		return fi.StoreTx, nil
+// 	case FILEINFO_FIELD_WHITELISTTX:
+// 		return fi.WhitelistTx, nil
+// 	case FILEINFO_FIELD_URL:
+// 		return fi.Url, nil
+// 	case FILEINFO_FIELD_LINK:
+// 		return fi.Link, nil
+// 	case FILEINFO_FIELD_FILEPATH:
+// 		return fi.FilePath, nil
+// 	case FILEINFO_FIELD_WALLETADDR:
+// 		return fi.WalletAddress, nil
+// 	case FILEINFO_FIELD_REGURL_TX:
+// 		return fi.RegisterDNSTx, nil
+// 	case FILEINFO_FIELD_BIND_TX:
+// 		return fi.BindDNSTx, nil
+// 	}
+// 	return "", fmt.Errorf("fileinfo field not found %s %d", id, field)
+// }
 
-func (this *FileDB) GetFileInfoBytesValue(id string, field int) ([]byte, error) {
+// func (this *TaskDB) GetFileInfoBytesValue(id string, field int) ([]byte, error) {
 
-	fi, err := this.GetFileInfo(id)
-	if err != nil {
-		return nil, err
-	}
-	if fi == nil {
-		return nil, fmt.Errorf("fileinfo not found of %s", id)
-	}
-	switch field {
-	case FILEINFO_FIELD_PROVE_PRIVATEKEY:
-		return fi.ProvePrivKey, nil
-	case FILEINFO_FIELD_PREFIX:
-		return fi.Prefix, nil
-	}
-	return nil, fmt.Errorf("fileinfo field not found %s %d", id, field)
-}
+// 	fi, err := this.GetTaskInfo(id)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if fi == nil {
+// 		return nil, fmt.Errorf("fileinfo not found of %s", id)
+// 	}
+// 	switch field {
+// 	case FILEINFO_FIELD_PROVE_PRIVATEKEY:
+// 		return fi.ProvePrivKey, nil
+// 	case FILEINFO_FIELD_PREFIX:
+// 		return fi.Prefix, nil
+// 	}
+// 	return nil, fmt.Errorf("fileinfo field not found %s %d", id, field)
+// }
 
-func (this *FileDB) GetFileInfoUint64Value(id string, field int) (uint64, error) {
+// func (this *TaskDB) GetFileInfoUint64Value(id string, field int) (uint64, error) {
 
-	fi, err := this.GetFileInfo(id)
-	if err != nil {
-		return 0, err
-	}
-	if fi == nil {
-		return 0, fmt.Errorf("fileinfo not found of %s", id)
-	}
-	switch field {
-	case FILEINFO_FIELD_TOTALCOUNT:
-		return fi.TotalBlockCount, nil
-	case FILEINFO_FIELD_COPYNUM:
-		return fi.CopyNum, nil
-	case FILEINFO_FIELD_TASKSTATE:
-		return fi.TaskState, nil
-	}
-	return 0, fmt.Errorf("fileinfo field not found %s %d", id, field)
-}
+// 	fi, err := this.GetTaskInfo(id)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	if fi == nil {
+// 		return 0, fmt.Errorf("fileinfo not found of %s", id)
+// 	}
+// 	switch field {
+// 	case FILEINFO_FIELD_TOTALCOUNT:
+// 		return fi.TotalBlockCount, nil
+// 	case FILEINFO_FIELD_COPYNUM:
+// 		return fi.CopyNum, nil
+// 	case FILEINFO_FIELD_TASKSTATE:
+// 		return fi.TaskState, nil
+// 	}
+// 	return 0, fmt.Errorf("fileinfo field not found %s %d", id, field)
+// }
 
-func (this *FileDB) DeleteTaskIds(ids []string) error {
+func (this *TaskDB) DeleteTaskIds(ids []string) error {
 	batch := this.db.NewBatch()
 	for _, id := range ids {
-		taskInfo, err := this.GetFileInfo(id)
+		taskInfo, err := this.GetTaskInfo(id)
 		if err != nil || taskInfo == nil {
 			continue
 		}
@@ -546,8 +549,8 @@ func (this *FileDB) DeleteTaskIds(ids []string) error {
 	return this.db.BatchCommit(batch)
 }
 
-// DeleteFileInfo. delete file info from db
-func (this *FileDB) DeleteFileInfo(id string) error {
+// DeleteTaskInfo. delete file info from db
+func (this *TaskDB) DeleteTaskInfo(id string) error {
 	taskCount, err := this.GetTaskCount()
 	if err != nil {
 		return err
@@ -570,7 +573,7 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 		}
 		this.db.BatchDelete(batch, countKey)
 	}
-	fi, _ := this.GetFileInfo(id)
+	fi, _ := this.GetTaskInfo(id)
 	if fi != nil {
 		// delete undone list
 		this.RemoveFromUndoneList(batch, id, fi.Type)
@@ -648,93 +651,10 @@ func (this *FileDB) DeleteFileInfo(id string) error {
 	return this.db.BatchCommit(batch)
 }
 
-// AddUploadedBlock. add a uploaded block into db
-func (this *FileDB) AddUploadedBlock(id, blockHashStr, nodeAddr string, index uint32, dataSize, offset uint64) error {
+func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockInfo) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	fi, err := this.GetFileInfo(id)
-	if err != nil {
-		log.Errorf("get info err %s", err)
-		return err
-	}
-	if fi == nil {
-		log.Errorf("file info not found %d", id)
-		return errors.New("file info not found")
-	}
-	// save block info
-	blockKey := BlockInfoKey(id, index, blockHashStr)
-	block, _ := this.getBlockInfo(blockKey)
-	if block == nil {
-		block = &BlockInfo{
-			FileInfoId: id,
-			FileHash:   fi.FileHash,
-			Hash:       blockHashStr,
-			Index:      index,
-			NodeList:   make([]string, 0),
-			ReqTimes:   make(map[string]uint64),
-		}
-	}
-	reqTime := block.ReqTimes[nodeAddr]
-	if reqTime > 0 {
-		block.ReqTimes[nodeAddr] = reqTime + 1
-		log.Debugf("the node has request this block: %s, times: %d", blockHashStr, reqTime)
-		blockBuf, err := json.Marshal(block)
-		if err != nil {
-			return err
-		}
-		return this.db.Put([]byte(blockKey), blockBuf)
-	}
-	block.ReqTimes[nodeAddr] = reqTime + 1
-	block.NodeList = append(block.NodeList, nodeAddr)
-	if block.DataOffset < offset {
-		block.DataOffset = offset
-		log.Debugf("set offset for %d %d, old %v", index, offset, block.DataOffset)
-	}
-	if block.DataSize < dataSize {
-		block.DataSize = dataSize
-	}
-	blockBuf, err := json.Marshal(block)
-	if err != nil {
-		return err
-	}
-	// save upload progress info
-	progressKey := FileProgressKey(fi.Id, nodeAddr)
-	progress, _ := this.getProgressInfo(progressKey)
-	if progress == nil {
-		progress = &FileProgress{
-			FileInfoId:   fi.Id,
-			NodeHostAddr: nodeAddr,
-		}
-	}
-	if progress.Progress == fi.TotalBlockCount && fi.SaveBlockCountMap[nodeAddr] == fi.TotalBlockCount && fi.TotalBlockCount > 0 {
-		// has done
-		log.Debugf("block has added: %d, %v, %v, %s", progress.Progress, fi.TotalBlockCount, fi.SaveBlockCountMap, nodeAddr)
-		return nil
-	}
-	progress.Progress++
-	progressBuf, err := json.Marshal(progress)
-	if err != nil {
-		return err
-	}
-	fi.SaveBlockCountMap[nodeAddr] = fi.SaveBlockCountMap[nodeAddr] + 1
-	fi.CurrentBlock = blockHashStr
-	fi.CurrentIndex = uint64(index)
-	fiBuf, err := json.Marshal(fi)
-	if err != nil {
-		return err
-	}
-	batch := this.db.NewBatch()
-	this.db.BatchPut(batch, []byte(blockKey), blockBuf)
-	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
-	this.db.BatchPut(batch, []byte(TaskInfoKey(fi.Id)), fiBuf)
-	log.Debugf("%s, nodeAddr %s increase sent %v, reqTime %v", fi.Id, nodeAddr, fi.SaveBlockCountMap, block.ReqTimes[nodeAddr])
-	return this.db.BatchCommit(batch)
-}
-
-func (this *FileDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockInfo) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	fi, err := this.GetFileInfo(id)
+	fi, err := this.GetTaskInfo(id)
 	if err != nil {
 		log.Errorf("get info err %s", err)
 		return err
@@ -749,8 +669,9 @@ func (this *FileDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 	progress, _ := this.getProgressInfo(progressKey)
 	if progress == nil {
 		progress = &FileProgress{
-			FileInfoId:   fi.Id,
+			TaskId:       fi.Id,
 			NodeHostAddr: nodeAddr,
+			CreatedAt:    utils.GetMilliSecTimestamp(),
 		}
 	}
 	for _, bi := range blockInfos {
@@ -761,12 +682,12 @@ func (this *FileDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 		block, _ := this.getBlockInfo(blockKey)
 		if block == nil {
 			block = &BlockInfo{
-				FileInfoId: id,
-				FileHash:   fi.FileHash,
-				Hash:       blockHashStr,
-				Index:      index,
-				NodeList:   make([]string, 0),
-				ReqTimes:   make(map[string]uint64),
+				TaskId:   id,
+				FileHash: fi.FileHash,
+				Hash:     blockHashStr,
+				Index:    index,
+				NodeList: make([]string, 0),
+				ReqTimes: make(map[string]uint32),
 			}
 		}
 		reqTime := block.ReqTimes[nodeAddr]
@@ -797,18 +718,17 @@ func (this *FileDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 		if err != nil {
 			return err
 		}
-		if progress.Progress == fi.TotalBlockCount && fi.SaveBlockCountMap[nodeAddr] == fi.TotalBlockCount && fi.TotalBlockCount > 0 {
+		if progress.Progress == fi.TotalBlockCount && fi.TotalBlockCount > 0 {
 			// has done
-			log.Debugf("block has added: %d, %v, %v, %s", progress.Progress, fi.TotalBlockCount, fi.SaveBlockCountMap, nodeAddr)
+			log.Debugf("block has added: %d, %v, %v, %s", progress.Progress, fi.TotalBlockCount, nodeAddr)
 			return nil
 		}
 		progress.Progress++
-		fi.SaveBlockCountMap[nodeAddr] = fi.SaveBlockCountMap[nodeAddr] + 1
 		fi.CurrentBlock = blockHashStr
-		fi.CurrentIndex = uint64(index)
+		fi.CurrentIndex = index
 		this.db.BatchPut(batch, []byte(blockKey), blockBuf)
 	}
-	log.Debugf("%s, nodeAddr %s increase sent %v, progress %v", fi.Id, nodeAddr, fi.SaveBlockCountMap, progress)
+	log.Debugf("%s, nodeAddr %s increase progress %v", fi.Id, nodeAddr, progress)
 	progressBuf, err := json.Marshal(progress)
 	if err != nil {
 		return err
@@ -823,7 +743,7 @@ func (this *FileDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 }
 
 // UpdateTaskPeerProgress. increase count of progress for a peer
-func (this *FileDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) error {
+func (this *TaskDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint32) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	batch := this.db.NewBatch()
@@ -832,11 +752,13 @@ func (this *FileDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) er
 	progress, _ := this.getProgressInfo(progressKey)
 	if progress == nil {
 		progress = &FileProgress{
-			FileInfoId:   id,
+			TaskId:       id,
 			NodeHostAddr: nodeAddr,
+			CreatedAt:    utils.GetMilliSecTimestamp(),
 		}
 	}
 	progress.Progress = count
+	progress.UpdatedAt = utils.GetMilliSecTimestamp()
 	log.Debugf("%s, nodeAddr %s progress %v", id, nodeAddr, progress)
 	progressBuf, err := json.Marshal(progress)
 	if err != nil {
@@ -847,7 +769,7 @@ func (this *FileDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) er
 }
 
 // GetTaskPeerProgress. get progress for a peer
-func (this *FileDB) GetTaskPeerProgress(id, nodeAddr string) uint64 {
+func (this *TaskDB) GetTaskPeerProgress(id, nodeAddr string) uint32 {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	// save upload progress info
@@ -860,15 +782,15 @@ func (this *FileDB) GetTaskPeerProgress(id, nodeAddr string) uint64 {
 }
 
 // GetCurrentSetBlock.
-func (this *FileDB) GetCurrentSetBlock(id string) (string, uint64, error) {
-	fi, err := this.GetFileInfo(id)
+func (this *TaskDB) GetCurrentSetBlock(id string) (string, uint32, error) {
+	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
 		return "", 0, fmt.Errorf("get file info not found: %s", id)
 	}
 	return fi.CurrentBlock, fi.CurrentIndex, nil
 }
 
-func (this *FileDB) GetBlockOffset(id, blockHash string, index uint32) (uint64, error) {
+func (this *TaskDB) GetBlockOffset(id, blockHash string, index uint32) (uint64, error) {
 	if index == 0 {
 		return 0, nil
 	}
@@ -884,24 +806,38 @@ func (this *FileDB) GetBlockOffset(id, blockHash string, index uint32) (uint64, 
 	return block.DataOffset, nil
 }
 
-func (this *FileDB) IsFileUploaded(id string) bool {
+func (this *TaskDB) IsFileUploaded(id string, isDispatched bool) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	fi, err := this.GetFileInfo(id)
+	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
+		log.Errorf("query upload progress keys failed, file info not found %s", err)
 		return false
 	}
-	sum := uint64(0)
-	for _, cnt := range fi.SaveBlockCountMap {
-		sum += cnt
+	progressPrefix := FileProgressKey(fi.Id, "")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(progressPrefix))
+	if err != nil {
+		log.Errorf("query upload progress keys failed %s", err)
+		return false
 	}
-	uploaded := sum
-	log.Debugf("IsFileUploaded %d %d, save: %d, copyNum: %d", fi.TotalBlockCount, uploaded, sum, fi.CopyNum)
-	return fi.TotalBlockCount > 0 && fi.TotalBlockCount == uploaded
+	sum := uint32(0)
+	for _, key := range keys {
+		progress, _ := this.getProgressInfo(key)
+		if progress == nil {
+			continue
+		}
+		sum += progress.Progress
+	}
+	log.Debugf("check is file uploaded total block %d, progress sum %d, copyNum: %d, is dispatched %t",
+		fi.TotalBlockCount, sum, fi.CopyNum, isDispatched)
+	if !isDispatched {
+		return fi.TotalBlockCount > 0 && fi.TotalBlockCount == sum
+	}
+	return fi.TotalBlockCount > 0 && fi.TotalBlockCount*fi.CopyNum == sum
 }
 
 // IsBlockUploaded. check if a block is uploaded
-func (this *FileDB) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uint32) bool {
+func (this *TaskDB) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uint32) bool {
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -917,7 +853,7 @@ func (this *FileDB) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uin
 }
 
 // GetUploadedBlockNodeList. get uploaded block nodelist
-func (this *FileDB) GetUploadedBlockNodeList(id, blockHashStr string, index uint32) []string {
+func (this *TaskDB) GetUploadedBlockNodeList(id, blockHashStr string, index uint32) []string {
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -926,31 +862,31 @@ func (this *FileDB) GetUploadedBlockNodeList(id, blockHashStr string, index uint
 	return block.NodeList
 }
 
-// UploadedBlockCount
-func (this *FileDB) UploadedBlockCount(id string) uint64 {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
-	fi, err := this.GetFileInfo(id)
-	if err != nil || fi == nil {
-		return 0
-	}
-	sum := uint64(0)
-	for _, cnt := range fi.SaveBlockCountMap {
-		sum += cnt
-	}
-	return sum
-}
+// // UploadedBlockCount
+// func (this *TaskDB) UploadedBlockCount(id string) uint64 {
+// 	this.lock.RLock()
+// 	defer this.lock.RUnlock()
+// 	fi, err := this.GetTaskInfo(id)
+// 	if err != nil || fi == nil {
+// 		return 0
+// 	}
+// 	sum := uint64(0)
+// 	for _, cnt := range fi.SaveBlockCountMap {
+// 		sum += cnt
+// 	}
+// 	return sum
+// }
 
 // AddFileBlockHashes add all blocks' hash, using for detect whether the node has stored the file
-func (this *FileDB) AddFileBlockHashes(id string, blocks []string) error {
+func (this *TaskDB) AddFileBlockHashes(id string, blocks []string) error {
 	// TODO: test performance
 	batch := this.db.NewBatch()
 	for index, hash := range blocks {
 		key := BlockInfoKey(id, uint32(index), hash)
 		info := &BlockInfo{
-			FileInfoId: id,
-			Hash:       hash,
-			Index:      uint32(index),
+			TaskId: id,
+			Hash:   hash,
+			Index:  uint32(index),
 		}
 		buf, err := json.Marshal(info)
 		if err != nil {
@@ -961,7 +897,7 @@ func (this *FileDB) AddFileBlockHashes(id string, blocks []string) error {
 	return this.db.BatchCommit(batch)
 }
 
-func (this *FileDB) AddFileUnpaid(id, recipientWalAddr string, paymentId, asset int32, amount uint64) error {
+func (this *TaskDB) AddFileUnpaid(id, recipientWalAddr string, paymentId, asset int32, amount uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	unpaidKey := FileUnpaidKey(id, recipientWalAddr, asset)
@@ -972,8 +908,8 @@ func (this *FileDB) AddFileUnpaid(id, recipientWalAddr string, paymentId, asset 
 	}
 	if info == nil {
 		info = &FileDownloadUnPaid{
-			FileInfoId: id,
-			Payments:   make(map[int32]*Payment, 0),
+			TaskId:   id,
+			Payments: make(map[int32]*Payment, 0),
 		}
 	}
 
@@ -1002,7 +938,7 @@ func (this *FileDB) AddFileUnpaid(id, recipientWalAddr string, paymentId, asset 
 }
 
 // GetUnpaidPayments. get unpaid amount of task to payee
-func (this *FileDB) GetUnpaidPayments(id, payToAddress string, asset int32) (map[int32]*Payment, error) {
+func (this *TaskDB) GetUnpaidPayments(id, payToAddress string, asset int32) (map[int32]*Payment, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
@@ -1017,7 +953,7 @@ func (this *FileDB) GetUnpaidPayments(id, payToAddress string, asset int32) (map
 	return info.Payments, nil
 }
 
-func (this *FileDB) DeleteFileUnpaid(id, payToAddress string, paymentId, asset int32, amount uint64) error {
+func (this *TaskDB) DeleteFileUnpaid(id, payToAddress string, paymentId, asset int32, amount uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
@@ -1051,9 +987,9 @@ func (this *FileDB) DeleteFileUnpaid(id, payToAddress string, paymentId, asset i
 	return this.db.BatchCommit(batch)
 }
 
-// IsInfoExist return a file is exist or not
-func (this *FileDB) IsFileInfoExist(id string) bool {
-	fi, err := this.GetFileInfo(id)
+// IsTaskInfoExist return a file is exist or not
+func (this *TaskDB) IsTaskInfoExist(id string) bool {
+	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
 		return false
 	}
@@ -1061,8 +997,8 @@ func (this *FileDB) IsFileInfoExist(id string) bool {
 }
 
 // FileBlockHashes. return file block hashes
-func (this *FileDB) FileBlockHashes(id string) []string {
-	fi, err := this.GetFileInfo(id)
+func (this *TaskDB) FileBlockHashes(id string) []string {
+	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
 		return nil
 	}
@@ -1081,16 +1017,16 @@ func (this *FileDB) FileBlockHashes(id string) []string {
 }
 
 // FileProgress. return each node count progress
-func (this *FileDB) FileProgress(id string) map[string]uint64 {
+func (this *TaskDB) FileProgress(id string) map[string]uint32 {
 	prefix := FileProgressKey(id, "")
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
 		return nil
 	}
-	m := make(map[string]uint64)
+	m := make(map[string]uint32)
 	for _, key := range keys {
 		progress, err := this.getProgressInfo(key)
-		if err != nil {
+		if err != nil || progress == nil {
 			continue
 		}
 		m[progress.NodeHostAddr] = progress.Progress
@@ -1099,7 +1035,7 @@ func (this *FileDB) FileProgress(id string) map[string]uint64 {
 }
 
 //  SetBlockStored set the flag of store state
-func (this *FileDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
+func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -1108,7 +1044,7 @@ func (this *FileDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 			LinkHashes: make([]string, 0),
 		}
 	}
-	block.FileInfoId = id
+	block.TaskId = id
 	block.Hash = blockHashStr
 	block.Index = index
 	block.DataOffset = uint64(offset)
@@ -1124,7 +1060,7 @@ func (this *FileDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 	progress, err := this.getProgressInfo(progressKey)
 	if progress == nil || err != nil {
 		progress = &FileProgress{
-			FileInfoId:   id,
+			TaskId:       id,
 			NodeHostAddr: nodeAddr,
 		}
 	}
@@ -1134,13 +1070,12 @@ func (this *FileDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 		return err
 	}
 
-	fi, err := this.GetFileInfo(id)
+	fi, err := this.GetTaskInfo(id)
 	if err != nil {
 		return err
 	}
-	fi.SaveBlockCountMap[nodeAddr]++
 	fi.CurrentBlock = blockHashStr
-	fi.CurrentIndex = uint64(index)
+	fi.CurrentIndex = index
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
 		return err
@@ -1154,7 +1089,7 @@ func (this *FileDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 }
 
 //  IsBlockDownloaded
-func (this *FileDB) IsBlockDownloaded(id, blockHashStr string, index uint32) bool {
+func (this *TaskDB) IsBlockDownloaded(id, blockHashStr string, index uint32) bool {
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -1167,21 +1102,32 @@ func (this *FileDB) IsBlockDownloaded(id, blockHashStr string, index uint32) boo
 }
 
 // IsFileDownloaded check if a downloaded file task has finished storing all blocks
-func (this *FileDB) IsFileDownloaded(id string) bool {
-	fi, err := this.GetFileInfo(id)
+func (this *TaskDB) IsFileDownloaded(id string) bool {
+	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
+		log.Errorf("query upload progress keys failed, file info not found %s", err)
 		return false
 	}
-	sum := uint64(0)
-	for _, cnt := range fi.SaveBlockCountMap {
-		sum += cnt
+	progressPrefix := FileProgressKey(fi.Id, "")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(progressPrefix))
+	if err != nil {
+		log.Errorf("query upload progress keys failed %s", err)
+		return false
+	}
+	sum := uint32(0)
+	for _, key := range keys {
+		progress, _ := this.getProgressInfo(key)
+		if progress == nil {
+			continue
+		}
+		sum += progress.Progress
 	}
 	return sum == fi.TotalBlockCount && fi.TotalBlockCount > 0
 }
 
 // GetUndownloadedBlockInfo. check undownloaded block in-order
-func (this *FileDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint32, error) {
-	fi, err := this.GetFileInfo(id)
+func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint32, error) {
+	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
 		return nil, nil, errors.New("file not found")
 	}
@@ -1255,7 +1201,7 @@ func (this *FileDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string
 	return hashes, indexMap, nil
 }
 
-func (this *FileDB) RemoveFromUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {
+func (this *TaskDB) RemoveFromUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {
 	var list []string
 	var undoneKey string
 	switch ft {
@@ -1296,7 +1242,7 @@ func (this *FileDB) RemoveFromUndoneList(batch *leveldb.Batch, id string, ft Tas
 	}
 }
 
-func (this *FileDB) UndoneList(ft TaskType) ([]string, error) {
+func (this *TaskDB) UndoneList(ft TaskType) ([]string, error) {
 	var list []string
 	var undoneKey string
 	switch ft {
@@ -1321,11 +1267,11 @@ func (this *FileDB) UndoneList(ft TaskType) ([]string, error) {
 	return list, nil
 }
 
-func (this *FileDB) SetUploadProgressDone(id, nodeAddr string) error {
+func (this *TaskDB) SetUploadProgressDone(id, nodeAddr string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	log.Debugf("SetUploadProgressDone :%s, addr: %s", id, nodeAddr)
-	fi, err := this.GetFileInfo(id)
+	fi, err := this.GetTaskInfo(id)
 	if err != nil {
 		log.Errorf("get info err %s", err)
 		return err
@@ -1339,19 +1285,18 @@ func (this *FileDB) SetUploadProgressDone(id, nodeAddr string) error {
 	progress, _ := this.getProgressInfo(progressKey)
 	if progress == nil {
 		progress = &FileProgress{
-			FileInfoId:   fi.Id,
+			TaskId:       fi.Id,
 			NodeHostAddr: nodeAddr,
 		}
 	}
-	log.Debugf("save upload progress done before: %v %v", fi.SaveBlockCountMap, progress.Progress)
+	log.Debugf("save upload progress done before: %v", progress.Progress)
 	progress.Progress = fi.TotalBlockCount
 	progressBuf, err := json.Marshal(progress)
 	if err != nil {
 		return err
 	}
 	// TODO: split save block count for each node
-	fi.SaveBlockCountMap[nodeAddr] = fi.TotalBlockCount
-	log.Debugf("save upload progress done after: %v %v", fi.SaveBlockCountMap, progress.Progress)
+	log.Debugf("save upload progress done after %v", progress.Progress)
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
 		return err
@@ -1362,11 +1307,82 @@ func (this *FileDB) SetUploadProgressDone(id, nodeAddr string) error {
 	return this.db.BatchCommit(batch)
 }
 
-func (this *FileDB) SaveFileUploaded(id string) error {
+func (this *TaskDB) UpdateTaskProgress(id, nodeAddr string, prog uint32) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	log.Debugf("UpdateTaskProgress :%s, addr: %s, progress %d", id, nodeAddr, prog)
+	// save upload progress info
+	progressKey := FileProgressKey(id, nodeAddr)
+	progress, _ := this.getProgressInfo(progressKey)
+	if progress == nil {
+		progress = &FileProgress{
+			TaskId:       id,
+			NodeHostAddr: nodeAddr,
+		}
+	}
+	log.Debugf("save  progress  before: %v %v", progress.Progress)
+	progress.Progress = prog
+	progressBuf, err := json.Marshal(progress)
+	if err != nil {
+		return err
+	}
+	log.Debugf("save  progress: %v %v", progress.Progress)
+	return this.db.Put([]byte(progressKey), progressBuf)
+}
+
+func (this *TaskDB) UpdateTaskProgressState(id, nodeAddr string, state TaskState) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	log.Debugf("UpdateTaskProgress :%s, addr: %s, state %d", id, nodeAddr, state)
+	// save upload progress info
+	progressKey := FileProgressKey(id, nodeAddr)
+	progress, _ := this.getProgressInfo(progressKey)
+	if progress == nil {
+		progress = &FileProgress{
+			TaskId:       id,
+			NodeHostAddr: nodeAddr,
+			CreatedAt:    utils.GetMilliSecTimestamp(),
+		}
+	}
+	log.Debugf("save  progress  before: %v %v", progress.Progress)
+	if state == TaskStateDoing {
+		progress.TransferCount++
+	}
+	progress.NextUpdatedAt = utils.GetMilliSecTimestamp() + common.DISPATCH_FILE_DURATION*1000
+	progress.State = state
+	progress.UpdatedAt = utils.GetMilliSecTimestamp()
+	progressBuf, err := json.Marshal(progress)
+	if err != nil {
+		return err
+	}
+	log.Debugf("save  progress: %v %v", progress.Progress)
+	return this.db.Put([]byte(progressKey), progressBuf)
+}
+
+// IsNodeTaskDone. check if a node has done
+func (this *TaskDB) IsNodeTaskDoingOrDone(id, nodeAddr string) (bool, error) {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	fi, err := this.GetTaskInfo(id)
+	if err != nil || fi == nil {
+		return false, err
+	}
+	log.Debugf("IsNodeTaskDone :%s, addr: %s,", id, nodeAddr)
+	// save upload progress info
+	progressKey := FileProgressKey(id, nodeAddr)
+	progress, _ := this.getProgressInfo(progressKey)
+	if progress == nil {
+		return false, fmt.Errorf("task %s progress of node %s not found", id, nodeAddr)
+	}
+	return progress.Progress == fi.TotalBlockCount && fi.TotalBlockCount > 0 ||
+		progress.State == TaskStateDoing, nil
+}
+
+func (this *TaskDB) SaveFileUploaded(id string) error {
 	return this.RemoveFromUndoneList(nil, id, TaskTypeUpload)
 }
 
-func (this *FileDB) SaveFileDownloaded(id string) error {
+func (this *TaskDB) SaveFileDownloaded(id string) error {
 	countKey := FileDownloadedCountKey()
 	countBuf, err := this.db.Get([]byte(countKey))
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1392,7 +1408,7 @@ func (this *FileDB) SaveFileDownloaded(id string) error {
 }
 
 // AllDownloadFiles. get all download files from db
-func (this *FileDB) AllDownloadFiles() ([]*TaskInfo, []string, error) {
+func (this *TaskDB) AllDownloadFiles() ([]*TaskInfo, []string, error) {
 	countKey := FileDownloadedCountKey()
 	countBuf, err := this.db.Get([]byte(countKey))
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1415,7 +1431,7 @@ func (this *FileDB) AllDownloadFiles() ([]*TaskInfo, []string, error) {
 		if err != nil || len(idBuf) == 0 {
 			continue
 		}
-		fi, err := this.GetFileInfo(string(idBuf))
+		fi, err := this.GetTaskInfo(string(idBuf))
 		if err != nil || fi == nil {
 			continue
 		}
@@ -1433,12 +1449,12 @@ func (this *FileDB) AllDownloadFiles() ([]*TaskInfo, []string, error) {
 	return infos, all, nil
 }
 
-func (this *FileDB) AddShareTo(id, walletAddress string) error {
+func (this *TaskDB) AddShareTo(id, walletAddress string) error {
 	shareKey := FileShareToKey(id, walletAddress)
 	return this.db.Put([]byte(shareKey), []byte("true"))
 }
 
-func (this *FileDB) GetUnpaidAmount(id, walletAddress string, asset int32) (uint64, error) {
+func (this *TaskDB) GetUnpaidAmount(id, walletAddress string, asset int32) (uint64, error) {
 	shareKey := FileShareToKey(id, walletAddress)
 	exist, err := this.db.Get([]byte(shareKey))
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1462,7 +1478,7 @@ func (this *FileDB) GetUnpaidAmount(id, walletAddress string, asset int32) (uint
 }
 
 // getFileUploadInfo. helper function, get file upload info from db. if fileinfo not found, return (nil, nil)
-func (this *FileDB) GetFileInfo(id string) (*TaskInfo, error) {
+func (this *TaskDB) GetTaskInfo(id string) (*TaskInfo, error) {
 	key := []byte(TaskInfoKey(id))
 	value, err := this.db.Get(key)
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1481,7 +1497,7 @@ func (this *FileDB) GetFileInfo(id string) (*TaskInfo, error) {
 	return info, nil
 }
 
-func (this *FileDB) getFileInfoByKey(key string) (*TaskInfo, error) {
+func (this *TaskDB) getTaskInfoByKey(key string) (*TaskInfo, error) {
 	value, err := this.db.Get([]byte(key))
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, err
@@ -1499,7 +1515,7 @@ func (this *FileDB) getFileInfoByKey(key string) (*TaskInfo, error) {
 	return info, nil
 }
 
-func (this *FileDB) SetFileUploadOptions(fileInfoId string, options *fs.UploadOption) error {
+func (this *TaskDB) SetFileUploadOptions(fileInfoId string, options *fs.UploadOption) error {
 	buf, err := json.Marshal(options)
 	if err != nil {
 		return err
@@ -1508,7 +1524,7 @@ func (this *FileDB) SetFileUploadOptions(fileInfoId string, options *fs.UploadOp
 	return this.db.Put([]byte(key), buf)
 }
 
-func (this *FileDB) GetFileUploadOptions(fileInfoId string) (*fs.UploadOption, error) {
+func (this *TaskDB) GetFileUploadOptions(fileInfoId string) (*fs.UploadOption, error) {
 	key := FileOptionsKey(fileInfoId)
 	value, err := this.db.Get([]byte(key))
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1525,7 +1541,7 @@ func (this *FileDB) GetFileUploadOptions(fileInfoId string) (*fs.UploadOption, e
 	return opt, nil
 }
 
-func (this *FileDB) SetFileDownloadOptions(fileInfoId string, options *common.DownloadOption) error {
+func (this *TaskDB) SetFileDownloadOptions(fileInfoId string, options *common.DownloadOption) error {
 	buf, err := json.Marshal(options)
 	if err != nil {
 		return err
@@ -1534,7 +1550,7 @@ func (this *FileDB) SetFileDownloadOptions(fileInfoId string, options *common.Do
 	return this.db.Put([]byte(key), buf)
 }
 
-func (this *FileDB) GetFileDownloadOptions(fileInfoId string) (*common.DownloadOption, error) {
+func (this *TaskDB) GetFileDownloadOptions(fileInfoId string) (*common.DownloadOption, error) {
 	key := FileOptionsKey(fileInfoId)
 	value, err := this.db.Get([]byte(key))
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1551,7 +1567,7 @@ func (this *FileDB) GetFileDownloadOptions(fileInfoId string) (*common.DownloadO
 	return opt, nil
 }
 
-func (this *FileDB) AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress string, asset, unitPrice uint64) error {
+func (this *TaskDB) AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress string, asset uint32, unitPrice uint64) error {
 	countKey := []byte(FileSessionCountKey(fileInfoId))
 	data, err := this.db.Get(countKey)
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1584,7 +1600,7 @@ func (this *FileDB) AddFileSession(fileInfoId, sessionId, walletAddress, hostAdd
 	return this.db.BatchCommit(batch)
 }
 
-func (this *FileDB) GetFileSessions(fileInfoId string) (map[string]*Session, error) {
+func (this *TaskDB) GetFileSessions(fileInfoId string) (map[string]*Session, error) {
 	countKey := []byte(FileSessionCountKey(fileInfoId))
 	data, err := this.db.Get(countKey)
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1615,11 +1631,11 @@ func (this *FileDB) GetFileSessions(fileInfoId string) (map[string]*Session, err
 }
 
 // saveFileInfo. helper function, put fileinfo to db
-func (this *FileDB) SaveFileInfo(info *TaskInfo) error {
-	return this.batchSaveFileInfo(nil, info)
+func (this *TaskDB) SaveTaskInfo(info *TaskInfo) error {
+	return this.batchSaveTaskInfo(nil, info)
 }
 
-func (this *FileDB) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
+func (this *TaskDB) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
 	buf, err := this.db.Get([]byte(TaskIdOfPaymentIDKey(paymentId)))
 	if err != nil && err != leveldb.ErrNotFound {
 		return "", err
@@ -1627,7 +1643,7 @@ func (this *FileDB) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
 	return string(buf), nil
 }
 
-func (this *FileDB) RemoveFromUnSalvedList(batch *leveldb.Batch, id string, ft TaskType) error {
+func (this *TaskDB) RemoveFromUnSalvedList(batch *leveldb.Batch, id string, ft TaskType) error {
 	var list []string
 	var key string
 	switch ft {
@@ -1667,7 +1683,7 @@ func (this *FileDB) RemoveFromUnSalvedList(batch *leveldb.Batch, id string, ft T
 	}
 }
 
-func (this *FileDB) UnSlavedList(ft TaskType) ([]string, error) {
+func (this *TaskDB) UnSlavedList(ft TaskType) ([]string, error) {
 	var list []string
 	var key string
 	switch ft {
@@ -1692,7 +1708,77 @@ func (this *FileDB) UnSlavedList(ft TaskType) ([]string, error) {
 	return list, nil
 }
 
-func (this *FileDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {
+func (this *TaskDB) GetUploadDoneNodeAddr(id string) (string, error) {
+	info, err := this.GetTaskInfo(id)
+	if err != nil {
+		return "", err
+	}
+	if info == nil {
+		return "", fmt.Errorf("upload file info not found")
+	}
+	progressPrefix := FileProgressKey(info.Id, "")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(progressPrefix))
+	if err != nil {
+		log.Errorf("query upload progress keys failed %s", err)
+		return "", err
+	}
+	for _, key := range keys {
+		progress, _ := this.getProgressInfo(key)
+		if progress == nil {
+			continue
+		}
+		if progress.Progress == info.TotalBlockCount {
+			return progress.NodeHostAddr, nil
+		}
+	}
+
+	return "", fmt.Errorf("no done node")
+}
+
+func (this *TaskDB) GetUnDispatchTaskInfos(curWalletAddr string) ([]*TaskInfo, error) {
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		return nil, err
+	}
+	taskInfos := make([]*TaskInfo, 0, len(keys))
+	for _, key := range keys {
+		info, err := this.getTaskInfoByKey(key)
+		if err != nil || info == nil {
+			continue
+		}
+		if info.Type != TaskTypeUpload {
+			continue
+		}
+		if info.TaskState == uint32(TaskStateDone) {
+			continue
+		}
+		if info.FileOwner == curWalletAddr {
+			continue
+		}
+		newInfo := this.CopyTask(info)
+		if newInfo == nil {
+			log.Warnf("copy task %s failed", info.Id)
+			continue
+		}
+		taskInfos = append(taskInfos, newInfo)
+	}
+	return taskInfos, nil
+}
+
+func (this *TaskDB) CopyTask(t *TaskInfo) *TaskInfo {
+	data, err := json.Marshal(t)
+	if err != nil {
+		return nil
+	}
+	newInfo := &TaskInfo{}
+	if err := json.Unmarshal(data, &newInfo); err != nil {
+		return nil
+	}
+	return newInfo
+}
+
+func (this *TaskDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {
 	var list []string
 	var undoneKey string
 	switch ft {
@@ -1735,7 +1821,7 @@ func (this *FileDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft Tas
 	return nil
 }
 
-func (this *FileDB) batchAddToUnSlavedList(batch *leveldb.Batch, id string, ft TaskType) error {
+func (this *TaskDB) batchAddToUnSlavedList(batch *leveldb.Batch, id string, ft TaskType) error {
 	var key string
 	switch ft {
 	case TaskTypeUpload:
@@ -1787,7 +1873,7 @@ func appendToStringSlice(data []byte, value string) ([]byte, error) {
 	return newData, nil
 }
 
-func (this *FileDB) batchSaveFileInfo(batch *leveldb.Batch, info *TaskInfo) error {
+func (this *TaskDB) batchSaveTaskInfo(batch *leveldb.Batch, info *TaskInfo) error {
 	info.UpdatedAt = utils.GetMilliSecTimestamp()
 	key := []byte(TaskInfoKey(info.Id))
 	buf, err := json.Marshal(info)
@@ -1801,7 +1887,7 @@ func (this *FileDB) batchSaveFileInfo(batch *leveldb.Batch, info *TaskInfo) erro
 	return nil
 }
 
-func (this *FileDB) batchSaveTaskCount(batch *leveldb.Batch, taskCount *TaskCount) error {
+func (this *TaskDB) batchSaveTaskCount(batch *leveldb.Batch, taskCount *TaskCount) error {
 	data, err := json.Marshal(taskCount)
 	if err != nil {
 		return err
@@ -1814,7 +1900,7 @@ func (this *FileDB) batchSaveTaskCount(batch *leveldb.Batch, taskCount *TaskCoun
 }
 
 // getBlockInfo. helper function, get file upload info from db. if fileinfo not found, return (nil, nil)
-func (this *FileDB) getBlockInfo(key string) (*BlockInfo, error) {
+func (this *TaskDB) getBlockInfo(key string) (*BlockInfo, error) {
 	value, err := this.db.Get([]byte(key))
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, err
@@ -1830,7 +1916,7 @@ func (this *FileDB) getBlockInfo(key string) (*BlockInfo, error) {
 	return info, nil
 }
 
-func (this *FileDB) saveBlockInfo(key string, info *BlockInfo) error {
+func (this *TaskDB) saveBlockInfo(key string, info *BlockInfo) error {
 	buf, err := json.Marshal(info)
 	if err != nil {
 		return err
@@ -1838,7 +1924,7 @@ func (this *FileDB) saveBlockInfo(key string, info *BlockInfo) error {
 	return this.db.Put([]byte(key), buf)
 }
 
-func (this *FileDB) getProgressInfo(key string) (*FileProgress, error) {
+func (this *TaskDB) getProgressInfo(key string) (*FileProgress, error) {
 	value, err := this.db.Get([]byte(key))
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, err
@@ -1854,7 +1940,7 @@ func (this *FileDB) getProgressInfo(key string) (*FileProgress, error) {
 	return info, nil
 }
 
-func (this *FileDB) saveProgress(key []byte, info *FileProgress) error {
+func (this *TaskDB) saveProgress(key []byte, info *FileProgress) error {
 	buf, err := json.Marshal(info)
 	if err != nil {
 		return err
@@ -1862,7 +1948,7 @@ func (this *FileDB) saveProgress(key []byte, info *FileProgress) error {
 	return this.db.Put(key, buf)
 }
 
-func (this *FileDB) getFileUnpaidInfo(key string) (*FileDownloadUnPaid, error) {
+func (this *TaskDB) getFileUnpaidInfo(key string) (*FileDownloadUnPaid, error) {
 	value, err := this.db.Get([]byte(key))
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, err
@@ -1879,7 +1965,7 @@ func (this *FileDB) getFileUnpaidInfo(key string) (*FileDownloadUnPaid, error) {
 	return info, nil
 }
 
-func (this *FileDB) batchDeleteBlocks(batch *leveldb.Batch, fi *TaskInfo) error {
+func (this *TaskDB) batchDeleteBlocks(batch *leveldb.Batch, fi *TaskInfo) error {
 	if fi == nil {
 		return nil
 	}
@@ -1902,7 +1988,7 @@ func (this *FileDB) batchDeleteBlocks(batch *leveldb.Batch, fi *TaskInfo) error 
 	return nil
 }
 
-func (this *FileDB) batchDeleteProgress(batch *leveldb.Batch, id string) error {
+func (this *TaskDB) batchDeleteProgress(batch *leveldb.Batch, id string) error {
 	prefix := FileProgressKey(id, "")
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {

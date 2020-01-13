@@ -78,7 +78,7 @@ func (this *TaskMgr) GetTaskDetailState(taskId string) (TaskProgressState, error
 	return v.TransferingState(), nil
 }
 
-func (this *TaskMgr) GetFileTotalBlockCount(taskId string) (uint64, error) {
+func (this *TaskMgr) GetFileTotalBlockCount(taskId string) (uint32, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
@@ -132,6 +132,14 @@ func (this *TaskMgr) GetStoreTx(taskId string) (string, error) {
 		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
 	return v.GetStoreTx(), nil
+}
+
+func (this *TaskMgr) GetTaskInfoClone(taskId string) (*store.TaskInfo, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
+	}
+	return v.GetTaskInfoClone(), nil
 }
 
 func (this *TaskMgr) GetRegUrlTx(taskId string) (string, error) {
@@ -214,7 +222,7 @@ func (this *TaskMgr) GetFileDownloadOptions(id string) (*common.DownloadOption, 
 	return opt, nil
 }
 
-func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint64, error) {
+func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint32, error) {
 	hash, index, err := this.db.GetCurrentSetBlock(fileInfoId)
 	if err != nil {
 		return "", 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
@@ -222,8 +230,8 @@ func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint64, erro
 	return hash, index, nil
 }
 
-func (this *TaskMgr) IsFileUploaded(id string) bool {
-	return this.db.IsFileUploaded(id)
+func (this *TaskMgr) IsFileUploaded(id string, isDispatched bool) bool {
+	return this.db.IsFileUploaded(id, isDispatched)
 }
 
 func (this *TaskMgr) IsFileDownloaded(id string) bool {
@@ -231,7 +239,7 @@ func (this *TaskMgr) IsFileDownloaded(id string) bool {
 }
 
 func (this *TaskMgr) GetFileInfo(id string) (*store.TaskInfo, error) {
-	info, err := this.db.GetFileInfo(id)
+	info, err := this.db.GetTaskInfo(id)
 	if err != nil {
 		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 	}
@@ -249,10 +257,6 @@ func (this *TaskMgr) GetUploadedBlockNodeList(id, blockHashStr string, index uin
 	return this.db.GetUploadedBlockNodeList(id, blockHashStr, index)
 }
 
-func (this *TaskMgr) UploadedBlockCount(id string) uint64 {
-	return this.db.UploadedBlockCount(id)
-}
-
 func (this *TaskMgr) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uint32) bool {
 	return this.db.IsBlockUploaded(id, blockHashStr, nodeAddr, index)
 }
@@ -262,7 +266,7 @@ func (this *TaskMgr) FileBlockHashes(id string) []string {
 }
 
 func (this *TaskMgr) IsFileInfoExist(id string) bool {
-	return this.db.IsFileInfoExist(id)
+	return this.db.IsTaskInfoExist(id)
 }
 
 func (this *TaskMgr) AllDownloadFiles() ([]*store.TaskInfo, []string, error) {
@@ -290,7 +294,7 @@ func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint32) (uint64,
 }
 
 func (this *TaskMgr) GetShareTaskReferId(id string) (string, error) {
-	info, err := this.db.GetFileInfo(id)
+	info, err := this.db.GetTaskInfo(id)
 	if err != nil {
 		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 	}
@@ -319,7 +323,7 @@ func (this *TaskMgr) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
 }
 
 // GetTaskPeerProgress. get task peer progress
-func (this *TaskMgr) GetTaskPeerProgress(id, nodeAddr string) uint64 {
+func (this *TaskMgr) GetTaskPeerProgress(id, nodeAddr string) uint32 {
 	return this.db.GetTaskPeerProgress(id, nodeAddr)
 }
 
@@ -330,4 +334,12 @@ func (this *TaskMgr) GetDownloadedTaskId(fileHashStr string) (string, error) {
 		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 	}
 	return id, nil
+}
+
+func (this *TaskMgr) GetUnDispatchTaskInfos(curWalletAddr string) ([]*store.TaskInfo, error) {
+	tasks, err := this.db.GetUnDispatchTaskInfos(curWalletAddr)
+	if err != nil {
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return tasks, nil
 }

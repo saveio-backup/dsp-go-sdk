@@ -57,7 +57,7 @@ func (this *TaskMgr) SetFileName(taskId, fileName string) error {
 	}
 	return nil
 }
-func (this *TaskMgr) SetTotalBlockCount(taskId string, totalBlockCount uint64) error {
+func (this *TaskMgr) SetTotalBlockCount(taskId string, totalBlockCount uint32) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetFileName] task not found: %s", taskId)
@@ -94,7 +94,7 @@ func (this *TaskMgr) SetWalletAddr(taskId, walletAddr string) error {
 	return nil
 }
 
-func (this *TaskMgr) SetCopyNum(taskId string, copyNum uint64) error {
+func (this *TaskMgr) SetCopyNum(taskId string, copyNum uint32) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetCopyNum] task not found: %s", taskId)
@@ -251,18 +251,6 @@ func (this *TaskMgr) BatchCommit(taskId string) error {
 	return nil
 }
 
-func (this *TaskMgr) AddUploadedBlock(taskId, blockHashStr, nodeAddr string, index uint32, dataSize, offset uint64) error {
-	v, ok := this.GetTaskById(taskId)
-	if !ok {
-		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
-	}
-	err := v.AddUploadedBlock(taskId, blockHashStr, nodeAddr, index, dataSize, offset)
-	if err != nil {
-		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
-	}
-	return nil
-}
-
 func (this *TaskMgr) SetBlocksUploaded(taskId, nodeAddr string, blockInfos []*store.BlockInfo) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
@@ -297,6 +285,51 @@ func (this *TaskMgr) SetUploadProgressDone(taskId, nodeAddr string) error {
 	return nil
 }
 
+func (this *TaskMgr) UpdateTaskNodeState(taskId, nodeAddr string, state store.TaskState) error {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
+	}
+	if v.State() == store.TaskStateCancel || v.State() == store.TaskStateFailed {
+		return nil
+	}
+	err := this.db.UpdateTaskProgressState(taskId, nodeAddr, state)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
+}
+
+func (this *TaskMgr) UpdateTaskProgress(taskId, nodeAddr string, progress uint32) error {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
+	}
+	if v.State() == store.TaskStateCancel || v.State() == store.TaskStateFailed {
+		return nil
+	}
+	err := this.db.UpdateTaskProgress(taskId, nodeAddr, progress)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
+}
+
+func (this *TaskMgr) IsNodeTaskDoingOrDone(taskId, nodeAddr string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
+	}
+	if v.State() == store.TaskStateCancel || v.State() == store.TaskStateFailed {
+		return false, nil
+	}
+	doingOrdone, err := this.db.IsNodeTaskDoingOrDone(taskId, nodeAddr)
+	if err != nil {
+		return false, sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return doingOrdone, nil
+}
+
 func (this *TaskMgr) SetBlockDownloaded(taskId, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
@@ -325,7 +358,8 @@ func (this *TaskMgr) SetFileDownloadOptions(id string, opt *common.DownloadOptio
 	return nil
 }
 
-func (this *TaskMgr) AddFileSession(fileInfoId string, sessionId, walletAddress, hostAddress string, asset, unitPrice uint64) error {
+func (this *TaskMgr) AddFileSession(fileInfoId string, sessionId, walletAddress, hostAddress string,
+	asset uint32, unitPrice uint64) error {
 	this.SetSessionId(fileInfoId, walletAddress, sessionId)
 	err := this.db.AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress, asset, unitPrice)
 	if err != nil {
@@ -387,7 +421,7 @@ func (this *TaskMgr) RemoveUnSlavedTasks(id string) error {
 	return nil
 }
 
-func (this *TaskMgr) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) error {
+func (this *TaskMgr) UpdateTaskPeerProgress(id, nodeAddr string, count uint32) error {
 	err := this.db.UpdateTaskPeerProgress(id, nodeAddr, count)
 	if err != nil {
 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
