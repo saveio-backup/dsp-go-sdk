@@ -216,9 +216,9 @@ func (this *Dsp) RunGetProgressTicker() bool {
 		progressSum := uint32(0)
 		for _, info := range progress.Infos {
 			log.Debugf("receive %s-%s progress wallet: %v, progress: %d", progress.Hash, fileHash, info.NodeAddr, info.Count)
-			oldCount := this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
-			if oldCount > uint32(info.Count) {
-				progressSum += oldCount
+			oldProgress := this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
+			if oldProgress != nil && oldProgress.Progress > uint32(info.Count) {
+				progressSum += oldProgress.Progress
 				continue
 			}
 			if err := this.taskMgr.UpdateTaskPeerProgress(id, info.NodeAddr, uint32(info.Count)); err != nil {
@@ -231,6 +231,7 @@ func (this *Dsp) RunGetProgressTicker() bool {
 			continue
 		}
 		taskHasDone++
+		log.Debugf("remove unslaved task %s", id)
 		this.taskMgr.RemoveUnSlavedTasks(id)
 	}
 	if taskHasDone == len(ids) {

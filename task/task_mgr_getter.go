@@ -323,7 +323,7 @@ func (this *TaskMgr) GetTaskIdWithPaymentId(paymentId int32) (string, error) {
 }
 
 // GetTaskPeerProgress. get task peer progress
-func (this *TaskMgr) GetTaskPeerProgress(id, nodeAddr string) uint32 {
+func (this *TaskMgr) GetTaskPeerProgress(id, nodeAddr string) *store.FileProgress {
 	return this.db.GetTaskPeerProgress(id, nodeAddr)
 }
 

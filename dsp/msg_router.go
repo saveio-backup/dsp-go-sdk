@@ -263,6 +263,8 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		task.Prefix(string(fileMsg.Prefix)),
 		task.Walletaddr(this.chain.WalletAddress()),
 		task.FileOwner(info.FileOwner.ToBase58()),
+		task.StoreTx(fileMsg.Tx.Hash),
+		task.StoreTxHeight(uint32(fileMsg.Tx.Height)),
 		task.TotalBlockCnt(uint32(fileMsg.TotalBlockCount))); err != nil {
 		log.Errorf("batch set file info fetch ask %s", err)
 		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR,
@@ -754,15 +756,19 @@ func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext,
 	nodeInfos := make([]*progress.ProgressInfo, 0)
 	for _, info := range progressMsg.Infos {
 		id := this.taskMgr.TaskId(progressMsg.Hash, this.WalletAddress(), store.TaskTypeUpload)
-		prog := uint32(0)
+		var prog *store.FileProgress
 		if len(id) != 0 {
 			prog = this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
 		}
-		log.Debugf("handle req progress msg, get progress of id %s, file: %s, addr %s, count %d",
+		log.Debugf("handle req progress msg, get progress of id %s, file: %s, addr %s, count %d, ",
 			id, progressMsg.Hash, info.NodeAddr, prog)
+		count := uint32(0)
+		if prog != nil {
+			count = prog.Progress
+		}
 		nodeInfos = append(nodeInfos, &progress.ProgressInfo{
 			NodeAddr: info.NodeAddr,
-			Count:    int32(prog),
+			Count:    int32(count),
 		})
 	}
 	resp := message.NewProgressMsg(this.WalletAddress(), progressMsg.Hash, netcom.FILE_OP_PROGRESS,

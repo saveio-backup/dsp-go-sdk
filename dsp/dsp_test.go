@@ -1213,7 +1213,7 @@ func TestGetUnproveFiles(t *testing.T) {
 
 func TestGetFileInfo(t *testing.T) {
 	dspCfg := &config.DspConfig{
-		ChainRpcAddrs: []string{"http://127.0.0.1:20336"},
+		ChainRpcAddrs: []string{"http://106.75.10.25:20336"},
 	}
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
@@ -1228,28 +1228,19 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	info, err := d.chain.GetFileInfo("QmQUDC3nh2ZhWo1oz41MXXEdrj1AMnNRSDecP3Chdh1DaU")
+	fileHash := "QmbqpZwUHptpbspu9iZrMCepv6P9zQH19p7LvqV5EVFgWH"
+	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	whiteList, err := d.chain.GetWhiteList("QmQUDC3nh2ZhWo1oz41MXXEdrj1AMnNRSDecP3Chdh1DaU")
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Printf("info: %v\n", info.Privilege)
-	fmt.Printf("whitelist: %v\n", whiteList.List[0].Addr.ToBase58())
-	details, err := d.chain.GetFileProveDetails("QmQUDC3nh2ZhWo1oz41MXXEdrj1AMnNRSDecP3Chdh1DaU")
+	fmt.Printf("info: %v\n", info.PrimaryNodes)
+	details, err := d.chain.GetFileProveDetails(fileHash)
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Printf("details %v\n", details.ProveDetailNum)
 	for _, d := range details.ProveDetails {
 		fmt.Printf("addr: %s, %s, %d \n", d.NodeAddr, d.WalletAddr.ToBase58(), d.ProveTimes)
-	}
-	if CheckFilePrivilege(d.chain.Themis(), "QmQUDC3nh2ZhWo1oz41MXXEdrj1AMnNRSDecP3Chdh1DaU", "APEoBSphUAJ5VhT2CoEApzFVsgsW3Hk3Zy") {
-		fmt.Printf("can download")
-	} else {
-		panic("can't download")
 	}
 	os.RemoveAll(filepath.Base(".") + "/Log")
 }

@@ -20,3 +20,10 @@ func TestCallRequestWithArgs(t *testing.T) {
 	fmt.Printf("end: %d, resps: %v\n", time.Now().Unix(), resps)
 	time.Sleep(time.Minute)
 }
+
+func TestGetMilliSecTimestamp(t *testing.T) {
+	now1 := GetMilliSecTimestamp()
+	time.Sleep(time.Second)
+	now2 := GetMilliSecTimestamp()
+	fmt.Println((now2 - now1) / 1000)
+}

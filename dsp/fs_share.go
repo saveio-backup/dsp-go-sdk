@@ -225,5 +225,9 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	}
 	// update share progress
 	oldProgress := this.taskMgr.GetTaskPeerProgress(taskId, req[0].PeerAddr)
-	this.taskMgr.UpdateTaskPeerProgress(taskId, req[0].PeerAddr, oldProgress+uint32(len(req)))
+	if oldProgress == nil {
+		this.taskMgr.UpdateTaskPeerProgress(taskId, req[0].PeerAddr, uint32(len(req)))
+		return
+	}
+	this.taskMgr.UpdateTaskPeerProgress(taskId, req[0].PeerAddr, oldProgress.Progress+uint32(len(req)))
 }

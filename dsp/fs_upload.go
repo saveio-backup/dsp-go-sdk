@@ -1152,9 +1152,12 @@ func (this *Dsp) sendBlocks(taskId, prefix string, hashes []string, g0, fileID [
 			if data.refCnt > 0 {
 				continue
 			}
-			log.Debugf("delete block msg data of key: %s", key)
 			delete(blockMsgDataMap, key)
 			this.fs.ReturnBuffer(data.blockData)
+		}
+		if len(reqInfos) > 0 {
+			log.Debugf("delete block msg data of key %s-%d to %s-%d", reqInfos[0].Hash, reqInfos[0].Index,
+				reqInfos[len(reqInfos)-1].Hash, reqInfos[len(reqInfos)-1].Index)
 		}
 	}
 	return this.sendBlocksToPeer(taskId, fileHashStr, payRet.MasterNodeHostAddr, prefix,
@@ -1391,23 +1394,32 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 	if len(nodesToDispatch) == 0 {
 		return nil
 	}
-	if len(taskId) == 0 {
-		var err error
-		taskId, err = this.taskMgr.NewTask(store.TaskTypeUpload)
-		log.Debugf("new task id %s upload task", taskId)
-		if err != nil {
-			return err
-		}
-		if err := this.taskMgr.BindTaskId(taskId); err != nil {
-			return err
-		}
-	}
 	refTaskInfo, err := this.taskMgr.GetTaskInfoClone(referId)
 	if err != nil {
 		return err
 	}
 	blockHashes := this.taskMgr.FileBlockHashes(referId)
 	totalCount := len(blockHashes)
+	if len(taskId) == 0 {
+		var err error
+		taskId, err = this.taskMgr.NewTask(store.TaskTypeUpload)
+		log.Debugf("new task id %s upload file %s", taskId, fileHashStr)
+		if err != nil {
+			return err
+		}
+		if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
+			task.FileHash(fileHashStr),
+			task.Walletaddr(this.WalletAddress()),
+			task.ReferId(referId),
+			task.CopyNum(uint32(fileInfo.CopyNum)),
+			task.FileOwner(fileInfo.FileOwner.ToBase58()),
+			task.TotalBlockCnt(uint32(totalCount))); err != nil {
+			return err
+		}
+		if err := this.taskMgr.BindTaskId(taskId); err != nil {
+			return err
+		}
+	}
 	getMsgData := func(hash string, index uint32) *blockMsgData {
 		block := this.fs.GetBlock(hash)
 		blockData := this.fs.BlockDataOfAny(block)
@@ -1426,13 +1438,6 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 			tag:       tag,
 			offset:    offset,
 		}
-	}
-	if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
-		task.ReferId(referId),
-		task.CopyNum(uint32(fileInfo.CopyNum)),
-		task.FileOwner(fileInfo.FileOwner.ToBase58()),
-		task.TotalBlockCnt(uint32(totalCount))); err != nil {
-		return err
 	}
 	for _, node := range nodesToDispatch {
 		go func(peerAddr string) {
@@ -1499,7 +1504,7 @@ func (this *Dsp) startDispatchFileService() {
 				this.taskMgr.SetTaskState(t.Id, store.TaskStateDone)
 				continue
 			}
-			log.Debugf("get task %s to dispatch %t", t.Id, this.taskMgr.IsFileUploaded(t.Id, true))
+			log.Debugf("get task %s to dispatch %s", t.Id, t.FileHash)
 			go this.dispatchBlocks(t.Id, t.ReferId, t.FileHash)
 		}
 	}

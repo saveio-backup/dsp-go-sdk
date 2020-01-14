@@ -709,7 +709,6 @@ func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 		offset := bi.DataOffset
 		if block.DataOffset < offset {
 			block.DataOffset = offset
-			log.Debugf("set offset for %d %d, old %v", index, offset, block.DataOffset)
 		}
 		if block.DataSize < bi.DataSize {
 			block.DataSize = bi.DataSize
@@ -727,6 +726,10 @@ func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 		fi.CurrentBlock = blockHashStr
 		fi.CurrentIndex = index
 		this.db.BatchPut(batch, []byte(blockKey), blockBuf)
+	}
+	if len(blockInfos) > 0 {
+		log.Debugf("set offset for %s-%d-%d to %s-%d-%d", fi.FileHash, blockInfos[0].Index, blockInfos[0].DataOffset,
+			blockInfos[len(blockInfos)-1].Index, blockInfos[len(blockInfos)-1].DataOffset)
 	}
 	log.Debugf("%s, nodeAddr %s increase progress %v", fi.Id, nodeAddr, progress)
 	progressBuf, err := json.Marshal(progress)
@@ -769,16 +772,13 @@ func (this *TaskDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint32) er
 }
 
 // GetTaskPeerProgress. get progress for a peer
-func (this *TaskDB) GetTaskPeerProgress(id, nodeAddr string) uint32 {
+func (this *TaskDB) GetTaskPeerProgress(id, nodeAddr string) *FileProgress {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	// save upload progress info
 	progressKey := FileProgressKey(id, nodeAddr)
 	progress, _ := this.getProgressInfo(progressKey)
-	if progress == nil {
-		return 0
-	}
-	return progress.Progress
+	return progress
 }
 
 // GetCurrentSetBlock.
