@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -1200,7 +1201,8 @@ func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx stri
 	}
 	blocks := make([]*block.Block, 0, common.MAX_SEND_BLOCK_COUNT)
 	blockInfos := make([]*store.BlockInfo, 0, common.MAX_SEND_BLOCK_COUNT)
-	sending := false
+	sending := uint32(0)
+
 	limitWg := new(sync.WaitGroup)
 	stopTickerCh := make(chan struct{})
 	defer close(stopTickerCh)
@@ -1210,7 +1212,8 @@ func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx stri
 		for {
 			select {
 			case <-speedLimitTicker.C:
-				if sending {
+				if ok := atomic.CompareAndSwapUint32(&sending, 1, 0); ok {
+					log.Debugf("sending is 1, set 0")
 					limitWg.Done()
 				}
 			case <-stopTickerCh:
@@ -1254,15 +1257,15 @@ func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx stri
 		log.Debugf("will send blocks %d", len(blocks))
 		this.taskMgr.ActiveUploadTaskPeer(peerAddr)
 		// handle fetch request async
-		limitWg.Add(1)
-		sending = true
+		if ok := atomic.CompareAndSwapUint32(&sending, 0, 1); ok {
+			log.Debugf("sending is 0, add 1")
+			limitWg.Add(1)
+		}
 		if err := this.sendBlockFlightMsg(taskId, fileHashStr, peerAddr, blocks); err != nil {
 			limitWg.Wait()
-			sending = false
 			return err
 		}
 		limitWg.Wait()
-		sending = false
 
 		if cleanMsgData != nil {
 			cleanMsgData(blocks)
