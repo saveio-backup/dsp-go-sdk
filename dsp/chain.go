@@ -86,11 +86,13 @@ func (this *Dsp) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
 	return this.chain.GetUserSpace(walletAddr)
 }
 
-func (this *Dsp) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error) {
+func (this *Dsp) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (
+	string, error) {
 	return this.chain.UpdateUserSpace(walletAddr, size, sizeOpType, blockCount, countOpType)
 }
 
-func (this *Dsp) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
+func (this *Dsp) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (
+	*usdt.State, error) {
 	return this.chain.GetUpdateUserSpaceCost(walletAddr, size, sizeOpType, blockCount, countOpType)
 }
 
@@ -172,23 +174,36 @@ func (this *Dsp) GetMemPoolTxCount() (*sdkCom.MemPoolTxCount, error) {
 func (this *Dsp) GetMemPoolTxState(txHash string) (*sdkCom.MemPoolTxState, error) {
 	return this.chain.GetMemPoolTxState(txHash)
 }
-func (this *Dsp) GetSmartContractEventByEventId(contractAddress string, address string, eventId uint32) ([]*sdkCom.SmartContactEvent, error) {
+
+func (this *Dsp) GetSmartContractEventByEventId(contractAddress string, address string, eventId uint32) (
+	[]*sdkCom.SmartContactEvent, error) {
 	return this.chain.GetSmartContractEventByEventId(contractAddress, address, eventId)
 }
+
+func (this *Dsp) GetSmartContractEventByEventIdAndHeights(contractAddress string, address string,
+	eventId, startHeight, endHeight uint32) ([]*sdkCom.SmartContactEvent, error) {
+	return this.chain.GetSmartContractEventByEventIdAndHeights(contractAddress, address, eventId,
+		startHeight, endHeight)
+}
+
 func (this *Dsp) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartContactEvent, error) {
 	return this.chain.GetSmartContractEventByBlock(height)
 }
-func (this *Dsp) Transfer(gasPrice, gasLimit uint64, from *account.Account, to chainCom.Address, amount uint64) (string, error) {
+func (this *Dsp) Transfer(gasPrice, gasLimit uint64, from *account.Account, to chainCom.Address, amount uint64) (
+	string, error) {
 	return this.chain.Transfer(gasPrice, gasLimit, from, to, amount)
 }
-func (this *Dsp) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account.Account, version byte, contractAddress chainCom.Address, method string, params []interface{}) (string, error) {
+func (this *Dsp) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account.Account, version byte,
+	contractAddress chainCom.Address, method string, params []interface{}) (string, error) {
 	return this.chain.InvokeNativeContract(gasPrice, gasLimit, signer, version, contractAddress, method, params)
 }
-func (this *Dsp) PreExecInvokeNativeContract(contractAddress chainCom.Address, version byte, method string, params []interface{}) (*sdkCom.PreExecResult, error) {
+func (this *Dsp) PreExecInvokeNativeContract(contractAddress chainCom.Address, version byte, method string,
+	params []interface{}) (*sdkCom.PreExecResult, error) {
 	return this.chain.PreExecInvokeNativeContract(contractAddress, version, method, params)
 }
 
-func (this *Dsp) GetChannelInfoFromChain(channelID uint64, participant1, participant2 chainCom.Address) (*micropayment.ChannelInfo, error) {
+func (this *Dsp) GetChannelInfoFromChain(channelID uint64, participant1, participant2 chainCom.Address) (
+	*micropayment.ChannelInfo, error) {
 	if this.chain == nil {
 		return nil, dspErr.New(dspErr.CHAIN_ERROR, "no chain")
 	}

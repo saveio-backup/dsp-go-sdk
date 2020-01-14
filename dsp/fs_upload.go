@@ -1200,6 +1200,25 @@ func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx stri
 	}
 	blocks := make([]*block.Block, 0, common.MAX_SEND_BLOCK_COUNT)
 	blockInfos := make([]*store.BlockInfo, 0, common.MAX_SEND_BLOCK_COUNT)
+	sending := false
+	limitWg := new(sync.WaitGroup)
+	stopTickerCh := make(chan struct{})
+	defer close(stopTickerCh)
+	go func() {
+		speedLimitTicker := time.NewTicker(time.Second)
+		defer speedLimitTicker.Stop()
+		for {
+			select {
+			case <-speedLimitTicker.C:
+				if sending {
+					limitWg.Done()
+				}
+			case <-stopTickerCh:
+				log.Debugf("stop check limit ticker")
+				return
+			}
+		}
+	}()
 	for index, hash := range blockHashes {
 		if uint32(index) < startIndex {
 			continue
@@ -1235,9 +1254,16 @@ func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx stri
 		log.Debugf("will send blocks %d", len(blocks))
 		this.taskMgr.ActiveUploadTaskPeer(peerAddr)
 		// handle fetch request async
+		limitWg.Add(1)
+		sending = true
 		if err := this.sendBlockFlightMsg(taskId, fileHashStr, peerAddr, blocks); err != nil {
+			limitWg.Wait()
+			sending = false
 			return err
 		}
+		limitWg.Wait()
+		sending = false
+
 		if cleanMsgData != nil {
 			cleanMsgData(blocks)
 		}

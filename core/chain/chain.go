@@ -227,6 +227,17 @@ func (this *Chain) GetSmartContractEventByEventId(contractAddress string, addres
 	}
 	return val, nil
 }
+
+func (this *Chain) GetSmartContractEventByEventIdAndHeights(contractAddress string, address string,
+	eventId, startHeight, endHeight uint32) ([]*sdkCom.SmartContactEvent, error) {
+	val, err := this.themis.GetSmartContractEventByEventIdAndHeights(
+		contractAddress, address, eventId, startHeight, endHeight)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return val, nil
+}
+
 func (this *Chain) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartContactEvent, error) {
 	val, err := this.themis.GetSmartContractEventByBlock(height)
 	if err != nil {
