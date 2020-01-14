@@ -1245,6 +1245,9 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 
 func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.BlockResp) error {
 	log.Debugf("putBlocks taskId: %s, fileHash: %s", taskId, fileHashStr)
+	if len(fileHashStr) != 0 {
+		defer this.fs.PinRoot(context.TODO(), fileHashStr)
+	}
 	if this.taskMgr.IsFileDownloaded(taskId) {
 		log.Debugf("file has downloaded: %s", fileHashStr)
 		err := this.fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)

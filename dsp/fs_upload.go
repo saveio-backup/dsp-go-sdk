@@ -1184,15 +1184,14 @@ func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx stri
 	}
 	respFileMsg := resp.Payload.(*file.File)
 	log.Debugf("blockHashes :%d", len(blockHashes))
-	startIndex := uint64(0)
+	startIndex := uint32(0)
 	if respFileMsg.Breakpoint != nil && len(respFileMsg.Breakpoint.Hash) != 0 &&
 		respFileMsg.Breakpoint.Index != 0 && respFileMsg.Breakpoint.Index < uint64(len(blockHashes)) &&
 		blockHashes[respFileMsg.Breakpoint.Index] == respFileMsg.Breakpoint.Hash {
-		startIndex = respFileMsg.Breakpoint.Index + 1
-		if err := this.taskMgr.UpdateTaskProgress(taskId, peerAddr,
-			uint32(respFileMsg.Breakpoint.Index+1)); err != nil {
-			return err
-		}
+		startIndex = uint32(respFileMsg.Breakpoint.Index + 1)
+	}
+	if err := this.taskMgr.UpdateTaskProgress(taskId, peerAddr, startIndex); err != nil {
+		return err
 	}
 	log.Debugf("task %s, start at %d", taskId, startIndex)
 	if stop, err := this.taskMgr.IsTaskStop(taskId); stop || err != nil {
@@ -1202,7 +1201,7 @@ func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx stri
 	blocks := make([]*block.Block, 0, common.MAX_SEND_BLOCK_COUNT)
 	blockInfos := make([]*store.BlockInfo, 0, common.MAX_SEND_BLOCK_COUNT)
 	for index, hash := range blockHashes {
-		if uint64(index) < startIndex {
+		if uint32(index) < startIndex {
 			continue
 		}
 		blockMsgData := getMsgData(hash, uint32(index))
