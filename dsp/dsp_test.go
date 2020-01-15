@@ -1228,12 +1228,22 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	fileHash := "QmUax2wMEq7QEm6BEugmrt5Dc2VBbT6YTib5Gr9GjGAojv"
+	fileHash := "QmZ1Gv8hh5msPh5M8ikZnjgFxGZcsBeKpovXsBz9egLzyJ"
 	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("info: %v\n", info.PrimaryNodes)
+	curHeight, err := d.chain.GetCurrentBlockHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("curHeight %d\n", curHeight)
+	fmt.Printf("height %d time: %d\n", info.BlockHeight, time.Now().Unix()-(int64(curHeight-uint32(info.BlockHeight)))*5)
+	fmt.Printf("expiredHeight %d\n", info.ExpiredHeight)
+	host, err := d.chain.GetNodeHostAddrListByWallets(info.PrimaryNodes.AddrList)
+	for idx, wa := range info.PrimaryNodes.AddrList {
+		fmt.Printf("wallet: %s, addr: %s\n", wa.ToBase58(), host[idx])
+	}
 	details, err := d.chain.GetFileProveDetails(fileHash)
 	if err != nil {
 		t.Fatal(err)

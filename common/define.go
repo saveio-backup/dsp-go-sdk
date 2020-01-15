@@ -1,6 +1,8 @@
 package common
 
 import (
+	"fmt"
+
 	chainCom "github.com/saveio/themis/common"
 )
 
@@ -92,4 +94,8 @@ type Gas struct {
 type NodeInfo struct {
 	HostAddr   string
 	WalletAddr string
+}
+
+func (n NodeInfo) String() string {
+	return fmt.Sprintf("wallet address: %s, host address: %s", n.WalletAddr, n.HostAddr)
 }

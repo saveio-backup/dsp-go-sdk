@@ -1036,6 +1036,8 @@ func (this *TaskDB) FileProgress(id string) map[string]uint32 {
 
 //  SetBlockStored set the flag of store state
 func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -1043,6 +1045,11 @@ func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 			NodeList:   make([]string, 0),
 			LinkHashes: make([]string, 0),
 		}
+	}
+	blockHasDownloaded := false
+	if block != nil && block.TaskId == id && block.Hash == blockHashStr && block.Index == index {
+		log.Warnf("set a downloaded block to db task %s, %s-%d", id, blockHashStr, index)
+		blockHasDownloaded = true
 	}
 	block.TaskId = id
 	block.Hash = blockHashStr
@@ -1054,6 +1061,10 @@ func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 	blockBuf, err := json.Marshal(block)
 	if err != nil {
 		return err
+	}
+
+	if blockHasDownloaded {
+		return this.db.Put([]byte(blockKey), blockBuf)
 	}
 
 	progressKey := FileProgressKey(id, nodeAddr)

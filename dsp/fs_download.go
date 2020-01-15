@@ -1261,9 +1261,19 @@ func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.B
 	}
 
 	for _, value := range resps {
+		if len(value.Block) == 0 {
+			log.Errorf("receive empty block %d of file %s", len(value.Block), fileHashStr)
+			return fmt.Errorf("receive empty block %d of file %s", len(value.Block), fileHashStr)
+		}
 		blk := this.fs.EncodedToBlockWithCid(value.Block, value.Hash)
 		if blk.Cid().String() != value.Hash {
 			return fmt.Errorf("receive a wrong block: %s, expected: %s", blk.Cid().String(), value.Hash)
+		}
+		if len(value.Tag) == 0 {
+			log.Errorf("receive empty tag %d of file %s and block %s",
+				len(value.Tag), fileHashStr, blk.Cid().String())
+			return fmt.Errorf("receive empty tag %d of file %s and block %s",
+				len(value.Tag), fileHashStr, blk.Cid().String())
 		}
 		if err := this.fs.PutBlock(blk); err != nil {
 			return err

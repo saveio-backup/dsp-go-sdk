@@ -807,8 +807,10 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.Uplo
 	}
 
 	if this.config.BlockConfirm > 0 && (len(dnsRegTx) > 0 || len(dnsBindTx) > 0) {
+		this.taskMgr.EmitProgress(taskId, task.TaskWaitForBlockConfirmed)
 		_, err := this.chain.WaitForGenerateBlock(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second,
 			this.config.BlockConfirm)
+		this.taskMgr.EmitProgress(taskId, task.TaskWaitForBlockConfirmedDone)
 		if err != nil {
 			log.Errorf("[Dsp registerUrls] wait for generate block failed, err %s", err)
 			return "", ""
@@ -1496,7 +1498,7 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 			if fileMsg.ChainInfo.Height < refTaskInfo.StoreTxHeight {
 				return
 			}
-			log.Debugf("taskId %s, fileHashStr %s, peerAddr %s, prefix %s, storeTx %s, "+
+			log.Debugf("dispatch send file taskId %s, fileHashStr %s, peerAddr %s, prefix %s, storeTx %s, "+
 				"totalCount %d, storeTxHeight %d", taskId, fileHashStr, peerAddr, string(refTaskInfo.Prefix),
 				refTaskInfo.StoreTx, uint32(totalCount), refTaskInfo.StoreTxHeight)
 			this.taskMgr.UpdateTaskNodeState(taskId, peerAddr, store.TaskStateDoing)
