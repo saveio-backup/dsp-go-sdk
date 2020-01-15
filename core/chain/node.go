@@ -81,9 +81,6 @@ func (this *Chain) NodeWithdrawProfit() (string, error) {
 
 // CheckFilePrivilege. check if the downloader has privilege to download file
 func (this *Chain) CheckFilePrivilege(info *fs.FileInfo, fileHashStr, walletAddr string) bool {
-	if this.isClient {
-		return true
-	}
 	// TODO: check sinature
 	if info.FileOwner.ToBase58() == walletAddr {
 		return true

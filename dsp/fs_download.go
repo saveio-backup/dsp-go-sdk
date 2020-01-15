@@ -1594,29 +1594,56 @@ func (this *Dsp) AESDecryptFile(file, prefix, password, outputPath string) error
 }
 
 func (this *Dsp) InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr string, profit uint64) error {
+	if this.shareRecordDB == nil {
+		return nil
+	}
 	return this.shareRecordDB.InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr, profit)
 }
 func (this *Dsp) IncreaseShareRecordProfit(id string, profit uint64) error {
+	if this.shareRecordDB == nil {
+		return nil
+	}
 	return this.shareRecordDB.IncreaseShareRecordProfit(id, profit)
 }
 func (this *Dsp) FindShareRecordById(id string) (*store.ShareRecord, error) {
+	if this.shareRecordDB == nil {
+		return nil, nil
+	}
 	return this.shareRecordDB.FindShareRecordById(id)
 }
 func (this *Dsp) FineShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit int64) ([]*store.ShareRecord, error) {
+	if this.shareRecordDB == nil {
+		return nil, nil
+	}
 	return this.shareRecordDB.FineShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit)
 }
 func (this *Dsp) FindLastShareTime(fileHash string) (uint64, error) {
+	if this.shareRecordDB == nil {
+		return 0, nil
+	}
 	return this.shareRecordDB.FindLastShareTime(fileHash)
 }
 func (this *Dsp) CountRecordByFileHash(fileHash string) (uint64, error) {
+	if this.shareRecordDB == nil {
+		return 0, nil
+	}
 	return this.shareRecordDB.CountRecordByFileHash(fileHash)
 }
 func (this *Dsp) SumRecordsProfit() (uint64, error) {
+	if this.shareRecordDB == nil {
+		return 0, nil
+	}
 	return this.shareRecordDB.SumRecordsProfit()
 }
 func (this *Dsp) SumRecordsProfitByFileHash(fileHashStr string) (uint64, error) {
+	if this.shareRecordDB == nil {
+		return 0, nil
+	}
 	return this.shareRecordDB.SumRecordsProfitByFileHash(fileHashStr)
 }
 func (this *Dsp) SumRecordsProfitById(id string) (uint64, error) {
+	if this.shareRecordDB == nil {
+		return 0, nil
+	}
 	return this.shareRecordDB.SumRecordsProfitById(id)
 }

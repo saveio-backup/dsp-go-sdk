@@ -298,6 +298,9 @@ func (this *TaskMgr) GetShareTaskReferId(id string) (string, error) {
 	if err != nil {
 		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 	}
+	if info == nil {
+		return "", sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task %s not exist", id))
+	}
 	return info.ReferId, nil
 }
 
