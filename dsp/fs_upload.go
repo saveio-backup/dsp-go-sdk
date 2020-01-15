@@ -796,14 +796,14 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.Uplo
 		if err != nil {
 			log.Errorf("register url err: %s", err)
 		}
-		log.Debugf("acc %s, reg dns %s", this.chain.WalletAddress(), dnsRegTx)
+		log.Debugf("acc %s, reg dns %s for %s", this.chain.WalletAddress(), dnsRegTx, fileHashStr)
 	}
 	if opt.BindDNS && len(opt.DnsURL) > 0 {
 		dnsBindTx, err = this.dns.BindFileUrl(string(opt.DnsURL), saveLink)
 		if err != nil {
 			log.Errorf("bind url err: %s", err)
 		}
-		log.Debugf("bind dns %s", dnsBindTx)
+		log.Debugf("bind dns %s for file %s", dnsBindTx, fileHashStr)
 	}
 
 	if this.config.BlockConfirm > 0 && (len(dnsRegTx) > 0 || len(dnsBindTx) > 0) {
