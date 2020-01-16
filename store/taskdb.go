@@ -1046,24 +1046,25 @@ func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 			LinkHashes: make([]string, 0),
 		}
 	}
-	blockHasDownloaded := false
-	if block != nil && block.TaskId == id && block.Hash == blockHashStr && block.Index == index {
-		log.Warnf("set a downloaded block to db task %s, %s-%d", id, blockHashStr, index)
-		blockHasDownloaded = true
+	if block.ReqTimes == nil {
+		block.ReqTimes = make(map[string]uint32)
 	}
+	count := block.ReqTimes[nodeAddr]
 	block.TaskId = id
 	block.Hash = blockHashStr
 	block.Index = index
 	block.DataOffset = uint64(offset)
 	block.NodeList = append(block.NodeList, nodeAddr)
 	block.LinkHashes = append(block.LinkHashes, links...)
+	block.ReqTimes[nodeAddr] = count + 1
 
 	blockBuf, err := json.Marshal(block)
 	if err != nil {
 		return err
 	}
 
-	if blockHasDownloaded {
+	if count > 0 {
+		log.Warnf("set a downloaded block to db task %s, %s-%d", id, blockHashStr, index)
 		return this.db.Put([]byte(blockKey), blockBuf)
 	}
 

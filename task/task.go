@@ -879,34 +879,44 @@ func (this *Task) GetTaskNotify() chan *BlockResp {
 	return this.notify
 }
 
-func (this *Task) AddBlockReqToPool(blockHash string, index int32) {
+func (this *Task) AddBlockReqToPool(blockReqs []*GetBlockReq) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if this.blockReqPool == nil {
 		this.blockReqPool = make([]*GetBlockReq, 0)
 	}
-	log.Debugf("add block req %s-%s-%d", this.info.FileHash, blockHash, index)
-	this.blockReqPool = append(this.blockReqPool, &GetBlockReq{
-		FileHash: this.info.FileHash,
-		Hash:     blockHash,
-		Index:    index,
-	})
+	if len(blockReqs) == 0 {
+		return
+	}
+	log.Debugf("add block req %s-%s-%d to %s-%d", this.info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
+		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
+	this.blockReqPool = append(this.blockReqPool, blockReqs...)
 	go this.notifyBlockReqPoolLen()
 }
 
-func (this *Task) DelBlockReqFromPool(blockHash string, index int32) {
+func (this *Task) DelBlockReqFromPool(blockReqs []*GetBlockReq) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if this.blockReqPool == nil {
 		return
 	}
-	log.Debugf("del block req %s-%s-%d", this.id, blockHash, index)
-	for i, req := range this.blockReqPool {
-		if req.Hash == blockHash && req.Index == index {
-			this.blockReqPool = append(this.blockReqPool[:i], this.blockReqPool[i+1:]...)
-			break
-		}
+	if len(blockReqs) == 0 {
+		return
 	}
+	log.Debugf("del block req %s-%s-%d to %s-%d", this.info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
+		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
+	hashKey := make(map[string]struct{}, 0)
+	for _, r := range blockReqs {
+		hashKey[fmt.Sprintf("%s-%d", r.Hash, r.Index)] = struct{}{}
+	}
+	newBlockReqPool := make([]*GetBlockReq, 0)
+	for _, req := range this.blockReqPool {
+		if _, ok := hashKey[fmt.Sprintf("%s-%d", req.Hash, req.Index)]; ok {
+			continue
+		}
+		newBlockReqPool = append(newBlockReqPool, req)
+	}
+	this.blockReqPool = newBlockReqPool
 	log.Debugf("block req pool len: %d", len(this.blockReqPool))
 	go this.notifyBlockReqPoolLen()
 }

@@ -217,6 +217,9 @@ func (this *Channel) GetAllPartners() []string {
 }
 
 func (this *Channel) AddChannelInfo(id uint64, partnerAddr string) error {
+	if this.channelDB == nil {
+		return dspErr.New(dspErr.CHANNEL_SET_DB_ERROR, "no channel DB")
+	}
 	err := this.channelDB.AddChannelInfo(id, partnerAddr)
 	if err != nil {
 		return dspErr.NewWithError(dspErr.CHANNEL_SET_DB_ERROR, err)

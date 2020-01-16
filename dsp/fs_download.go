@@ -952,11 +952,17 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			}
 			this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileDownloading)
 			log.Debugf("%s-%s-%d set downloaded", fileHashStr, value.Hash, value.Index)
+			reqs := make([]*task.GetBlockReq, 0)
 			for _, l := range links {
 				blockIndex++
-				if err := this.taskMgr.AddBlockReq(taskId, l, blockIndex); err != nil {
-					return dspErr.New(dspErr.ADD_GET_BLOCK_REQUEST_FAILED, err.Error())
-				}
+				reqs = append(reqs, &task.GetBlockReq{
+					FileHash: fileHashStr,
+					Hash:     l,
+					Index:    blockIndex,
+				})
+			}
+			if err := this.taskMgr.AddBlockReq(taskId, reqs); err != nil {
+				return dspErr.New(dspErr.ADD_GET_BLOCK_REQUEST_FAILED, err.Error())
 			}
 			if len(links) != 0 {
 				continue
@@ -1050,13 +1056,18 @@ func (this *Dsp) addUndownloadedReq(taskId, fileHashStr string) (int32, error) {
 		return 0, nil
 	}
 	log.Debugf("start download at %s-%s-%d", fileHashStr, hashes[0], indexMap[hashes[0]])
+	reqs := make([]*task.GetBlockReq, 0)
 	blockIndex := int32(0)
 	for _, hash := range hashes {
 		blockIndex = int32(indexMap[hash])
-		err = this.taskMgr.AddBlockReq(taskId, hash, int32(blockIndex))
-		if err != nil {
-			return 0, err
-		}
+		reqs = append(reqs, &task.GetBlockReq{
+			FileHash: fileHashStr,
+			Hash:     hash,
+			Index:    int32(blockIndex),
+		})
+	}
+	if err := this.taskMgr.AddBlockReq(taskId, reqs); err != nil {
+		return 0, err
 	}
 	return blockIndex, nil
 }

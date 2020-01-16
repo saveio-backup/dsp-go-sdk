@@ -496,7 +496,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				break
 			}
 			// check pool has item or no
+			log.Debugf("wait for block pool notify")
 			<-tsk.blockReqPoolNotify
+			log.Debugf("wait for block pool notify done")
 			reqPoolLen := tsk.GetBlockReqPoolLen()
 			if reqPoolLen == 0 {
 				continue
@@ -568,7 +570,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					flightMap.Delete(k)
 				}
 				for k, v := range resp.flightKey {
-
 					log.Debugf("receive response of flight %s, err %s", v, resp.err)
 					if resp.err != nil {
 						flightMap.Delete(v)
@@ -579,40 +580,47 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("add flightkey to cache %s, blockhash %s", v, resp.ret[k].Hash)
 					blockCache.Store(v, resp.ret[k])
 					flightMap.Delete(v)
-					// notify outside
-					pool := tsk.GetBlockReqPool()
-					type toDeleteInfo struct {
-						hash  string
-						index int32
+				}
+				if resp.err != nil {
+					go func() {
+						log.Debugf("notify when block reqs failed %v", resp.flightKey)
+						tsk.blockReqPoolNotify <- &blockReqPool{}
+						log.Debugf("notify when block reqs failed done")
+					}()
+					break
+				}
+				// notify outside
+				pool := tsk.GetBlockReqPool()
+				toDelete := make([]*GetBlockReq, 0)
+				for poolIdx, r := range pool {
+					blkKey := fmt.Sprintf("%s-%d", r.Hash, r.Index)
+					_, ok := blockCache.Load(blkKey)
+					log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
+					if !ok {
+						log.Debugf("break because block cache not has %v", blkKey)
+						break
 					}
-					toDelete := make([]*toDeleteInfo, 0)
-					for poolIdx, r := range pool {
-						blkKey := fmt.Sprintf("%s-%d", r.Hash, r.Index)
-						_, ok := blockCache.Load(blkKey)
-						log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
-						if !ok {
-							log.Debugf("break because block cache not has %v", blkKey)
-							break
-						}
-						toDelete = append(toDelete, &toDeleteInfo{
-							hash:  r.Hash,
-							index: r.Index,
-						})
+					toDelete = append(toDelete, &GetBlockReq{
+						Hash:     r.Hash,
+						Index:    r.Index,
+						FileHash: r.FileHash,
+					})
+				}
+				log.Debugf("remove %d response from req pool", len(toDelete))
+				for _, toD := range toDelete {
+					blkKey := fmt.Sprintf("%s-%d", toD.Hash, toD.Index)
+					blktemp, ok := blockCache.Load(blkKey)
+					if !ok {
+						log.Warnf("break because block cache not has %v!", blkKey)
+						continue
 					}
-					log.Debugf("remove %d response from req pool", len(toDelete))
-					for _, toD := range toDelete {
-						blkKey := fmt.Sprintf("%s-%d", toD.hash, toD.index)
-						blktemp, ok := blockCache.Load(blkKey)
-						if !ok {
-							log.Warnf("break because block cache not has %v!", blkKey)
-							continue
-						}
-						this.DelBlockReq(taskId, toD.hash, toD.index)
-						blk := blktemp.(*BlockResp)
-						log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
-						tsk.NotifyBlock(blk)
-						blockCache.Delete(blkKey)
-					}
+					blk := blktemp.(*BlockResp)
+					log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
+					tsk.NotifyBlock(blk)
+					blockCache.Delete(blkKey)
+				}
+				if len(toDelete) > 0 {
+					this.DelBlockReq(taskId, toDelete)
 				}
 				log.Debugf("remain %d response at block cache", getBlockCacheLen())
 				log.Debugf("receive response process done")
@@ -717,21 +725,21 @@ func (this *TaskMgr) TaskNotify(taskId string) chan *BlockResp {
 	return v.GetTaskNotify()
 }
 
-func (this *TaskMgr) AddBlockReq(taskId, blockHash string, index int32) error {
+func (this *TaskMgr) AddBlockReq(taskId string, blockReqs []*GetBlockReq) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return errors.New("task not found")
 	}
-	v.AddBlockReqToPool(blockHash, index)
+	v.AddBlockReqToPool(blockReqs)
 	return nil
 }
 
-func (this *TaskMgr) DelBlockReq(taskId, blockHash string, index int32) {
+func (this *TaskMgr) DelBlockReq(taskId string, blockReqs []*GetBlockReq) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
 	}
-	v.DelBlockReqFromPool(blockHash, index)
+	v.DelBlockReqFromPool(blockReqs)
 }
 
 func (this *TaskMgr) IsTaskCanResume(taskId string) (bool, error) {
