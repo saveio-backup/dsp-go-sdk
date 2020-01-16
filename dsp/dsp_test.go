@@ -1228,12 +1228,12 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	fileHash := "QmRh6WpkAJGj31ncZmwucT2ubSrjHk6wGMzMvZq4uub8B1"
+	fileHash := "zb2rhmD186HTNY7i4xjiQiMR4ceBBn1tp1ydt1RzJfFw7AaGi"
 	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("fileHash: %s\n", fileHash)
+	fmt.Printf("fileHash: %s, copyNum : %d, owner %s\n", fileHash, info.CopyNum, info.FileOwner.ToBase58())
 	curHeight, err := d.chain.GetCurrentBlockHeight()
 	if err != nil {
 		t.Fatal(err)

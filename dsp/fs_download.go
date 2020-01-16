@@ -815,7 +815,7 @@ func (this *Dsp) downloadFileWithOpt(fileHashStr string, opt *common.DownloadOpt
 	if taskPreparing, taskDoing, _ := this.taskMgr.IsTaskPreparingOrDoing(taskId); taskPreparing || taskDoing {
 		return dspErr.New(dspErr.DOWNLOAD_REFUSED, "task exists, and it is preparing or doing")
 	}
-	log.Debugf("task has done, resume the download task of id: %s, file %s", taskId, fileHashStr)
+	log.Debugf("task exists, resume the download task of id: %s, file %s", taskId, fileHashStr)
 	return this.DownloadFile(taskId, fileHashStr, opt)
 }
 
@@ -1051,12 +1051,26 @@ func (this *Dsp) addUndownloadedReq(taskId, fileHashStr string) (int32, error) {
 	if err != nil {
 		return 0, err
 	}
+	reqs := make([]*task.GetBlockReq, 0)
 	if len(hashes) == 0 {
-		log.Debugf("no undownloaded block %s %v", hashes, indexMap)
+		// TODO: check bug
+		if this.taskMgr.IsFileDownloaded(fileHashStr) {
+			log.Debugf("no undownloaded block %s %v", hashes, indexMap)
+			return 0, nil
+		}
+		log.Warnf("all block has downloaded, but file not downloed")
+		reqs = append(reqs, &task.GetBlockReq{
+			FileHash: fileHashStr,
+			Hash:     fileHashStr,
+			Index:    0,
+		})
+		if err := this.taskMgr.AddBlockReq(taskId, reqs); err != nil {
+			return 0, err
+		}
 		return 0, nil
 	}
 	log.Debugf("start download at %s-%s-%d", fileHashStr, hashes[0], indexMap[hashes[0]])
-	reqs := make([]*task.GetBlockReq, 0)
+
 	blockIndex := int32(0)
 	for _, hash := range hashes {
 		blockIndex = int32(indexMap[hash])

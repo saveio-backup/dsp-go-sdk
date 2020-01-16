@@ -1427,6 +1427,10 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 	}
 	log.Debugf("nodes to dispatch %v", nodesToDispatch)
 	if len(nodesToDispatch) == 0 {
+		log.Debugf("all nodes have dispatched, set %s file %s done", taskId, fileHashStr)
+		if len(taskId) > 0 {
+			this.taskMgr.SetTaskState(taskId, store.TaskStateDone)
+		}
 		return nil
 	}
 	refTaskInfo, err := this.taskMgr.GetTaskInfoClone(referId)

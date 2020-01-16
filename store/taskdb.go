@@ -828,8 +828,8 @@ func (this *TaskDB) IsFileUploaded(id string, isDispatched bool) bool {
 		}
 		sum += progress.Progress
 	}
-	log.Debugf("check is file uploaded total block %d, progress sum %d, copyNum: %d, is dispatched %t",
-		fi.TotalBlockCount, sum, fi.CopyNum, isDispatched)
+	log.Debugf("check is file %s uploaded total block %d, progress sum %d, copyNum: %d, is dispatched %t",
+		fi.FileHash, fi.TotalBlockCount, sum, fi.CopyNum, isDispatched)
 	if !isDispatched {
 		return fi.TotalBlockCount > 0 && fi.TotalBlockCount == sum
 	}
