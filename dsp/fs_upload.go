@@ -841,7 +841,7 @@ func (this *Dsp) getFileProvedNode(fileHashStr string) []string {
 		return nil
 	}
 	nodes := make([]string, 0)
-	log.Debugf("details :%v, err:%s", len(proveDetails.ProveDetails), err)
+	log.Debugf("fileHashStr %s prove details :%v, err:%s", fileHashStr, len(proveDetails.ProveDetails), err)
 	for _, detail := range proveDetails.ProveDetails {
 		log.Debugf("%s, node:%s, prove times %d", fileHashStr, string(detail.NodeAddr), detail.ProveTimes)
 		if detail.ProveTimes == 0 {

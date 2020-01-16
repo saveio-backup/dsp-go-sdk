@@ -910,8 +910,10 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				}
 				// cut prefix
 				// TEST: why not use filesize == 0
-				if !filePrefix.Encrypt && !hasCutPrefix && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
-					log.Debugf("cut prefix data-len %d, prefix %s, prefix-len: %d, str %s", len(data), prefix, len(prefix), string(data[:len(prefix)]))
+				if !filePrefix.Encrypt && !hasCutPrefix && len(data) >= len(prefix) &&
+					string(data[:len(prefix)]) == prefix {
+					log.Debugf("cut prefix data-len %d, prefix %s, prefix-len: %d, str %s",
+						len(data), prefix, len(prefix), string(data[:len(prefix)]))
 					data = data[len(prefix):]
 					hasCutPrefix = true
 				}
@@ -920,7 +922,8 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 				if value.Offset > 0 && !filePrefix.Encrypt {
 					writeAtPos = value.Offset - int64(len(prefix))
 				}
-				log.Debugf("block %s filesize %d, block-len %d, offset %v prefix %v pos %d", block.Cid().String(), fileStat.Size(), len(data), value.Offset, len(prefix), writeAtPos)
+				log.Debugf("block %s filesize %d, block-len %d, offset %v prefix %v pos %d",
+					block.Cid().String(), fileStat.Size(), len(data), value.Offset, len(prefix), writeAtPos)
 				_, err = file.WriteAt(data, writeAtPos)
 				// fileStat2, _ := file.Stat()
 				// log.Debugf("after write size %v, file %v", fileStat2.Size(), file)

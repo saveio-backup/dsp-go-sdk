@@ -17,6 +17,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
+	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -235,11 +236,23 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 			return
 		}
 		if storeTx == fileMsg.Tx.Hash {
+			fileHashDone := this.taskMgr.IsFileDownloaded(taskId)
+			if fileHashDone && this.IsFs() && !this.chain.CheckHasProveFile(fileMsg.Hash, this.Address()) {
+				// file has downloaded but not proved
+				if err := this.fs.StartPDPVerify(fileMsg.Hash, 0, 0, 0, chainCom.ADDRESS_EMPTY); err != nil {
+					replyErr(fileMsg.Hash, msg.MessageId, serr.SET_FILEINFO_DB_ERROR, err.Error())
+					return
+				}
+			}
 			state, _ := this.taskMgr.GetTaskState(taskId)
 			if state != store.TaskStateDone {
-				// set a new task state
-				err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
-				log.Debugf("set task state err: %s", err)
+				if fileHashDone {
+					this.taskMgr.SetTaskState(taskId, store.TaskStateDone)
+				} else {
+					// set a new task state
+					err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
+					log.Debugf("set task state err: %s", err)
+				}
 			}
 		} else {
 			log.Debugf("task %s store tx not match %s-%s", taskId, storeTx, fileMsg.Tx.Hash)
