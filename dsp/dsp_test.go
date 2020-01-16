@@ -360,7 +360,7 @@ func TestDeleteFileFromUploader(t *testing.T) {
 	}
 	d := NewDsp(dspCfg, acc, nil)
 	d.Start()
-	ret, err := d.DeleteUploadedFileByIds([]string{""})
+	ret, err := d.DeleteUploadedFileByIds([]string{""}, 41005)
 	if err != nil {
 		log.Errorf("delete file failed, err:%s", err)
 		return

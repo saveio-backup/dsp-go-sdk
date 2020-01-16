@@ -300,7 +300,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 	return this.checkIfResume(taskId)
 }
 
-func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, error) {
+func (this *Dsp) CancelUpload(taskId string, gasLimit uint64) (*common.DeleteUploadFileResp, error) {
 	taskType, _ := this.taskMgr.GetTaskType(taskId)
 	if taskType != store.TaskTypeUpload {
 		return nil, dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a upload task", taskId)
@@ -337,7 +337,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	}
 	nodeList := this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0)
 	if len(nodeList) == 0 {
-		resp, err := this.DeleteUploadedFileByIds([]string{taskId})
+		resp, err := this.DeleteUploadedFileByIds([]string{taskId}, gasLimit)
 		if err != nil {
 			this.taskMgr.SetTaskState(taskId, oldState)
 			return nil, err
@@ -355,7 +355,7 @@ func (this *Dsp) CancelUpload(taskId string) (*common.DeleteUploadFileResp, erro
 	)
 	ret, err := client.P2pBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId)
 	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
-	resp, err := this.DeleteUploadedFileByIds([]string{taskId})
+	resp, err := this.DeleteUploadedFileByIds([]string{taskId}, gasLimit)
 	if err != nil {
 		this.taskMgr.SetTaskState(taskId, oldState)
 		return nil, err
@@ -386,7 +386,7 @@ func (this *Dsp) RetryUpload(taskId string) error {
 	return this.checkIfResume(taskId)
 }
 
-func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string) (string, uint32, error) {
+func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string, gasLimit uint64) (string, uint32, error) {
 	if len(fileHashStrs) == 0 {
 		return "", 0, dspErr.New(dspErr.DELETE_FILE_HASHES_EMPTY, "delete file hash string is empty")
 	}
@@ -408,7 +408,7 @@ func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string) (string, uint
 	if !needDeleteFile {
 		return "", 0, dspErr.New(dspErr.NO_FILE_NEED_DELETED, "no file to delete")
 	}
-	txHashStr, err := this.chain.DeleteFiles(fileHashStrs)
+	txHashStr, err := this.chain.DeleteFiles(fileHashStrs, gasLimit)
 	log.Debugf("delete file tx %v, err %v", txHashStr, err)
 	if err != nil {
 		return "", 0, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
@@ -427,7 +427,7 @@ func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string) (string, uint
 }
 
 // DeleteUploadedFileByIds. Delete uploaded file from remote nodes. it is called by the owner
-func (this *Dsp) DeleteUploadedFileByIds(ids []string) ([]*common.DeleteUploadFileResp, error) {
+func (this *Dsp) DeleteUploadedFileByIds(ids []string, gasLimit uint64) ([]*common.DeleteUploadFileResp, error) {
 	if len(ids) == 0 {
 		return nil, dspErr.New(dspErr.DELETE_FILE_FAILED, "delete file ids is empty")
 	}
@@ -453,7 +453,7 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string) ([]*common.DeleteUploadFi
 		fileHashStrs = append(fileHashStrs, hash)
 	}
 
-	txHashStr, txHeight, err := this.DeleteUploadFilesFromChain(fileHashStrs)
+	txHashStr, txHeight, err := this.DeleteUploadFilesFromChain(fileHashStrs, gasLimit)
 	log.Debugf("delete upload files from chain :%s, %d, %v", txHashStr, txHeight, err)
 	if err != nil {
 		if sdkErr, ok := err.(*dspErr.Error); ok && sdkErr.Code != dspErr.NO_FILE_NEED_DELETED {
@@ -543,6 +543,10 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string) ([]*common.DeleteUploadFi
 		resps = append(resps, resp)
 	}
 	return resps, nil
+}
+
+func (this *Dsp) GetDeleteFilesStorageFee(fileHashStrs []string) (uint64, error) {
+	return this.chain.GetDeleteFilesStorageFee(fileHashStrs)
 }
 
 func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, error) {

@@ -41,6 +41,14 @@ func (this *Chain) GetUploadStorageFee(opt *fs.UploadOption) (*fs.StorageFee, er
 	return fee, nil
 }
 
+func (this *Chain) GetDeleteFilesStorageFee(fileHashStrs []string) (uint64, error) {
+	fee, err := this.themis.Native.Fs.GetDeleteFilesStorageFee(fileHashStrs)
+	if err != nil {
+		return 0, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return fee, nil
+}
+
 func (this *Chain) GetNodeList() (*fs.FsNodesInfo, error) {
 	list, err := this.themis.Native.Fs.GetNodeList()
 	if err != nil {
@@ -80,8 +88,8 @@ func (this *Chain) StoreFile(fileHashStr string, blockNum, blockSizeInKB, proveI
 	return tx, nil
 }
 
-func (this *Chain) DeleteFiles(files []string) (string, error) {
-	txHash, err := this.themis.Native.Fs.DeleteFiles(files)
+func (this *Chain) DeleteFiles(files []string, gasLimit uint64) (string, error) {
+	txHash, err := this.themis.Native.Fs.DeleteFiles(files, gasLimit)
 	if err != nil {
 		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
