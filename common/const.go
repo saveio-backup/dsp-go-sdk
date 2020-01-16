@@ -65,7 +65,7 @@ const (
 const (
 	MAX_TASKS_NUM                  = 50     // max task number
 	MAX_GOROUTINES_FOR_WORK_TASK   = 8      // max goroutines for choose worker to do job
-	BACKUP_FILE_DURATION           = 10     // 10s check
+	BACKUP_FILE_DURATION           = 30     // 10s check
 	DISPATCH_FILE_DURATION         = 300    // 10s check
 	REMOVE_FILES_DURATION          = 10     // 10s for remove files check
 	MAX_EXPIRED_PROVE_TASK_NUM     = 10     // max backup tasks one time
@@ -74,6 +74,7 @@ const (
 	MAX_DOWNLOAD_PEERS_NUM         = 50     // max peers for download file
 	MAX_NETWORK_REQUEST_RETRY      = 4      // max network request retry
 	MAX_BACKUP_FILE_FAILED         = 3      // max backup file failed times
+	MAX_BACKUP_FILES_IN_QUEUE      = 10     // max backuping files
 	MAX_TRACKERS_NUM               = 100    // max tracker num
 	MAX_DNS_NUM                    = 15     // max dns num
 	MAX_PUBLICADDR_CACHE_LEN       = 100    // cache len

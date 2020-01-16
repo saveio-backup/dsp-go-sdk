@@ -710,6 +710,7 @@ func (this *Dsp) StartBackupFileService() {
 			if err != nil || tasks == nil || len(tasks.Tasks) == 0 {
 				break
 			}
+			log.Debugf("get %d task to back up", len(tasks.Tasks))
 			if backupingCnt > 0 {
 				log.Debugf("doing backup jobs %d", backupingCnt)
 				break
@@ -743,6 +744,7 @@ func (this *Dsp) StartBackupFileService() {
 					continue
 				}
 			}
+			log.Debugf("finish backup one round")
 			// reset
 			backupingCnt = 0
 		}
