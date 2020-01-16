@@ -179,32 +179,27 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 			message.WithSign(this.account),
 			message.WithSyn(synMsgId),
 		)
-		return client.P2pSend(peer.Address, replyMsg.MessageId, replyMsg.ToProtoMsg())
+		err := client.P2pSend(peer.Address, replyMsg.MessageId, replyMsg.ToProtoMsg())
+		if err != nil {
+			log.Errorf("reply rdy ok msg failed %s", err)
+		}
+		return err
 	}
 
 	// check file tx, and if it is confirmed, and file info is still exist
 	if fileMsg.Tx == nil {
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.MISS_UPLOADED_FILE_TX,
-			"upload file tx is required"); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.MISS_UPLOADED_FILE_TX, "upload file tx is required")
 		return
 	}
 	if err := this.waitForTxConfirmed(fileMsg.Tx.Height); err != nil {
 		log.Errorf("get block height err %s", err)
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.CHECK_UPLOADED_TX_ERROR,
-			"get block height err "+err.Error()); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.CHECK_UPLOADED_TX_ERROR, "get block height err "+err.Error())
 		return
 	}
 	info, _ := this.chain.GetFileInfo(fileMsg.Hash)
 	if info == nil {
 		log.Errorf("fetch ask file info is nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.FILEINFO_NOT_EXIST,
-			"fetch ask file info is nil"); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.FILEINFO_NOT_EXIST, "fetch ask file info is nil")
 		return
 	}
 	log.Debugf("get file info %s success", fileMsg.Hash)
@@ -213,18 +208,12 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		len(info.PrimaryNodes.AddrList) > 0 &&
 		info.PrimaryNodes.AddrList[0].ToBase58() != fileMsg.PayInfo.WalletAddress) {
 		log.Errorf("receive fetch ask msg from wrong account %s", fileMsg.PayInfo.WalletAddress)
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.NO_PRIVILEGE_TO_UPLOAD,
-			"fetch owner not match"); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.NO_PRIVILEGE_TO_UPLOAD, "fetch owner not match")
 		return
 	}
 	if int32(info.FileBlockNum) != fileMsg.TotalBlockCount {
 		log.Errorf("block number is unmatched %d, %d", len(fileMsg.BlockHashes), info.FileBlockNum)
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.NO_PRIVILEGE_TO_UPLOAD,
-			"file block number not match"); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.NO_PRIVILEGE_TO_UPLOAD, "file block number not match")
 		return
 	}
 	// my task. use my wallet address
@@ -236,26 +225,43 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
 		if err != nil {
 			log.Errorf("new task failed %s", err)
-			if err := replyErr(fileMsg.Hash, msg.MessageId, serr.NEW_TASK_FAILED,
-				"new task failed"); err != nil {
-				log.Errorf("reply rdy ok msg failed", err)
-			}
+			replyErr(fileMsg.Hash, msg.MessageId, serr.NEW_TASK_FAILED, "new task failed")
 			return
 		}
 	} else {
-		state, _ := this.taskMgr.GetTaskState(taskId)
-		if state != store.TaskStateDone {
-			// set a new task state
-			err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
-			log.Debugf("set task state err: %s", err)
+		storeTx, err := this.taskMgr.GetStoreTx(taskId)
+		if err != nil {
+			replyErr(fileMsg.Hash, msg.MessageId, serr.GET_TASK_PROPERTY_ERROR, err.Error())
+			return
+		}
+		if storeTx == fileMsg.Tx.Hash {
+			state, _ := this.taskMgr.GetTaskState(taskId)
+			if state != store.TaskStateDone {
+				// set a new task state
+				err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
+				log.Debugf("set task state err: %s", err)
+			}
+		} else {
+			log.Debugf("task %s store tx not match %s-%s", taskId, storeTx, fileMsg.Tx.Hash)
+			// receive a new file info tx, delete old task info
+			if err := this.taskMgr.CleanTask(taskId); err != nil {
+				replyErr(fileMsg.Hash, msg.MessageId, serr.SET_FILEINFO_DB_ERROR, err.Error())
+				return
+			}
+			// handle new download task. use my wallet address
+			var err error
+			taskId, err = this.taskMgr.NewTask(store.TaskTypeDownload)
+			log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
+			if err != nil {
+				log.Errorf("new task failed %s", err)
+				replyErr(fileMsg.Hash, msg.MessageId, serr.NEW_TASK_FAILED, "new task failed")
+				return
+			}
 		}
 	}
 	if !this.taskMgr.IsFileInfoExist(taskId) {
 		log.Warnf("new task is deleted immediately")
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.NEW_TASK_FAILED,
-			"new task failed"); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.NEW_TASK_FAILED, "new task failed")
 		return
 	}
 	if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
@@ -267,35 +273,24 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		task.StoreTxHeight(uint32(fileMsg.Tx.Height)),
 		task.TotalBlockCnt(uint32(fileMsg.TotalBlockCount))); err != nil {
 		log.Errorf("batch set file info fetch ask %s", err)
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR,
-			"new task failed"); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR, "new task failed")
 		return
 	}
 	if err := this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress,
 		peer.Address, uint32(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice); err != nil {
 		log.Errorf("add session err in file fetch ask %s", err)
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR,
-			"new task failed"); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR, "new task failed")
 		return
 	}
 	if err := this.taskMgr.BindTaskId(taskId); err != nil {
 		log.Errorf("set task info err in file fetch ask %s", err)
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR,
-			"new task failed"); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR, "new task failed")
 		return
 	}
 	currentBlockHash, currentBlockIndex, err := this.taskMgr.GetCurrentSetBlock(taskId)
 	if err != nil {
-		if err := replyErr(fileMsg.Hash, msg.MessageId, serr.GET_TASK_PROPERTY_ERROR,
-			"get current received block hash failed"+err.Error()); err != nil {
-			log.Errorf("reply rdy ok msg failed", err)
-		}
+		replyErr(fileMsg.Hash, msg.MessageId, serr.GET_TASK_PROPERTY_ERROR,
+			"get current received block hash failed"+err.Error())
 		return
 	}
 	replyMsg := message.NewFileMsgWithError(fileMsg.Hash,
