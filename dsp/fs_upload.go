@@ -545,8 +545,8 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string, gasLimit uint64) ([]*comm
 	return resps, nil
 }
 
-func (this *Dsp) GetDeleteFilesStorageFee(fileHashStrs []string) (uint64, error) {
-	return this.chain.GetDeleteFilesStorageFee(fileHashStrs)
+func (this *Dsp) GetDeleteFilesStorageFee(addr chainCom.Address, fileHashStrs []string) (uint64, error) {
+	return this.chain.GetDeleteFilesStorageFee(addr, fileHashStrs)
 }
 
 func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, error) {

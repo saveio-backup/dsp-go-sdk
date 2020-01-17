@@ -84,3 +84,8 @@ const (
 	WorkerSendFileDeleteDone
 	WorkerRecvFileDeleteDone
 )
+
+type Gas struct {
+	GasPrice uint64
+	GasLimit uint64
+}

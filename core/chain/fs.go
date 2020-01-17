@@ -2,6 +2,8 @@ package chain
 
 import (
 	"encoding/hex"
+	"fmt"
+	"strings"
 
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	chainCom "github.com/saveio/themis/common"
@@ -41,11 +43,38 @@ func (this *Chain) GetUploadStorageFee(opt *fs.UploadOption) (*fs.StorageFee, er
 	return fee, nil
 }
 
-func (this *Chain) GetDeleteFilesStorageFee(fileHashStrs []string) (uint64, error) {
-	fee, err := this.themis.Native.Fs.GetDeleteFilesStorageFee(fileHashStrs)
+func (this *Chain) GetDeleteFilesStorageFee(addr chainCom.Address, fileHashStrs []string) (uint64, error) {
+	list, err := this.GetFileList(addr)
 	if err != nil {
-		return 0, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+		return 0, err
 	}
+
+	fileListFound, fileListNotFound := make([]string, 0, 0), make([]string, 0, 0)
+
+	for _, hash := range fileHashStrs {
+		if hash != "" {
+			found := false
+			for _, fh := range list.List {
+				if strings.ToUpper(hash) == strings.ToUpper(string(fh.Hash)) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				fileListNotFound = append(fileListNotFound, hash)
+			} else {
+				fileListFound = append(fileListFound, hash)
+			}
+		}
+	}
+
+	fee, err := this.themis.Native.Fs.GetDeleteFilesStorageFee(fileListFound)
+	if err != nil {
+		return fee, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	} else if len(fileListNotFound) != 0 {
+		return fee, fmt.Errorf("files not found on chain, hashs: %v", fileListNotFound)
+	}
+
 	return fee, nil
 }
 
