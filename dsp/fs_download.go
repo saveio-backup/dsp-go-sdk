@@ -482,8 +482,20 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		dnsWalletList = append(dnsWalletList, this.dns.DNSNode.WalletAddr)
 		existDNSMap[this.dns.DNSNode.WalletAddr] = struct{}{}
 	}
+	allCh, err := this.channel.AllChannels()
+	if err != nil {
+		return 0, err
+	}
+	myChannels := make(map[string]struct{}, 0)
+	for _, ch := range allCh.Channels {
+		myChannels[ch.Address] = struct{}{}
+	}
+
 	for otherDNS, _ := range this.dns.OnlineDNS {
 		if _, ok := existDNSMap[otherDNS]; ok {
+			continue
+		}
+		if _, ok := myChannels[otherDNS]; !ok {
 			continue
 		}
 		if err := this.checkDNSState(otherDNS); err != nil {
