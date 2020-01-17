@@ -143,10 +143,10 @@ func (this *Channel) StartService() error {
 	}
 	log.Debugf("start pylons")
 	err = ch_actor.StartPylons()
+	log.Debugf("start pylons done")
 	if err != nil {
 		return dspErr.NewWithError(dspErr.CHANNEL_START_INSTANCE_ERROR, err)
 	}
-	log.Debugf("StartService done")
 	this.isStart = true
 	this.OverridePartners()
 	return nil

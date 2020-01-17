@@ -73,9 +73,11 @@ func (this *Dsp) Progress() {
 		stop := false
 		for {
 			v := <-this.ProgressChannel()
-			for node, cnt := range v.Count {
-				log.Infof("file:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
-				stop = (cnt == v.Total)
+			for node, pro := range v.Progress {
+				log.Infof("file progress:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f, speed: %d",
+					v.FileName, v.FileHash, v.Total, node, pro.Progress, float64(pro.Progress)/float64(v.Total),
+					pro.AvgSpeed())
+				stop = (pro.Progress == v.Total)
 			}
 			if stop {
 				break
@@ -148,11 +150,11 @@ func (this *Dsp) GetFileUploadSize(fileHashStr, nodeAddr string) (uint64, error)
 	if progressInfo == nil {
 		return 0, nil
 	}
-	progress, ok := progressInfo.Count[nodeAddr]
+	progress, ok := progressInfo.Progress[nodeAddr]
 	if ok {
-		return uint64(progress) * common.CHUNK_SIZE, nil
+		return uint64(progress.Progress) * common.CHUNK_SIZE, nil
 	}
-	return uint64(progressInfo.SlaveProgress[nodeAddr]) * common.CHUNK_SIZE, nil
+	return uint64(progressInfo.SlaveProgress[nodeAddr].Progress) * common.CHUNK_SIZE, nil
 }
 
 func (this *Dsp) RunGetProgressTicker() bool {
@@ -252,8 +254,8 @@ func (this *Dsp) RunGetProgressTicker() bool {
 func (this *Dsp) GetDownloadTaskRemainSize(taskId string) uint32 {
 	progress := this.taskMgr.GetProgressInfo(taskId)
 	sum := uint32(0)
-	for _, c := range progress.Count {
-		sum += c
+	for _, c := range progress.Progress {
+		sum += c.Progress
 	}
 	if progress.Total > sum {
 		return progress.Total - sum

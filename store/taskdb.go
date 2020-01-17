@@ -138,6 +138,18 @@ type FileProgress struct {
 	CreatedAt      uint64    `json:"createdAt"`
 	UpdatedAt      uint64    `json:"updatedAt"`
 	NextUpdatedAt  uint64    `json:"next_updatedAt"`
+	Speeds         []uint64  `json:"speeds"`
+}
+
+func (prog FileProgress) AvgSpeed() uint64 {
+	sum := uint64(0)
+	for _, speed := range prog.Speeds {
+		sum += speed
+	}
+	if sum == 0 {
+		return 0
+	}
+	return sum / uint64(len(prog.Speeds))
 }
 
 type FileDownloadUnPaid struct {
@@ -747,6 +759,38 @@ func (this *TaskDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint32) er
 	return this.db.BatchCommit(batch)
 }
 
+// UpdateTaskPeerSpeed. update speed progress for a peer
+func (this *TaskDB) UpdateTaskPeerSpeed(id, nodeAddr string, speed uint64) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	batch := this.db.NewBatch()
+	// save upload progress info
+	progressKey := FileProgressKey(id, nodeAddr)
+	progress, _ := this.getProgressInfo(progressKey)
+	if progress == nil {
+		progress = &FileProgress{
+			TaskId:       id,
+			NodeHostAddr: nodeAddr,
+			CreatedAt:    utils.GetMilliSecTimestamp(),
+		}
+	}
+	if progress.Speeds == nil {
+		progress.Speeds = make([]uint64, 0)
+	}
+	progress.Speeds = append(progress.Speeds, speed)
+	if len(progress.Speeds) > common.PROGRESS_SPEED_LEN {
+		progress.Speeds = progress.Speeds[len(progress.Speeds)-common.PROGRESS_SPEED_LEN:]
+	}
+	progress.UpdatedAt = utils.GetMilliSecTimestamp()
+	log.Debugf("%s, nodeAddr %s progress %v, speed %v", id, nodeAddr, progress, progress.Speeds)
+	progressBuf, err := json.Marshal(progress)
+	if err != nil {
+		return err
+	}
+	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
+	return this.db.BatchCommit(batch)
+}
+
 // GetTaskPeerProgress. get progress for a peer
 func (this *TaskDB) GetTaskPeerProgress(id, nodeAddr string) *FileProgress {
 	this.lock.Lock()
@@ -993,19 +1037,19 @@ func (this *TaskDB) FileBlockHashes(id string) []string {
 }
 
 // FileProgress. return each node count progress
-func (this *TaskDB) FileProgress(id string) map[string]uint32 {
+func (this *TaskDB) FileProgress(id string) map[string]FileProgress {
 	prefix := FileProgressKey(id, "")
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
 		return nil
 	}
-	m := make(map[string]uint32)
+	m := make(map[string]FileProgress)
 	for _, key := range keys {
 		progress, err := this.getProgressInfo(key)
 		if err != nil || progress == nil {
 			continue
 		}
-		m[progress.NodeHostAddr] = progress.Progress
+		m[progress.NodeHostAddr] = *progress
 	}
 	return m
 }

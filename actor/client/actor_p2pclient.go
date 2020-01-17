@@ -42,10 +42,11 @@ type ConnectReq struct {
 }
 
 type SendReq struct {
-	Address  string
-	MsgId    string
-	Data     proto.Message
-	Response chan *P2pResp
+	Address     string
+	MsgId       string
+	Data        proto.Message
+	SendTimeout time.Duration
+	Response    chan *P2pResp
 }
 
 type RecvMsg struct {
@@ -88,10 +89,11 @@ type RequestWithRetryReq struct {
 }
 
 type SendAndWaitReplyReq struct {
-	Address  string
-	MsgId    string
-	Data     proto.Message
-	Response chan *RequestWithRetryResp
+	Address     string
+	MsgId       string
+	Data        proto.Message
+	SendTimeout time.Duration
+	Response    chan *RequestWithRetryResp
 }
 
 type RequestWithRetryResp struct {
@@ -238,6 +240,26 @@ func P2pReconnectPeer(address string, netType P2pNetType) error {
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pConnect] timeout")
+	}
+}
+
+func P2pSendWithTimeout(address, msgId string, data proto.Message, sendTimeout time.Duration) error {
+	chReq := &SendReq{
+		Address:     address,
+		MsgId:       msgId,
+		Data:        data,
+		SendTimeout: sendTimeout,
+		Response:    make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return dspErr.NewWithError(dspErr.NETWORK_SEND_ERROR, resp.Error)
+		}
+		return nil
+	case <-time.After(time.Duration(common.MAX_ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pSend] timeout")
 	}
 }
 

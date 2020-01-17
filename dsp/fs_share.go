@@ -83,16 +83,20 @@ func (this *Dsp) registerReceiveNotification() {
 					asset = common.ASSET_USDT
 				}
 				// delete record
-				err = this.taskMgr.DeleteFileUnpaid(taskId, addr.ToBase58(), int32(event.Identifier), int32(asset), uint64(event.Amount))
+				err = this.taskMgr.DeleteFileUnpaid(taskId, addr.ToBase58(), int32(event.Identifier),
+					int32(asset), uint64(event.Amount))
 				if err != nil {
 					log.Errorf("delete share file info %s", err)
 					continue
 				}
-				downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
+				downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(),
+					store.TaskTypeDownload)
 				fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
 				fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
-				log.Debugf("delete unpaid success %v %v %v %v %v %v", taskId, fileHashStr, fileName, fileOwner, addr.ToBase58(), uint64(event.Amount))
-				this.shareRecordDB.InsertShareRecord(taskId, fileHashStr, fileName, fileOwner, addr.ToBase58(), uint64(event.Amount))
+				log.Debugf("delete unpaid success %v %v %v %v %v %v",
+					taskId, fileHashStr, fileName, fileOwner, addr.ToBase58(), uint64(event.Amount))
+				this.shareRecordDB.InsertShareRecord(taskId, fileHashStr, fileName, fileOwner,
+					addr.ToBase58(), uint64(event.Amount))
 			case <-this.channel.GetCloseCh():
 				return
 			}
@@ -104,7 +108,8 @@ func (this *Dsp) canShareTo(taskId, walletAddress string, asset int32) bool {
 	unpaidAmount, err := this.taskMgr.GetUnpaidAmount(taskId, walletAddress, asset)
 	maxUnpaidAmount := uint64(common.CHUNK_SIZE * common.MAX_REQ_BLOCK_COUNT * this.config.MaxUnpaidPayment)
 	if err != nil || unpaidAmount >= maxUnpaidAmount {
-		log.Errorf("cant share to %s for file %s, unpaidAmount: %d err %s", walletAddress, taskId, unpaidAmount, err)
+		log.Errorf("cant share to %s for file %s, unpaidAmount: %d err %s",
+			walletAddress, taskId, unpaidAmount, err)
 		return false
 	}
 	return true
@@ -154,7 +159,8 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		if err != nil {
 			shareErr = dspErr.New(dspErr.GET_TASK_PROPERTY_ERROR,
 				"share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s",
-				taskId, downloadTaskId, blockmsg.FileHash, blockmsg.Hash, blockmsg.Index, offset, blockmsg.PeerAddr, err)
+				taskId, downloadTaskId, blockmsg.FileHash, blockmsg.Hash,
+				blockmsg.Index, offset, blockmsg.PeerAddr, err)
 			break
 		}
 		// TODO: only send tag with tagflag enabled
@@ -217,7 +223,8 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[len(req)-1].FileHash, req[len(req)-1].Hash,
 		req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
 	msg := message.NewBlockFlightsMsg(flights, message.WithSyn(req[0].Syn))
-	err := client.P2pSend(req[0].PeerAddr, msg.MessageId, msg.ToProtoMsg())
+	err := client.P2pSendWithTimeout(req[0].PeerAddr, msg.MessageId, msg.ToProtoMsg(),
+		common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT)
 	if err != nil {
 		log.Errorf("share send block, err: %s", err)
 		// TODO: delete unpaid msg if need

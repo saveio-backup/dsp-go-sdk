@@ -428,3 +428,11 @@ func (this *TaskMgr) UpdateTaskPeerProgress(id, nodeAddr string, count uint32) e
 	}
 	return nil
 }
+
+func (this *TaskMgr) UpdateTaskPeerSpeed(id, nodeAddr string, speed uint64) error {
+	err := this.db.UpdateTaskPeerSpeed(id, nodeAddr, speed)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
+}

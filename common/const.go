@@ -16,8 +16,9 @@ const (
 	TRACKER_NETWORK_PROTOCOL = "tcp" // tracker network protocol
 	MILLISECOND_PER_SECOND   = 1000  // 1 Second = 1000 Millisecond
 
-	TASK_STATE_CHECK_DURATION     = 1 // task state change check ticker duration
-	TASK_PROGRESS_TICKER_DURATION = 2 // task ticker
+	TASK_STATE_CHECK_DURATION     = 1  // task state change check ticker duration
+	TASK_PROGRESS_TICKER_DURATION = 2  // task ticker
+	PROGRESS_SPEED_LEN            = 10 // progress speed len
 )
 
 // oni link
@@ -51,10 +52,11 @@ const (
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT      = 10      // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT              = 20      // media transfer timeout
 
-	NETWORK_STREAM_WRITE_TIMEOUT  = 8                                                                                               // network write stream timeout for 128KB (128KB/8s=16KB/s)
-	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT = (CHUNK_SIZE / network.PER_SEND_BLOCK_SIZE) * NETWORK_STREAM_WRITE_TIMEOUT * MAX_REQ_BLOCK_COUNT // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2, 128s
-	DOWNLOAD_FILE_TIMEOUT         = DOWNLOAD_BLOCKFLIGHTS_TIMEOUT                                                                   // download file time out, 256s
-	ACTOR_MAX_P2P_REQ_TIMEOUT     = DOWNLOAD_FILE_TIMEOUT                                                                           // max p2p request timeout
+	NETWORK_STREAM_WRITE_TIMEOUT  = 8                                                                                                // network write stream timeout for 128KB (128KB/8s=16KB/s)
+	DOWNLOAD_STREAM_WRITE_TIMEOUT = 2                                                                                                // download stream timeout 128KB/2s 64KB/s
+	DOWNLOAD_BLOCKFLIGHTS_TIMEOUT = (CHUNK_SIZE / network.PER_SEND_BLOCK_SIZE) * DOWNLOAD_STREAM_WRITE_TIMEOUT * MAX_REQ_BLOCK_COUNT // download block flights time out,  Notice: DOWNLOAD_BLOCKFLIGHTS_TIMEOUT <= DOWNLOAD_FILE_TIMEOUT / 2, 128s
+	DOWNLOAD_FILE_TIMEOUT         = DOWNLOAD_BLOCKFLIGHTS_TIMEOUT                                                                    // download file time out, 256s
+	ACTOR_MAX_P2P_REQ_TIMEOUT     = DOWNLOAD_FILE_TIMEOUT                                                                            // max p2p request timeout
 )
 
 const (
