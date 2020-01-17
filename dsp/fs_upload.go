@@ -455,6 +455,10 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string, gasLimit uint64) ([]*comm
 			continue
 		}
 		hashM[hash] = struct{}{}
+		if this.taskMgr.ExistSameUploadingFile(id, hash) {
+			log.Debugf("exist same file %s uploading, ignore delete it from chain", hash)
+			continue
+		}
 		fileHashStrs = append(fileHashStrs, hash)
 	}
 

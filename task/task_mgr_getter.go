@@ -346,3 +346,17 @@ func (this *TaskMgr) GetUnDispatchTaskInfos(curWalletAddr string) ([]*store.Task
 	}
 	return tasks, nil
 }
+
+func (this *TaskMgr) ExistSameUploadingFile(taskId, fileHashStr string) bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	for id, tsk := range this.tasks {
+		if id == taskId {
+			continue
+		}
+		if tsk.GetFileHash() == fileHashStr {
+			return true
+		}
+	}
+	return false
+}
