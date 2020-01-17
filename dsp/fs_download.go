@@ -476,42 +476,38 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		}
 	}
 
-	dnsWalletList := make([]string, 0)
-	existDNSMap := make(map[string]struct{}, 0)
+	// use default dns to pay
 	if err := this.checkDNSState(this.dns.DNSNode.WalletAddr); err == nil {
-		dnsWalletList = append(dnsWalletList, this.dns.DNSNode.WalletAddr)
-		existDNSMap[this.dns.DNSNode.WalletAddr] = struct{}{}
+		if err := this.channel.MediaTransfer(paymentId, amount, this.dns.DNSNode.WalletAddr,
+			payInfo.WalletAddress); err == nil {
+			// clean unpaid order
+			if err := this.taskMgr.DeleteFileUnpaid(taskId, payInfo.WalletAddress, paymentId,
+				payInfo.Asset, amount); err != nil {
+				return 0, err
+			}
+			log.Debugf("delete unpaid %d", amount)
+			return paymentId, nil
+		} else {
+			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s",
+				paymentId, payInfo.WalletAddress, err)
+		}
 	}
+
+	// use other dns to pay
 	allCh, err := this.channel.AllChannels()
 	if err != nil {
 		return 0, err
 	}
-	myChannels := make(map[string]struct{}, 0)
-	for _, ch := range allCh.Channels {
-		myChannels[ch.Address] = struct{}{}
-	}
-
-	for otherDNS, _ := range this.dns.OnlineDNS {
-		if _, ok := existDNSMap[otherDNS]; ok {
-			continue
-		}
-		if _, ok := myChannels[otherDNS]; !ok {
-			continue
-		}
-		if err := this.checkDNSState(otherDNS); err != nil {
-			continue
-		}
-		existDNSMap[otherDNS] = struct{}{}
-		dnsWalletList = append(dnsWalletList, otherDNS)
-		if len(dnsWalletList) >= common.MAX_DNS_NODE_FOR_PAY {
-			break
-		}
-	}
-	log.Debugf("selected dns wallet list %v", dnsWalletList)
 	paySuccess := false
-	for _, dnsWalletAddr := range dnsWalletList {
-		log.Debugf("paying to %s, id %v, use dns: %s", payInfo.WalletAddress, paymentId, dnsWalletAddr)
-		if err := this.channel.MediaTransfer(paymentId, amount, dnsWalletAddr, payInfo.WalletAddress); err != nil {
+	for _, ch := range allCh.Channels {
+		if ch.Address == this.dns.DNSNode.WalletAddr {
+			continue
+		}
+		if err := this.checkDNSState(ch.Address); err == nil {
+			continue
+		}
+		log.Debugf("paying to %s, id %v, use dns: %s", payInfo.WalletAddress, paymentId, ch.Address)
+		if err := this.channel.MediaTransfer(paymentId, amount, ch.Address, payInfo.WalletAddress); err != nil {
 			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s", paymentId, payInfo.WalletAddress, err)
 			continue
 		}
