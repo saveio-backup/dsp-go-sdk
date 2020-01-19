@@ -1492,6 +1492,10 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 	for _, node := range nodesToDispatch {
 		go func(peerAddr string) {
 			client.P2pAppendAddrForHealthCheck(peerAddr, client.P2pNetTypeDsp)
+			if err := client.P2pConnect(peerAddr); err != nil {
+				log.Errorf("dispatch task %s connect to peer failed %s", taskId, err)
+				return
+			}
 			sessionId, _ := this.taskMgr.GetSessionId(taskId, "")
 			msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_ASK,
 				message.WithSessionId(sessionId),

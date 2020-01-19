@@ -39,6 +39,9 @@ func TaskInfoKey(id string) string {
 
 // TaskIdIndexKey. Key of task id
 func TaskIdIndexKey(index uint32) string {
+	if index == 0 {
+		return fmt.Sprintf("[%s]", TASKINFO_ID_PREFIX)
+	}
 	return fmt.Sprintf("[%s]%d", TASKINFO_ID_PREFIX, index)
 }
 

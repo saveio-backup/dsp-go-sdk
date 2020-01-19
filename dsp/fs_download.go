@@ -594,6 +594,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		return err
 	}
 	prefix := string(prefixBuf)
+
 	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%v", fileHashStr, len(blockHashes), prefix)
 	fileName, _ := this.taskMgr.GetFileName(taskId)
 	fullFilePath, err := this.taskMgr.GetFilePath(taskId)
@@ -656,7 +657,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		}
 		log.Debugf("will check file hash task id %s, file hash %s, downloaded %t",
 			taskId, fileHashStr, this.taskMgr.IsFileDownloaded(taskId))
-		if this.IsClient() && this.taskMgr.IsFileDownloaded(taskId) {
+		if this.IsClient() && this.taskMgr.IsFileDownloaded(taskId) && !this.IsFileEncrypted(fullFilePath) {
 			this.taskMgr.EmitProgress(taskId, task.TaskDownloadCheckingFile)
 			checkFileList, err := this.fs.NodesFromFile(fullFilePath, prefix, false, "")
 			if err != nil {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -173,7 +174,9 @@ func (this *TaskDB) Close() error {
 }
 
 func (this *TaskDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
-	taskCount, err := this.GetTaskCount()
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	taskCount, err := this.getTaskCount()
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +225,7 @@ func (this *TaskDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
 	return fi, nil
 }
 
-func (this *TaskDB) GetTaskCount() (*TaskCount, error) {
+func (this *TaskDB) getTaskCount() (*TaskCount, error) {
 	countBuf, err := this.db.Get([]byte(TaskCountKey()))
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, err
@@ -235,71 +238,32 @@ func (this *TaskDB) GetTaskCount() (*TaskCount, error) {
 	return taskCount, err
 }
 
-func (this *TaskDB) GetTaskIdByIndex(index uint32) (string, error) {
-	idKey := TaskIdIndexKey(index)
-	buf, err := this.db.Get([]byte(idKey))
-	if err != nil && err != leveldb.ErrNotFound {
-		return "", err
-	}
-	if len(buf) == 0 {
-		return "", nil
-	}
-	return string(buf), nil
-}
-
 // GetTaskIdList. Get all task id list with offset, limit, task type
 func (this *TaskDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, reverse, includeFailed bool) []string {
-	count, err := this.GetTaskCount()
+	prefix := TaskIdIndexKey(0)
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
+		log.Errorf("get task id list query key %s err %s", prefix, err)
 		return nil
 	}
-	if count.TotalCount == 0 {
-		return nil
-	}
-	var list []string
-	if limit > 0 {
-		list = make([]string, 0, limit)
-	} else {
-		list = make([]string, 0)
-	}
-	reach := uint32(0)
-
-	start := func() int32 {
-		if reverse {
-			if int32(count.Index) == 0 {
-				return 0
-			}
-			return int32(count.Index) - 1
-		} else {
-			return 0
-		}
-	}
-	cond := func(i int32) bool {
-		if reverse {
-			return i >= 0
-		}
-		return i < int32(count.Index)
-	}
-	next := func(i int32) int32 {
-		if reverse {
-			return int32(i) - 1
-		}
-		return int32(i) + 1
-	}
-	for i := start(); cond(i); i = next(i) {
-		id, _ := this.GetTaskIdByIndex(uint32(i))
-		if len(id) == 0 {
+	infos := make(TaskInfos, 0)
+	for _, k := range keys {
+		buf, err := this.db.Get([]byte(k))
+		if err != nil && err != leveldb.ErrNotFound {
+			log.Errorf("get err %s", err)
 			continue
 		}
-		if offset > reach {
-			reach++
+		if len(buf) == 0 {
+			log.Errorf("get buf is 0 %s", k)
 			continue
 		}
+		id := string(buf)
 		info, err := this.GetTaskInfo(id)
 		if err != nil || info == nil {
 			log.Warnf("get file info of id %s failed", id)
 			continue
 		}
+
 		if !allType {
 			if info.Type != ft {
 				continue
@@ -311,12 +275,19 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 		if !includeFailed && info.TaskState == uint32(TaskStateFailed) {
 			continue
 		}
-		list = append(list, id)
-		if limit > 0 && uint32(len(list)) >= limit {
-			break
-		}
+		infos = append(infos, info)
 	}
-	return list
+	sort.Sort(sort.Reverse(infos))
+	end := offset + limit
+	if limit == 0 {
+		end = uint32(len(infos))
+	}
+	infos = infos[offset:end]
+	ids := make([]string, 0)
+	for _, info := range infos {
+		ids = append(ids, info.Id)
+	}
+	return ids
 }
 
 func (this *TaskDB) SaveFileInfoId(key, id string) error {
@@ -551,7 +522,7 @@ func (this *TaskDB) DeleteTaskIds(ids []string) error {
 
 // DeleteTaskInfo. delete file info from db
 func (this *TaskDB) DeleteTaskInfo(id string) error {
-	taskCount, err := this.GetTaskCount()
+	taskCount, err := this.getTaskCount()
 	if err != nil {
 		return err
 	}
