@@ -3,7 +3,6 @@ package chain
 import (
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	chainCom "github.com/saveio/themis/common"
@@ -52,19 +51,17 @@ func (this *Chain) GetDeleteFilesStorageFee(addr chainCom.Address, fileHashStrs 
 	fileListFound, fileListNotFound := make([]string, 0, 0), make([]string, 0, 0)
 
 	for _, hash := range fileHashStrs {
-		if hash != "" {
-			found := false
-			for _, fh := range list.List {
-				if strings.ToUpper(hash) == strings.ToUpper(string(fh.Hash)) {
-					found = true
-					break
-				}
+		found := false
+		for _, fh := range list.List {
+			if hash == string(fh.Hash) {
+				found = true
+				break
 			}
-			if !found {
-				fileListNotFound = append(fileListNotFound, hash)
-			} else {
-				fileListFound = append(fileListFound, hash)
-			}
+		}
+		if !found {
+			fileListNotFound = append(fileListNotFound, hash)
+		} else {
+			fileListFound = append(fileListFound, hash)
 		}
 	}
 
