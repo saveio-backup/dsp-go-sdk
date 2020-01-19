@@ -1386,11 +1386,6 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	}
 	timeStamp := time.Now().UnixNano()
 	log.Debugf("download block timestamp %d", timeStamp)
-	ch := this.taskMgr.NewBlockFlightsRespCh(taskId, sessionId, timeStamp)
-	defer func() {
-		log.Debugf("drop block flight resp channel: %s-%s-%d", taskId, sessionId, timeStamp)
-		this.taskMgr.DropBlockFlightsRespCh(taskId, sessionId, timeStamp)
-	}()
 	msg := message.NewBlockFlightsReqMsg(blocks, timeStamp)
 
 	ticker := time.NewTicker(time.Second)
@@ -1399,47 +1394,51 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	for i := uint32(0); i < retry; i++ {
 		log.Debugf("send download block flights msg sessionId %s of %s from %s,  retry: %d", sessionId, fileHashStr, ipAddr, i)
 		// TODO: refactor send msg with request-reply model
-		err = client.P2pSend(ipAddr, msg.MessageId, msg.ToProtoMsg())
+		resp, err := client.P2pSendAndWaitReply(ipAddr, msg.MessageId, msg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("send download block flights msg err: %s", err)
 			continue
 		}
-		downloadTimeout := false
-		logCounter := 0
-		for {
-			select {
-			case value, ok := <-ch:
-				if !ok {
-					log.Errorf("receive blocks channel closed")
-					err = dspErr.New(dspErr.INTERNAL_ERROR, "receiving block channel close")
-					continue
+		msg := message.ReadMessage(resp)
+		if msg == nil {
+			return nil, fmt.Errorf("receive invalid msg from peer %s", ipAddr)
+		}
+		if msg.Payload == nil {
+			log.Error("receive empty block flights of task %s", taskId)
+			return nil, fmt.Errorf("receive empty block flights of task %s", taskId)
+		}
+		blockFlightsMsg := msg.Payload.(*block.BlockFlights)
+		if blockFlightsMsg == nil || len(blockFlightsMsg.Blocks) == 0 {
+			log.Errorf("receive empty block flights, err %v", msg.Error)
+			return nil, fmt.Errorf("receive empty block flights of task %s", taskId)
+		}
+		log.Debugf("taskId: %s, sessionId: %s receive %d blocks from peer:%s",
+			taskId, blockFlightsMsg.Blocks[0].SessionId, len(blockFlightsMsg.Blocks), ipAddr)
+		// active worker
+		this.taskMgr.ActiveDownloadTaskPeer(ipAddr)
+		blocks := make([]*task.BlockResp, 0)
+		for _, blockMsg := range blockFlightsMsg.Blocks {
+			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
+			if !isDownloaded {
+				b := &task.BlockResp{
+					Hash:      blockMsg.Hash,
+					Index:     blockMsg.Index,
+					PeerAddr:  ipAddr,
+					Block:     blockMsg.Data,
+					Tag:       blockMsg.Tag,
+					Offset:    blockMsg.Offset,
+					PaymentId: blockFlightsMsg.PaymentId,
 				}
-				if len(value) > 0 {
-					log.Debugf("receive blocks of %s-%d ~ %s-%d from", value[0].Hash, value[0].Index, value[len(value)-1].Hash, value[len(value)-1].Index)
-				}
-				this.taskMgr.ActiveDownloadTaskPeer(ipAddr)
-				return value, nil
-			case <-ticker.C:
-				duration, err := this.taskMgr.GetTaskWorkerIdleDuration(taskId, ipAddr)
-				logCounter++
-				if logCounter%10 == 0 {
-					log.Debugf("worker %s idle duration %d, timeout %d", ipAddr, duration, timeout/retry)
-				}
-				if err != nil {
-					return nil, err
-				}
-				if duration < uint64(timeout/retry)*1000 {
-					continue
-				}
-				err = dspErr.New(dspErr.DOWNLOAD_BLOCK_FAILED, "receiving blockflight %s timeout", blocks[0].GetHash())
-				downloadTimeout = true
-				// TODO: case 3? no channel and no timeout, needed stop ?
-
-			}
-			if downloadTimeout {
-				break
+				blocks = append(blocks, b)
+				log.Debugf("append block %s finished", blockMsg.Hash)
+			} else {
+				log.Debugf("the block %s has downloaded", blockMsg.Hash)
 			}
 		}
+		if len(blocks) == 0 {
+			log.Debug("all download blocks have been downloaded")
+		}
+		return blocks, nil
 	}
 	if err != nil {
 		log.Errorf("download block flight err %s", err)

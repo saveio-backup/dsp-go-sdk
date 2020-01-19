@@ -125,8 +125,8 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 
 	for _, blockmsg := range req {
 		taskId = this.taskMgr.TaskId(blockmsg.FileHash, blockmsg.WalletAddress, store.TaskTypeShare)
-		log.Debugf("+++++share block task id %v, file hash %v, peer wallet address %v",
-			taskId, blockmsg.FileHash, blockmsg.WalletAddress)
+		log.Debugf("share block task id %v, file hash %v, peer wallet address %v, syn %s",
+			taskId, blockmsg.FileHash, blockmsg.WalletAddress, blockmsg.Syn)
 		reqWalletAddr = blockmsg.WalletAddress
 		reqAsset = blockmsg.Asset
 		// check if has unpaid block request
@@ -196,7 +196,8 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	}
 	if shareErr != nil {
 		log.Error(shareErr.Error())
-		msg := message.NewBlockFlightsMsgWithError(nil, shareErr.Code, shareErr.Error())
+		msg := message.NewBlockFlightsMsgWithError(nil, shareErr.Code, shareErr.Error(),
+			message.WithSyn(req[0].Syn))
 		err := client.P2pSend(req[0].PeerAddr, msg.MessageId, msg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("send share block err msg failed, err: %s", err)
@@ -215,7 +216,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s",
 		taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[len(req)-1].FileHash, req[len(req)-1].Hash,
 		req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
-	msg := message.NewBlockFlightsMsg(flights)
+	msg := message.NewBlockFlightsMsg(flights, message.WithSyn(req[0].Syn))
 	err := client.P2pSend(req[0].PeerAddr, msg.MessageId, msg.ToProtoMsg())
 	if err != nil {
 		log.Errorf("share send block, err: %s", err)

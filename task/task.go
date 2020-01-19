@@ -19,6 +19,7 @@ type GetBlockReq struct {
 	PeerAddr      string
 	WalletAddress string
 	Asset         int32
+	Syn           string
 }
 
 type BlockResp struct {

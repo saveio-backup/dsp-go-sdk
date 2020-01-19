@@ -708,6 +708,7 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 					PeerAddr:      peer.Address,
 					WalletAddress: v.Payment.Sender,
 					Asset:         v.Payment.Asset,
+					Syn:           msg.MessageId,
 				}
 				req = append(req, r)
 			}
