@@ -277,7 +277,12 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 		}
 		infos = append(infos, info)
 	}
-	sort.Sort(sort.Reverse(infos))
+	if allType {
+		sort.Sort(sort.Reverse(infos))
+	} else {
+		sort.Sort(TaskInfosByCreatedAt(infos))
+	}
+
 	end := offset + limit
 	if limit == 0 {
 		end = uint32(len(infos))
