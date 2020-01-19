@@ -1491,6 +1491,7 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 	}
 	for _, node := range nodesToDispatch {
 		go func(peerAddr string) {
+			client.P2pAppendAddrForHealthCheck(peerAddr, client.P2pNetTypeDsp)
 			sessionId, _ := this.taskMgr.GetSessionId(taskId, "")
 			msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_FETCH_ASK,
 				message.WithSessionId(sessionId),
@@ -1517,7 +1518,6 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 				"totalCount %d, storeTxHeight %d", taskId, fileHashStr, peerAddr, string(refTaskInfo.Prefix),
 				refTaskInfo.StoreTx, uint32(totalCount), refTaskInfo.StoreTxHeight)
 			this.taskMgr.UpdateTaskNodeState(taskId, peerAddr, store.TaskStateDoing)
-			client.P2pAppendAddrForHealthCheck(peerAddr, client.P2pNetTypeDsp)
 			if err := this.sendBlocksToPeer(taskId, fileHashStr, peerAddr, string(refTaskInfo.Prefix),
 				refTaskInfo.StoreTx, blockHashes, uint32(totalCount), refTaskInfo.StoreTxHeight,
 				getMsgData, nil); err != nil {
