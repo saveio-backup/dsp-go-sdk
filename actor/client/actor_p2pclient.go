@@ -41,11 +41,6 @@ type ConnectReq struct {
 	Response chan *P2pResp
 }
 
-type CloseReq struct {
-	Address  string
-	Response chan *P2pResp
-}
-
 type SendReq struct {
 	Address  string
 	MsgId    string
@@ -169,6 +164,12 @@ type AppendAddrToHealthCheckReq struct {
 	Response chan *P2pResp
 }
 
+type RemoveAddrFromHealthCheckReq struct {
+	NetType  P2pNetType
+	Address  string
+	Response chan *P2pResp
+}
+
 func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
 	chReq := &ConnectionExistReq{
 		Address:  address,
@@ -237,23 +238,6 @@ func P2pReconnectPeer(address string, netType P2pNetType) error {
 		return nil
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pConnect] timeout")
-	}
-}
-
-func P2pClose(address string) error {
-	chReq := &CloseReq{
-		Address:  address,
-		Response: make(chan *P2pResp, 1),
-	}
-	P2pServerPid.Tell(chReq)
-	select {
-	case resp := <-chReq.Response:
-		if resp != nil && resp.Error != nil {
-			return dspErr.NewWithError(dspErr.NETWORK_CLOSE_ERROR, resp.Error)
-		}
-		return nil
-	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pClose] timeout")
 	}
 }
 
@@ -471,5 +455,23 @@ func P2pAppendAddrForHealthCheck(address string, netType P2pNetType) error {
 		return dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pAppendAddrForHealthCheck] no response")
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pAppendAddrForHealthCheck] timeout")
+	}
+}
+
+func P2pRemoveAddrFormHealthCheck(address string, netType P2pNetType) error {
+	chReq := &RemoveAddrFromHealthCheckReq{
+		Address:  address,
+		NetType:  netType,
+		Response: make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil {
+			return resp.Error
+		}
+		return dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pRemoveAddrFormHealthCheck] no response")
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return dspErr.New(dspErr.NETWORK_REQ_ERROR, "[P2pRemoveAddrFormHealthCheck] timeout")
 	}
 }

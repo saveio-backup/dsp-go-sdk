@@ -977,6 +977,7 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 	backupAddrs := make(map[chainCom.Address]string, 0)
 	stop := false
 	height, _ := this.chain.GetCurrentBlockHeight()
+	nodeListLen := len(nodeList)
 	action := func(res proto.Message, addr string) bool {
 		p2pMsg := message.ReadMessage(res)
 		if p2pMsg.Error != nil && p2pMsg.Error.Code != dspErr.SUCCESS {
@@ -999,11 +1000,13 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 		if fileMsg.ChainInfo.Height > height && fileMsg.ChainInfo.Height > height+common.MAX_BLOCK_HEIGHT_DIFF {
 			log.Debugf("remote node block height is %d, but current block height is %d",
 				fileMsg.ChainInfo.Height, height)
+			backupAddrs[receiverWalletAddr] = addr
 			return false
 		}
 		if height > fileMsg.ChainInfo.Height && height > fileMsg.ChainInfo.Height+common.MAX_BLOCK_HEIGHT_DIFF {
 			log.Debugf("remote node block height is %d, but current block height is %d",
 				fileMsg.ChainInfo.Height, height)
+			backupAddrs[receiverWalletAddr] = addr
 			return false
 		}
 
@@ -1021,7 +1024,10 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 		walletAddrs = append(walletAddrs, receiverWalletAddr)
 		hostAddrs = append(hostAddrs, addr)
 		log.Debugf("send file_ask msg success of file: %s, to: %s  receivers: %v", fileMsg.Hash, addr, walletAddrs)
-		if len(walletAddrs) >= minResponse || len(walletAddrs) >= len(nodeList) {
+		primaryListLen := len(walletAddrs)
+		backupListLen := len(backupAddrs)
+		if primaryListLen >= minResponse || primaryListLen >= nodeListLen ||
+			backupListLen >= nodeListLen {
 			log.Debugf("break receiver goroutine")
 			stop = true
 			return true
@@ -1034,7 +1040,8 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 		log.Errorf("wait file receivers broadcast err %s", err)
 		return nil, nil, err
 	}
-	log.Debugf("receives %v, broadcast file ask ret %v, minResponse %d", walletAddrs, ret, minResponse)
+	log.Debugf("receives %v, backupAddrs: %v, broadcast file ask ret %v, minResponse %d",
+		walletAddrs, backupAddrs, ret, minResponse)
 	if len(walletAddrs) >= minResponse {
 		return walletAddrs, hostAddrs, nil
 	}
@@ -1510,15 +1517,18 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 				"totalCount %d, storeTxHeight %d", taskId, fileHashStr, peerAddr, string(refTaskInfo.Prefix),
 				refTaskInfo.StoreTx, uint32(totalCount), refTaskInfo.StoreTxHeight)
 			this.taskMgr.UpdateTaskNodeState(taskId, peerAddr, store.TaskStateDoing)
+			client.P2pAppendAddrForHealthCheck(peerAddr, client.P2pNetTypeDsp)
 			if err := this.sendBlocksToPeer(taskId, fileHashStr, peerAddr, string(refTaskInfo.Prefix),
 				refTaskInfo.StoreTx, blockHashes, uint32(totalCount), refTaskInfo.StoreTxHeight,
 				getMsgData, nil); err != nil {
 				log.Errorf("send block err %s", err)
 				this.taskMgr.EmitResult(taskId, nil, dspErr.NewWithError(dspErr.DISPATCH_FILE_ERROR, err))
 				this.taskMgr.UpdateTaskNodeState(taskId, peerAddr, store.TaskStateFailed)
+				client.P2pRemoveAddrFormHealthCheck(peerAddr, client.P2pNetTypeDsp)
 				return
 			}
 			this.taskMgr.UpdateTaskNodeState(taskId, peerAddr, store.TaskStateDone)
+			client.P2pRemoveAddrFormHealthCheck(peerAddr, client.P2pNetTypeDsp)
 		}(node.HostAddr)
 	}
 	return nil

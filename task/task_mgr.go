@@ -173,7 +173,7 @@ func (this *TaskMgr) TaskId(prefix, walletAddress string, tp store.TaskType) str
 func (this *TaskMgr) DeleteTask(taskId string) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	log.Debugf("delete task %s", debug.Stack())
+	log.Debugf("delete task %s, %s", taskId, debug.Stack())
 	delete(this.tasks, taskId)
 }
 
@@ -182,7 +182,7 @@ func (this *TaskMgr) CleanTask(taskId string) error {
 	this.lock.Lock()
 	delete(this.tasks, taskId)
 	this.lock.Unlock()
-	log.Debugf("clean task %s", debug.Stack())
+	log.Debugf("clean task %s, %s", taskId, debug.Stack())
 	err := this.db.DeleteTaskInfo(taskId)
 	if err != nil {
 		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)

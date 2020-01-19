@@ -571,7 +571,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 	} else {
 		log.Debugf("reply download ack msg success")
 	}
-	log.Debugf("reply download ack success new share task %s, key %s", fileMsg.Hash, taskId)
+	log.Debugf("reply download ack success new share task %s, file %s", taskId, fileMsg.Hash)
 	if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
 		task.FileHash(fileMsg.Hash),
 		task.ReferId(downloadedId),

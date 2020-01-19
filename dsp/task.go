@@ -128,6 +128,9 @@ func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
 }
 
 func (this *Dsp) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse, includeFailed bool) []string {
+	if this == nil || this.taskMgr == nil {
+		return nil
+	}
 	return this.taskMgr.GetTaskIdList(offset, limit, ft, allType, reverse, includeFailed)
 }
 
