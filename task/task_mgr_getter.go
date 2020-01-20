@@ -354,7 +354,8 @@ func (this *TaskMgr) ExistSameUploadingFile(taskId, fileHashStr string) bool {
 		if id == taskId {
 			continue
 		}
-		if tsk.GetFileHash() == fileHashStr {
+		if tsk.GetTaskType() == store.TaskTypeUpload &&
+			tsk.GetFileHash() == fileHashStr {
 			return true
 		}
 	}
