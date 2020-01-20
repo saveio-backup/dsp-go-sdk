@@ -1136,6 +1136,7 @@ func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string
 			return nil
 		}
 		if len(block.LinkHashes) == 0 {
+			log.Warnf("block .link hashes is empty return nil %s %s", id, rootBlockHash)
 			return nil
 		}
 		oldIndex := blockIndex
@@ -1183,6 +1184,9 @@ func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string
 		return nil, nil, err
 	}
 	log.Debugf("undownloaded hashes :%v, len:%d", hashes, len(hashes))
+	if len(hashes) == 0 {
+		return []string{rootBlockHash}, map[string]uint32{rootBlockHash: 0}, nil
+	}
 	for h, i := range indexMap {
 		log.Debugf("undownloaded hashes-index %s-%d", h, i)
 	}

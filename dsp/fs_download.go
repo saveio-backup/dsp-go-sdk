@@ -857,7 +857,7 @@ func (this *Dsp) checkIfResumeDownload(taskId string) error {
 	if len(fileHashStr) == 0 {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "filehash not found %s", taskId)
 	}
-	log.Debugf("resume download file")
+	log.Debugf("resume download file %s", taskId)
 	// TODO: record original workers
 	go this.DownloadFile(taskId, fileHashStr, opt)
 	return nil
@@ -1377,24 +1377,23 @@ func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.B
 }
 
 // downloadBlockUnits. download block helper function for client.
-func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAddr string, blocks []*block.Block, retry, timeout uint32) ([]*task.BlockResp, error) {
+func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAddr string, blockReqs []*block.Block, retry, timeout uint32) ([]*task.BlockResp, error) {
 	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
 	if err != nil {
 		return nil, err
 	}
-	if len(blocks) > 0 {
-		log.Debugf("download block of task: %s %s-%s-%d to %s-%s-%d to %s", taskId, fileHashStr, blocks[0].Hash, blocks[0].Index, fileHashStr, blocks[len(blocks)-1].Hash, blocks[len(blocks)-1].Index, ipAddr)
+	if len(blockReqs) > 0 {
+		log.Debugf("download block of task: %s %s-%s-%d to %s-%s-%d to %s", taskId, fileHashStr, blockReqs[0].Hash, blockReqs[0].Index, fileHashStr, blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index, ipAddr)
 	}
 	timeStamp := time.Now().UnixNano()
 	log.Debugf("download block timestamp %d", timeStamp)
-	msg := message.NewBlockFlightsReqMsg(blocks, timeStamp)
-
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
+	msg := message.NewBlockFlightsReqMsg(blockReqs, timeStamp)
+	blockReqM := make(map[string]struct{}, 0)
+	for _, req := range blockReqs {
+		blockReqM[keyOfBlockHashAndIndex(req.Hash, uint32(req.Index))] = struct{}{}
+	}
 	for i := uint32(0); i < retry; i++ {
 		log.Debugf("send download block flights msg sessionId %s of %s from %s,  retry: %d", sessionId, fileHashStr, ipAddr, i)
-		// TODO: refactor send msg with request-reply model
 		resp, err := client.P2pSendAndWaitReply(ipAddr, msg.MessageId, msg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("send download block flights msg err: %s", err)
@@ -1417,29 +1416,31 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 			taskId, blockFlightsMsg.Blocks[0].SessionId, len(blockFlightsMsg.Blocks), ipAddr)
 		// active worker
 		this.taskMgr.ActiveDownloadTaskPeer(ipAddr)
-		blocks := make([]*task.BlockResp, 0)
+		blockResps := make([]*task.BlockResp, 0)
 		for _, blockMsg := range blockFlightsMsg.Blocks {
-			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
-			if !isDownloaded {
-				b := &task.BlockResp{
-					Hash:      blockMsg.Hash,
-					Index:     blockMsg.Index,
-					PeerAddr:  ipAddr,
-					Block:     blockMsg.Data,
-					Tag:       blockMsg.Tag,
-					Offset:    blockMsg.Offset,
-					PaymentId: blockFlightsMsg.PaymentId,
-				}
-				blocks = append(blocks, b)
-				log.Debugf("append block %s finished", blockMsg.Hash)
-			} else {
-				log.Debugf("the block %s has downloaded", blockMsg.Hash)
+			if _, ok := blockReqM[keyOfBlockHashAndIndex(blockMsg.Hash, uint32(blockMsg.Index))]; !ok {
+				log.Warnf("block %s-%d is not my request task", blockMsg.Hash, blockMsg.Index)
+				continue
 			}
+			block := this.fs.EncodedToBlockWithCid(blockMsg.Data, blockMsg.Hash)
+			if block.Cid().String() != blockMsg.Hash {
+				log.Warnf("receive wrong block %s-%d", blockMsg.Hash, blockMsg.Index)
+				continue
+			}
+			blockResps = append(blockResps, &task.BlockResp{
+				Hash:      blockMsg.Hash,
+				Index:     blockMsg.Index,
+				PeerAddr:  ipAddr,
+				Block:     blockMsg.Data,
+				Tag:       blockMsg.Tag,
+				Offset:    blockMsg.Offset,
+				PaymentId: blockFlightsMsg.PaymentId,
+			})
 		}
-		if len(blocks) == 0 {
-			log.Debug("all download blocks have been downloaded")
+		if len(blockResps) == 0 {
+			log.Warnf("blockResps is not match request")
 		}
-		return blocks, nil
+		return blockResps, nil
 	}
 	if err != nil {
 		log.Errorf("download block flight err %s", err)

@@ -1098,6 +1098,9 @@ func (this *Dsp) generateBlockMsgData(hash string, index uint32, offset uint64,
 	// TODO: use disk fetch rather then memory access
 	block := this.fs.GetBlock(hash)
 	blockData := this.fs.BlockDataOfAny(block)
+	if len(blockData) == 0 {
+		log.Warnf("get empty block of %s %d", hash, index)
+	}
 	tag, err := pdp.SignGenerate(blockData, fileID, uint32(index+1), g0, privateKey)
 	if err != nil {
 		return nil, err
@@ -1135,7 +1138,7 @@ func (this *Dsp) sendBlocks(taskId, prefix string, hashes []string, g0, fileID [
 	getMsgData := func(hash string, index uint32) *blockMsgData {
 		getMsgDataLock.Lock()
 		defer getMsgDataLock.Unlock()
-		key := keyOfUnixNode(hash, index)
+		key := keyOfBlockHashAndIndex(hash, index)
 		data, ok := blockMsgDataMap[key]
 		if ok {
 			return data
@@ -1156,7 +1159,7 @@ func (this *Dsp) sendBlocks(taskId, prefix string, hashes []string, g0, fileID [
 		for _, reqInfo := range reqInfos {
 			hash := reqInfo.Hash
 			index := uint32(reqInfo.Index)
-			key := keyOfUnixNode(hash, index)
+			key := keyOfBlockHashAndIndex(hash, index)
 			data, ok := blockMsgDataMap[key]
 			if !ok {
 				continue
@@ -1578,6 +1581,6 @@ func uploadOptValid(filePath string, opt *fs.UploadOption) error {
 	return nil
 }
 
-func keyOfUnixNode(hash string, index uint32) string {
+func keyOfBlockHashAndIndex(hash string, index uint32) string {
 	return fmt.Sprintf("%s-%d", hash, index)
 }

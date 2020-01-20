@@ -656,7 +656,6 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 					PaymentId: blockFlightsMsg.PaymentId,
 				}
 				blocks = append(blocks, b)
-				log.Debugf("append block %s finished", blockMsg.Hash)
 			} else {
 				log.Debugf("the block %s has downloaded", blockMsg.Hash)
 			}
@@ -665,7 +664,9 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 			log.Debug("all download blocks have been downloaded")
 			return
 		}
-		log.Debugf("push %d blocks to channel", len(blocks))
+		log.Debugf("task %s, push blocks from %s-%s-%d to %s-%d",
+			taskId, blockFlightsMsg.Blocks[0].FileHash, blocks[0].Hash, blocks[0].Index,
+			blocks[len(blocks)-1].Hash, blocks[len(blocks)-1].Index)
 		if this.taskMgr.BlockFlightsChannelExists(taskId, blockFlightsMsg.Blocks[0].SessionId,
 			blockFlightsMsg.TimeStamp) {
 			this.taskMgr.PushGetBlockFlights(taskId, blockFlightsMsg.Blocks[0].SessionId,
