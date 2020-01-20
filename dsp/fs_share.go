@@ -223,8 +223,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 		taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[len(req)-1].FileHash, req[len(req)-1].Hash,
 		req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr)
 	msg := message.NewBlockFlightsMsg(flights, message.WithSyn(req[0].Syn))
-	err := client.P2pSendWithTimeout(req[0].PeerAddr, msg.MessageId, msg.ToProtoMsg(),
-		common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT)
+	err := client.P2pSend(req[0].PeerAddr, msg.MessageId, msg.ToProtoMsg())
 	if err != nil {
 		log.Errorf("share send block, err: %s", err)
 		// TODO: delete unpaid msg if need
