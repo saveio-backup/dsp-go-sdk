@@ -1026,6 +1026,19 @@ func (this *Task) IsTimeout() bool {
 	return true
 }
 
+func (this *Task) AllPeerPaidFailed() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	paidFailed := true
+	for _, w := range this.workers {
+		if !w.Unpaid() {
+			paidFailed = false
+			break
+		}
+	}
+	return paidFailed
+}
+
 // HasWorker. check if worker exist
 func (this *Task) HasWorker(addr string) bool {
 	this.lock.RLock()

@@ -673,7 +673,7 @@ func (this *Dsp) DownloadFileWithQuotation(fileHashStr string, asset int32, inOr
 		if err != nil {
 			log.Errorf("pay for blocks err %s", err)
 			this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksFailed)
-			return nil, err
+			return nil, dspErr.New(dspErr.PAY_UNPAID_BLOCK_FAILED, err.Error())
 		}
 		this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksDone)
 		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d",
@@ -1038,6 +1038,9 @@ func (this *Dsp) receiveBlockInOrder(taskId, fileHashStr, fullFilePath, prefix s
 			for addr, state := range workerState {
 				log.Debugf("download timeout worker addr: %s, working : %t, unpaid: %t, totalFailed %v",
 					addr, state.Working, state.Unpaid, state.TotalFailed)
+			}
+			if paidFail, _ := this.taskMgr.AllPeerPaidFailed(taskId); paidFail {
+				return dspErr.New(dspErr.DOWNLOAD_FILE_TIMEOUT, "Download file failed, pay failed to all peers")
 			}
 			return dspErr.New(dspErr.DOWNLOAD_FILE_TIMEOUT, "Download file timeout")
 		}

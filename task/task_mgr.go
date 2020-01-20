@@ -636,7 +636,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	}()
 
 	// open max routine to do jobs
-	log.Debugf("open %d routines to work background", max)
+	log.Debugf("open %d routines to work task %s, file %s background", max, taskId, fileHash)
 	for i := 0; i < max; i++ {
 		go func() {
 			for {
@@ -671,14 +671,19 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				log.Debugf("start request block %s-%s to %s from %s, peer wallet: %s", fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
 				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(), job.worker.WalletAddr(), flights)
-				tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 				if err != nil {
+					if derr, ok := err.(*dspErr.Error); ok && derr.Code == dspErr.PAY_UNPAID_BLOCK_FAILED {
+						log.Errorf("request blocks paid failed %v from %s, err %s", job.req, job.worker.remoteAddr, err)
+					} else {
+						tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
+					}
 					if len(job.req) > 0 {
 						log.Errorf("request blocks %s of %s to %s from %s, err %s", fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.remoteAddr, err)
 					} else {
 						log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
 					}
 				} else {
+					tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 					log.Debugf("request block %s-%s to %s from %s success", fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.remoteAddr)
 				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0
@@ -900,6 +905,14 @@ func (this *TaskMgr) IsTaskTimeout(taskId string) (bool, error) {
 		return false, fmt.Errorf("task %s not found", taskId)
 	}
 	return tsk.IsTimeout(), nil
+}
+
+func (this *TaskMgr) AllPeerPaidFailed(taskId string) (bool, error) {
+	tsk, ok := this.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return false, fmt.Errorf("task %s not found", taskId)
+	}
+	return tsk.AllPeerPaidFailed(), nil
 }
 
 // GetTaskWorkerIdleDuration.
