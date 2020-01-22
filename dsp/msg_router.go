@@ -126,18 +126,18 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 			message.ChainHeight(height),
 			message.WithSyn(msg.MessageId),
 		)
-		log.Debugf("send new task of file_ack msg to %v", peer)
 		if err := client.P2pSend(peer.Address, newMsg.MessageId, newMsg.ToProtoMsg()); err != nil {
-			log.Errorf("reply file_ack msg failed", err)
+			log.Errorf("send new task file_ack msg to %s failed %s",
+				existTaskId, peer.Address, err)
 			return
 		}
-		log.Debugf("reply file_ack msg success")
+		log.Debugf("send new task file_ack msg to %s success",
+			existTaskId, peer.Address)
 		return
 	}
-	log.Debugf("handle file ask existTaskId: %s", existTaskId)
 	// handle old task
 	state, _ := this.taskMgr.GetTaskState(existTaskId)
-	log.Debugf("fetch_ask task exist localId %s, %s state: %d", existTaskId, fileMsg.Hash, state)
+	log.Debugf("download task exist %s, file %s, state: %d", existTaskId, fileMsg.Hash, state)
 	if state == store.TaskStateCancel || state == store.TaskStateFailed || state == store.TaskStateDone {
 		log.Warnf("the task has a wrong state of file_ask %s", state)
 	}
@@ -162,12 +162,13 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 		message.ChainHeight(height),
 		message.WithSyn(msg.MessageId),
 	)
-	log.Debugf("fetch task is exist send file_ack msg %v", peer)
 	if err := client.P2pSend(peer.Address, newMsg.MessageId, newMsg.ToProtoMsg()); err != nil {
-		log.Errorf("reply file_ack msg failed", err)
+		log.Errorf("send exist task %s file_ack msg to %s failed %s",
+			existTaskId, peer.Address, err)
 		return
 	}
-	log.Debugf("reply exist task file_ack msg success")
+	log.Debugf("send exist task %s file_ack msg to %s success",
+		existTaskId, peer.Address)
 }
 
 // handleFileRdyMsg. client send ready msg to storage node for telling them it's ready for be fetched
@@ -197,6 +198,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		replyErr(fileMsg.Hash, msg.MessageId, serr.CHECK_UPLOADED_TX_ERROR, "get block height err "+err.Error())
 		return
 	}
+	// TODO: check rpc server avaliable
 	info, _ := this.chain.GetFileInfo(fileMsg.Hash)
 	if info == nil {
 		log.Errorf("fetch ask file info is nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)

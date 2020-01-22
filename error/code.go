@@ -85,6 +85,7 @@ const (
 	NO_PRIVILEGE_TO_UPLOAD                                    // 50068
 	SET_TASK_PROPERTY_ERROR                                   // 50069
 	DISPATCH_FILE_ERROR                                       // 50070
+	RECEIVE_ERROR_MSG                                         // 50071
 )
 
 // delete file error

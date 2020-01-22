@@ -128,7 +128,8 @@ func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, fileNameMap map[st
 		if err != nil {
 			return err
 		}
-		if err := this.SetTaskInfoWithOptions(newId, FileHash(fileHashStr), Walletaddr(walletAddr), FileName(fileNameMap[fileHashStr])); err != nil {
+		if err := this.SetTaskInfoWithOptions(newId, FileHash(fileHashStr), Walletaddr(walletAddr),
+			FileName(fileNameMap[fileHashStr])); err != nil {
 			return err
 		}
 		err = this.BindTaskId(newId)
@@ -263,8 +264,10 @@ func (this *TaskMgr) UploadingFileExist(taskId, fileHashStr string) bool {
 		tskCreatedAt = utils.GetMilliSecTimestamp()
 	}
 	for _, t := range this.tasks {
-		if t.GetFileHash() == fileHashStr && t.GetId() != taskId && t.GetTaskType() == store.TaskTypeUpload && t.GetCreatedAt() < tskCreatedAt {
-			log.Debugf("fileHashStr %s, taskId %s , newTaskId %s, taskCreatedAt: %d, newTaskCreatedAt: %d", fileHashStr, t.GetId(), taskId, t.GetCreatedAt(), tskCreatedAt)
+		if t.GetFileHash() == fileHashStr && t.GetId() != taskId && t.GetTaskType() == store.TaskTypeUpload &&
+			t.GetCreatedAt() < tskCreatedAt {
+			log.Debugf("fileHashStr %s, taskId %s , newTaskId %s, taskCreatedAt: %d, newTaskCreatedAt: %d",
+				fileHashStr, t.GetId(), taskId, t.GetCreatedAt(), tskCreatedAt)
 			return true
 		}
 	}
@@ -498,14 +501,15 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			// check pool has item or no
 			log.Debugf("wait for block pool notify")
 			<-tsk.blockReqPoolNotify
-			log.Debugf("wait for block pool notify done")
 			reqPoolLen := tsk.GetBlockReqPoolLen()
+			log.Debugf("wait for block pool notify done %d", reqPoolLen)
 			if reqPoolLen == 0 {
 				continue
 			}
 			// check all pool items are in request flights
 			if getFlightMapLen()+getBlockCacheLen() >= reqPoolLen {
-				log.Debug("all requests are on flights ")
+				log.Debug("all requests are on flights flight len %d, cache len %d",
+					getFlightMapLen(), getBlockCacheLen())
 				continue
 			}
 			// get the idle request
@@ -534,14 +538,16 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			worker := tsk.GetIdleWorker(addrs, fileHash, req[0].Hash)
 			if worker == nil {
 				// can't find a valid worker
-				log.Debugf("no idle workers of flights %s-%s to %s-%s", fileHash, flights[0], fileHash, flights[len(flights)-1])
+				log.Debugf("no idle workers of flights %s-%s to %s-%s",
+					fileHash, flights[0], fileHash, flights[len(flights)-1])
 				continue
 			}
 			for _, v := range flights {
 				flightMap.Store(v, struct{}{})
 			}
 			if len(flights) > 0 {
-				log.Debugf("add flight %s-%s to %s-%s, worker %s", fileHash, flights[0], fileHash, flights[len(flights)-1], worker.RemoteAddress())
+				log.Debugf("add flight %s-%s to %s-%s, worker %s",
+					fileHash, flights[0], fileHash, flights[len(flights)-1], worker.RemoteAddress())
 			}
 			tsk.SetWorkerUnPaid(worker.remoteAddr, true)
 			jobCh <- &job{
@@ -669,22 +675,28 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					flights = append(flights, b)
 					allFlightskey[fmt.Sprintf("%s-%d", v.Hash, v.Index)] = struct{}{}
 				}
-				log.Debugf("start request block %s-%s to %s from %s, peer wallet: %s", fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.RemoteAddress(), job.worker.WalletAddr())
-				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(), job.worker.WalletAddr(), flights)
+				log.Debugf("start request block %s-%s-%d to %s-%d to %s, peer wallet: %s",
+					fileHash, job.req[0].Hash, job.req[0].Index, job.req[len(job.req)-1].Hash,
+					job.req[len(job.req)-1].Index, job.worker.RemoteAddress(), job.worker.WalletAddr())
+				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(),
+					job.worker.WalletAddr(), flights)
 				if err != nil {
 					if derr, ok := err.(*dspErr.Error); ok && derr.Code == dspErr.PAY_UNPAID_BLOCK_FAILED {
-						log.Errorf("request blocks paid failed %v from %s, err %s", job.req, job.worker.remoteAddr, err)
+						log.Errorf("request blocks paid failed %v from %s, err %s",
+							job.req, job.worker.remoteAddr, err)
 					} else {
 						tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 					}
 					if len(job.req) > 0 {
-						log.Errorf("request blocks %s of %s to %s from %s, err %s", fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.remoteAddr, err)
+						log.Errorf("request blocks %s of %s to %s from %s, err %s",
+							fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.remoteAddr, err)
 					} else {
 						log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
 					}
 				} else {
 					tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
-					log.Debugf("request block %s-%s to %s from %s success", fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.remoteAddr)
+					log.Debugf("request blocks %s-%s to %s from %s success",
+						fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.remoteAddr)
 				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0
 				if stop {
@@ -698,7 +710,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					delete(allFlightskey, key)
 				}
 				if len(ret) > 0 {
-					log.Debugf("push flightskey from %s to %s", fmt.Sprintf("%s-%d", ret[0].Hash, ret[0].Index), fmt.Sprintf("%s-%d", ret[len(ret)-1].Hash, ret[len(ret)-1].Index))
+					log.Debugf("push flightskey from %s to %s",
+						fmt.Sprintf("%s-%d", ret[0].Hash, ret[0].Index),
+						fmt.Sprintf("%s-%d", ret[len(ret)-1].Hash, ret[len(ret)-1].Index))
 				}
 				resp := &getBlocksResp{
 					worker:          job.worker,

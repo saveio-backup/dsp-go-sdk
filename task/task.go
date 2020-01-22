@@ -146,21 +146,21 @@ func GetTaskFromDB(id string, db *store.TaskDB) (*Task, error) {
 func NewTaskFromDB(id string, db *store.TaskDB) (*Task, error) {
 	info, err := db.GetTaskInfo(id)
 	if err != nil {
-		log.Errorf("[Task NewTaskFromDB] get file info failed, id: %s", id)
+		log.Errorf("get task from db, get file info failed, id: %s", id)
 		return nil, err
 	}
 	if info == nil {
-		log.Warnf("[Task NewTaskFromDB] recover task get file info is nil, id: %v", id)
+		log.Warnf("get task from db, recover task get file info is nil, id: %v", id)
 		return nil, nil
 	}
 	if (store.TaskState(info.TaskState) == store.TaskStatePause ||
 		store.TaskState(info.TaskState) == store.TaskStateDoing) &&
 		info.UpdatedAt+common.DOWNLOAD_FILE_TIMEOUT*1000 < utils.GetMilliSecTimestamp() {
-		log.Warnf("[Task NewTaskFromDB] task: %s is expired, type: %d, updatedAt: %d", id, info.Type, info.UpdatedAt)
+		log.Warnf("get task from db, task: %s is expired, type: %d, updatedAt: %d", id, info.Type, info.UpdatedAt)
 	}
 	sessions, err := db.GetFileSessions(id)
 	if err != nil {
-		log.Errorf("[Task NewTaskFromDB] set task session: %s", err)
+		log.Errorf("get task from db, set task session: %s", err)
 		return nil, err
 	}
 	state := store.TaskState(info.TaskState)
@@ -172,15 +172,14 @@ func NewTaskFromDB(id string, db *store.TaskDB) (*Task, error) {
 	t.info.TranferState = uint32(TaskPause)
 	err = db.SaveTaskInfo(t.info)
 	if err != nil {
-		log.Errorf("[Task NewTaskFromDB] set file info failed: %s", err)
+		log.Errorf("get task from db, set file info failed: %s", err)
 		return nil, err
 	}
-	log.Debugf("task name: %s, state: %d", t.info.FileName, state)
 	for _, session := range sessions {
-		log.Debugf("set setssion : %s %s", session.WalletAddr, session.SessionId)
 		t.peerSenIds[session.WalletAddr] = session.SessionId
 	}
-	log.Debugf("NewTaskFromDB store type: %d", t.info.StoreType)
+	log.Debugf("get task from db, task id %s, file name %s, task type %d, state %d, sessions %v",
+		t.id, t.info.FileName, t.info.StoreType, t.State, t.peerSenIds)
 	return t, nil
 }
 

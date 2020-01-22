@@ -309,22 +309,7 @@ func TestUploadFile(t *testing.T) {
 		Encrypt:       false,
 		DnsURL:        []byte(fmt.Sprintf("dsp://file%d", time.Now().Unix())),
 	}
-	d.RegProgressChannel()
-	go func() {
-		stop := false
-		for {
-			v := <-d.ProgressChannel()
-			for node, cnt := range v.Count {
-				log.Infof("file:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
-				stop = (cnt == v.Total)
-			}
-			if stop {
-				break
-			}
-		}
-		// TODO: why need close
-		d.CloseProgressChannel()
-	}()
+
 	ret, err := d.UploadFile("", uploadTestFile, opt)
 	log.Debugf("upload file ret %v", ret)
 	if err != nil {
@@ -453,20 +438,6 @@ func TestDownloadFile(t *testing.T) {
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d.taskMgr.RegProgressCh()
-	d.RegProgressChannel()
-	go func() {
-		stop := false
-		for {
-			v := <-d.ProgressChannel()
-			for node, cnt := range v.Count {
-				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
-				stop = (cnt == v.Total)
-			}
-			if stop {
-				break
-			}
-		}
-	}()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	err = d.DownloadFile("", fileHashStr, nil)
 	if err != nil {
@@ -534,20 +505,6 @@ func TestDownloadFileWithQuotation(t *testing.T) {
 		t.Fatal(err)
 	}
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
-	d.RegProgressChannel()
-	go func() {
-		stop := false
-		for {
-			v := <-d.ProgressChannel()
-			for node, cnt := range v.Count {
-				log.Infof("file:%s, hash:%s, total:%d, peer:%s, downloaded:%d, progress:%f", v.FileName, v.FileHash, v.Total, node, cnt, float64(cnt)/float64(v.Total))
-				stop = (cnt == v.Total)
-			}
-			if stop {
-				break
-			}
-		}
-	}()
 
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	// set use free peers
@@ -1228,7 +1185,7 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	fileHash := "QmbSNPQ3CatEhVMtgWcbjxnr1Lh9ZodRrmkExU8YrP8Cp6"
+	fileHash := "QmVnVnSjYggE5HGK6cNVt6gDAXaL1dhmyXpCFYccs6fzj2"
 	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)

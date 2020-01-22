@@ -1194,11 +1194,16 @@ func (this *Dsp) sendBlocksToPeer(taskId, fileHashStr, peerAddr, prefix, tx stri
 		log.Errorf("notify fetch ready msg failed, err %s", err)
 		return err
 	}
+	if resp.Error != nil && resp.Error.Code != netcomm.MSG_ERROR_CODE_NONE {
+		log.Errorf("receive rdy msg reply err %d, msg %s", resp.Error.Code, resp.Error.Message)
+		return dspErr.New(dspErr.RECEIVE_ERROR_MSG, resp.Error.Message)
+	}
 	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
 	if err != nil {
 		return dspErr.New(dspErr.GET_SESSION_ID_FAILED, err.Error())
 	}
 	respFileMsg := resp.Payload.(*file.File)
+
 	log.Debugf("blockHashes :%d", len(blockHashes))
 	startIndex := uint32(0)
 	if respFileMsg.Breakpoint != nil && len(respFileMsg.Breakpoint.Hash) != 0 &&
@@ -1519,6 +1524,8 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 			// compare chain info
 			fileMsg := p2pMsg.Payload.(*file.File)
 			if fileMsg.ChainInfo.Height < refTaskInfo.StoreTxHeight {
+				log.Debugf("task %s dispatch interrupt, height %d less than %d",
+					taskId, fileMsg.ChainInfo.Height, refTaskInfo.StoreTxHeight)
 				return
 			}
 			log.Debugf("dispatch send file taskId %s, fileHashStr %s, peerAddr %s, prefix %s, storeTx %s, "+

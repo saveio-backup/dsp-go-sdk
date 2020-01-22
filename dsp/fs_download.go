@@ -1422,7 +1422,7 @@ func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.B
 		}
 		return nil
 	}
-	log.Debugf("push to trackers %v", this.dns.TrackerUrls)
+	log.Debugf("pdp verify %s success, push the file to trackers %v", fileHashStr, this.dns.TrackerUrls)
 	this.dns.PushToTrackers(fileHashStr, this.dns.TrackerUrls, client.P2pGetPublicAddr())
 	// TODO: remove unused file info fields after prove pdp success
 	this.taskMgr.EmitResult(taskId, "", nil)
