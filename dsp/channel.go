@@ -36,6 +36,9 @@ func (this *Dsp) GetFileUnitPrice(asset int32) (uint64, error) {
 }
 
 func (this *Dsp) GetChannelPid() *actor.PID {
+	if this.channel == nil {
+		return nil
+	}
 	return this.channel.GetChannelPid()
 }
 
@@ -179,5 +182,8 @@ func (this *Dsp) GetChannelInfo(walletAddr string) (*ch_actor.ChannelInfo, error
 	return this.channel.GetChannelInfo(walletAddr)
 }
 func (this *Dsp) AllChannels() (*ch_actor.ChannelsInfoResp, error) {
+	if this.channel == nil {
+		return nil, nil
+	}
 	return this.channel.AllChannels()
 }

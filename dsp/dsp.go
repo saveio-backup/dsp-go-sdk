@@ -82,7 +82,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	if len(c.ChannelListenAddr) > 0 && acc != nil {
 		if err := d.initChannelService(); err != nil {
 			log.Errorf("init channel err %s", err)
-			return nil
+			// return nil
 		}
 		chActorClient.SetP2pPid(p2pActor)
 	}
@@ -115,14 +115,18 @@ func (this *Dsp) Start() error {
 	// start dns service
 	if this.channel == nil {
 		if err := this.initChannelService(); err != nil {
-			return err
+			// return err
+			log.Errorf("init channel err %s", err)
 		}
 	}
-	if err := this.StartChannelService(); err != nil {
-		return err
+	if this.channel != nil {
+		if err := this.StartChannelService(); err != nil {
+			return err
+		}
+		this.dns.Channel = this.channel
+		this.dns.BootstrapDNS()
 	}
-	this.dns.Channel = this.channel
-	this.dns.BootstrapDNS()
+
 	// start seed service
 	if this.config.SeedInterval > 0 {
 		go this.StartSeedService()

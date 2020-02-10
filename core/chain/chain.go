@@ -64,10 +64,16 @@ func (this *Chain) CurrentAccount() *account.Account {
 }
 
 func (this *Chain) WalletAddress() string {
+	if this.account == nil {
+		return ""
+	}
 	return this.account.Address.ToBase58()
 }
 
 func (this *Chain) Address() chainCom.Address {
+	if this.account == nil {
+		return chainCom.ADDRESS_EMPTY
+	}
 	return this.account.Address
 }
 

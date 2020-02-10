@@ -174,6 +174,9 @@ func (d *DNS) BootstrapDNS() {
 		return
 	}
 	log.Debugf("d.channel %v", d.Channel)
+	if d.Channel == nil {
+		return
+	}
 	channels, err := d.Channel.AllChannels()
 	if err != nil {
 		log.Errorf("get all channel err %s", err)
