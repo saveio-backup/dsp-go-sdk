@@ -41,6 +41,8 @@ type ProgressInfo struct {
 	FileHash      string                        // file hash
 	FilePath      string                        // file path
 	CopyNum       uint32                        // copyNum
+	FileSize      uint64                        // file size
+	RealFileSize  uint64                        // real file size
 	Total         uint32                        // total file's blocks count
 	Progress      map[string]store.FileProgress // address <=> progress
 	SlaveProgress map[string]store.FileProgress // progress for slave nodes
@@ -570,9 +572,9 @@ func (this *Task) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index ui
 	return nil
 }
 
-// GetTaskInfoClone. get task info deep copy object.
+// GetTaskInfoCopy. get task info deep copy object.
 // clone it for read-only
-func (this *Task) GetTaskInfoClone() *store.TaskInfo {
+func (this *Task) GetTaskInfoCopy() *store.TaskInfo {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.db.CopyTask(this.info)
@@ -695,6 +697,8 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 		FilePath:      this.info.FilePath,
 		Total:         this.info.TotalBlockCount,
 		CopyNum:       this.info.CopyNum,
+		FileSize:      this.info.FileSize,
+		RealFileSize:  this.info.RealFileSize,
 		Progress:      this.db.FileProgress(this.id),
 		TaskState:     store.TaskState(this.info.TaskState),
 		ProgressState: TaskProgressState(this.info.TranferState),
@@ -891,6 +895,27 @@ func (this *Task) AddBlockReqToPool(blockReqs []*GetBlockReq) {
 	log.Debugf("add block req %s-%s-%d to %s-%d", this.info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
 		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
 	this.blockReqPool = append(this.blockReqPool, blockReqs...)
+	if len(this.workers) == 0 {
+		return
+	}
+	go this.notifyBlockReqPoolLen()
+}
+
+func (this *Task) InsertBlockReqToPool(blockReqs []*GetBlockReq) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	if this.blockReqPool == nil {
+		this.blockReqPool = make([]*GetBlockReq, 0)
+	}
+	if len(blockReqs) == 0 {
+		return
+	}
+	log.Debugf("insert block req %s-%s-%d to %s-%d", this.info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
+		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
+	this.blockReqPool = append(blockReqs, this.blockReqPool...)
+	if len(this.workers) == 0 {
+		return
+	}
 	go this.notifyBlockReqPoolLen()
 }
 
@@ -918,6 +943,9 @@ func (this *Task) DelBlockReqFromPool(blockReqs []*GetBlockReq) {
 	}
 	this.blockReqPool = newBlockReqPool
 	log.Debugf("block req pool len: %d", len(this.blockReqPool))
+	if len(this.workers) == 0 {
+		return
+	}
 	go this.notifyBlockReqPoolLen()
 }
 

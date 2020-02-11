@@ -65,67 +65,80 @@ type Payment struct {
 	PaymentId     int32  `json:"paymentId"`
 }
 
-// const (
-// 	FILEINFO_FIELD_FILENAME int = iota
-// 	FILEINFO_FIELD_FILEHASH
-// 	FILEINFO_FIELD_STORETX
-// 	FILEINFO_FIELD_WHITELISTTX
-// 	FILEINFO_FIELD_PROVE_PRIVATEKEY
-// 	FILEINFO_FIELD_PREFIX
-// 	FILEINFO_FIELD_TOTALCOUNT
-// 	FILEINFO_FIELD_COPYNUM
-// 	FILEINFO_FIELD_URL
-// 	FILEINFO_FIELD_LINK
-// 	FILEINFO_FIELD_FILEPATH
-// 	FILEINFO_FIELD_WALLETADDR
-// 	FILEINFO_FIELD_REGURL_TX
-// 	FILEINFO_FIELD_BIND_TX
-// 	FILEINFO_FIELD_TASKSTATE
-// 	FILEINFO_FIELD_OWNER
-// )
+type DownloadOption struct {
+	Asset       int32
+	InOrder     bool
+	DecryptPwd  string
+	Free        bool
+	SetFileName bool
+	MaxPeerCnt  int
+}
+
+type WhiteList struct {
+	Address     string
+	StartHeight uint64
+	EndHeight   uint64
+}
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type TaskInfo struct {
-	Id              string      `json:"id"`                     // task id
-	Index           uint32      `json:"index"`                  // task index
-	FileHash        string      `json:"file_hash"`              // file hash
-	FileName        string      `json:"file_name"`              // file name
-	FilePath        string      `json:"file_path"`              // file absolute path
-	FileOwner       string      `json:"file_owner"`             // file owner wallet address
-	SimpleChecksum  string      `json:"simple_checksum"`        // hash of first 128 KB and last 128 KB from file content
-	WalletAddress   string      `json:"wallet_address"`         // task belong to
-	CopyNum         uint32      `json:"copy_num"`               // copy num
-	Type            TaskType    `json:"file_info_type"`         // task type
-	StoreTx         string      `json:"store_tx"`               // store tx hash
-	StoreTxHeight   uint32      `json:"store_tx_height"`        // store tx height
-	RegisterDNSTx   string      `json:"register_dns_tx"`        // register dns tx
-	BindDNSTx       string      `json:"bind_dns_tx"`            // bind dns tx
-	WhitelistTx     string      `json:"whitelist_tx"`           // first op whitelist tx
-	TotalBlockCount uint32      `json:"total_block_count"`      // total block count
-	TaskState       uint32      `json:"task_state"`             // task state
-	ProvePrivKey    []byte      `json:"prove_private_key"`      // prove private key params
-	Prefix          []byte      `json:"prefix"`                 // file prefix
-	EncryptHash     string      `json:"encrypt_hash"`           // encrypt hash
-	EncryptSalt     string      `json:"encrypt_salt"`           // encrypt salt
-	Url             string      `json:"url"`                    // url
-	Link            string      `json:"link"`                   // link
-	CurrentBlock    string      `json:"current_block_hash"`     // current transferred block
-	CurrentIndex    uint32      `json:"current_block_index"`    // current transferred block index
-	StoreType       uint32      `json:"store_type"`             // store type
-	InOrder         bool        `json:"in_order"`               // is in order
-	OnlyBlock       bool        `json:"only_block"`             // send only raw block data
-	TranferState    uint32      `json:"transfer_state"`         // transfer state
-	ReferId         string      `json:"refer_id"`               // refer task id
-	PrimaryNodes    []string    `json:"primary_nodes"`          // primary nodes
-	CandidateNodes  []string    `json:"candidate_nodes"`        // candidate nodes
-	CreatedAt       uint64      `json:"createdAt"`              // createAt, unit ms
-	CreatedAtHeight uint32      `json:"createdAt_block_height"` // created at block height
-	UpdatedAt       uint64      `json:"updatedAt"`              // updatedAt, unit ms
-	UpdatedAtHeight uint32      `json:"updatedAt_block_height"` // updatedAt block height
-	ExpiredHeight   uint64      `json:"expired_block_height"`   // expiredAt block height
-	ErrorCode       uint32      `json:"error_code"`             // error code
-	ErrorMsg        string      `json:"error_msg"`              // error msg
-	Result          interface{} `json:"result"`                 // task complete result
+	Id              string       `json:"id"`                     // task id
+	Index           uint32       `json:"index"`                  // task index
+	FileHash        string       `json:"file_hash"`              // file hash
+	BlocksRoot      string       `json:"blocks_root"`            // blocks hash root
+	FileName        string       `json:"file_name"`              // file name
+	FileDesc        string       `json:"file_desc"`              // file name
+	FilePath        string       `json:"file_path"`              // file absolute path
+	FileOwner       string       `json:"file_owner"`             // file owner wallet address
+	SimpleChecksum  string       `json:"simple_checksum"`        // hash of first 128 KB and last 128 KB from file content
+	WalletAddress   string       `json:"wallet_address"`         // task belong to
+	CopyNum         uint32       `json:"copy_num"`               // copy num
+	Type            TaskType     `json:"file_info_type"`         // task type
+	StoreTx         string       `json:"store_tx"`               // store tx hash
+	StoreTxHeight   uint32       `json:"store_tx_height"`        // store tx height
+	RegisterDNSTx   string       `json:"register_dns_tx"`        // register dns tx
+	BindDNSTx       string       `json:"bind_dns_tx"`            // bind dns tx
+	WhitelistTx     string       `json:"whitelist_tx"`           // first op whitelist tx
+	TotalBlockCount uint32       `json:"total_block_count"`      // total block count
+	TaskState       uint32       `json:"task_state"`             // task state
+	ProvePrivKey    []byte       `json:"prove_private_key"`      // prove private key params
+	Prefix          []byte       `json:"prefix"`                 // file prefix
+	EncryptHash     string       `json:"encrypt_hash"`           // encrypt hash
+	EncryptSalt     string       `json:"encrypt_salt"`           // encrypt salt
+	Url             string       `json:"url"`                    // url
+	Link            string       `json:"link"`                   // url <=> link
+	CurrentBlock    string       `json:"current_block_hash"`     // current transferred block
+	CurrentIndex    uint32       `json:"current_block_index"`    // current transferred block index
+	StoreType       uint32       `json:"store_type"`             // store type
+	InOrder         bool         `json:"in_order"`               // is in order
+	OnlyBlock       bool         `json:"only_block"`             // send only raw block data
+	TranferState    uint32       `json:"transfer_state"`         // transfer state
+	ReferId         string       `json:"refer_id"`               // refer task id
+	PrimaryNodes    []string     `json:"primary_nodes"`          // primary nodes
+	CandidateNodes  []string     `json:"candidate_nodes"`        // candidate nodes
+	CreatedAt       uint64       `json:"createdAt"`              // createAt, unit ms
+	CreatedAtHeight uint32       `json:"createdAt_block_height"` // created at block height
+	UpdatedAt       uint64       `json:"updatedAt"`              // updatedAt, unit ms
+	UpdatedAtHeight uint32       `json:"updatedAt_block_height"` // updatedAt block height
+	ExpiredHeight   uint64       `json:"expired_block_height"`   // expiredAt block height
+	Asset           int32        `json:"asset"`                  // download task pay asset
+	DecryptPwd      string       `json:"decrypt_pwd"`            // download task with decrypt pwd
+	Free            bool         `json:"free"`                   // download task with free opts
+	SetFileName     bool         `json:"set_file_name"`          // download task with set file name
+	MaxPeerCnt      int          `json:"max_peer_count"`         // download task with max peer count to download
+	RealFileSize    uint64       `json:"real_file_size"`         // real file size in KB
+	FileSize        uint64       `json:"file_size"`              // real file size in block
+	ProveInterval   uint64       `json:"prove_interval"`         // prove interval
+	Privilege       uint64       `json:"privilege"`              // file privilege
+	Encrypt         bool         `json:"encrypt"`                // encrypt or not
+	EncryptPassword []byte       `json:"encrypt pwd"`            // encrypted pwd
+	RegisterDNS     bool         `json:"register_dns"`           // register dns or not
+	BindDNS         bool         `json:"bind_dns"`               // bind dns or not
+	WhiteList       []*WhiteList `json:"white_list"`             // white list
+	Share           bool         `json:"share"`                  // share or not
+	ErrorCode       uint32       `json:"error_code"`             // error code
+	ErrorMsg        string       `json:"error_msg"`              // error msg
+	Result          interface{}  `json:"result"`                 // task complete result
 }
 
 type FileProgress struct {
@@ -349,51 +362,6 @@ func (this *TaskDB) DeleteFileInfoId(key string) error {
 	return this.db.Delete([]byte(key))
 }
 
-// func (this *TaskDB) SetFileInfoField(id string, field int, value interface{}) error {
-// 	fi, err := this.GetTaskInfo(id)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if fi == nil {
-// 		return fmt.Errorf("fileinfo not found of %s", id)
-// 	}
-// 	switch field {
-// 	case FILEINFO_FIELD_FILENAME:
-// 		fi.FileName = value.(string)
-// 	case FILEINFO_FIELD_STORETX:
-// 		fi.StoreTx = value.(string)
-// 	case FILEINFO_FIELD_WHITELISTTX:
-// 		fi.WhitelistTx = value.(string)
-// 	case FILEINFO_FIELD_PROVE_PRIVATEKEY:
-// 		fi.ProvePrivKey = value.([]byte)
-// 	case FILEINFO_FIELD_PREFIX:
-// 		fi.Prefix = value.([]byte)
-// 	case FILEINFO_FIELD_TOTALCOUNT:
-// 		fi.TotalBlockCount = value.(uint64)
-// 	case FILEINFO_FIELD_COPYNUM:
-// 		fi.CopyNum = value.(uint64)
-// 	case FILEINFO_FIELD_URL:
-// 		fi.Url = value.(string)
-// 	case FILEINFO_FIELD_LINK:
-// 		fi.Link = value.(string)
-// 	case FILEINFO_FIELD_FILEHASH:
-// 		fi.FileHash = value.(string)
-// 	case FILEINFO_FIELD_FILEPATH:
-// 		fi.FilePath = value.(string)
-// 	case FILEINFO_FIELD_WALLETADDR:
-// 		fi.WalletAddress = value.(string)
-// 	case FILEINFO_FIELD_REGURL_TX:
-// 		fi.RegisterDNSTx = value.(string)
-// 	case FILEINFO_FIELD_BIND_TX:
-// 		fi.BindDNSTx = value.(string)
-// 	case FILEINFO_FIELD_TASKSTATE:
-// 		fi.TaskState = value.(uint64)
-// 	case FILEINFO_FIELD_OWNER:
-// 		fi.FileOwner = value.(string)
-// 	}
-// 	return this.batchSaveTaskInfo(nil, fi)
-// }
-
 func (this *TaskDB) SetFileName(id string, fileName string) error {
 
 	fi, err := this.GetTaskInfo(id)
@@ -406,123 +374,6 @@ func (this *TaskDB) SetFileName(id string, fileName string) error {
 	fi.FileName = fileName
 	return this.batchSaveTaskInfo(nil, fi)
 }
-
-// func (this *TaskDB) SetFileInfoFields(id string, m map[int]interface{}) error {
-
-// 	fi, err := this.GetTaskInfo(id)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if fi == nil {
-// 		return fmt.Errorf("fileinfo not found of %s", id)
-// 	}
-// 	for field, value := range m {
-// 		switch field {
-// 		case FILEINFO_FIELD_FILENAME:
-// 			fi.FileName = value.(string)
-// 		case FILEINFO_FIELD_STORETX:
-// 			fi.StoreTx = value.(string)
-// 		case FILEINFO_FIELD_WHITELISTTX:
-// 			fi.WhitelistTx = value.(string)
-// 		case FILEINFO_FIELD_PROVE_PRIVATEKEY:
-// 			fi.ProvePrivKey = value.([]byte)
-// 		case FILEINFO_FIELD_PREFIX:
-// 			fi.Prefix = value.([]byte)
-// 		case FILEINFO_FIELD_TOTALCOUNT:
-// 			fi.TotalBlockCount = value.(uint64)
-// 		case FILEINFO_FIELD_COPYNUM:
-// 			fi.CopyNum = value.(uint64)
-// 		case FILEINFO_FIELD_URL:
-// 			fi.Url = value.(string)
-// 		case FILEINFO_FIELD_LINK:
-// 			fi.Link = value.(string)
-// 		case FILEINFO_FIELD_FILEHASH:
-// 			fi.FileHash = value.(string)
-// 		case FILEINFO_FIELD_FILEPATH:
-// 			fi.FilePath = value.(string)
-// 		case FILEINFO_FIELD_WALLETADDR:
-// 			fi.WalletAddress = value.(string)
-// 		case FILEINFO_FIELD_REGURL_TX:
-// 			fi.RegisterDNSTx = value.(string)
-// 		case FILEINFO_FIELD_BIND_TX:
-// 			fi.BindDNSTx = value.(string)
-// 		case FILEINFO_FIELD_TASKSTATE:
-// 			fi.TaskState = value.(uint64)
-// 		case FILEINFO_FIELD_OWNER:
-// 			fi.FileOwner = value.(string)
-// 		}
-// 	}
-// 	return this.batchSaveTaskInfo(nil, fi)
-// }
-
-// func (this *TaskDB) GetFileInfoStringValue(id string, field int) (string, error) {
-// 	fi, err := this.GetTaskInfo(id)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	if fi == nil {
-// 		return "", fmt.Errorf("fileinfo not found of %s", id)
-// 	}
-// 	switch field {
-// 	case FILEINFO_FIELD_FILENAME:
-// 		return fi.FileName, nil
-// 	case FILEINFO_FIELD_STORETX:
-// 		return fi.StoreTx, nil
-// 	case FILEINFO_FIELD_WHITELISTTX:
-// 		return fi.WhitelistTx, nil
-// 	case FILEINFO_FIELD_URL:
-// 		return fi.Url, nil
-// 	case FILEINFO_FIELD_LINK:
-// 		return fi.Link, nil
-// 	case FILEINFO_FIELD_FILEPATH:
-// 		return fi.FilePath, nil
-// 	case FILEINFO_FIELD_WALLETADDR:
-// 		return fi.WalletAddress, nil
-// 	case FILEINFO_FIELD_REGURL_TX:
-// 		return fi.RegisterDNSTx, nil
-// 	case FILEINFO_FIELD_BIND_TX:
-// 		return fi.BindDNSTx, nil
-// 	}
-// 	return "", fmt.Errorf("fileinfo field not found %s %d", id, field)
-// }
-
-// func (this *TaskDB) GetFileInfoBytesValue(id string, field int) ([]byte, error) {
-
-// 	fi, err := this.GetTaskInfo(id)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if fi == nil {
-// 		return nil, fmt.Errorf("fileinfo not found of %s", id)
-// 	}
-// 	switch field {
-// 	case FILEINFO_FIELD_PROVE_PRIVATEKEY:
-// 		return fi.ProvePrivKey, nil
-// 	case FILEINFO_FIELD_PREFIX:
-// 		return fi.Prefix, nil
-// 	}
-// 	return nil, fmt.Errorf("fileinfo field not found %s %d", id, field)
-// }
-
-// func (this *TaskDB) GetFileInfoUint64Value(id string, field int) (uint64, error) {
-
-// 	fi, err := this.GetTaskInfo(id)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	if fi == nil {
-// 		return 0, fmt.Errorf("fileinfo not found of %s", id)
-// 	}
-// 	switch field {
-// 	case FILEINFO_FIELD_TOTALCOUNT:
-// 		return fi.TotalBlockCount, nil
-// 	case FILEINFO_FIELD_COPYNUM:
-// 		return fi.CopyNum, nil
-// 	case FILEINFO_FIELD_TASKSTATE:
-// 		return fi.TaskState, nil
-// 	}
-// 	return 0, fmt.Errorf("fileinfo field not found %s %d", id, field)
-// }
 
 func (this *TaskDB) DeleteTaskIds(ids []string) error {
 	batch := this.db.NewBatch()
@@ -882,21 +733,6 @@ func (this *TaskDB) GetUploadedBlockNodeList(id, blockHashStr string, index uint
 	return block.NodeList
 }
 
-// // UploadedBlockCount
-// func (this *TaskDB) UploadedBlockCount(id string) uint64 {
-// 	this.lock.RLock()
-// 	defer this.lock.RUnlock()
-// 	fi, err := this.GetTaskInfo(id)
-// 	if err != nil || fi == nil {
-// 		return 0
-// 	}
-// 	sum := uint64(0)
-// 	for _, cnt := range fi.SaveBlockCountMap {
-// 		sum += cnt
-// 	}
-// 	return sum
-// }
-
 // AddFileBlockHashes add all blocks' hash, using for detect whether the node has stored the file
 func (this *TaskDB) AddFileBlockHashes(id string, blocks []string) error {
 	// TODO: test performance
@@ -1137,7 +973,7 @@ func (this *TaskDB) IsBlockDownloaded(id, blockHashStr string, index uint32) boo
 func (this *TaskDB) IsFileDownloaded(id string) bool {
 	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
-		log.Errorf("query upload progress keys failed, file info not found %s", err)
+		log.Errorf("query download progress keys failed, file info %s not found %s", id, err)
 		return false
 	}
 	progressPrefix := FileProgressKey(fi.Id, "")
@@ -1163,76 +999,18 @@ func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string
 	if err != nil || fi == nil {
 		return nil, nil, errors.New("file not found")
 	}
+	blockHashes := this.FileBlockHashes(id)
+	if len(blockHashes) == 0 {
+		return nil, nil, nil
+	}
 	hashes := make([]string, 0)
 	indexMap := make(map[string]uint32)
-	var search func(string, uint32) error
-	// TEST: improve performance
-	log.Debugf("search %s", rootBlockHash)
-	search = func(blockHash string, blockIndex uint32) error {
-		blockKey := BlockInfoKey(id, blockIndex, blockHash)
-		block, err := this.getBlockInfo(blockKey)
-		if err != nil {
-			return err
+	for index, hash := range blockHashes {
+		if this.IsBlockDownloaded(id, hash, uint32(index)) {
+			continue
 		}
-		if block == nil || len(block.NodeList) == 0 {
-			hashes = append(hashes, blockHash)
-			indexMap[blockHash] = blockIndex
-			return nil
-		}
-		if len(block.LinkHashes) == 0 {
-			log.Warnf("block .link hashes is empty return nil %s %s", id, rootBlockHash)
-			return nil
-		}
-		oldIndex := blockIndex
-		childUndoneIndex := -1
-		for i, hash := range block.LinkHashes {
-			blockIndex++
-			childBlockKey := BlockInfoKey(id, blockIndex, hash)
-			childBlock, err := this.getBlockInfo(childBlockKey)
-			if err != nil {
-				return err
-			}
-			if childBlock != nil && len(childBlock.NodeList) > 0 {
-				// downloaded block, skip
-				continue
-			}
-			hashes = append(hashes, hash)
-			indexMap[hash] = blockIndex
-			if childUndoneIndex == -1 {
-				childUndoneIndex = i
-			}
-		}
-		for i, hash := range block.LinkHashes {
-			if childUndoneIndex != -1 && i == childUndoneIndex {
-				break
-			}
-			oldIndex++
-			neighBorBlockKey := BlockInfoKey(id, oldIndex, hash)
-			neighBlock, err := this.getBlockInfo(neighBorBlockKey)
-			if err != nil {
-				return err
-			}
-			for _, ch := range neighBlock.LinkHashes {
-				blockIndex++
-				err := search(ch, blockIndex)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-	err = search(rootBlockHash, 0)
-	log.Debugf("search done err %s", err)
-	if err != nil {
-		return nil, nil, err
-	}
-	log.Debugf("undownloaded hashes :%v, len:%d", hashes, len(hashes))
-	if len(hashes) == 0 {
-		return []string{rootBlockHash}, map[string]uint32{rootBlockHash: 0}, nil
-	}
-	for h, i := range indexMap {
-		log.Debugf("undownloaded hashes-index %s-%d", h, i)
+		hashes = append(hashes, hash)
+		indexMap[hash] = uint32(index)
 	}
 	return hashes, indexMap, nil
 }

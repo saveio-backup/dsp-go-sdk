@@ -1,6 +1,7 @@
 package client
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -298,6 +299,15 @@ func P2pBroadcast(addresses []string, data proto.Message, msgId string, actions 
 	case resp := <-chReq.Response:
 		if resp != nil && resp.Error != nil {
 			return nil, dspErr.NewWithError(dspErr.NETWORK_BROADCAST_ERROR, resp.Error)
+		}
+		connectionErrCnt := 0
+		for _, broadcastErr := range resp.Result {
+			if broadcastErr != nil && strings.Contains(broadcastErr.Error(), "connected timeout") {
+				connectionErrCnt++
+			}
+		}
+		if connectionErrCnt == len(resp.Result) {
+			return nil, dspErr.New(dspErr.NETWORK_CONNECT_ERROR, "connect to all peers failed")
 		}
 		return resp.Result, nil
 	case <-time.After(time.Duration(common.MAX_ACTOR_P2P_REQ_TIMEOUT*len(addresses)) * time.Second):

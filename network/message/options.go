@@ -92,6 +92,12 @@ func WithSessionId(sessionId string) FileMsgOption {
 	})
 }
 
+func WithBlocksRoot(blocksRoot string) FileMsgOption {
+	return optionFunc(func(f *file.File) {
+		f.BlocksRoot = blocksRoot
+	})
+}
+
 func WithHash(hash string) FileMsgOption {
 	return optionFunc(func(f *file.File) {
 		f.Hash = hash

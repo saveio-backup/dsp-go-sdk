@@ -165,7 +165,7 @@ func (this *Dsp) RunGetProgressTicker() bool {
 	log.Debugf("un slaved task %v", ids)
 	taskHasDone := 0
 	for _, id := range ids {
-		taskInfo, _ := this.taskMgr.GetTaskInfoClone(id)
+		taskInfo, _ := this.taskMgr.GetTaskInfoCopy(id)
 		if taskInfo == nil {
 			log.Warnf("task %s not exist, remove it", id)
 			this.taskMgr.RemoveUnSlavedTasks(id)

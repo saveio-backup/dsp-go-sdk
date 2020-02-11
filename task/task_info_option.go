@@ -24,6 +24,12 @@ func FileHash(fileHash string) InfoOption {
 	})
 }
 
+func BlocksRoot(blocksRoot string) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.BlocksRoot = blocksRoot
+	})
+}
+
 func Prefix(prefix string) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.Prefix = []byte(prefix)
@@ -152,6 +158,102 @@ func PrimaryNodes(pm []string) InfoOption {
 func CandidateNodes(cn []string) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.CandidateNodes = cn
+	})
+}
+
+func DecryptPwd(decryptPwd string) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.DecryptPwd = decryptPwd
+	})
+}
+
+func Asset(asset int32) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.Asset = asset
+	})
+}
+
+func MaxPeerCnt(maxPeerCnt int) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.MaxPeerCnt = maxPeerCnt
+	})
+}
+
+func Free(free bool) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.Free = free
+	})
+}
+
+func SetFileName(setFileName bool) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.SetFileName = setFileName
+	})
+}
+
+func RealFileSize(realFileSize uint64) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.RealFileSize = realFileSize
+	})
+}
+
+func FileSize(fileSize uint64) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.FileSize = fileSize
+	})
+}
+
+func ExpiredHeight(expiredHeight uint64) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.ExpiredHeight = expiredHeight
+	})
+}
+
+func ProveInterval(proveInterval uint64) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.ProveInterval = proveInterval
+	})
+}
+
+func Privilege(privilege uint64) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.Privilege = privilege
+	})
+}
+
+func Encrypt(encrypt bool) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.Encrypt = encrypt
+	})
+}
+
+func RegisterDNS(registerDNS bool) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.RegisterDNS = registerDNS
+	})
+}
+
+func BindDNS(bindDNS bool) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.BindDNS = bindDNS
+	})
+}
+
+func Share(share bool) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.Share = share
+	})
+}
+
+func EncryptPassword(encryptPassword []byte) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.EncryptPassword = encryptPassword
+	})
+}
+
+func WhiteList(whiteList []*store.WhiteList) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.WhiteList = whiteList
 	})
 }
 

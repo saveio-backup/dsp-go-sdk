@@ -86,6 +86,7 @@ const (
 	SET_TASK_PROPERTY_ERROR                                   // 50069
 	DISPATCH_FILE_ERROR                                       // 50070
 	RECEIVE_ERROR_MSG                                         // 50071
+	MISSING_FILE_BLOCKS_ROOT                                  // 50072
 )
 
 // delete file error

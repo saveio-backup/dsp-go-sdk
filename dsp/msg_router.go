@@ -119,15 +119,13 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	if len(existTaskId) == 0 {
 		newMsg := message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 			message.WithSessionId(fileMsg.SessionId),
-			// message.WithBreakpointHash(""),
-			// message.WithBreakpointIndex(0),
 			message.WithWalletAddress(this.chain.WalletAddress()),
 			message.WithSign(this.account),
 			message.ChainHeight(height),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2pSend(peer.Address, newMsg.MessageId, newMsg.ToProtoMsg()); err != nil {
-			log.Errorf("send new task file_ack msg to %s failed %s",
+			log.Errorf("send new task %s file_ack msg to %s failed %s",
 				existTaskId, peer.Address, err)
 			return
 		}
@@ -141,22 +139,8 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peer *network.P
 	if state == store.TaskStateCancel || state == store.TaskStateFailed || state == store.TaskStateDone {
 		log.Warnf("the task has a wrong state of file_ask %s", state)
 	}
-	// currentBlockHash, currentBlockIndex, err := this.taskMgr.GetCurrentSetBlock(existTaskId)
-	// if err != nil {
-	// 	log.Errorf("get current set block err %s", err)
-	// 	replyMsg := message.NewFileMsgWithError(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
-	// 		netcom.MSG_ERROR_INTERNAL_ERROR, fmt.Sprintf("get current set block err %s", err),
-	// 		message.WithSign(this.account), message.WithSyn(msg.MessageId))
-	// 	if err := client.P2pSend(peer.Address, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
-	// 		log.Errorf("reply file_ack msg failed", err)
-	// 		return
-	// 	}
-	// 	return
-	// }
 	newMsg := message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 		message.WithSessionId(fileMsg.SessionId),
-		// message.WithBreakpointHash(currentBlockHash),
-		// message.WithBreakpointIndex(currentBlockIndex),
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithSign(this.account),
 		message.ChainHeight(height),
@@ -187,7 +171,6 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		}
 		return err
 	}
-
 	// check file tx, and if it is confirmed, and file info is still exist
 	if fileMsg.Tx == nil {
 		replyErr(fileMsg.Hash, msg.MessageId, serr.MISS_UPLOADED_FILE_TX, "upload file tx is required")
@@ -218,6 +201,9 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		log.Errorf("block number is unmatched %d, %d", len(fileMsg.BlockHashes), info.FileBlockNum)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.NO_PRIVILEGE_TO_UPLOAD, "file block number not match")
 		return
+	}
+	if len(info.BlocksRoot) == 0 {
+		log.Warnf("file %s has not blocks root", fileMsg.Hash)
 	}
 	// my task. use my wallet address
 	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
@@ -281,6 +267,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 	}
 	if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
 		task.FileHash(fileMsg.Hash),
+		task.BlocksRoot(fileMsg.BlocksRoot),
 		task.Prefix(string(fileMsg.Prefix)),
 		task.Walletaddr(this.chain.WalletAddress()),
 		task.FileOwner(info.FileOwner.ToBase58()),

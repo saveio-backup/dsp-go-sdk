@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/saveio/dsp-go-sdk/common"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
@@ -442,6 +443,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	fileHash := tsk.GetFileHash()
 	tskWalletAddr := tsk.GetWalletAddr()
 	addrs := tsk.GetWorkerAddrs()
+	inOrder := tsk.GetInorder()
+	notifyIndex := int32(0)
 	// lock for local go routines variables
 	max := len(addrs)
 	if max > common.MAX_GOROUTINES_FOR_WORK_TASK {
@@ -458,14 +461,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 		})
 		return len
 	}
-	getFlightMapLen := func() int {
-		len := int(0)
-		flightMap.Range(func(k, v interface{}) bool {
-			len++
-			return true
-		})
-		return len
-	}
 
 	type job struct {
 		req       []*GetBlockReq
@@ -475,15 +470,17 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	jobCh := make(chan *job, max)
 
 	type getBlocksResp struct {
-		worker          *Worker
-		flightKey       []string
-		failedFlightKey map[string]struct{}
-		ret             []*BlockResp
-		err             error
+		worker        *Worker
+		flightKey     []string
+		failedFlights map[string]*GetBlockReq
+		ret           []*BlockResp
+		err           error
 	}
 	dropDoneCh := uint32(0)
 
 	done := make(chan *getBlocksResp, 1)
+	// trigger to start
+	go tsk.notifyBlockReqPoolLen()
 	go func() {
 		for {
 			if tsk.State() == store.TaskStateDone {
@@ -500,16 +497,14 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			}
 			// check pool has item or no
 			log.Debugf("wait for block pool notify")
-			<-tsk.blockReqPoolNotify
+			select {
+			case <-tsk.blockReqPoolNotify:
+			case <-time.After(time.Duration(3) * time.Second):
+			}
 			reqPoolLen := tsk.GetBlockReqPoolLen()
 			log.Debugf("wait for block pool notify done %d", reqPoolLen)
 			if reqPoolLen == 0 {
-				continue
-			}
-			// check all pool items are in request flights
-			if getFlightMapLen()+getBlockCacheLen() >= reqPoolLen {
-				log.Debug("all requests are on flights flight len %d, cache len %d",
-					getFlightMapLen(), getBlockCacheLen())
+				log.Debugf("req pool is empty but state is %d", tsk.State())
 				continue
 			}
 			// get the idle request
@@ -549,6 +544,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				log.Debugf("add flight %s-%s to %s-%s, worker %s",
 					fileHash, flights[0], fileHash, flights[len(flights)-1], worker.RemoteAddress())
 			}
+			tsk.DelBlockReqFromPool(req)
 			tsk.SetWorkerUnPaid(worker.remoteAddr, true)
 			jobCh <- &job{
 				req:       req,
@@ -572,64 +568,61 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					break
 				}
 				// delete failed key
-				for k, _ := range resp.failedFlightKey {
+				for k, _ := range resp.failedFlights {
 					flightMap.Delete(k)
 				}
 				for k, v := range resp.flightKey {
-					log.Debugf("receive response of flight %s, err %s", v, resp.err)
 					if resp.err != nil {
 						flightMap.Delete(v)
 						// remove the request from flight
 						log.Errorf("worker %s do job err continue %s", resp.worker.remoteAddr, resp.err)
 						continue
 					}
-					log.Debugf("add flightkey to cache %s, blockhash %s", v, resp.ret[k].Hash)
 					blockCache.Store(v, resp.ret[k])
 					flightMap.Delete(v)
 				}
+				go func() {
+					log.Debugf("notify when block reqs receive response", resp.flightKey)
+					tsk.blockReqPoolNotify <- &blockReqPool{}
+					log.Debugf("notify when block reqs  receive response done")
+				}()
 				if resp.err != nil {
-					go func() {
-						log.Debugf("notify when block reqs failed %v", resp.flightKey)
-						tsk.blockReqPoolNotify <- &blockReqPool{}
-						log.Debugf("notify when block reqs failed done")
-					}()
 					break
 				}
+				if len(resp.flightKey) > 0 {
+					log.Debugf("store flight from %s to %s from peer %s",
+						resp.flightKey[0], resp.flightKey[len(resp.flightKey)-1], resp.worker.remoteAddr)
+				}
 				// notify outside
-				pool := tsk.GetBlockReqPool()
-				toDelete := make([]*GetBlockReq, 0)
-				for poolIdx, r := range pool {
-					blkKey := fmt.Sprintf("%s-%d", r.Hash, r.Index)
-					_, ok := blockCache.Load(blkKey)
-					log.Debugf("loop req poolIdx %d pool %v", poolIdx, blkKey)
-					if !ok {
-						log.Debugf("break because block cache not has %v", blkKey)
-						break
-					}
-					toDelete = append(toDelete, &GetBlockReq{
-						Hash:     r.Hash,
-						Index:    r.Index,
-						FileHash: r.FileHash,
+				if inOrder {
+					blockCache.Range(func(blkKey, blktemp interface{}) bool {
+						blktemp, ok := blockCache.Load(blkKey)
+						if !ok {
+							log.Warnf("continue because block cache not has %v!", blkKey)
+							return true
+						}
+						blk := blktemp.(*BlockResp)
+						if blk.Index != notifyIndex {
+							return true
+						}
+						notifyIndex++
+						tsk.NotifyBlock(blk)
+						blockCache.Delete(blkKey)
+						return true
 					})
-				}
-				log.Debugf("remove %d response from req pool", len(toDelete))
-				for _, toD := range toDelete {
-					blkKey := fmt.Sprintf("%s-%d", toD.Hash, toD.Index)
-					blktemp, ok := blockCache.Load(blkKey)
-					if !ok {
-						log.Warnf("break because block cache not has %v!", blkKey)
-						continue
+				} else {
+					for _, blkKey := range resp.flightKey {
+						blktemp, ok := blockCache.Load(blkKey)
+						if !ok {
+							log.Warnf("continue because block cache not has %v!", blkKey)
+							continue
+						}
+						blk := blktemp.(*BlockResp)
+						tsk.NotifyBlock(blk)
+						blockCache.Delete(blkKey)
 					}
-					blk := blktemp.(*BlockResp)
-					log.Debugf("notify flightkey from cache %s-%d", blk.Hash, blk.Index)
-					tsk.NotifyBlock(blk)
-					blockCache.Delete(blkKey)
-				}
-				if len(toDelete) > 0 {
-					this.DelBlockReq(taskId, toDelete)
 				}
 				log.Debugf("remain %d response at block cache", getBlockCacheLen())
-				log.Debugf("receive response process done")
 			}
 			if tsk.State() == store.TaskStatePause || tsk.State() == store.TaskStateFailed {
 				log.Debugf("receive state %d", tsk.State())
@@ -659,7 +652,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				flights := make([]*block.Block, 0)
 				sessionId, err := this.GetSessionId(taskId, job.worker.WalletAddr())
 
-				allFlightskey := make(map[string]struct{}, 0)
+				allFlightskey := make(map[string]*GetBlockReq, 0)
 				for _, v := range job.req {
 					b := &block.Block{
 						SessionId: sessionId,
@@ -673,7 +666,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						},
 					}
 					flights = append(flights, b)
-					allFlightskey[fmt.Sprintf("%s-%d", v.Hash, v.Index)] = struct{}{}
+					allFlightskey[fmt.Sprintf("%s-%d", v.Hash, v.Index)] = v
 				}
 				log.Debugf("start request block %s-%s-%d to %s-%d to %s, peer wallet: %s",
 					fileHash, job.req[0].Hash, job.req[0].Index, job.req[len(job.req)-1].Hash,
@@ -714,12 +707,20 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						fmt.Sprintf("%s-%d", ret[0].Hash, ret[0].Index),
 						fmt.Sprintf("%s-%d", ret[len(ret)-1].Hash, ret[len(ret)-1].Index))
 				}
+
 				resp := &getBlocksResp{
-					worker:          job.worker,
-					flightKey:       flightskey,
-					failedFlightKey: allFlightskey,
-					ret:             ret,
-					err:             err,
+					worker:        job.worker,    // worker info
+					flightKey:     flightskey,    // success flight keys
+					failedFlights: allFlightskey, // failed flight keys
+					ret:           ret,           // success flight response
+					err:           err,           // job error
+				}
+				if len(allFlightskey) > 0 {
+					failedReqs := make([]*GetBlockReq, 0)
+					for _, req := range allFlightskey {
+						failedReqs = append(failedReqs, req)
+					}
+					tsk.InsertBlockReqToPool(failedReqs)
 				}
 				done <- resp
 			}
@@ -759,6 +760,14 @@ func (this *TaskMgr) DelBlockReq(taskId string, blockReqs []*GetBlockReq) {
 		return
 	}
 	v.DelBlockReqFromPool(blockReqs)
+}
+
+func (this *TaskMgr) GetBlockReqPoolLen(taskId string) (int, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return 0, errors.New("task not found")
+	}
+	return v.GetBlockReqPoolLen(), nil
 }
 
 func (this *TaskMgr) IsTaskCanResume(taskId string) (bool, error) {

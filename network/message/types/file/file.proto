@@ -35,4 +35,5 @@ message File {
    Breakpoint breakpoint = 9;
    int32 totalBlockCount = 10;
    Chain chainInfo = 11;
+   string blocksRoot = 12;
 }

@@ -3,10 +3,8 @@ package task
 import (
 	"fmt"
 
-	"github.com/saveio/dsp-go-sdk/common"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
-	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 // getter list for task info
@@ -134,12 +132,12 @@ func (this *TaskMgr) GetStoreTx(taskId string) (string, error) {
 	return v.GetStoreTx(), nil
 }
 
-func (this *TaskMgr) GetTaskInfoClone(taskId string) (*store.TaskInfo, error) {
+func (this *TaskMgr) GetTaskInfoCopy(taskId string) (*store.TaskInfo, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
 	}
-	return v.GetTaskInfoClone(), nil
+	return v.GetTaskInfoCopy(), nil
 }
 
 func (this *TaskMgr) GetRegUrlTx(taskId string) (string, error) {
@@ -204,22 +202,6 @@ func (this *TaskMgr) GetFileSessions(fileInfoId string) (map[string]*store.Sessi
 		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 	}
 	return sessions, nil
-}
-
-func (this *TaskMgr) GetFileUploadOptions(id string) (*fs.UploadOption, error) {
-	opt, err := this.db.GetFileUploadOptions(id)
-	if err != nil {
-		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
-	}
-	return opt, nil
-}
-
-func (this *TaskMgr) GetFileDownloadOptions(id string) (*common.DownloadOption, error) {
-	opt, err := this.db.GetFileDownloadOptions(id)
-	if err != nil {
-		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
-	}
-	return opt, nil
 }
 
 func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint32, error) {

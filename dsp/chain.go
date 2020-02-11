@@ -124,7 +124,7 @@ func (this *Dsp) QueryUrl(url string, ownerAddr chainCom.Address) (*dns.NameInfo
 	return this.chain.QueryUrl(url, ownerAddr)
 }
 
-func (this *Dsp) PollForTxConfirmed(timeout time.Duration, txHashStr string) (bool, error) {
+func (this *Dsp) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
 	return this.chain.PollForTxConfirmed(timeout, txHashStr)
 }
 

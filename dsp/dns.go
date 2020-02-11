@@ -65,7 +65,14 @@ func (this *Dsp) BindFileUrl(url, link string) (string, error) {
 }
 
 func (this *Dsp) GenLink(fileHashStr, fileName string, fileSize, totalCount uint64) string {
-	return utils.GenOniLink(fileHashStr, fileName, this.chain.WalletAddress(), fileSize, totalCount, this.dns.TrackerUrls)
+	return utils.GenOniLinkJSONString(&utils.URLLink{
+		FileHashStr: fileHashStr,
+		FileName:    fileName,
+		FileOwner:   this.chain.WalletAddress(),
+		FileSize:    fileSize,
+		BlockNum:    totalCount,
+		Trackers:    this.dns.TrackerUrls,
+	})
 }
 
 func (this *Dsp) GetLinkFromUrl(url string) string {
@@ -84,7 +91,7 @@ func (this *Dsp) GetFileHashFromUrl(url string) string {
 	return this.dns.GetFileHashFromUrl(url)
 }
 
-func (this *Dsp) GetLinkValues(link string) map[string]string {
+func (this *Dsp) GetLinkValues(link string) (*utils.URLLink, error) {
 	return this.dns.GetLinkValues(link)
 }
 

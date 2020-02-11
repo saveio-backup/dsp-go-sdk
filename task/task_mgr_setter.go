@@ -3,11 +3,9 @@ package task
 import (
 	"fmt"
 
-	"github.com/saveio/dsp-go-sdk/common"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/themis/common/log"
-	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 // SetFileInfoWithOptions
@@ -263,12 +261,12 @@ func (this *TaskMgr) SetBlocksUploaded(taskId, nodeAddr string, blockInfos []*st
 	return nil
 }
 
-func (this *TaskMgr) SetFileUploadOptions(taskId string, opt *fs.UploadOption) error {
-	if err := this.db.SetFileUploadOptions(taskId, opt); err != nil {
-		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
-	}
-	return nil
-}
+// func (this *TaskMgr) SetFileUploadOptions(taskId string, opt *fs.UploadOption) error {
+// 	if err := this.db.SetFileUploadOptions(taskId, opt); err != nil {
+// 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+// 	}
+// 	return nil
+// }
 
 func (this *TaskMgr) SetUploadProgressDone(taskId, nodeAddr string) error {
 	v, ok := this.GetTaskById(taskId)
@@ -350,13 +348,13 @@ func (this *TaskMgr) AddShareTo(id, walletAddress string) error {
 	return nil
 }
 
-func (this *TaskMgr) SetFileDownloadOptions(id string, opt *common.DownloadOption) error {
-	err := this.db.SetFileDownloadOptions(id, opt)
-	if err != nil {
-		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
-	}
-	return nil
-}
+// func (this *TaskMgr) SetFileDownloadOptions(id string, opt *common.DownloadOption) error {
+// 	err := this.db.SetFileDownloadOptions(id, opt)
+// 	if err != nil {
+// 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+// 	}
+// 	return nil
+// }
 
 func (this *TaskMgr) AddFileSession(fileInfoId string, sessionId, walletAddress, hostAddress string,
 	asset uint32, unitPrice uint64) error {

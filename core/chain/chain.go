@@ -89,17 +89,17 @@ func (this *Chain) GetCurrentBlockHeight() (uint32, error) {
 	return height, nil
 }
 
-func (this *Chain) PollForTxConfirmed(timeout time.Duration, txHashStr string) (bool, error) {
+func (this *Chain) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
 	reverseTxHash, err := hex.DecodeString(txHashStr)
 	if err != nil {
-		return false, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+		return 0, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	txHash := chainCom.ToArrayReverse(reverseTxHash)
-	confirmed, err := this.themis.PollForTxConfirmed(timeout, txHash)
+	height, err := this.themis.PollForTxConfirmedHeight(timeout, txHash)
 	if err != nil {
-		return false, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+		return 0, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
-	return confirmed, nil
+	return height, nil
 }
 
 func (this *Chain) WaitForGenerateBlock(timeout time.Duration, blockCount ...uint32) (bool, error) {

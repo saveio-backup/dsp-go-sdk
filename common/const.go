@@ -16,20 +16,22 @@ const (
 	TRACKER_NETWORK_PROTOCOL = "tcp" // tracker network protocol
 	MILLISECOND_PER_SECOND   = 1000  // 1 Second = 1000 Millisecond
 
-	TASK_STATE_CHECK_DURATION     = 1  // task state change check ticker duration
-	TASK_PROGRESS_TICKER_DURATION = 2  // task ticker
-	PROGRESS_SPEED_LEN            = 10 // progress speed len
+	TASK_STATE_CHECK_DURATION     = 1     // task state change check ticker duration
+	TASK_PROGRESS_TICKER_DURATION = 2     // task ticker
+	PROGRESS_SPEED_LEN            = 10    // progress speed len
+	URL_LINK_VERSION              = "1.0" // url link version
 )
 
 // oni link
 const (
-	FILE_LINK_PREFIX       = "oni-link://" // save link header
-	FILE_LINK_HASH_KEY     = "hash"        // hash
-	FILE_LINK_NAME_KEY     = "name"        // filename
-	FILE_LINK_SIZE_KEY     = "size"        // size
-	FILE_LINK_BLOCKNUM_KEY = "blocknum"    // block count
-	FILE_LINK_TRACKERS_KEY = "tr"          // tr
-	FILE_LINK_OWNER_KEY    = "owner"       // owner
+	FILE_LINK_PREFIX         = "oni-link://" // save link header
+	FILE_LINK_HASH_KEY       = "hash"        // hash
+	FILE_LINK_NAME_KEY       = "name"        // filename
+	FILE_LINK_SIZE_KEY       = "size"        // size
+	FILE_LINK_BLOCKNUM_KEY   = "blocknum"    // block count
+	FILE_LINK_TRACKERS_KEY   = "tr"          // tr
+	FILE_LINK_OWNER_KEY      = "owner"       // owner
+	FILE_LINK_BLOCKSROOT_KEY = "blocksroot"  // blocksroot
 )
 
 // timeout
@@ -89,7 +91,7 @@ const (
 	MAX_REQ_BLOCK_COUNT            = 32     // max block count when request for download flights
 	MIN_REQ_BLOCK_COUNT            = 16     // min block count when request for download flights
 	MAX_SEND_BLOCK_COUNT           = 16     // max send block count for send flights
-	MIN_SEND_BLOCK_COUNT           = 16     // max send block count for send flights
+	MIN_SEND_BLOCK_COUNT           = 16     // min send block count for send flights
 	MAX_START_PDP_RETRY            = 2      // max start pdp retry
 	START_PDP_RETRY_DELAY          = 5      // delay pdp retry
 	MAX_PEERCNT_FOR_DOWNLOAD       = 100    // max peer count (threads) for download file

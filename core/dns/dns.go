@@ -163,7 +163,10 @@ func (d *DNS) SetupTrackers() error {
 
 // BootstrapDNS. bootstrap max 15 DNS from smart contract
 func (d *DNS) BootstrapDNS() {
-	log.Debugf("start bootstrapDNS...")
+	log.Debugf("start bootstrapDNS... %v", d.Channel)
+	if d.Channel == nil {
+		return
+	}
 	connetedDNS, err := d.connectDNS(common.MAX_DNS_NUM)
 	if err != nil {
 		return
@@ -173,10 +176,7 @@ func (d *DNS) BootstrapDNS() {
 	if d.AutoBootstrap || len(d.OnlineDNS) == 0 {
 		return
 	}
-	log.Debugf("d.channel %v", d.Channel)
-	if d.Channel == nil {
-		return
-	}
+
 	channels, err := d.Channel.AllChannels()
 	if err != nil {
 		log.Errorf("get all channel err %s", err)
@@ -438,8 +438,8 @@ func (d *DNS) RegisterFileUrl(url, link string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	confirmed, err := d.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
-	if err != nil || !confirmed {
+	height, err := d.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
+	if err != nil || height == 0 {
 		return "", dspErr.New(dspErr.CHAIN_ERROR, "tx confirm err %s", err)
 	}
 	return tx, nil
@@ -450,8 +450,8 @@ func (d *DNS) BindFileUrl(url, link string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	confirmed, err := d.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
-	if err != nil || !confirmed {
+	height, err := d.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
+	if err != nil || height == 0 {
 		return "", dspErr.New(dspErr.CHAIN_ERROR, "tx confirm err %s", err)
 	}
 	return tx, nil
@@ -506,11 +506,15 @@ func (d *DNS) GetFileHashFromUrl(url string) string {
 	if len(link) == 0 {
 		return ""
 	}
-	return utils.GetFileHashFromLink(link)
+	l, err := utils.DecodeLinkStr(link)
+	if err != nil {
+		return ""
+	}
+	return l.FileHashStr
 }
 
-func (d *DNS) GetLinkValues(link string) map[string]string {
-	return utils.GetFilePropertiesFromLink(link)
+func (d *DNS) GetLinkValues(link string) (*utils.URLLink, error) {
+	return utils.DecodeLinkStr(link)
 }
 
 func (d *DNS) RegNodeEndpoint(walletAddr chaincom.Address, endpointAddr string) error {
