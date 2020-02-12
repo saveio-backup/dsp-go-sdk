@@ -732,6 +732,23 @@ func (this *Dsp) DeleteDownloadedFile(taskId string) error {
 	return this.taskMgr.CleanTask(taskId)
 }
 
+// DeleteDownloadedLocalFile. Delete file in local.
+func (this *Dsp) DeleteDownloadedLocalFile(fileHash string) error {
+	taskId, _ := this.taskMgr.GetDownloadedTaskId(fileHash)
+	if len(taskId) == 0 {
+		return dspErr.New(dspErr.DELETE_FILE_FAILED, "delete taskId is empty")
+	}
+	filePath, _ := this.taskMgr.GetFilePath(taskId)
+	fileHashStr, _ := this.taskMgr.GetTaskFileHash(taskId)
+	err := this.fs.DeleteFile(fileHashStr, filePath)
+	if err != nil {
+		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHashStr, filePath, err)
+		return err
+	}
+	log.Debugf("delete local file success fileHash:%s, path:%s", fileHashStr, filePath)
+	return nil
+}
+
 // StartBackupFileService. start a backup file service to find backup jobs.
 func (this *Dsp) StartBackupFileService() {
 	backupingCnt := 0
