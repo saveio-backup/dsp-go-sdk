@@ -462,6 +462,10 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 		return len
 	}
 
+	blockIndexKey := func(hash string, index int32) string {
+		return fmt.Sprintf("%s-%d", hash, index)
+	}
+
 	type job struct {
 		req       []*GetBlockReq
 		worker    *Worker
@@ -472,7 +476,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	type getBlocksResp struct {
 		worker        *Worker
 		flightKey     []string
-		failedFlights map[string]*GetBlockReq
+		failedFlights []*GetBlockReq
 		ret           []*BlockResp
 		err           error
 	}
@@ -513,7 +517,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			var flights []string
 			pool := tsk.GetBlockReqPool()
 			for _, r := range pool {
-				flightKey = fmt.Sprintf("%s-%d", r.Hash, r.Index)
+				flightKey = blockIndexKey(r.Hash, r.Index)
 				if _, ok := flightMap.Load(flightKey); ok {
 					continue
 				}
@@ -568,8 +572,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					break
 				}
 				// delete failed key
-				for k, _ := range resp.failedFlights {
-					flightMap.Delete(k)
+				for _, req := range resp.failedFlights {
+					flightMap.Delete(blockIndexKey(req.Hash, req.Index))
 				}
 				for k, v := range resp.flightKey {
 					if resp.err != nil {
@@ -651,8 +655,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				flights := make([]*block.Block, 0)
 				sessionId, err := this.GetSessionId(taskId, job.worker.WalletAddr())
-
-				allFlightskey := make(map[string]*GetBlockReq, 0)
+				if err != nil {
+					log.Warnf("task %s get session id failed of peer %s", taskId, job.worker.WalletAddr())
+				}
 				for _, v := range job.req {
 					b := &block.Block{
 						SessionId: sessionId,
@@ -666,7 +671,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						},
 					}
 					flights = append(flights, b)
-					allFlightskey[fmt.Sprintf("%s-%d", v.Hash, v.Index)] = v
 				}
 				log.Debugf("start request block %s-%s-%d to %s-%d to %s, peer wallet: %s",
 					fileHash, job.req[0].Hash, job.req[0].Index, job.req[len(job.req)-1].Hash,
@@ -696,11 +700,21 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					log.Debugf("stop when drop channel is not 0")
 					break
 				}
-				flightskey := make([]string, 0)
+				successFlightKeys := make([]string, 0)
+				failedFlightReqs := make([]*GetBlockReq, 0)
+				successFlightMap := make(map[string]struct{}, 0)
 				for _, v := range ret {
-					key := fmt.Sprintf("%s-%d", v.Hash, v.Index)
-					flightskey = append(flightskey, key)
-					delete(allFlightskey, key)
+					key := blockIndexKey(v.Hash, v.Index)
+					successFlightMap[key] = struct{}{}
+					successFlightKeys = append(successFlightKeys, key)
+				}
+				if len(successFlightKeys) != len(job.req) {
+					for _, r := range job.req {
+						if _, ok := successFlightMap[blockIndexKey(r.Hash, r.Index)]; ok {
+							continue
+						}
+						failedFlightReqs = append(failedFlightReqs, r)
+					}
 				}
 				if len(ret) > 0 {
 					log.Debugf("push flightskey from %s to %s",
@@ -709,18 +723,14 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 
 				resp := &getBlocksResp{
-					worker:        job.worker,    // worker info
-					flightKey:     flightskey,    // success flight keys
-					failedFlights: allFlightskey, // failed flight keys
-					ret:           ret,           // success flight response
-					err:           err,           // job error
+					worker:        job.worker,        // worker info
+					flightKey:     successFlightKeys, // success flight keys
+					failedFlights: failedFlightReqs,  // failed flight keys
+					ret:           ret,               // success flight response
+					err:           err,               // job error
 				}
-				if len(allFlightskey) > 0 {
-					failedReqs := make([]*GetBlockReq, 0)
-					for _, req := range allFlightskey {
-						failedReqs = append(failedReqs, req)
-					}
-					tsk.InsertBlockReqToPool(failedReqs)
+				if len(failedFlightReqs) > 0 {
+					tsk.InsertBlockReqToPool(failedFlightReqs)
 				}
 				done <- resp
 			}

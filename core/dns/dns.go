@@ -51,6 +51,7 @@ type DNS struct {
 	DNSWalletAddrsFromCfg []string          // specific dns wallet address from global config
 	PublicAddrCache       *lru.ARCCache     // get public addr cache
 	channelProtocol       string            // channel protocol
+	bootstraping          bool              // is bootstraping
 }
 
 type DNSOption interface {
@@ -167,6 +168,13 @@ func (d *DNS) BootstrapDNS() {
 	if d.Channel == nil {
 		return
 	}
+	if d.bootstraping {
+		return
+	}
+	d.bootstraping = true
+	defer func() {
+		d.bootstraping = false
+	}()
 	connetedDNS, err := d.connectDNS(common.MAX_DNS_NUM)
 	if err != nil {
 		return

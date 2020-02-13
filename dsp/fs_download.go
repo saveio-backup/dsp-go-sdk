@@ -558,6 +558,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 
 	// use default dns to pay
 	if err := this.checkDNSState(this.dns.DNSNode.WalletAddr); err == nil {
+		log.Debugf("paying to %s, id %v, use dns: %s", payInfo.WalletAddress, paymentId, this.dns.DNSNode.WalletAddr)
 		if err := this.channel.MediaTransfer(paymentId, amount, this.dns.DNSNode.WalletAddr,
 			payInfo.WalletAddress); err == nil {
 			// clean unpaid order
@@ -566,8 +567,11 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 				return 0, err
 			}
 			log.Debugf("delete unpaid %d", amount)
+			// active peer to prevent pay too long
+			this.taskMgr.ActiveDownloadTaskPeer(addr)
 			return paymentId, nil
 		} else {
+			this.taskMgr.ActiveDownloadTaskPeer(addr)
 			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s",
 				paymentId, payInfo.WalletAddress, err)
 		}
@@ -589,8 +593,10 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		log.Debugf("paying to %s, id %v, use dns: %s", payInfo.WalletAddress, paymentId, ch.Address)
 		if err := this.channel.MediaTransfer(paymentId, amount, ch.Address, payInfo.WalletAddress); err != nil {
 			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s", paymentId, payInfo.WalletAddress, err)
+			this.taskMgr.ActiveDownloadTaskPeer(addr)
 			continue
 		}
+		this.taskMgr.ActiveDownloadTaskPeer(addr)
 		paySuccess = true
 		log.Debugf("paying to %s, id %v success", payInfo.WalletAddress, paymentId)
 		break

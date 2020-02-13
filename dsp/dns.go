@@ -64,14 +64,15 @@ func (this *Dsp) BindFileUrl(url, link string) (string, error) {
 	return this.dns.BindFileUrl(url, link)
 }
 
-func (this *Dsp) GenLink(fileHashStr, fileName string, fileSize, totalCount uint64) string {
+func (this *Dsp) GenLink(fileHashStr, fileName, blocksRoot, fileOwner string, fileSize, totalCount uint64) string {
 	return utils.GenOniLinkJSONString(&utils.URLLink{
 		FileHashStr: fileHashStr,
 		FileName:    fileName,
-		FileOwner:   this.chain.WalletAddress(),
+		FileOwner:   fileOwner,
 		FileSize:    fileSize,
 		BlockNum:    totalCount,
 		Trackers:    this.dns.TrackerUrls,
+		BlocksRoot:  blocksRoot,
 	})
 }
 
