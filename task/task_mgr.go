@@ -253,10 +253,10 @@ func (this *TaskMgr) TaskExistInDB(taskId string) bool {
 	return true
 }
 
-// UploadingFileHashExist. check if a uploading task has contained the file
-func (this *TaskMgr) UploadingFileExist(taskId, fileHashStr string) bool {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
+// PauseDuplicatedTask. check if a uploading task has contained the file, if exist pause it
+func (this *TaskMgr) PauseDuplicatedTask(taskId, fileHashStr string) bool {
+	this.lock.Lock()
+	defer this.lock.Unlock()
 	tsk := this.tasks[taskId]
 	var tskCreatedAt uint64
 	if tsk != nil {
@@ -264,13 +264,28 @@ func (this *TaskMgr) UploadingFileExist(taskId, fileHashStr string) bool {
 	} else {
 		tskCreatedAt = utils.GetMilliSecTimestamp()
 	}
+
 	for _, t := range this.tasks {
-		if t.GetFileHash() == fileHashStr && t.GetId() != taskId && t.GetTaskType() == store.TaskTypeUpload &&
-			t.GetCreatedAt() < tskCreatedAt {
-			log.Debugf("fileHashStr %s, taskId %s , newTaskId %s, taskCreatedAt: %d, newTaskCreatedAt: %d",
-				fileHashStr, t.GetId(), taskId, t.GetCreatedAt(), tskCreatedAt)
-			return true
+		if t.GetFileHash() != fileHashStr {
+			continue
 		}
+		if t.GetId() == taskId {
+			// skip self
+			continue
+		}
+		if t.GetTaskType() != store.TaskTypeUpload {
+			continue
+		}
+		log.Debugf("duplicated check %s, %s %v", t.GetId(), taskId, t.State())
+		if t.State() != store.TaskStateDoing {
+			continue
+		}
+		log.Debugf("fileHashStr %s, taskId %s , newTaskId %s, taskCreatedAt: %d, newTaskCreatedAt: %d",
+			fileHashStr, t.GetId(), taskId, t.GetCreatedAt(), tskCreatedAt)
+		if err := tsk.SetTaskState(store.TaskStatePause); err != nil {
+			continue
+		}
+		return true
 	}
 	return false
 }

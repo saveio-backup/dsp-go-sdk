@@ -101,6 +101,9 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 		if taskId, err = this.taskMgr.NewTask(store.TaskTypeUpload); err != nil {
 			return nil, err
 		}
+		if err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
+			return nil, err
+		}
 		newTask = true
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
@@ -208,9 +211,8 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 		return nil, err
 	}
 	fi, _ := this.chain.GetFileInfo(fileHashStr)
-	if newTask && (fi != nil || this.taskMgr.UploadingFileExist(taskId, fileHashStr)) {
-		err = dspErr.New(dspErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
-		return nil, err
+	if newTask && (fi != nil || this.taskMgr.PauseDuplicatedTask(taskId, fileHashStr)) {
+		return nil, dspErr.New(dspErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
 	}
 	if pause, err := this.checkIfPause(taskId, fileHashStr); err != nil || pause {
 		return nil, err
