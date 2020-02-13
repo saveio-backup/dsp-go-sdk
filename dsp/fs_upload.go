@@ -415,7 +415,8 @@ func (this *Dsp) RetryUpload(taskId string) error {
 
 func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string, gasLimit uint64) (string, uint32, error) {
 	if len(fileHashStrs) == 0 {
-		return "", 0, dspErr.New(dspErr.DELETE_FILE_HASHES_EMPTY, "delete file hash string is empty")
+		return "", 0, nil
+		// return "", 0, dspErr.New(dspErr.DELETE_FILE_HASHES_EMPTY, "delete file hash string is empty")
 	}
 	needDeleteFile := false
 	for _, fileHashStr := range fileHashStrs {
