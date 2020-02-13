@@ -343,3 +343,7 @@ func (this *TaskMgr) ExistSameUploadingFile(taskId, fileHashStr string) bool {
 	}
 	return false
 }
+
+func (this *TaskMgr) GetFileNameWithPath(filePath string) string {
+	return this.db.GetFileNameWithPath(filePath)
+}

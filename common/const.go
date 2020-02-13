@@ -16,10 +16,11 @@ const (
 	TRACKER_NETWORK_PROTOCOL = "tcp" // tracker network protocol
 	MILLISECOND_PER_SECOND   = 1000  // 1 Second = 1000 Millisecond
 
-	TASK_STATE_CHECK_DURATION     = 1     // task state change check ticker duration
-	TASK_PROGRESS_TICKER_DURATION = 2     // task ticker
-	PROGRESS_SPEED_LEN            = 10    // progress speed len
-	URL_LINK_VERSION              = "1.0" // url link version
+	TASK_STATE_CHECK_DURATION     = 1      // task state change check ticker duration
+	TASK_PROGRESS_TICKER_DURATION = 2      // task ticker
+	PROGRESS_SPEED_LEN            = 10     // progress speed len
+	URL_LINK_VERSION              = "1.0"  // url link version
+	ENCRYPTED_FILE_EXTENSION      = ".ept" // encrypted file extension
 )
 
 // oni link

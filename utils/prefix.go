@@ -147,3 +147,9 @@ func VerifyEncryptPassword(password string, salt [4]byte, hash [32]byte) bool {
 	result := sha256.Sum256(encryptData)
 	return result == hash
 }
+
+func GetPrefixEncrypted(prefix []byte) bool {
+	filePrefix := &FilePrefix{}
+	filePrefix.Deserialize(prefix)
+	return filePrefix.Encrypt
+}

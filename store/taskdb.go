@@ -131,7 +131,7 @@ type TaskInfo struct {
 	ProveInterval   uint64       `json:"prove_interval"`         // prove interval
 	Privilege       uint64       `json:"privilege"`              // file privilege
 	Encrypt         bool         `json:"encrypt"`                // encrypt or not
-	EncryptPassword []byte       `json:"encrypt pwd"`            // encrypted pwd
+	EncryptPassword []byte       `json:"encrypt_pwd"`            // encrypted pwd
 	RegisterDNS     bool         `json:"register_dns"`           // register dns or not
 	BindDNS         bool         `json:"bind_dns"`               // bind dns or not
 	WhiteList       []*WhiteList `json:"white_list"`             // white list
@@ -1590,6 +1590,29 @@ func (this *TaskDB) CopyTask(t *TaskInfo) *TaskInfo {
 		return nil
 	}
 	return newInfo
+}
+
+// GetFileNameWithPath. Query all task to get file name whit a specific file path
+func (this *TaskDB) GetFileNameWithPath(filePath string) string {
+	if len(filePath) == 0 {
+		return ""
+	}
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		return ""
+	}
+	for _, key := range keys {
+		info, err := this.getTaskInfoByKey(key)
+		if err != nil || info == nil {
+			continue
+		}
+		if info.FilePath != filePath {
+			return ""
+		}
+		return info.FileName
+	}
+	return ""
 }
 
 func (this *TaskDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {

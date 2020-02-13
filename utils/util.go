@@ -11,8 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
-	"github.com/saveio/themis/common"
+	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -85,8 +86,14 @@ func IsHostAddrValid(hostAddr string) bool {
 	return false
 }
 
-func GetFileNameAtPath(dirPath, fileHash, fileName string) string {
+func GetFileFullPath(dirPath, fileHash, fileName string, encrypted bool) string {
+	if strings.LastIndex(dirPath, "/") != len(dirPath)-1 {
+		dirPath = dirPath + "/"
+	}
 	if len(fileName) == 0 {
+		if encrypted {
+			return dirPath + fileHash + common.ENCRYPTED_FILE_EXTENSION
+		}
 		return dirPath + fileHash
 	}
 	i := strings.LastIndex(fileName, ".")
@@ -102,10 +109,14 @@ func GetFileNameAtPath(dirPath, fileHash, fileName string) string {
 		if count > 0 {
 			fullPath += fmt.Sprintf(" (%d)", count)
 		}
-		if len(ext) > 0 {
-			fullPath += ext
+		if encrypted {
+			fullPath += common.ENCRYPTED_FILE_EXTENSION
+		} else {
+			if len(ext) > 0 {
+				fullPath += ext
+			}
 		}
-		exist := common.FileExisted(fullPath)
+		exist := chainCom.FileExisted(fullPath)
 		if !exist {
 			return fullPath
 		}
@@ -119,14 +130,23 @@ func StringToSha256Hex(str string) string {
 	return hexStr
 }
 
-func GetDecryptedFilePath(filePath string) string {
-	i := strings.LastIndex(filePath, ".")
+// GetDecryptedFilePath. get file path after dectypted file
+func GetDecryptedFilePath(filePath, fileName string) string {
+	i := strings.LastIndex(filePath, common.ENCRYPTED_FILE_EXTENSION)
 	if i == -1 {
 		return filePath + "-decrypted"
 	}
 	name := filePath[:i]
-	ext := filePath[i:]
-	return name + "-decrypted" + ext
+	if len(fileName) == 0 {
+		return name
+	}
+	orignalExt := ""
+	origExtIndex := strings.LastIndex(fileName, ".")
+	if origExtIndex == -1 {
+		return name
+	}
+	orignalExt = fileName[origExtIndex:]
+	return name + orignalExt
 }
 
 func GetMilliSecTimestamp() uint64 {
