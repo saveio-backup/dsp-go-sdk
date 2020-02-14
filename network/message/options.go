@@ -191,7 +191,7 @@ func WithBreakpointIndex(index uint64) FileMsgOption {
 	})
 }
 
-func WithTotalBlockCount(totalBlockCount int32) FileMsgOption {
+func WithTotalBlockCount(totalBlockCount uint64) FileMsgOption {
 	return optionFunc(func(f *file.File) {
 		f.TotalBlockCount = totalBlockCount
 	})

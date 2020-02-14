@@ -50,7 +50,7 @@ type BlockInfo struct {
 	TaskId     string            `json:"task_id"`
 	FileHash   string            `json:"file_hash"`
 	Hash       string            `json:"hash"`                  // block  hash
-	Index      uint32            `json:"index"`                 // block index of file
+	Index      uint64            `json:"index"`                 // block index of file
 	DataOffset uint64            `json:"data_offset"`           // block raw data offset
 	DataSize   uint64            `json:"data_size"`             // block data size
 	NodeList   []string          `json:"node_list,omitempty"`   // uploaded node list
@@ -65,15 +65,6 @@ type Payment struct {
 	PaymentId     int32  `json:"paymentId"`
 }
 
-type DownloadOption struct {
-	Asset       int32
-	InOrder     bool
-	DecryptPwd  string
-	Free        bool
-	SetFileName bool
-	MaxPeerCnt  int
-}
-
 type WhiteList struct {
 	Address     string
 	StartHeight uint64
@@ -82,70 +73,72 @@ type WhiteList struct {
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type TaskInfo struct {
-	Id              string       `json:"id"`                     // task id
-	Index           uint32       `json:"index"`                  // task index
-	FileHash        string       `json:"file_hash"`              // file hash
-	BlocksRoot      string       `json:"blocks_root"`            // blocks hash root
-	FileName        string       `json:"file_name"`              // file name
-	FileDesc        string       `json:"file_desc"`              // file name
-	FilePath        string       `json:"file_path"`              // file absolute path
-	FileOwner       string       `json:"file_owner"`             // file owner wallet address
-	SimpleChecksum  string       `json:"simple_checksum"`        // hash of first 128 KB and last 128 KB from file content
-	WalletAddress   string       `json:"wallet_address"`         // task belong to
-	CopyNum         uint32       `json:"copy_num"`               // copy num
-	Type            TaskType     `json:"file_info_type"`         // task type
-	StoreTx         string       `json:"store_tx"`               // store tx hash
-	StoreTxHeight   uint32       `json:"store_tx_height"`        // store tx height
-	RegisterDNSTx   string       `json:"register_dns_tx"`        // register dns tx
-	BindDNSTx       string       `json:"bind_dns_tx"`            // bind dns tx
-	WhitelistTx     string       `json:"whitelist_tx"`           // first op whitelist tx
-	TotalBlockCount uint32       `json:"total_block_count"`      // total block count
-	TaskState       uint32       `json:"task_state"`             // task state
-	ProvePrivKey    []byte       `json:"prove_private_key"`      // prove private key params
-	Prefix          []byte       `json:"prefix"`                 // file prefix
-	EncryptHash     string       `json:"encrypt_hash"`           // encrypt hash
-	EncryptSalt     string       `json:"encrypt_salt"`           // encrypt salt
-	Url             string       `json:"url"`                    // url
-	Link            string       `json:"link"`                   // url <=> link
-	CurrentBlock    string       `json:"current_block_hash"`     // current transferred block
-	CurrentIndex    uint32       `json:"current_block_index"`    // current transferred block index
-	StoreType       uint32       `json:"store_type"`             // store type
-	InOrder         bool         `json:"in_order"`               // is in order
-	OnlyBlock       bool         `json:"only_block"`             // send only raw block data
-	TranferState    uint32       `json:"transfer_state"`         // transfer state
-	ReferId         string       `json:"refer_id"`               // refer task id
-	PrimaryNodes    []string     `json:"primary_nodes"`          // primary nodes
-	CandidateNodes  []string     `json:"candidate_nodes"`        // candidate nodes
-	CreatedAt       uint64       `json:"createdAt"`              // createAt, unit ms
-	CreatedAtHeight uint32       `json:"createdAt_block_height"` // created at block height
-	UpdatedAt       uint64       `json:"updatedAt"`              // updatedAt, unit ms
-	UpdatedAtHeight uint32       `json:"updatedAt_block_height"` // updatedAt block height
-	ExpiredHeight   uint64       `json:"expired_block_height"`   // expiredAt block height
-	Asset           int32        `json:"asset"`                  // download task pay asset
-	DecryptPwd      string       `json:"decrypt_pwd"`            // download task with decrypt pwd
-	Free            bool         `json:"free"`                   // download task with free opts
-	SetFileName     bool         `json:"set_file_name"`          // download task with set file name
-	MaxPeerCnt      int          `json:"max_peer_count"`         // download task with max peer count to download
-	RealFileSize    uint64       `json:"real_file_size"`         // real file size in KB
-	FileSize        uint64       `json:"file_size"`              // real file size in block
-	ProveInterval   uint64       `json:"prove_interval"`         // prove interval
-	Privilege       uint64       `json:"privilege"`              // file privilege
-	Encrypt         bool         `json:"encrypt"`                // encrypt or not
-	EncryptPassword []byte       `json:"encrypt_pwd"`            // encrypted pwd
-	RegisterDNS     bool         `json:"register_dns"`           // register dns or not
-	BindDNS         bool         `json:"bind_dns"`               // bind dns or not
-	WhiteList       []*WhiteList `json:"white_list"`             // white list
-	Share           bool         `json:"share"`                  // share or not
-	ErrorCode       uint32       `json:"error_code"`             // error code
-	ErrorMsg        string       `json:"error_msg"`              // error msg
-	Result          interface{}  `json:"result"`                 // task complete result
+	Id                 string            `json:"id"`                               // task id
+	Index              uint32            `json:"index"`                            // task index
+	FileHash           string            `json:"file_hash"`                        // file hash
+	BlocksRoot         string            `json:"blocks_root"`                      // blocks hash root
+	FileName           string            `json:"file_name"`                        // file name
+	FileDesc           string            `json:"file_desc,omitempty"`              // file desc
+	FilePath           string            `json:"file_path"`                        // file absolute path
+	FileOwner          string            `json:"file_owner"`                       // file owner wallet address
+	SimpleChecksum     string            `json:"simple_checksum,omitempty"`        // hash of first 128 KB and last 128 KB from file content
+	WalletAddress      string            `json:"wallet_address"`                   // task belong to
+	CopyNum            uint32            `json:"copy_num,omitempty"`               // copy num
+	Type               TaskType          `json:"file_info_type"`                   // task type
+	StoreTx            string            `json:"store_tx"`                         // store tx hash
+	StoreTxHeight      uint32            `json:"store_tx_height"`                  // store tx height
+	RegisterDNSTx      string            `json:"register_dns_tx,omitempty"`        // register dns tx
+	BindDNSTx          string            `json:"bind_dns_tx,omitempty"`            // bind dns tx
+	WhitelistTx        string            `json:"whitelist_tx,omitempty"`           // first op whitelist tx
+	TotalBlockCount    uint64            `json:"total_block_count"`                // total block count
+	TaskState          uint32            `json:"task_state"`                       // task state
+	ProvePrivKey       []byte            `json:"prove_private_key,omitempty"`      // prove private key params
+	Prefix             []byte            `json:"prefix"`                           // file prefix
+	EncryptHash        string            `json:"encrypt_hash,omitempty"`           // encrypt hash
+	EncryptSalt        string            `json:"encrypt_salt,omitempty"`           // encrypt salt
+	Url                string            `json:"url"`                              // url
+	Link               string            `json:"link"`                             // url <=> link
+	CurrentBlock       string            `json:"current_block_hash,omitempty"`     // current transferred block
+	CurrentIndex       uint64            `json:"current_block_index,omitempty"`    // current transferred block index
+	StoreType          uint32            `json:"store_type"`                       // store type
+	InOrder            bool              `json:"in_order,omitempty"`               // is in order
+	OnlyBlock          bool              `json:"only_block,omitempty"`             // send only raw block data
+	TranferState       uint32            `json:"transfer_state"`                   // transfer state
+	ReferId            string            `json:"refer_id,omitempty"`               // refer task id
+	PrimaryNodes       []string          `json:"primary_nodes,omitempty"`          // primary nodes wallet address
+	PrimaryHostAddrs   map[string]string `json:"primary_node_hosts,omitempty"`     // primary nodes wallet address <=> host addrs
+	CandidateNodes     []string          `json:"candidate_nodes,omitempty"`        // candidate nodes wallet address
+	CandidateHostAddrs map[string]string `json:"candidate_node_hosts,omitempty"`   // candidate nodes wallet address <=> host addrs
+	CreatedAt          uint64            `json:"createdAt"`                        // createAt, unit ms
+	CreatedAtHeight    uint32            `json:"createdAt_block_height,omitempty"` // created at block height
+	UpdatedAt          uint64            `json:"updatedAt"`                        // updatedAt, unit ms
+	UpdatedAtHeight    uint32            `json:"updatedAt_block_height,omitempty"` // updatedAt block height
+	ExpiredHeight      uint64            `json:"expired_block_height,omitempty"`   // expiredAt block height
+	Asset              int32             `json:"asset,omitempty"`                  // download task pay asset
+	DecryptPwd         string            `json:"decrypt_pwd,omitempty"`            // download task with decrypt pwd
+	Free               bool              `json:"free,omitempty"`                   // download task with free opts
+	SetFileName        bool              `json:"set_file_name,omitempty"`          // download task with set file name
+	MaxPeerCnt         int               `json:"max_peer_count,omitempty"`         // download task with max peer count to download
+	RealFileSize       uint64            `json:"real_file_size"`                   // real file size in KB
+	FileSize           uint64            `json:"file_size"`                        // real file size in block
+	ProveInterval      uint64            `json:"prove_interval,omitempty"`         // prove interval
+	Privilege          uint64            `json:"privilege,omitempty"`              // file privilege
+	Encrypt            bool              `json:"encrypt,omitempty"`                // encrypt or not
+	EncryptPassword    []byte            `json:"encrypt_pwd,omitempty"`            // encrypted pwd
+	RegisterDNS        bool              `json:"register_dns,omitempty"`           // register dns or not
+	BindDNS            bool              `json:"bind_dns,omitempty"`               // bind dns or not
+	WhiteList          []*WhiteList      `json:"white_list,omitempty"`             // white list
+	Share              bool              `json:"share,omitempty"`                  // share or not
+	ErrorCode          uint32            `json:"error_code,omitempty"`             // error code
+	ErrorMsg           string            `json:"error_msg,omitempty"`              // error msg
+	Result             interface{}       `json:"result"`                           // task complete result
 }
 
 type FileProgress struct {
 	TaskId         string    `json:"task_id"`
 	NodeHostAddr   string    `json:"node_host_addr"`
 	NodeWalletAddr string    `json:"node_wallet_addr"`
-	Progress       uint32    `json:"progress"`
+	Progress       uint64    `json:"progress"`
 	TransferCount  uint32    `json:"transfer_count"`
 	State          TaskState `json:"progress_state"`
 	CreatedAt      uint64    `json:"createdAt"`
@@ -585,7 +578,7 @@ func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 }
 
 // UpdateTaskPeerProgress. increase count of progress for a peer
-func (this *TaskDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint32) error {
+func (this *TaskDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	batch := this.db.NewBatch()
@@ -653,7 +646,7 @@ func (this *TaskDB) GetTaskPeerProgress(id, nodeAddr string) *FileProgress {
 }
 
 // GetCurrentSetBlock.
-func (this *TaskDB) GetCurrentSetBlock(id string) (string, uint32, error) {
+func (this *TaskDB) GetCurrentSetBlock(id string) (string, uint64, error) {
 	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
 		return "", 0, fmt.Errorf("get file info not found: %s", id)
@@ -661,7 +654,7 @@ func (this *TaskDB) GetCurrentSetBlock(id string) (string, uint32, error) {
 	return fi.CurrentBlock, fi.CurrentIndex, nil
 }
 
-func (this *TaskDB) GetBlockOffset(id, blockHash string, index uint32) (uint64, error) {
+func (this *TaskDB) GetBlockOffset(id, blockHash string, index uint64) (uint64, error) {
 	if index == 0 {
 		return 0, nil
 	}
@@ -691,7 +684,7 @@ func (this *TaskDB) IsFileUploaded(id string, isDispatched bool) bool {
 		log.Errorf("query upload progress keys failed %s", err)
 		return false
 	}
-	sum := uint32(0)
+	sum := uint64(0)
 	for _, key := range keys {
 		progress, _ := this.getProgressInfo(key)
 		if progress == nil {
@@ -704,11 +697,11 @@ func (this *TaskDB) IsFileUploaded(id string, isDispatched bool) bool {
 	if !isDispatched {
 		return fi.TotalBlockCount > 0 && fi.TotalBlockCount == sum
 	}
-	return fi.TotalBlockCount > 0 && fi.TotalBlockCount*fi.CopyNum == sum
+	return fi.TotalBlockCount > 0 && fi.TotalBlockCount*uint64(fi.CopyNum) == sum
 }
 
 // IsBlockUploaded. check if a block is uploaded
-func (this *TaskDB) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uint32) bool {
+func (this *TaskDB) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uint64) bool {
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -724,7 +717,7 @@ func (this *TaskDB) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uin
 }
 
 // GetUploadedBlockNodeList. get uploaded block nodelist
-func (this *TaskDB) GetUploadedBlockNodeList(id, blockHashStr string, index uint32) []string {
+func (this *TaskDB) GetUploadedBlockNodeList(id, blockHashStr string, index uint64) []string {
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -738,11 +731,11 @@ func (this *TaskDB) AddFileBlockHashes(id string, blocks []string) error {
 	// TODO: test performance
 	batch := this.db.NewBatch()
 	for index, hash := range blocks {
-		key := BlockInfoKey(id, uint32(index), hash)
+		key := BlockInfoKey(id, uint64(index), hash)
 		info := &BlockInfo{
 			TaskId: id,
 			Hash:   hash,
-			Index:  uint32(index),
+			Index:  uint64(index),
 		}
 		buf, err := json.Marshal(info)
 		if err != nil {
@@ -859,7 +852,7 @@ func (this *TaskDB) FileBlockHashes(id string) []string {
 		return nil
 	}
 	hashes := make([]string, 0, fi.TotalBlockCount)
-	for i := uint32(0); i < uint32(fi.TotalBlockCount); i++ {
+	for i := uint64(0); i < fi.TotalBlockCount; i++ {
 		prefix := BlockInfoKey(id, i, "")
 		keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 		if len(keys) != 1 || err != nil {
@@ -891,7 +884,7 @@ func (this *TaskDB) FileProgress(id string) map[string]FileProgress {
 }
 
 //  SetBlockStored set the flag of store state
-func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
+func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint64, offset int64, links []string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	blockKey := BlockInfoKey(id, index, blockHashStr)
@@ -957,7 +950,7 @@ func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 }
 
 //  IsBlockDownloaded
-func (this *TaskDB) IsBlockDownloaded(id, blockHashStr string, index uint32) bool {
+func (this *TaskDB) IsBlockDownloaded(id, blockHashStr string, index uint64) bool {
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -982,7 +975,7 @@ func (this *TaskDB) IsFileDownloaded(id string) bool {
 		log.Errorf("query upload progress keys failed %s", err)
 		return false
 	}
-	sum := uint32(0)
+	sum := uint64(0)
 	for _, key := range keys {
 		progress, _ := this.getProgressInfo(key)
 		if progress == nil {
@@ -994,7 +987,7 @@ func (this *TaskDB) IsFileDownloaded(id string) bool {
 }
 
 // GetUndownloadedBlockInfo. check undownloaded block in-order
-func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint32, error) {
+func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint64, error) {
 	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
 		return nil, nil, errors.New("file not found")
@@ -1004,13 +997,13 @@ func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string
 		return nil, nil, nil
 	}
 	hashes := make([]string, 0)
-	indexMap := make(map[string]uint32)
+	indexMap := make(map[string]uint64)
 	for index, hash := range blockHashes {
-		if this.IsBlockDownloaded(id, hash, uint32(index)) {
+		if this.IsBlockDownloaded(id, hash, uint64(index)) {
 			continue
 		}
 		hashes = append(hashes, hash)
-		indexMap[hash] = uint32(index)
+		indexMap[hash] = uint64(index)
 	}
 	return hashes, indexMap, nil
 }
@@ -1121,7 +1114,7 @@ func (this *TaskDB) SetUploadProgressDone(id, nodeAddr string) error {
 	return this.db.BatchCommit(batch)
 }
 
-func (this *TaskDB) UpdateTaskProgress(id, nodeAddr string, prog uint32) error {
+func (this *TaskDB) UpdateTaskProgress(id, nodeAddr string, prog uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	log.Debugf("UpdateTaskProgress :%s, addr: %s, progress %d", id, nodeAddr, prog)
@@ -1615,6 +1608,28 @@ func (this *TaskDB) GetFileNameWithPath(filePath string) string {
 	return ""
 }
 
+// GetUploadTaskInfos. get all upload task info, sort by updated at
+func (this *TaskDB) GetUploadTaskInfos() ([]*TaskInfo, error) {
+	infos := make(TaskInfos, 0)
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range keys {
+		info, err := this.getTaskInfoByKey(key)
+		if err != nil || info == nil {
+			continue
+		}
+		if info.Type != TaskTypeUpload {
+			continue
+		}
+		infos = append(infos, info)
+	}
+	sort.Sort(infos)
+	return infos, nil
+}
+
 func (this *TaskDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {
 	var list []string
 	var undoneKey string
@@ -1806,7 +1821,7 @@ func (this *TaskDB) batchDeleteBlocks(batch *leveldb.Batch, fi *TaskInfo) error 
 	if fi == nil {
 		return nil
 	}
-	for i := uint32(0); i < uint32(fi.TotalBlockCount); i++ {
+	for i := uint64(0); i < fi.TotalBlockCount; i++ {
 		prefix := BlockInfoKey(fi.Id, i, "")
 		keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 		if len(keys) != 1 || err != nil {

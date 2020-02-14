@@ -155,7 +155,7 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 				"get download task id of task %s not found", taskId)
 			break
 		}
-		offset, err := this.taskMgr.GetBlockOffset(downloadTaskId, blockmsg.Hash, uint32(blockmsg.Index))
+		offset, err := this.taskMgr.GetBlockOffset(downloadTaskId, blockmsg.Hash, blockmsg.Index)
 		if err != nil {
 			shareErr = dspErr.New(dspErr.GET_TASK_PROPERTY_ERROR,
 				"share block taskId: %s download info %s,  hash: %s-%s-%v, offset %v to: %s err %s",
@@ -233,8 +233,8 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	// update share progress
 	oldProgress := this.taskMgr.GetTaskPeerProgress(taskId, req[0].PeerAddr)
 	if oldProgress == nil {
-		this.taskMgr.UpdateTaskPeerProgress(taskId, req[0].PeerAddr, uint32(len(req)))
+		this.taskMgr.UpdateTaskPeerProgress(taskId, req[0].PeerAddr, uint64(len(req)))
 		return
 	}
-	this.taskMgr.UpdateTaskPeerProgress(taskId, req[0].PeerAddr, oldProgress.Progress+uint32(len(req)))
+	this.taskMgr.UpdateTaskPeerProgress(taskId, req[0].PeerAddr, oldProgress.Progress+uint64(len(req)))
 }

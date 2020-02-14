@@ -15,7 +15,7 @@ type GetBlockReq struct {
 	TimeStamp     int64
 	FileHash      string
 	Hash          string
-	Index         int32
+	Index         uint64
 	PeerAddr      string
 	WalletAddress string
 	Asset         int32
@@ -24,7 +24,7 @@ type GetBlockReq struct {
 
 type BlockResp struct {
 	Hash      string
-	Index     int32
+	Index     uint64
 	PeerAddr  string
 	Block     []byte
 	Tag       []byte
@@ -43,7 +43,7 @@ type ProgressInfo struct {
 	CopyNum       uint32                        // copyNum
 	FileSize      uint64                        // file size
 	RealFileSize  uint64                        // real file size
-	Total         uint32                        // total file's blocks count
+	Total         uint64                        // total file's blocks count
 	Progress      map[string]store.FileProgress // address <=> progress
 	SlaveProgress map[string]store.FileProgress // progress for slave nodes
 	TaskState     store.TaskState               // task state
@@ -395,7 +395,7 @@ func (this *Task) SetTransferState(transferState uint32) error {
 	return this.db.SaveTaskInfo(this.info)
 }
 
-func (this *Task) SetTotalBlockCnt(cnt uint32) error {
+func (this *Task) SetTotalBlockCnt(cnt uint64) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	this.info.TotalBlockCount = cnt
@@ -557,7 +557,7 @@ func (this *Task) SetUploadProgressDone(id, nodeAddr string) error {
 	return nil
 }
 
-func (this *Task) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
+func (this *Task) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint64, offset int64, links []string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	err := this.db.SetBlockDownloaded(id, blockHashStr, nodeAddr, index, offset, links)
@@ -717,7 +717,10 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 	if len(this.info.PrimaryNodes) == 0 {
 		return pInfo
 	}
-	masterNode := this.info.PrimaryNodes[0]
+	masterNode := this.info.PrimaryHostAddrs[this.info.PrimaryNodes[0]]
+	if len(masterNode) == 0 {
+		return pInfo
+	}
 	masterNodeProgress := make(map[string]store.FileProgress, 0)
 	pInfo.SlaveProgress = make(map[string]store.FileProgress, 0)
 	for node, progress := range pInfo.Progress {
@@ -833,7 +836,7 @@ func (this *Task) DropBlockFlightsRespCh(sessionId string, timeStamp int64) {
 	delete(this.blockFlightRespsMap, key)
 }
 
-func (this *Task) GetTotalBlockCnt() uint32 {
+func (this *Task) GetTotalBlockCnt() uint64 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.info.TotalBlockCount

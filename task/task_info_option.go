@@ -101,7 +101,7 @@ func TransferState(transferState uint32) InfoOption {
 	})
 }
 
-func TotalBlockCnt(cnt uint32) InfoOption {
+func TotalBlockCnt(cnt uint64) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.TotalBlockCount = cnt
 	})
@@ -155,9 +155,21 @@ func PrimaryNodes(pm []string) InfoOption {
 	})
 }
 
+func PrimaryHostAddrs(pm map[string]string) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.PrimaryHostAddrs = pm
+	})
+}
+
 func CandidateNodes(cn []string) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.CandidateNodes = cn
+	})
+}
+
+func CandidateHostAddrs(cm map[string]string) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.CandidateHostAddrs = cm
 	})
 }
 

@@ -56,7 +56,7 @@ func FileShareToKey(fileInfoId, receiver string) string {
 }
 
 // BlockInfoKey. Key of block info
-func BlockInfoKey(fileInfoId string, index uint32, blockHashStr string) string {
+func BlockInfoKey(fileInfoId string, index uint64, blockHashStr string) string {
 	return fmt.Sprintf("[%s]%s_%d_%s", BLOCK_INFO_PREFIX, fileInfoId, index, blockHashStr)
 }
 

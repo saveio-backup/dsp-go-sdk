@@ -224,21 +224,21 @@ func (this *Dsp) RunGetProgressTicker() bool {
 			continue
 		}
 		// update progress
-		progressSum := uint32(0)
+		progressSum := uint64(0)
 		for _, info := range progress.Infos {
 			log.Debugf("receive %s-%s progress wallet: %v, progress: %d", progress.Hash, fileHash, info.NodeAddr, info.Count)
 			oldProgress := this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
-			if oldProgress != nil && oldProgress.Progress > uint32(info.Count) {
+			if oldProgress != nil && oldProgress.Progress > uint64(info.Count) {
 				progressSum += oldProgress.Progress
 				continue
 			}
-			if err := this.taskMgr.UpdateTaskPeerProgress(id, info.NodeAddr, uint32(info.Count)); err != nil {
+			if err := this.taskMgr.UpdateTaskPeerProgress(id, info.NodeAddr, uint64(info.Count)); err != nil {
 				continue
 			}
-			progressSum += uint32(info.Count)
+			progressSum += uint64(info.Count)
 		}
 		log.Debugf("progressSum: %d, total: %d", progressSum, uint64(len(toReqPeers))*info.FileBlockNum)
-		if progressSum != uint32(len(toReqPeers))*uint32(info.FileBlockNum) {
+		if progressSum != uint64(len(toReqPeers))*uint64(info.FileBlockNum) {
 			continue
 		}
 		taskHasDone++
@@ -251,9 +251,9 @@ func (this *Dsp) RunGetProgressTicker() bool {
 	return false
 }
 
-func (this *Dsp) GetDownloadTaskRemainSize(taskId string) uint32 {
+func (this *Dsp) GetDownloadTaskRemainSize(taskId string) uint64 {
 	progress := this.taskMgr.GetProgressInfo(taskId)
-	sum := uint32(0)
+	sum := uint64(0)
 	for _, c := range progress.Progress {
 		sum += c.Progress
 	}
@@ -275,4 +275,8 @@ func (this *Dsp) InsertUserspaceRecord(id, walletAddr string, size uint64,
 func (this *Dsp) SelectUserspaceRecordByWalletAddr(
 	walletAddr string, offset, limit uint64) ([]*store.UserspaceRecord, error) {
 	return this.userspaceRecordDB.SelectUserspaceRecordByWalletAddr(walletAddr, offset, limit)
+}
+
+func (this *Dsp) GetUploadTaskInfos() ([]*store.TaskInfo, error) {
+	return this.taskMgr.GetUploadTaskInfos()
 }

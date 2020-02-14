@@ -31,7 +31,7 @@ func (m *Payment) Reset()         { *m = Payment{} }
 func (m *Payment) String() string { return proto.CompactTextString(m) }
 func (*Payment) ProtoMessage()    {}
 func (*Payment) Descriptor() ([]byte, []int) {
-	return fileDescriptor_file_2dc9774f0045ac35, []int{0}
+	return fileDescriptor_file_1fc11a2241036b5b, []int{0}
 }
 func (m *Payment) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Payment.Unmarshal(m, b)
@@ -84,7 +84,7 @@ func (m *Tx) Reset()         { *m = Tx{} }
 func (m *Tx) String() string { return proto.CompactTextString(m) }
 func (*Tx) ProtoMessage()    {}
 func (*Tx) Descriptor() ([]byte, []int) {
-	return fileDescriptor_file_2dc9774f0045ac35, []int{1}
+	return fileDescriptor_file_1fc11a2241036b5b, []int{1}
 }
 func (m *Tx) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Tx.Unmarshal(m, b)
@@ -130,7 +130,7 @@ func (m *Breakpoint) Reset()         { *m = Breakpoint{} }
 func (m *Breakpoint) String() string { return proto.CompactTextString(m) }
 func (*Breakpoint) ProtoMessage()    {}
 func (*Breakpoint) Descriptor() ([]byte, []int) {
-	return fileDescriptor_file_2dc9774f0045ac35, []int{2}
+	return fileDescriptor_file_1fc11a2241036b5b, []int{2}
 }
 func (m *Breakpoint) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Breakpoint.Unmarshal(m, b)
@@ -176,7 +176,7 @@ func (m *Chain) Reset()         { *m = Chain{} }
 func (m *Chain) String() string { return proto.CompactTextString(m) }
 func (*Chain) ProtoMessage()    {}
 func (*Chain) Descriptor() ([]byte, []int) {
-	return fileDescriptor_file_2dc9774f0045ac35, []int{3}
+	return fileDescriptor_file_1fc11a2241036b5b, []int{3}
 }
 func (m *Chain) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Chain.Unmarshal(m, b)
@@ -220,7 +220,7 @@ type File struct {
 	PayInfo              *Payment    `protobuf:"bytes,7,opt,name=payInfo,proto3" json:"payInfo,omitempty"`
 	Tx                   *Tx         `protobuf:"bytes,8,opt,name=tx,proto3" json:"tx,omitempty"`
 	Breakpoint           *Breakpoint `protobuf:"bytes,9,opt,name=breakpoint,proto3" json:"breakpoint,omitempty"`
-	TotalBlockCount      int32       `protobuf:"varint,10,opt,name=totalBlockCount,proto3" json:"totalBlockCount,omitempty"`
+	TotalBlockCount      uint64      `protobuf:"varint,10,opt,name=totalBlockCount,proto3" json:"totalBlockCount,omitempty"`
 	ChainInfo            *Chain      `protobuf:"bytes,11,opt,name=chainInfo,proto3" json:"chainInfo,omitempty"`
 	BlocksRoot           string      `protobuf:"bytes,12,opt,name=blocksRoot,proto3" json:"blocksRoot,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
@@ -232,7 +232,7 @@ func (m *File) Reset()         { *m = File{} }
 func (m *File) String() string { return proto.CompactTextString(m) }
 func (*File) ProtoMessage()    {}
 func (*File) Descriptor() ([]byte, []int) {
-	return fileDescriptor_file_2dc9774f0045ac35, []int{4}
+	return fileDescriptor_file_1fc11a2241036b5b, []int{4}
 }
 func (m *File) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_File.Unmarshal(m, b)
@@ -315,7 +315,7 @@ func (m *File) GetBreakpoint() *Breakpoint {
 	return nil
 }
 
-func (m *File) GetTotalBlockCount() int32 {
+func (m *File) GetTotalBlockCount() uint64 {
 	if m != nil {
 		return m.TotalBlockCount
 	}
@@ -344,9 +344,9 @@ func init() {
 	proto.RegisterType((*File)(nil), "file.File")
 }
 
-func init() { proto.RegisterFile("file.proto", fileDescriptor_file_2dc9774f0045ac35) }
+func init() { proto.RegisterFile("file.proto", fileDescriptor_file_1fc11a2241036b5b) }
 
-var fileDescriptor_file_2dc9774f0045ac35 = []byte{
+var fileDescriptor_file_1fc11a2241036b5b = []byte{
 	// 398 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x52, 0x5d, 0x6b, 0xdb, 0x30,
 	0x14, 0xc5, 0x5f, 0x49, 0x7c, 0x1d, 0x6f, 0x43, 0x84, 0xa1, 0x87, 0x31, 0x8c, 0x19, 0xcc, 0x7b,
@@ -369,8 +369,8 @@ var fileDescriptor_file_2dc9774f0045ac35 = []byte{
 	0xc4, 0xd3, 0xc8, 0x4a, 0x82, 0x7f, 0xe1, 0xd2, 0x2c, 0xb5, 0xdb, 0x22, 0x79, 0xbf, 0x45, 0x18,
 	0x6c, 0x5d, 0xe3, 0x99, 0xe9, 0x99, 0xb5, 0x3d, 0xfb, 0x9a, 0xd8, 0xba, 0x46, 0x2b, 0x80, 0x43,
 	0x1f, 0x2e, 0xf6, 0x4d, 0xc7, 0xb7, 0xb6, 0x63, 0x08, 0x9d, 0x8c, 0x7a, 0x50, 0x02, 0x5f, 0xb5,
-	0xd4, 0xb4, 0x58, 0x37, 0x8f, 0xdb, 0xc8, 0xb3, 0xd0, 0x18, 0x8c, 0xb1, 0x6b, 0x18, 0xfd, 0x69,
-	0xcc, 0x53, 0x2e, 0x8c, 0xc1, 0xc0, 0x48, 0x07, 0xad, 0xb4, 0xd9, 0x0b, 0x19, 0x6e, 0xd1, 0x4f,
-	0x00, 0x13, 0x96, 0x22, 0x52, 0x6a, 0x3c, 0x37, 0xc9, 0x8e, 0x90, 0xc3, 0xc4, 0xfc, 0xd3, 0xff,
-	0x6f, 0x01, 0x00, 0x00, 0xff, 0xff, 0xe7, 0x53, 0x22, 0x64, 0xb5, 0x02, 0x00, 0x00,
+	0xd4, 0xb4, 0x58, 0x37, 0x8f, 0xdb, 0xc8, 0xb3, 0xd0, 0x18, 0x4c, 0xec, 0xd7, 0x30, 0xfa, 0xd3,
+	0x98, 0xa7, 0x5c, 0x18, 0x83, 0x81, 0x91, 0x0e, 0x5a, 0x69, 0xb3, 0x17, 0x32, 0xdc, 0xa2, 0x9f,
+	0x00, 0x26, 0x2c, 0x45, 0xa4, 0xd4, 0x78, 0x6e, 0x92, 0x1d, 0x21, 0x87, 0x89, 0xf9, 0xa7, 0xff,
+	0xdf, 0x02, 0x00, 0x00, 0xff, 0xff, 0xd8, 0x23, 0xe9, 0xea, 0xb5, 0x02, 0x00, 0x00,
 }

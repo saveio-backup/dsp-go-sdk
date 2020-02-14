@@ -168,3 +168,24 @@ func GenIdByTimestamp(r *rand.Rand) string {
 	}
 	return fmt.Sprintf("%d%d", time.Now().UnixNano(), 100000+r.Int31n(900000))
 }
+
+// WalletAddrsToBase58. convert address to base58 format
+func WalletAddrsToBase58(addrs []chainCom.Address) []string {
+	addr := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		addr = append(addr, a.ToBase58())
+	}
+	return addr
+}
+
+// WalletHostAddressMap. get wallet address map
+func WalletHostAddressMap(addrs []chainCom.Address, hosts []string) map[string]string {
+	m := make(map[string]string)
+	if len(addrs) != len(hosts) {
+		return nil
+	}
+	for i, a := range addrs {
+		m[a.ToBase58()] = hosts[i]
+	}
+	return m
+}

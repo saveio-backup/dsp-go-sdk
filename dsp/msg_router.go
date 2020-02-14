@@ -197,7 +197,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		replyErr(fileMsg.Hash, msg.MessageId, serr.NO_PRIVILEGE_TO_UPLOAD, "fetch owner not match")
 		return
 	}
-	if int32(info.FileBlockNum) != fileMsg.TotalBlockCount {
+	if info.FileBlockNum != fileMsg.TotalBlockCount {
 		log.Errorf("block number is unmatched %d, %d", len(fileMsg.BlockHashes), info.FileBlockNum)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.NO_PRIVILEGE_TO_UPLOAD, "file block number not match")
 		return
@@ -273,7 +273,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peer *network.P
 		task.FileOwner(info.FileOwner.ToBase58()),
 		task.StoreTx(fileMsg.Tx.Hash),
 		task.StoreTxHeight(uint32(fileMsg.Tx.Height)),
-		task.TotalBlockCnt(uint32(fileMsg.TotalBlockCount))); err != nil {
+		task.TotalBlockCnt(fileMsg.TotalBlockCount)); err != nil {
 		log.Errorf("batch set file info fetch ask %s", err)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR, "new task failed")
 		return
@@ -494,7 +494,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 		replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK,
 			message.WithSessionId(sessionId),
 			message.WithBlockHashes(this.taskMgr.FileBlockHashes(downloadedId)),
-			message.WithTotalBlockCount(int32(totalCount)),
+			message.WithTotalBlockCount(totalCount),
 			message.WithWalletAddress(this.chain.WalletAddress()),
 			message.WithPrefix(prefix),
 			message.WithUnitPrice(price),
@@ -541,13 +541,13 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 		replyErr(sessionId, fileMsg.Hash, serr.TOO_MANY_TASKS, "", ctx)
 		return
 	}
-	totalBlockCount := len(this.taskMgr.FileBlockHashes(downloadedId))
+	totalBlockCount := uint64(len(this.taskMgr.FileBlockHashes(downloadedId)))
 	log.Debugf("sessionId %s blockCount %v %s prefix %s", sessionId, totalBlockCount,
 		downloadedId, prefix)
 	replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK,
 		message.WithSessionId(sessionId),
 		message.WithBlockHashes(this.taskMgr.FileBlockHashes(downloadedId)),
-		message.WithTotalBlockCount(int32(totalBlockCount)),
+		message.WithTotalBlockCount(totalBlockCount),
 		message.WithWalletAddress(this.chain.WalletAddress()),
 		message.WithPrefix(prefix),
 		message.WithUnitPrice(price),
@@ -633,7 +633,7 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 		this.taskMgr.ActiveDownloadTaskPeer(peer.Address)
 		blocks := make([]*task.BlockResp, 0)
 		for _, blockMsg := range blockFlightsMsg.Blocks {
-			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint32(blockMsg.Index))
+			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint64(blockMsg.Index))
 			if !isDownloaded {
 				b := &task.BlockResp{
 					Hash:      blockMsg.Hash,
@@ -761,7 +761,7 @@ func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext,
 		}
 		log.Debugf("handle req progress msg, get progress of id %s, file: %s, addr %s, count %d, ",
 			id, progressMsg.Hash, info.NodeAddr, prog)
-		count := uint32(0)
+		count := uint64(0)
 		if prog != nil {
 			count = prog.Progress
 		}

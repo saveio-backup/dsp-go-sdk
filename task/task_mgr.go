@@ -459,7 +459,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	tskWalletAddr := tsk.GetWalletAddr()
 	addrs := tsk.GetWorkerAddrs()
 	inOrder := tsk.GetInorder()
-	notifyIndex := int32(0)
+	notifyIndex := uint64(0)
 	// lock for local go routines variables
 	max := len(addrs)
 	if max > common.MAX_GOROUTINES_FOR_WORK_TASK {
@@ -477,7 +477,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 		return len
 	}
 
-	blockIndexKey := func(hash string, index int32) string {
+	blockIndexKey := func(hash string, index uint64) string {
 		return fmt.Sprintf("%s-%d", hash, index)
 	}
 

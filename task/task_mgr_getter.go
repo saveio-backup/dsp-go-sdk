@@ -76,7 +76,7 @@ func (this *TaskMgr) GetTaskDetailState(taskId string) (TaskProgressState, error
 	return v.TransferingState(), nil
 }
 
-func (this *TaskMgr) GetFileTotalBlockCount(taskId string) (uint32, error) {
+func (this *TaskMgr) GetFileTotalBlockCount(taskId string) (uint64, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
@@ -188,7 +188,7 @@ func (this *TaskMgr) GetProgressInfo(taskId string) *ProgressInfo {
 	return v.GetProgressInfo()
 }
 
-func (this *TaskMgr) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint32, error) {
+func (this *TaskMgr) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint64, error) {
 	undownloadedList, undownloadedMap, err := this.db.GetUndownloadedBlockInfo(id, rootBlockHash)
 	if err != nil {
 		return nil, nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
@@ -204,7 +204,7 @@ func (this *TaskMgr) GetFileSessions(fileInfoId string) (map[string]*store.Sessi
 	return sessions, nil
 }
 
-func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint32, error) {
+func (this *TaskMgr) GetCurrentSetBlock(fileInfoId string) (string, uint64, error) {
 	hash, index, err := this.db.GetCurrentSetBlock(fileInfoId)
 	if err != nil {
 		return "", 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
@@ -228,18 +228,18 @@ func (this *TaskMgr) GetFileInfo(id string) (*store.TaskInfo, error) {
 	return info, nil
 }
 
-func (this *TaskMgr) IsBlockDownloaded(id, blockHashStr string, index uint32) bool {
+func (this *TaskMgr) IsBlockDownloaded(id, blockHashStr string, index uint64) bool {
 	return this.db.IsBlockDownloaded(id, blockHashStr, index)
 }
 
-func (this *TaskMgr) GetUploadedBlockNodeList(id, blockHashStr string, index uint32) []string {
+func (this *TaskMgr) GetUploadedBlockNodeList(id, blockHashStr string, index uint64) []string {
 	if len(blockHashStr) == 0 {
 		return nil
 	}
 	return this.db.GetUploadedBlockNodeList(id, blockHashStr, index)
 }
 
-func (this *TaskMgr) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uint32) bool {
+func (this *TaskMgr) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uint64) bool {
 	return this.db.IsBlockUploaded(id, blockHashStr, nodeAddr, index)
 }
 
@@ -267,7 +267,7 @@ func (this *TaskMgr) GetUnpaidAmount(id, walletAddress string, asset int32) (uin
 	return amount, nil
 }
 
-func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint32) (uint64, error) {
+func (this *TaskMgr) GetBlockOffset(id, blockHash string, index uint64) (uint64, error) {
 	offset, err := this.db.GetBlockOffset(id, blockHash, index)
 	if err != nil {
 		return 0, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
@@ -346,4 +346,12 @@ func (this *TaskMgr) ExistSameUploadingFile(taskId, fileHashStr string) bool {
 
 func (this *TaskMgr) GetFileNameWithPath(filePath string) string {
 	return this.db.GetFileNameWithPath(filePath)
+}
+
+func (this *TaskMgr) GetUploadTaskInfos() ([]*store.TaskInfo, error) {
+	infos, err := this.db.GetUploadTaskInfos()
+	if err != nil {
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+	}
+	return infos, nil
 }

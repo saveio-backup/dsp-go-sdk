@@ -255,3 +255,23 @@ func TestSort(t *testing.T) {
 		fmt.Printf("info id = %s, created %d, updated %d\n", info.Id, info.CreatedAt, info.UpdatedAt)
 	}
 }
+
+func TestJsonOmit(t *testing.T) {
+	obj := &TaskInfo{
+		CopyNum: 1,
+	}
+	data, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("json str %s\n", string(data))
+	obj = &TaskInfo{}
+	json.Unmarshal(data, &obj)
+	fmt.Printf("desc %v\n", obj.CopyNum)
+	obj = &TaskInfo{}
+	data, err = json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("json str %s\n", string(data))
+}

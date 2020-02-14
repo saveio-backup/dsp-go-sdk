@@ -5,7 +5,7 @@ package block;
 
 message Block {
    string sessionId = 1; // request session id
-   int32 index = 2; // block index of file
+   uint64 index = 2; // block index of file
    string fileHash = 3; // file  hash
    string hash = 4; // block hash
    bytes data = 5; // raw data

@@ -55,7 +55,7 @@ func (this *TaskMgr) SetFileName(taskId, fileName string) error {
 	}
 	return nil
 }
-func (this *TaskMgr) SetTotalBlockCount(taskId string, totalBlockCount uint32) error {
+func (this *TaskMgr) SetTotalBlockCount(taskId string, totalBlockCount uint64) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return fmt.Errorf("[TaskMgr SetFileName] task not found: %s", taskId)
@@ -298,7 +298,7 @@ func (this *TaskMgr) UpdateTaskNodeState(taskId, nodeAddr string, state store.Ta
 	return nil
 }
 
-func (this *TaskMgr) UpdateTaskProgress(taskId, nodeAddr string, progress uint32) error {
+func (this *TaskMgr) UpdateTaskProgress(taskId, nodeAddr string, progress uint64) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
@@ -328,7 +328,7 @@ func (this *TaskMgr) IsNodeTaskDoingOrDone(taskId, nodeAddr string) (bool, error
 	return doingOrdone, nil
 }
 
-func (this *TaskMgr) SetBlockDownloaded(taskId, blockHashStr, nodeAddr string, index uint32, offset int64, links []string) error {
+func (this *TaskMgr) SetBlockDownloaded(taskId, blockHashStr, nodeAddr string, index uint64, offset int64, links []string) error {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
@@ -419,7 +419,7 @@ func (this *TaskMgr) RemoveUnSlavedTasks(id string) error {
 	return nil
 }
 
-func (this *TaskMgr) UpdateTaskPeerProgress(id, nodeAddr string, count uint32) error {
+func (this *TaskMgr) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) error {
 	err := this.db.UpdateTaskPeerProgress(id, nodeAddr, count)
 	if err != nil {
 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())

@@ -458,7 +458,7 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 	}
 	log.Debugf("get file total count :%d", taskInfo.TotalBlockCount)
 	// check has add file block hashes
-	if uint32(len(this.taskMgr.FileBlockHashes(taskInfo.Id))) == taskInfo.TotalBlockCount &&
+	if uint64(len(this.taskMgr.FileBlockHashes(taskInfo.Id))) == taskInfo.TotalBlockCount &&
 		taskInfo.TotalBlockCount != 0 {
 		return peerPayInfos, nil
 	}
@@ -473,7 +473,7 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 	if err := this.taskMgr.SetTaskInfoWithOptions(taskInfo.Id,
 		task.Prefix(prefix),
 		task.FileSize(getFileSizeWithBlockCount(uint64(totalBlockCount))),
-		task.TotalBlockCnt(uint32(totalBlockCount))); err != nil {
+		task.TotalBlockCnt(uint64(totalBlockCount))); err != nil {
 		return nil, err
 	}
 	return peerPayInfos, nil
@@ -1062,7 +1062,7 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet map[string]st
 				return err
 			}
 			log.Debugf("received block %s-%s-%d from %s", taskInfo.FileHash, value.Hash, value.Index, value.PeerAddr)
-			if this.taskMgr.IsBlockDownloaded(taskInfo.Id, value.Hash, uint32(value.Index)) &&
+			if this.taskMgr.IsBlockDownloaded(taskInfo.Id, value.Hash, uint64(value.Index)) &&
 				!this.taskMgr.IsFileDownloaded(taskInfo.Id) {
 				log.Debugf("%s-%s-%d is downloaded", taskInfo.FileHash, value.Hash, value.Index)
 				continue
@@ -1120,7 +1120,7 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet map[string]st
 				log.Errorf("put block err %s", err)
 				return err
 			}
-			if err := this.taskMgr.SetBlockDownloaded(taskInfo.Id, value.Hash, value.PeerAddr, uint32(value.Index),
+			if err := this.taskMgr.SetBlockDownloaded(taskInfo.Id, value.Hash, value.PeerAddr, value.Index,
 				value.Offset, links); err != nil {
 				return err
 			}
@@ -1248,13 +1248,13 @@ func (this *Dsp) addDownloadBlockReq(taskId, fileHashStr string) error {
 	}
 	log.Debugf("start download at %s-%s-%d", fileHashStr, hashes[0], indexMap[hashes[0]])
 
-	blockIndex := int32(0)
+	blockIndex := uint64(0)
 	for _, hash := range hashes {
-		blockIndex = int32(indexMap[hash])
+		blockIndex = indexMap[hash]
 		reqs = append(reqs, &task.GetBlockReq{
 			FileHash: fileHashStr,
 			Hash:     hash,
-			Index:    int32(blockIndex),
+			Index:    blockIndex,
 		})
 	}
 	return this.taskMgr.AddBlockReq(taskId, reqs)
@@ -1341,7 +1341,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 			log.Debugf("fetch task break it pause: %t, cancel: %t", pause, cancel)
 			break
 		}
-		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {
+		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint64(index)) {
 			log.Debugf("block has downloaded %s %d", hash, index)
 			blk := this.fs.GetBlock(hash)
 			links, err := this.fs.GetBlockLinks(blk)
@@ -1354,7 +1354,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 		}
 		blocks = append(blocks, &block.Block{
 			SessionId: sessionId,
-			Index:     int32(index),
+			Index:     uint64(index),
 			FileHash:  fileHashStr,
 			Hash:      hash,
 			Operation: netcom.BLOCK_OP_GET,
@@ -1400,7 +1400,7 @@ func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr strin
 				return err
 			}
 			err = this.taskMgr.SetBlockDownloaded(taskId, value.Hash, value.PeerAddr,
-				uint32(value.Index), value.Offset, nil)
+				value.Index, value.Offset, nil)
 			if err != nil {
 				log.Errorf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d, err: %s",
 					taskId, fileHashStr, value.Hash, value.Index, value.Offset, err)
@@ -1493,7 +1493,7 @@ func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.B
 		}
 
 		if err := this.taskMgr.SetBlockDownloaded(taskId, value.Hash,
-			value.PeerAddr, uint32(value.Index), value.Offset, nil); err != nil {
+			value.PeerAddr, value.Index, value.Offset, nil); err != nil {
 			log.Errorf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d, err: %s",
 				taskId, fileHashStr, value.Hash, value.Index, value.Offset, err)
 			return err
@@ -1564,7 +1564,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	msg := message.NewBlockFlightsReqMsg(blockReqs, timeStamp)
 	blockReqM := make(map[string]struct{}, 0)
 	for _, req := range blockReqs {
-		blockReqM[keyOfBlockHashAndIndex(req.Hash, uint32(req.Index))] = struct{}{}
+		blockReqM[keyOfBlockHashAndIndex(req.Hash, req.Index)] = struct{}{}
 	}
 	for i := uint32(0); i < retry; i++ {
 		log.Debugf("send download block flights msg sessionId %s of %s from %s,  retry: %d",
@@ -1593,7 +1593,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 		this.taskMgr.ActiveDownloadTaskPeer(ipAddr)
 		blockResps := make([]*task.BlockResp, 0)
 		for _, blockMsg := range blockFlightsMsg.Blocks {
-			if _, ok := blockReqM[keyOfBlockHashAndIndex(blockMsg.Hash, uint32(blockMsg.Index))]; !ok {
+			if _, ok := blockReqM[keyOfBlockHashAndIndex(blockMsg.Hash, blockMsg.Index)]; !ok {
 				log.Warnf("block %s-%d is not my request task", blockMsg.Hash, blockMsg.Index)
 				continue
 			}
@@ -1675,7 +1675,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 		return err
 	}
 	for index, hash := range hashes {
-		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint32(index)) {
+		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint64(index)) {
 			log.Debugf("%s-%s-%d is downloaded", fileHashStr, hash, index)
 			continue
 		}
@@ -1687,7 +1687,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 		offsetKey := fmt.Sprintf("%s-%d", hash, index)
 		offset := offsets[offsetKey]
 		log.Debugf("hash: %s-%s-%d , offset: %d, links count %d", fileHashStr, hash, index, offset, len(links))
-		if err := this.taskMgr.SetBlockDownloaded(taskId, fileHashStr, client.P2pGetPublicAddr(), uint32(index),
+		if err := this.taskMgr.SetBlockDownloaded(taskId, fileHashStr, client.P2pGetPublicAddr(), uint64(index),
 			int64(offset), links); err != nil {
 			return err
 		}

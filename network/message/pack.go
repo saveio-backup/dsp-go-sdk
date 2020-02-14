@@ -60,7 +60,7 @@ func NewEmptyMsg(opts ...Option) *Message {
 }
 
 // NewBlockMsg block req msg
-func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAddress string, asset int32,
+func NewBlockReqMsg(sessionId, fileHash, blockHash string, index uint64, walletAddress string, asset int32,
 	opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
@@ -100,7 +100,7 @@ func NewBlockReqMsg(sessionId, fileHash, blockHash string, index int32, walletAd
 }
 
 // NewBlockMsg block ack msg
-func NewBlockMsg(sessionId string, index int32, fileHash, hash string, blockData, tag []byte, offset int64,
+func NewBlockMsg(sessionId string, index uint64, fileHash, hash string, blockData, tag []byte, offset int64,
 	opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
