@@ -124,10 +124,13 @@ func (this *Dsp) GetOnlineDNSHostAddr(walletAddr string) string {
 	return this.dns.OnlineDNS[walletAddr]
 }
 
-func (this *Dsp) UpdateDNS(walletAddr, hostAddr string) {
+func (this *Dsp) UpdateDNS(walletAddr, hostAddr string, use bool) {
 	log.Debugf("reachable %t host %s", this.channel.ChannelReachale(walletAddr), hostAddr)
 	if this.channel.ChannelReachale(walletAddr) && len(hostAddr) > 0 {
 		this.dns.OnlineDNS[walletAddr] = hostAddr
+	}
+	if !use && (this.dns != nil && this.dns.DNSNode != nil) {
+		return
 	}
 	this.dns.DNSNode = &dns.DNSNodeInfo{
 		WalletAddr: walletAddr,

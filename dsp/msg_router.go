@@ -588,6 +588,9 @@ func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer
 		return
 	}
 	// TODO: check unpaid amount
+	if err := client.P2pClosePeerSession(peer.Address, taskId); err != nil {
+		log.Errorf("close peer failed")
+	}
 	this.taskMgr.CleanTask(taskId)
 	log.Debugf("delete share task of %s", taskId)
 }
@@ -602,6 +605,9 @@ func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext,
 		return
 	}
 	// TODO: check unpaid amount
+	if err := client.P2pClosePeerSession(peer.Address, taskId); err != nil {
+		log.Errorf("close peer failed")
+	}
 	this.taskMgr.CleanTask(taskId)
 	log.Debugf("delete share task of %s", taskId)
 }

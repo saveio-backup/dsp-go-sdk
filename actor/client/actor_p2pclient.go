@@ -37,6 +37,12 @@ type P2pStringSliceResp struct {
 	Error error
 }
 
+type P2pSpeedResp struct {
+	Tx    uint64
+	Rx    uint64
+	Error error
+}
+
 type ConnectReq struct {
 	Address  string
 	Response chan *P2pResp
@@ -44,6 +50,7 @@ type ConnectReq struct {
 
 type SendReq struct {
 	Address     string
+	SessionId   string
 	MsgId       string
 	Data        proto.Message
 	SendTimeout time.Duration
@@ -57,6 +64,7 @@ type RecvMsg struct {
 
 type BroadcastReq struct {
 	Addresses []string
+	SessionId string
 	MsgId     string
 	Data      proto.Message
 	Action    func(proto.Message, string) bool
@@ -91,10 +99,23 @@ type RequestWithRetryReq struct {
 
 type SendAndWaitReplyReq struct {
 	Address     string
+	SessionId   string
 	MsgId       string
 	Data        proto.Message
 	SendTimeout time.Duration
 	Response    chan *RequestWithRetryResp
+}
+
+type ClosePeerSessionReq struct {
+	Address   string
+	SessionId string
+	Response  chan *P2pResp
+}
+
+type PeerSessionSpeedReq struct {
+	Address   string
+	SessionId string
+	Response  chan *P2pSpeedResp
 }
 
 type RequestWithRetryResp struct {
@@ -264,6 +285,27 @@ func P2pSendWithTimeout(address, msgId string, data proto.Message, sendTimeout t
 	}
 }
 
+func P2pStreamSend(address, sessionId, msgId string, data proto.Message, timeout time.Duration) error {
+	chReq := &SendReq{
+		Address:     address,
+		SessionId:   sessionId,
+		MsgId:       msgId,
+		Data:        data,
+		SendTimeout: timeout,
+		Response:    make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			return dspErr.NewWithError(dspErr.NETWORK_SEND_ERROR, resp.Error)
+		}
+		return nil
+	case <-time.After(time.Duration(common.MAX_ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pSend] timeout")
+	}
+}
+
 func P2pSend(address, msgId string, data proto.Message) error {
 	chReq := &SendReq{
 		Address:  address,
@@ -373,6 +415,49 @@ func P2pSendAndWaitReply(peer, msgId string, msg proto.Message) (proto.Message, 
 		return resp.Data, nil
 	case <-time.After(time.Duration(common.MAX_ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return nil, dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pSendAndWaitReply] send request msg to %s timeout", peer)
+	}
+}
+
+// P2pSendAndWaitReply.
+func P2pStreamSendAndWaitReply(peer, sessionId, msgId string, msg proto.Message, timeout time.Duration) (proto.Message, error) {
+	chReq := &SendAndWaitReplyReq{
+		Address:     peer,
+		Data:        msg,
+		SessionId:   sessionId,
+		MsgId:       msgId,
+		SendTimeout: timeout,
+		Response:    make(chan *RequestWithRetryResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			log.Errorf("[P2pSendAndWaitReply] resp.Error %s", resp.Error)
+			return nil, dspErr.NewWithError(dspErr.NETWORK_REQ_ERROR, resp.Error)
+		}
+		return resp.Data, nil
+	case <-time.After(time.Duration(common.MAX_ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return nil, dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pSendAndWaitReply] send request msg to %s timeout", peer)
+	}
+}
+
+// P2pClosePeerSession.
+func P2pClosePeerSession(peer, sessionId string) error {
+	chReq := &ClosePeerSessionReq{
+		Address:   peer,
+		SessionId: sessionId,
+		Response:  make(chan *P2pResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil && resp.Error != nil {
+			log.Errorf("[P2pClosePeerSession] resp.Error %s", resp.Error)
+			return dspErr.NewWithError(dspErr.NETWORK_REQ_ERROR, resp.Error)
+		}
+		return nil
+	case <-time.After(time.Duration(common.MAX_ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pClosePeerSession] send request msg to %s timeout", peer)
 	}
 }
 

@@ -302,8 +302,12 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 	}
 
 	end := offset + limit
-	if limit == 0 {
-		end = uint32(len(infos))
+	infosLen := uint32(len(infos))
+	if limit == 0 || end > infosLen {
+		end = infosLen
+	}
+	if offset > infosLen {
+		offset = infosLen
 	}
 	infos = infos[offset:end]
 	ids := make([]string, 0)
