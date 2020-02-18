@@ -2,11 +2,29 @@ package utils
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/saveio/dsp-go-sdk/common"
 )
+
+const URLVERSION_SPLIT_STRING = "#UV#"
+const URLVERSION_CHANGELOG_PREFIX = "#CL#"
+
+type URLVERSION struct {
+	Platform    int
+	Version     string
+	FileHashStr string
+	ChangeLog   string
+}
+
+type UrlVersionType int
+
+func (u *URLVERSION) String() string {
+	data, _ := json.Marshal(u)
+	return string(data)
+}
 
 func GenOniLink(fileHashStr, fileName, owner string, fileSize, blockNum uint64, trackers []string) string {
 	link := fmt.Sprintf("%s%s", common.FILE_LINK_PREFIX, fileHashStr)

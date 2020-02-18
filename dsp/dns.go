@@ -72,6 +72,14 @@ func (this *Dsp) GetLinkFromUrl(url string) string {
 	return this.dns.GetLinkFromUrl(url)
 }
 
+func (this *Dsp) UpdateFileUrlVersion(url string, urlVersion utils.URLVERSION) (string, error) {
+	return this.dns.UpdateFileUrlVersion(url, urlVersion)
+}
+
+func (this *Dsp) GetVersionFromUrl(url string) string {
+	return this.dns.GetVersionFromUrl(url)
+}
+
 func (this *Dsp) GetFileHashFromUrl(url string) string {
 	return this.dns.GetFileHashFromUrl(url)
 }

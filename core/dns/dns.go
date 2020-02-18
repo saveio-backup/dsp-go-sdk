@@ -466,6 +466,40 @@ func (d *DNS) GetLinkFromUrl(url string) string {
 	return string(info.Name)
 }
 
+func (d *DNS) UpdateFileUrlVersion(url string, urlVersion utils.URLVERSION) (string, error) {
+	urlPrefix := common.FILE_URL_CUSTOM_HEADER
+	if !strings.HasPrefix(url, urlPrefix) && !strings.HasPrefix(url, common.FILE_URL_CUSTOM_HEADER_PROTOCOL) {
+		return "", dspErr.New(dspErr.INTERNAL_ERROR, "url should start with %s", urlPrefix)
+	}
+	if !utils.ValidateDomainName(url[len(urlPrefix):]) {
+		return "", dspErr.New(dspErr.INTERNAL_ERROR, "domain name is invalid")
+	}
+	nameInfo, err := d.Chain.QueryUrl(url, d.Chain.Address())
+	log.Debugf("query url %s %s info %s err %s", url, d.Chain.WalletAddress(), nameInfo, err)
+	info := urlVersion.String()
+	if nameInfo != nil {
+		info = string(nameInfo.Desc) + utils.URLVERSION_SPLIT_STRING + info
+	}
+	tx, err := d.Chain.RegisterUrl(url, dns.CUSTOM_URL, url, info, common.FILE_DNS_TTL)
+	if err != nil {
+		return "", err
+	}
+	confirmed, err := d.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
+	if err != nil || !confirmed {
+		return "", dspErr.New(dspErr.CHAIN_ERROR, "tx confirm err %s", err)
+	}
+	return tx, nil
+}
+
+func (d *DNS) GetVersionFromUrl(url string) string {
+	info, err := d.Chain.QueryUrl(url, d.Chain.Address())
+	log.Debugf("query url %s %s info %s err %s", url, d.Chain.WalletAddress(), info, err)
+	if err != nil || info == nil {
+		return ""
+	}
+	return string(info.Desc)
+}
+
 func (d *DNS) GetFileHashFromUrl(url string) string {
 	link := d.GetLinkFromUrl(url)
 	log.Debugf("get link from url %s %s", url, link)
