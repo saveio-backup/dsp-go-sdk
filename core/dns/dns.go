@@ -492,8 +492,8 @@ func (d *DNS) UpdateFileUrlVersion(url string, urlVersion utils.URLVERSION) (str
 	if err != nil {
 		return "", err
 	}
-	confirmed, err := d.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
-	if err != nil || !confirmed {
+	height, err := d.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
+	if err != nil || height == 0 {
 		return "", dspErr.New(dspErr.CHAIN_ERROR, "tx confirm err %s", err)
 	}
 	return tx, nil
