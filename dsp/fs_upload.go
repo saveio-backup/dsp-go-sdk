@@ -84,7 +84,11 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 	defer func() {
 		sdkErr, _ := err.(*dspErr.Error)
 		if uploadRet == nil {
-			log.Errorf("task %s upload finish %v, err: %v", err)
+			if sdkErr != nil {
+				log.Errorf("task %s upload finish %v, err: %v", err)
+			} else {
+				log.Debugf("task %s is paused", taskId)
+			}
 			this.taskMgr.EmitResult(taskId, nil, sdkErr)
 		} else {
 			log.Debugf("task %v upload finish, result %v", taskId, uploadRet)
@@ -132,7 +136,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 		task.WhiteList(fsWhiteListToWhiteList(opt.WhiteList)),
 		task.Share(opt.Share),
 		task.StoreType(uint32(opt.StorageType)),
-		// task.Url(string(opt.DnsURL)),
+		task.Url(string(opt.DnsURL)),
 		task.FileName(string(opt.FileDesc)),
 		task.Walletaddr(this.chain.WalletAddress()),
 		task.CopyNum(uint32(opt.CopyNum))); err != nil {
