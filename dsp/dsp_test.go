@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/saveio/dsp-go-sdk/utils"
 	themisSDK "github.com/saveio/themis-go-sdk"
 
 	"github.com/saveio/themis-go-sdk/usdt"
@@ -468,68 +467,6 @@ func TestDownloadFile(t *testing.T) {
 	// }
 	// // use for testing go routines for tasks are released or not
 	// time.Sleep(time.Duration(5) * time.Second)
-}
-
-func TestDownloadFileWithQuotation(t *testing.T) {
-	fileRoot, err := filepath.Abs("./testdata")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dspCfg := &config.DspConfig{
-		DBPath:               fileRoot + "/db3",
-		FsRepoRoot:           fileRoot + "/max3",
-		FsFileRoot:           fileRoot,
-		FsType:               config.FS_FILESTORE,
-		ChainRpcAddr:         rpcAddr,
-		ChannelClientType:    "rpc",
-		ChannelListenAddr:    channel3Addr,
-		ChannelProtocol:      "tcp",
-		ChannelRevealTimeout: "1000",
-
-		DnsNodeMaxNum: 100,
-		SeedInterval:  3600, //  1h
-	}
-
-	w, err := wallet.OpenWallet(wallet3File)
-	if err != nil {
-		t.Fatal(err)
-	}
-	acc, err := w.GetDefaultAccount([]byte(walletPwd))
-	if err != nil {
-		t.Fatal(err)
-	}
-	d := NewDsp(dspCfg, acc, nil)
-	fmt.Printf("TestDownloadFileWithQuotation d:%v\n", d)
-	err = d.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
-	log.Infof("wallet address:%s", acc.Address.ToBase58())
-
-	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	// set use free peers
-	useFree := false
-	addrs := d.GetPeerFromTracker(fileHashStr, d.dns.TrackerUrls)
-	quotation, err := d.GetDownloadQuotation(fileHashStr, "", common.ASSET_USDT, useFree, addrs)
-	if len(quotation) == 0 {
-		log.Errorf("no peer to download")
-		return
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !useFree {
-		// filter peers
-		quotation = utils.SortPeersByPrice(quotation, 100)
-	}
-	err = d.DepositChannelForFile(fileHashStr, quotation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	d.DownloadFileWithQuotation(fileHashStr, common.ASSET_USDT, true, false, quotation, "")
-
-	// use for testing go routines for tasks are released or not
-	time.Sleep(time.Duration(5) * time.Second)
 }
 
 func TestStartPDPVerify(t *testing.T) {
@@ -1170,7 +1107,7 @@ func TestGetUnproveFiles(t *testing.T) {
 
 func TestGetFileInfo(t *testing.T) {
 	dspCfg := &config.DspConfig{
-		ChainRpcAddrs: []string{"http://106.75.10.25:20336"},
+		ChainRpcAddrs: []string{"http://139.219.136.38:20336"},
 	}
 	w, err := wallet.OpenWallet(walletFile)
 	if err != nil {
@@ -1185,7 +1122,7 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	fileHash := "QmVnVnSjYggE5HGK6cNVt6gDAXaL1dhmyXpCFYccs6fzj2"
+	fileHash := "QmNy61xYHE7rfBvCKJpLeFsyfoitWqA7fccLH16yhXs6Yw"
 	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)
@@ -1275,4 +1212,14 @@ func TestGetNodelist(t *testing.T) {
 		fmt.Printf("%s, remain: %d\n", l.NodeAddr, l.RestVol)
 	}
 
+}
+
+func TestReAssignValue(t *testing.T) {
+	for i := 0; i < 3; i++ {
+		fileHash := fmt.Sprintf("%d", i)
+		go func(j int) {
+			fmt.Printf("i=%d, filehash=%s\n", j, fileHash)
+		}(i)
+	}
+	time.Sleep(time.Minute)
 }

@@ -348,7 +348,7 @@ func P2pBroadcast(addresses []string, data proto.Message, msgId string, actions 
 				connectionErrCnt++
 			}
 		}
-		if connectionErrCnt == len(resp.Result) {
+		if connectionErrCnt == len(resp.Result) && connectionErrCnt != 0 {
 			return nil, dspErr.New(dspErr.NETWORK_CONNECT_ERROR, "connect to all peers failed")
 		}
 		return resp.Result, nil

@@ -562,7 +562,8 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 
 	// use default dns to pay
 	if err := this.checkDNSState(this.dns.DNSNode.WalletAddr); err == nil {
-		log.Debugf("paying to %s, id %v, use dns: %s", payInfo.WalletAddress, paymentId, this.dns.DNSNode.WalletAddr)
+		log.Debugf("paying for file %s, to %s, id %v, use dns: %s",
+			fileHashStr, payInfo.WalletAddress, paymentId, this.dns.DNSNode.WalletAddr)
 		if err := this.channel.MediaTransfer(paymentId, amount, this.dns.DNSNode.WalletAddr,
 			payInfo.WalletAddress); err == nil {
 			// clean unpaid order
@@ -594,7 +595,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		if err := this.checkDNSState(ch.Address); err == nil {
 			continue
 		}
-		log.Debugf("paying to %s, id %v, use dns: %s", payInfo.WalletAddress, paymentId, ch.Address)
+		log.Debugf("paying for file %s, to %s, id %v, use dns: %s", fileHashStr, payInfo.WalletAddress, paymentId, ch.Address)
 		if err := this.channel.MediaTransfer(paymentId, amount, ch.Address, payInfo.WalletAddress); err != nil {
 			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s", paymentId, payInfo.WalletAddress, err)
 			this.taskMgr.ActiveDownloadTaskPeer(addr)
@@ -602,7 +603,7 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, addr, fileHashStr string, bl
 		}
 		this.taskMgr.ActiveDownloadTaskPeer(addr)
 		paySuccess = true
-		log.Debugf("paying to %s, id %v success", payInfo.WalletAddress, paymentId)
+		log.Debugf("paying for file %s ,to %s, id %v success", fileHashStr, payInfo.WalletAddress, paymentId)
 		break
 	}
 	if !paySuccess {
@@ -1156,6 +1157,7 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet map[string]st
 					addr, state.Working, state.Unpaid, state.TotalFailed)
 			}
 			if paidFail, _ := this.taskMgr.AllPeerPaidFailed(taskInfo.Id); paidFail {
+				log.Errorf("Download file %s failed, pay failed to all peers", taskInfo.Id)
 				return dspErr.New(dspErr.DOWNLOAD_FILE_TIMEOUT, "Download file failed, pay failed to all peers")
 			}
 			return dspErr.New(dspErr.DOWNLOAD_FILE_TIMEOUT, "Download file timeout")
