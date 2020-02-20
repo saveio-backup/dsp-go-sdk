@@ -707,6 +707,11 @@ func (this *Dsp) DownloadFileWithQuotation(taskInfo *store.TaskInfo, quotation m
 	this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadFileDownloading)
 	// declare job for workers
 	job := func(tId, fHash, pAddr, walletAddr string, blocks []*block.Block) ([]*task.BlockResp, error) {
+		if stop, err := this.taskMgr.IsTaskStop(tId); err != nil || stop {
+			log.Debugf("stop download task %s", tId)
+			return nil, err
+		}
+		// if state
 		this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadRequestBlocks)
 		startedAt := utils.GetMilliSecTimestamp()
 		resp, err := this.downloadBlockFlights(tId, fHash, pAddr, walletAddr, blocks, 1,
@@ -739,12 +744,14 @@ func (this *Dsp) DownloadFileWithQuotation(taskInfo *store.TaskInfo, quotation m
 		log.Debugf("download block of file %s-%s-%d to %s-%s-%d from %s success, start paying to it, "+
 			"size is %d speed: %d", fHash, resp[0].Hash, resp[0].Index,
 			fHash, resp[len(resp)-1].Hash, resp[len(resp)-1].Index, pAddr, totalBytes, speed)
+		this.taskMgr.SetWorkerUnpaid(tId, pAddr, true)
 		paymentId, err := this.PayForBlock(payInfo, pAddr, fHash, uint64(totalBytes), resp[0].PaymentId, true)
 		if err != nil {
 			log.Errorf("pay for blocks err %s", err)
 			this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadPayForBlocksFailed)
 			return nil, dspErr.New(dspErr.PAY_UNPAID_BLOCK_FAILED, err.Error())
 		}
+		this.taskMgr.SetWorkerUnpaid(tId, pAddr, false)
 		this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadPayForBlocksDone)
 		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d",
 			fHash, pAddr, walletAddr, paymentId)
@@ -1562,15 +1569,16 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 			blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index, ipAddr)
 	}
 	timeStamp := time.Now().UnixNano()
-	log.Debugf("download block timestamp %d", timeStamp)
 	msg := message.NewBlockFlightsReqMsg(blockReqs, timeStamp)
 	blockReqM := make(map[string]struct{}, 0)
 	for _, req := range blockReqs {
 		blockReqM[keyOfBlockHashAndIndex(req.Hash, req.Index)] = struct{}{}
 	}
 	for i := uint32(0); i < retry; i++ {
-		log.Debugf("send download block flights msg sessionId %s of %s from %s,  retry: %d",
-			sessionId, fileHashStr, ipAddr, i)
+		state, _ := this.taskMgr.GetTaskState(taskId)
+		log.Debugf("send download block flights msg sessionId %s of %s from %s, retry %d,"+
+			" msgId %s, timeStamp %s, state %d",
+			sessionId, fileHashStr, ipAddr, i, msg.MessageId, timeStamp, state)
 		resp, err := client.P2pSendAndWaitReply(ipAddr, msg.MessageId, msg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("send download block flights msg err: %s", err)

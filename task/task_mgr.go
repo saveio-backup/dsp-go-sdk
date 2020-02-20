@@ -448,6 +448,14 @@ func (this *TaskMgr) NewWorkers(taskId string, addrToWalletMap map[string]string
 	v.NewWorkers(addrToWalletMap, job)
 }
 
+func (this *TaskMgr) SetWorkerUnpaid(taskId, worker string, unpaid bool) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return
+	}
+	v.SetWorkerUnPaid(worker, unpaid)
+}
+
 // WorkBackground. Run n goroutines to check request pool one second a time.
 // If there exist a idle request, find the idle worker to do the job
 func (this *TaskMgr) WorkBackground(taskId string) {
@@ -564,7 +572,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					fileHash, flights[0], fileHash, flights[len(flights)-1], worker.RemoteAddress())
 			}
 			tsk.DelBlockReqFromPool(req)
-			tsk.SetWorkerUnPaid(worker.remoteAddr, true)
+			tsk.SetWorkerWorking(worker.remoteAddr, true)
 			jobCh <- &job{
 				req:       req,
 				flightKey: flights,
@@ -692,12 +700,12 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					job.req[len(job.req)-1].Index, job.worker.RemoteAddress(), job.worker.WalletAddr())
 				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(),
 					job.worker.WalletAddr(), flights)
+				tsk.SetWorkerWorking(job.worker.remoteAddr, false)
 				if err != nil {
 					if derr, ok := err.(*dspErr.Error); ok && derr.Code == dspErr.PAY_UNPAID_BLOCK_FAILED {
 						log.Errorf("request blocks paid failed %v from %s, err %s",
 							job.req, job.worker.remoteAddr, err)
 					} else {
-						tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 					}
 					if len(job.req) > 0 {
 						log.Errorf("request blocks %s of %s to %s from %s, err %s",
@@ -706,7 +714,6 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
 					}
 				} else {
-					tsk.SetWorkerUnPaid(job.worker.remoteAddr, false)
 					log.Debugf("request blocks %s-%s to %s from %s success",
 						fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.remoteAddr)
 				}

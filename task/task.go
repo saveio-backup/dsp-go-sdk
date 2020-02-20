@@ -872,13 +872,27 @@ func (this *Task) NewWorkers(addrs map[string]string, job jobFunc) {
 	}
 }
 
+func (this *Task) SetWorkerWorking(remoteAddr string, working bool) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	w, ok := this.workers[remoteAddr]
+	if !ok {
+		log.Warnf("set remote peer %s working failed, peer not found", remoteAddr)
+		return
+	}
+	log.Debugf("set peer %s working %s", remoteAddr, working)
+	w.SetWorking(working)
+}
+
 func (this *Task) SetWorkerUnPaid(remoteAddr string, unpaid bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	w, ok := this.workers[remoteAddr]
 	if !ok {
+		log.Warnf("set remote peer %s unpaid failed, peer not found", remoteAddr)
 		return
 	}
+	log.Debugf("set peer %s unpaid %s", remoteAddr, unpaid)
 	w.SetUnpaid(unpaid)
 }
 
@@ -1059,6 +1073,9 @@ func (this *Task) IsTimeout() bool {
 func (this *Task) AllPeerPaidFailed() bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
+	if len(this.workers) == 0 {
+		return false
+	}
 	paidFailed := true
 	for _, w := range this.workers {
 		if !w.Unpaid() {

@@ -88,6 +88,10 @@ func (w *Worker) SetUnpaid(unpaid bool) {
 	w.unpaid = unpaid
 }
 
+func (w *Worker) SetWorking(working bool) {
+	w.working = working
+}
+
 func (w *Worker) Unpaid() bool {
 	return w.unpaid
 }
