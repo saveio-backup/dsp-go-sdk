@@ -1062,8 +1062,8 @@ func (this *Task) IsTimeout() bool {
 	timeout := uint64(common.DOWNLOAD_FILE_TIMEOUT * 1000)
 	now := utils.GetMilliSecTimestamp()
 	for _, w := range this.workers {
-		log.Debugf("worker active time %s %d", w.RemoteAddress(), w.ActiveTime())
 		if now-w.ActiveTime() < timeout {
+			log.Debugf("worker active time %s %d", w.RemoteAddress(), w.ActiveTime())
 			return false
 		}
 	}

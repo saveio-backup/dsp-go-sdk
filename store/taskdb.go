@@ -477,6 +477,8 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 				this.db.BatchDelete(batch, []byte(unpaidKey))
 			}
 		}
+
+		// FIXME: duplicate file hash tasks will make this encounter some errors
 		taskIdWithFilekey := TaskIdWithFile(fi.FileHash, fi.WalletAddress, fi.Type)
 		existId, _ := this.GetFileInfoId(taskIdWithFilekey)
 		log.Debugf("delete local file info key %s, id %s, exist id %s",

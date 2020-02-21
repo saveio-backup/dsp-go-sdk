@@ -53,7 +53,6 @@ func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
 			return false, nil
 		}
 		log.Debugf("upload task exist checksum: %s, filepath: %s", checksum, filePath)
-		return false, nil
 	}
 	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
 	if err != nil || taskInfo == nil {
@@ -213,6 +212,10 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 	fi, _ := this.chain.GetFileInfo(fileHashStr)
 	if newTask && (fi != nil || this.taskMgr.PauseDuplicatedTask(taskId, fileHashStr)) {
 		return nil, dspErr.New(dspErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
+	}
+	// bind task id with file hash
+	if err = this.taskMgr.BindTaskId(taskId); err != nil {
+		return nil, err
 	}
 	if pause, err := this.checkIfPause(taskId, fileHashStr); err != nil || pause {
 		return nil, err
@@ -623,6 +626,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 	if taskInfo == nil {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "can't find download options, please retry")
 	}
+
 	opt := &fs.UploadOption{
 		FileDesc:        []byte(taskInfo.FileName),
 		FileSize:        taskInfo.RealFileSize,
@@ -643,6 +647,11 @@ func (this *Dsp) checkIfResume(taskId string) error {
 	if len(taskInfo.FileHash) == 0 {
 		go this.UploadFile(taskId, taskInfo.FilePath, opt)
 		return nil
+	}
+	if this.taskMgr.ExistSameUploadFile(taskId, taskInfo.FileHash) {
+		err := dspErr.New(dspErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
+		this.taskMgr.EmitResult(taskId, nil, err)
+		return err
 	}
 	fileInfo, _ := this.chain.GetFileInfo(taskInfo.FileHash)
 	if fileInfo != nil {
