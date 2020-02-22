@@ -91,7 +91,7 @@ type TaskInfo struct {
 	BindDNSTx          string            `json:"bind_dns_tx,omitempty"`            // bind dns tx
 	WhitelistTx        string            `json:"whitelist_tx,omitempty"`           // first op whitelist tx
 	TotalBlockCount    uint64            `json:"total_block_count"`                // total block count
-	TaskState          uint32            `json:"task_state"`                       // task state
+	TaskState          TaskState         `json:"task_state"`                       // task state
 	ProvePrivKey       []byte            `json:"prove_private_key,omitempty"`      // prove private key params
 	Prefix             []byte            `json:"prefix"`                           // file prefix
 	EncryptHash        string            `json:"encrypt_hash,omitempty"`           // encrypt hash
@@ -286,11 +286,11 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 			if info.Type != ft {
 				continue
 			}
-			if info.TaskState == uint32(TaskStateDone) {
+			if info.TaskState == TaskStateDone {
 				continue
 			}
 		}
-		if !includeFailed && info.TaskState == uint32(TaskStateFailed) {
+		if !includeFailed && info.TaskState == TaskStateFailed {
 			continue
 		}
 		infos = append(infos, info)
@@ -344,7 +344,7 @@ func (this *TaskDB) GetDownloadedTaskId(fileHashStr string) (string, error) {
 		if info.Type != TaskTypeDownload {
 			continue
 		}
-		if info.TaskState != uint32(TaskStateDone) {
+		if info.TaskState != TaskStateDone {
 			continue
 		}
 		if info.FileHash != fileHashStr {
@@ -478,8 +478,12 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 			}
 		}
 		taskIdWithFilekey := TaskIdWithFile(fi.FileHash, fi.WalletAddress, fi.Type)
-		log.Debugf("delete local file info key %s", TaskInfoIdWithFile(taskIdWithFilekey))
-		this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
+		existId, _ := this.GetFileInfoId(taskIdWithFilekey)
+		log.Debugf("delete local file info key %s, id %s, exist id %s",
+			TaskInfoIdWithFile(taskIdWithFilekey), id, existId)
+		if existId == id {
+			this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
+		}
 	}
 	// delete fileInfo
 	this.db.BatchDelete(batch, []byte(TaskInfoKey(id)))
@@ -1561,7 +1565,7 @@ func (this *TaskDB) GetUnDispatchTaskInfos(curWalletAddr string) ([]*TaskInfo, e
 		if info.Type != TaskTypeUpload {
 			continue
 		}
-		if info.TaskState == uint32(TaskStateDone) {
+		if info.TaskState == TaskStateDone {
 			continue
 		}
 		if info.FileOwner == curWalletAddr {
@@ -1632,6 +1636,28 @@ func (this *TaskDB) GetUploadTaskInfos() ([]*TaskInfo, error) {
 	}
 	sort.Sort(infos)
 	return infos, nil
+}
+
+// ExistSameUploadTaskInfo. exist same upload task info with specific file hash
+func (this *TaskDB) ExistSameUploadTaskInfo(taskId, fileHashStr string) (bool, error) {
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		return false, err
+	}
+	for _, key := range keys {
+		info, err := this.getTaskInfoByKey(key)
+		if err != nil || info == nil {
+			continue
+		}
+		if info.Type != TaskTypeUpload {
+			continue
+		}
+		if info.Id != taskId && info.FileHash == fileHashStr {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (this *TaskDB) batchAddToUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {

@@ -120,7 +120,7 @@ func NewTask(taskT store.TaskType, db *store.TaskDB) *Task {
 		return nil
 	}
 	t := newTask(id.String(), info, db)
-	t.info.TaskState = uint32(store.TaskStatePrepare)
+	t.info.TaskState = store.TaskStatePrepare
 	err = db.SaveTaskInfo(t.info)
 	if err != nil {
 		log.Debugf("save file info failed err %s", err)
@@ -170,7 +170,7 @@ func NewTaskFromDB(id string, db *store.TaskDB) (*Task, error) {
 		state = store.TaskStatePause
 	}
 	t := newTask(id, info, db)
-	t.info.TaskState = uint32(state)
+	t.info.TaskState = state
 	t.info.TranferState = uint32(TaskPause)
 	err = db.SaveTaskInfo(t.info)
 	if err != nil {
@@ -350,7 +350,7 @@ func (this *Task) SetTaskState(newState store.TaskState) error {
 		log.Debugf("task: %s has done", this.id)
 	case store.TaskStateCancel:
 	}
-	this.info.TaskState = uint32(newState)
+	this.info.TaskState = newState
 	changeFromPause := (oldState == store.TaskStatePause && (newState == store.TaskStateDoing || newState == store.TaskStateCancel))
 	changeFromDoing := (oldState == store.TaskStateDoing && (newState == store.TaskStatePause || newState == store.TaskStateCancel))
 	if changeFromPause {
@@ -431,11 +431,11 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	this.info.ErrorCode = errorCode
 	this.info.ErrorMsg = errorMsg
 	if errorCode != 0 {
-		this.info.TaskState = uint32(store.TaskStateFailed)
+		this.info.TaskState = store.TaskStateFailed
 	} else if result != nil {
 		log.Debugf("task: %s has done", this.id)
 		this.info.Result = result
-		this.info.TaskState = uint32(store.TaskStateDone)
+		this.info.TaskState = store.TaskStateDone
 		switch this.info.Type {
 		case store.TaskTypeUpload:
 			err := this.db.SaveFileUploaded(this.id)

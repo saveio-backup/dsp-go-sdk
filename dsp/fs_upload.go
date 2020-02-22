@@ -210,15 +210,15 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 		task.Prefix(prefixStr)); err != nil {
 		return nil, err
 	}
-	// bind task id with file hash
-	if err = this.taskMgr.BindTaskId(taskId); err != nil {
-		return nil, err
-	}
 	fi, _ := this.chain.GetFileInfo(fileHashStr)
 	if newTask && (fi != nil || this.taskMgr.PauseDuplicatedTask(taskId, fileHashStr)) {
 		return nil, dspErr.New(dspErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
 	}
 	if pause, err := this.checkIfPause(taskId, fileHashStr); err != nil || pause {
+		return nil, err
+	}
+	// bind task id with file hash
+	if err = this.taskMgr.BindTaskId(taskId); err != nil {
 		return nil, err
 	}
 	// check has uploaded this file
@@ -483,7 +483,7 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string, gasLimit uint64) ([]*comm
 			continue
 		}
 		hashM[hash] = struct{}{}
-		if this.taskMgr.ExistSameUploadingFile(id, hash) {
+		if this.taskMgr.ExistSameUploadFile(id, hash) {
 			log.Debugf("exist same file %s uploading, ignore delete it from chain", hash)
 			continue
 		}

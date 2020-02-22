@@ -5,6 +5,7 @@ import (
 
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
+	"github.com/saveio/themis/common/log"
 )
 
 // getter list for task info
@@ -329,19 +330,16 @@ func (this *TaskMgr) GetUnDispatchTaskInfos(curWalletAddr string) ([]*store.Task
 	return tasks, nil
 }
 
-func (this *TaskMgr) ExistSameUploadingFile(taskId, fileHashStr string) bool {
+// ExistSameUploadingFile.
+func (this *TaskMgr) ExistSameUploadFile(taskId, fileHashStr string) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	for id, tsk := range this.tasks {
-		if id == taskId {
-			continue
-		}
-		if tsk.GetTaskType() == store.TaskTypeUpload &&
-			tsk.GetFileHash() == fileHashStr {
-			return true
-		}
+	exist, err := this.db.ExistSameUploadTaskInfo(taskId, fileHashStr)
+	if err != nil {
+		log.Errorf("exist same upload task info err %s", err)
+		return false
 	}
-	return false
+	return exist
 }
 
 func (this *TaskMgr) GetFileNameWithPath(filePath string) string {

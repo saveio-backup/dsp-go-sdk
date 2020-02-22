@@ -1122,7 +1122,7 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	fileHash := "QmNy61xYHE7rfBvCKJpLeFsyfoitWqA7fccLH16yhXs6Yw"
+	fileHash := "zb2rhoVpdEon9Jj583TGhf4vCgVELfF9RuQq5YBAUjCLeGCRn"
 	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)
@@ -1212,14 +1212,4 @@ func TestGetNodelist(t *testing.T) {
 		fmt.Printf("%s, remain: %d\n", l.NodeAddr, l.RestVol)
 	}
 
-}
-
-func TestReAssignValue(t *testing.T) {
-	for i := 0; i < 3; i++ {
-		fileHash := fmt.Sprintf("%d", i)
-		go func(j int) {
-			fmt.Printf("i=%d, filehash=%s\n", j, fileHash)
-		}(i)
-	}
-	time.Sleep(time.Minute)
 }
