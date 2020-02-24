@@ -165,6 +165,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 			EncryptPwd: string(opt.EncryptPassword),
 			Owner:      this.chain.Address(),
 			FileSize:   opt.FileSize,
+			FileName:   string(opt.FileDesc),
 		}
 		filePrefix.MakeSalt()
 		prefixStr = filePrefix.String()

@@ -99,18 +99,11 @@ func (this *Dsp) SumRecordsProfitById(id string) (uint64, error) {
 
 // IsFileEncrypted. read prefix of file to check it's encrypted or not
 func (this *Dsp) IsFileEncrypted(fullFilePath string) bool {
-	sourceFile, err := os.Open(fullFilePath)
+	filePrefix, _, err := utils.GetPrefixFromFile(fullFilePath)
 	if err != nil {
+		log.Errorf("get file prefix from path %s err %s", fullFilePath, err)
 		return false
 	}
-	defer sourceFile.Close()
-	prefix := make([]byte, utils.PREFIX_LEN)
-	_, err = sourceFile.Read(prefix)
-	if err != nil {
-		return false
-	}
-	filePrefix := &utils.FilePrefix{}
-	filePrefix.Deserialize([]byte(prefix))
 	return filePrefix.Encrypt
 }
 
@@ -418,7 +411,7 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 		}
 
 		filePrefix := &utils.FilePrefix{}
-		filePrefix.Deserialize([]byte(prefix))
+		filePrefix.Deserialize(fileMsg.Prefix)
 		if len(taskInfo.DecryptPwd) > 0 && !utils.VerifyEncryptPassword(taskInfo.DecryptPwd, filePrefix.EncryptSalt,
 			filePrefix.EncryptHash) {
 			log.Warnf("encrypt password not match hash")
@@ -1206,19 +1199,10 @@ func (this *Dsp) decryptDownloadedFile(taskId string) error {
 	if len(taskInfo.DecryptPwd) == 0 {
 		return dspErr.New(dspErr.DECRYPT_FILE_FAILED, "no decrypt password")
 	}
-	filePrefix := &utils.FilePrefix{}
-	sourceFile, err := os.Open(taskInfo.FilePath)
+	filePrefix, prefix, err := utils.GetPrefixFromFile(taskInfo.FilePath)
 	if err != nil {
 		return dspErr.New(dspErr.DECRYPT_FILE_FAILED, err.Error())
 	}
-	defer sourceFile.Close()
-	prefix := make([]byte, utils.PREFIX_LEN)
-	_, err = sourceFile.Read(prefix)
-	if err != nil {
-		return dspErr.New(dspErr.DECRYPT_FILE_FAILED, err.Error())
-	}
-	log.Debugf("read first n prefix :%v", prefix)
-	filePrefix.Deserialize([]byte(prefix))
 	if !utils.VerifyEncryptPassword(taskInfo.DecryptPwd, filePrefix.EncryptSalt, filePrefix.EncryptHash) {
 		return dspErr.New(dspErr.DECRYPT_WRONG_PASSWORD, "wrong password")
 	}
@@ -1577,7 +1561,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, ipAddr, peerWalletAdd
 	for i := uint32(0); i < retry; i++ {
 		state, _ := this.taskMgr.GetTaskState(taskId)
 		log.Debugf("send download block flights msg sessionId %s of %s from %s, retry %d,"+
-			" msgId %s, timeStamp %s, state %d",
+			" msgId %s, timeStamp %d, state %d",
 			sessionId, fileHashStr, ipAddr, i, msg.MessageId, timeStamp, state)
 		resp, err := client.P2pSendAndWaitReply(ipAddr, msg.MessageId, msg.ToProtoMsg())
 		if err != nil {
