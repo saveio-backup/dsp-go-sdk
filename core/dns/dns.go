@@ -474,9 +474,9 @@ func (d *DNS) GetLinkFromUrl(url string) string {
 	return string(info.Name)
 }
 
-func (d *DNS) UpdateFileUrlVersion(url string, urlVersion utils.URLVERSION) (string, error) {
-	urlPrefix := common.FILE_URL_CUSTOM_HEADER
-	if !strings.HasPrefix(url, urlPrefix) && !strings.HasPrefix(url, common.FILE_URL_CUSTOM_HEADER_PROTOCOL) {
+func (d *DNS) UpdatePluginVersion(url, link string, urlVersion utils.URLVERSION) (string, error) {
+	urlPrefix := common.FILE_URL_CUSTOM_PLUGIN_HEADER_PROTOCOL
+	if !strings.HasPrefix(url, common.FILE_URL_CUSTOM_PLUGIN_HEADER_PROTOCOL) {
 		return "", dspErr.New(dspErr.INTERNAL_ERROR, "url should start with %s", urlPrefix)
 	}
 	if !utils.ValidateDomainName(url[len(urlPrefix):]) {
@@ -486,9 +486,9 @@ func (d *DNS) UpdateFileUrlVersion(url string, urlVersion utils.URLVERSION) (str
 	log.Debugf("query url %s %s info %s err %s", url, d.Chain.WalletAddress(), nameInfo, err)
 	info := urlVersion.String()
 	if nameInfo != nil {
-		info = string(nameInfo.Desc) + utils.URLVERSION_SPLIT_STRING + info
+		info = string(nameInfo.Desc) + utils.PLUGIN_URLVERSION_SPLIT + info
 	}
-	tx, err := d.Chain.RegisterUrl(url, dns.CUSTOM_URL, url, info, common.FILE_DNS_TTL)
+	tx, err := d.Chain.RegisterUrl(url, dns.CUSTOM_HEADER_URL, link, info, common.FILE_DNS_TTL)
 	if err != nil {
 		return "", err
 	}
@@ -499,7 +499,7 @@ func (d *DNS) UpdateFileUrlVersion(url string, urlVersion utils.URLVERSION) (str
 	return tx, nil
 }
 
-func (d *DNS) GetVersionFromUrl(url string) string {
+func (d *DNS) GetPluginVersionFromUrl(url string) string {
 	info, err := d.Chain.QueryUrl(url, d.Chain.Address())
 	log.Debugf("query url %s %s info %s err %s", url, d.Chain.WalletAddress(), info, err)
 	if err != nil || info == nil {

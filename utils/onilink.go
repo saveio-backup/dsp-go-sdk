@@ -11,13 +11,16 @@ import (
 	"github.com/saveio/dsp-go-sdk/common"
 )
 
-const URLVERSION_SPLIT_STRING = "#UV#"
-const URLVERSION_CHANGELOG_PREFIX = "#CL#"
+const PLUGIN_URLVERSION_SPLIT = "#PV#"
+const PLUGIN_URLVERSION_CHANGELOG_PREFIX = "#CL#"
 
 type URLVERSION struct {
-	Platform    int
+	Url         string
 	Version     string
 	FileHashStr string
+	Img         string
+	Title       string
+	Platform    int
 	ChangeLog   string
 }
 

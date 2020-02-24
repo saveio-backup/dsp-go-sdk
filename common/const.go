@@ -3,12 +3,13 @@ package common
 import "github.com/saveio/carrier/network"
 
 const (
-	CHUNK_SIZE                      = 256 * 1024 // chunk size
-	DOWNLOAD_FILE_TEMP_DIR_PATH     = "./temp"   // download temp file path
-	PROTO_NODE_FILE_HASH_LEN        = 46         // proto node file hash length
-	RAW_NODE_FILE_HASH_LEN          = 49         // raw node file hash length
-	FILE_URL_CUSTOM_HEADER_PROTOCOL = "oni://"
-	FILE_URL_CUSTOM_HEADER          = FILE_URL_CUSTOM_HEADER_PROTOCOL + "share/" // file url custom header
+	CHUNK_SIZE                             = 256 * 1024 // chunk size
+	DOWNLOAD_FILE_TEMP_DIR_PATH            = "./temp"   // download temp file path
+	PROTO_NODE_FILE_HASH_LEN               = 46         // proto node file hash length
+	RAW_NODE_FILE_HASH_LEN                 = 49         // raw node file hash length
+	FILE_URL_CUSTOM_HEADER_PROTOCOL        = "oni://"
+	FILE_URL_CUSTOM_HEADER                 = FILE_URL_CUSTOM_HEADER_PROTOCOL + "share/" // file url custom header
+	FILE_URL_CUSTOM_PLUGIN_HEADER_PROTOCOL = "dsp-plugin://"
 
 	FILE_DOWNLOAD_UNIT_PRICE = 1     // unit price for all file
 	DSP_NETWORK_PROTOCOL     = "tcp" // default dsp network protocol

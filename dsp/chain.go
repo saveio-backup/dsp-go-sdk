@@ -280,3 +280,7 @@ func (this *Dsp) GetAllDnsNodes() (map[string]dns.DNSNodeInfo, error) {
 func (this *Dsp) GetNodeHostAddrListByWallets(wallets []chainCom.Address) ([]string, error) {
 	return this.chain.GetNodeHostAddrListByWallets(wallets)
 }
+
+func (this *Dsp) QueryPluginsInfo() (*dns.NameInfoList, error) {
+	return this.chain.QueryPluginsInfo()
+}

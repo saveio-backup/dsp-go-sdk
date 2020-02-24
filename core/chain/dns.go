@@ -16,6 +16,14 @@ func (this *Chain) GetAllDnsNodes() (map[string]dns.DNSNodeInfo, error) {
 	return info, nil
 }
 
+func (this *Chain) QueryPluginsInfo() (*dns.NameInfoList, error) {
+	info, err := this.themis.Native.Dns.GetPluginList()
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return info, nil
+}
+
 func (this *Chain) RegisterUrl(url string, rType uint64, name, desc string, ttl uint64) (string, error) {
 	txHash, err := this.themis.Native.Dns.RegisterUrl(url, rType, name, desc, ttl)
 	if err != nil {
