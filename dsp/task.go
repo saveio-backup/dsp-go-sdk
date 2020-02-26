@@ -129,11 +129,12 @@ func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
 	return this.taskMgr.GetUrlOfUploadedfile(fileHashStr, this.chain.WalletAddress())
 }
 
-func (this *Dsp) GetTaskIdList(offset, limit uint32, ft store.TaskType, allType, reverse, includeFailed bool) []string {
+func (this *Dsp) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uint64,
+	ft store.TaskType, allType, reverse, includeFailed bool) []string {
 	if this == nil || this.taskMgr == nil {
 		return nil
 	}
-	return this.taskMgr.GetTaskIdList(offset, limit, ft, allType, reverse, includeFailed)
+	return this.taskMgr.GetTaskIdList(offset, limit, createdAt, updatedAt, ft, allType, reverse, includeFailed)
 }
 
 func (this *Dsp) DeleteTaskIds(ids []string) error {

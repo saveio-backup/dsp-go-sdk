@@ -257,7 +257,8 @@ func (this *TaskDB) getTaskCount() (*TaskCount, error) {
 }
 
 // GetTaskIdList. Get all task id list with offset, limit, task type
-func (this *TaskDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, reverse, includeFailed bool) []string {
+func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uint64,
+	ft TaskType, allType, reverse, includeFailed bool) []string {
 	prefix := TaskIdIndexKey(0)
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
@@ -291,6 +292,12 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, ft TaskType, allType, re
 			}
 		}
 		if !includeFailed && info.TaskState == TaskStateFailed {
+			continue
+		}
+		if info.CreatedAt < createdAt {
+			continue
+		}
+		if info.UpdatedAt < updatedAt {
 			continue
 		}
 		infos = append(infos, info)
@@ -579,6 +586,7 @@ func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 		return err
 	}
 	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
+	fi.UpdatedAt = utils.GetMilliSecTimestamp()
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
 		return err
@@ -947,6 +955,7 @@ func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 	}
 	fi.CurrentBlock = blockHashStr
 	fi.CurrentIndex = index
+	fi.UpdatedAt = utils.GetMilliSecTimestamp()
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
 		return err
@@ -1113,6 +1122,7 @@ func (this *TaskDB) SetUploadProgressDone(id, nodeAddr string) error {
 		return err
 	}
 	// TODO: split save block count for each node
+	fi.UpdatedAt = utils.GetMilliSecTimestamp()
 	log.Debugf("save upload progress done after %v", progress.Progress)
 	fiBuf, err := json.Marshal(fi)
 	if err != nil {
