@@ -33,8 +33,8 @@ func (this *Chain) RegisterUrl(url string, rType uint64, name, desc string, ttl 
 	return tx, nil
 }
 
-func (this *Chain) BindUrl(url string, name, desc string, ttl uint64) (string, error) {
-	txHash, err := this.themis.Native.Dns.Binding(url, name, desc, ttl)
+func (this *Chain) BindUrl(urlType uint64, url string, name, desc string, ttl uint64) (string, error) {
+	txHash, err := this.themis.Native.Dns.Binding(urlType, url, name, desc, ttl)
 	if err != nil {
 		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}

@@ -15,13 +15,14 @@ const PLUGIN_URLVERSION_SPLIT = "#PV#"
 const PLUGIN_URLVERSION_CHANGELOG_PREFIX = "#CL#"
 
 type URLVERSION struct {
-	Url         string
-	Version     string
-	FileHashStr string
-	Img         string
-	Title       string
-	Platform    int
-	ChangeLog   string
+	Type      uint64
+	Url       string
+	Version   string
+	FileHash  string
+	Img       string
+	Title     string
+	Platform  int
+	ChangeLog string
 }
 
 type UrlVersionType int

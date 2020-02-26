@@ -80,8 +80,8 @@ func (this *Dsp) GetLinkFromUrl(url string) string {
 	return this.dns.GetLinkFromUrl(url)
 }
 
-func (this *Dsp) UpdatePluginVersion(url, link string, urlVersion utils.URLVERSION) (string, error) {
-	return this.dns.UpdatePluginVersion(url, link, urlVersion)
+func (this *Dsp) UpdatePluginVersion(urlType uint64, url, link string, urlVersion utils.URLVERSION) (string, error) {
+	return this.dns.UpdatePluginVersion(urlType, url, link, urlVersion)
 }
 
 func (this *Dsp) GetPluginVersionFromUrl(url string) string {

@@ -442,7 +442,7 @@ func (d *DNS) RegisterFileUrl(url, link string) (string, error) {
 	if !utils.ValidateDomainName(url[len(urlPrefix):]) {
 		return "", dspErr.New(dspErr.INTERNAL_ERROR, "domain name is invalid")
 	}
-	tx, err := d.Chain.RegisterUrl(url, dns.CUSTOM_URL, link, link, common.FILE_DNS_TTL)
+	tx, err := d.Chain.RegisterUrl(url, dns.CUSTOM_URL, link, "", common.FILE_DNS_TTL)
 	if err != nil {
 		return "", err
 	}
@@ -454,7 +454,7 @@ func (d *DNS) RegisterFileUrl(url, link string) (string, error) {
 }
 
 func (d *DNS) BindFileUrl(url, link string) (string, error) {
-	tx, err := d.Chain.BindUrl(url, link, link, common.FILE_DNS_TTL)
+	tx, err := d.Chain.BindUrl(uint64(dns.NameTypeNormal), url, link, link, common.FILE_DNS_TTL)
 	if err != nil {
 		return "", err
 	}
@@ -474,9 +474,9 @@ func (d *DNS) GetLinkFromUrl(url string) string {
 	return string(info.Name)
 }
 
-func (d *DNS) UpdatePluginVersion(url, link string, urlVersion utils.URLVERSION) (string, error) {
-	urlPrefix := common.FILE_URL_CUSTOM_PLUGIN_HEADER_PROTOCOL
-	if !strings.HasPrefix(url, common.FILE_URL_CUSTOM_PLUGIN_HEADER_PROTOCOL) {
+func (d *DNS) UpdatePluginVersion(urlType uint64, url, link string, urlVersion utils.URLVERSION) (string, error) {
+	urlPrefix := common.FILE_URL_CUSTOM_HEADER_PROTOCOL
+	if !strings.HasPrefix(url, urlPrefix) {
 		return "", dspErr.New(dspErr.INTERNAL_ERROR, "url should start with %s", urlPrefix)
 	}
 	if !utils.ValidateDomainName(url[len(urlPrefix):]) {
@@ -488,7 +488,7 @@ func (d *DNS) UpdatePluginVersion(url, link string, urlVersion utils.URLVERSION)
 	if nameInfo != nil {
 		info = string(nameInfo.Desc) + utils.PLUGIN_URLVERSION_SPLIT + info
 	}
-	tx, err := d.Chain.RegisterUrl(url, dns.CUSTOM_HEADER_URL, link, info, common.FILE_DNS_TTL)
+	tx, err := d.Chain.BindUrl(urlType, url, link, info, common.FILE_DNS_TTL)
 	if err != nil {
 		return "", err
 	}
