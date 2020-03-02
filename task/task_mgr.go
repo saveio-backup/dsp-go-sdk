@@ -196,12 +196,12 @@ func (this *TaskMgr) TaskNum() int {
 	return len(this.tasks)
 }
 
-func (this *TaskMgr) ShareTaskNum() int {
+func (this *TaskMgr) GetDoingTaskNum(tskType store.TaskType) uint32 {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	cnt := 0
+	cnt := uint32(0)
 	for _, t := range this.tasks {
-		if t.State() == store.TaskStateDoing && t.GetTaskType() == store.TaskTypeShare {
+		if t.State() == store.TaskStateDoing && t.GetTaskType() == tskType {
 			cnt++
 		}
 	}
@@ -506,6 +506,8 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	dropDoneCh := uint32(0)
 
 	done := make(chan *getBlocksResp, 1)
+	maxFlightLen := this.GetMaxFlightLen(tsk)
+	log.Debugf("max flight len %d", maxFlightLen)
 	// trigger to start
 	go tsk.notifyBlockReqPoolLen()
 	go func() {
@@ -549,7 +551,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				req = append(req, r)
 				flights = append(flights, flightKey)
-				if len(req) == common.MAX_REQ_BLOCK_COUNT {
+				if len(req) == maxFlightLen {
 					break
 				}
 			}
@@ -1023,4 +1025,15 @@ func (this *TaskMgr) GetUploadDoneNodeAddr(taskId string) (string, error) {
 		return "", dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "upload file info not found")
 	}
 	return nodeAddr, nil
+}
+
+func (this *TaskMgr) GetMaxFlightLen(tsk *Task) int {
+	maxFlightLen := 0
+	if int(tsk.GetTotalBlockCnt()) < common.MAX_REQ_BLOCK_COUNT {
+		maxFlightLen = int(tsk.GetTotalBlockCnt()) / len(tsk.GetWorkerAddrs()) * 3 / 4
+	}
+	if maxFlightLen <= 0 || maxFlightLen > common.MAX_REQ_BLOCK_COUNT {
+		maxFlightLen = common.MAX_REQ_BLOCK_COUNT
+	}
+	return maxFlightLen
 }

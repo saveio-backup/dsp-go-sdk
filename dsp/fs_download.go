@@ -101,7 +101,6 @@ func (this *Dsp) SumRecordsProfitById(id string) (uint64, error) {
 func (this *Dsp) IsFileEncrypted(fullFilePath string) bool {
 	filePrefix, _, err := utils.GetPrefixFromFile(fullFilePath)
 	if err != nil {
-		log.Errorf("get file prefix from path %s err %s", fullFilePath, err)
 		return false
 	}
 	return filePrefix.Encrypt
@@ -1559,6 +1558,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, peerWalletAddr string
 		log.Debugf("send download block flights msg sessionId %s of %s from %s, retry %d,"+
 			" msgId %s, timeStamp %d, state %d",
 			sessionId, fileHashStr, i, msg.MessageId, timeStamp, state)
+		this.taskMgr.ActiveDownloadTaskPeer(peerWalletAddr)
 		resp, err := client.P2pSendAndWaitReply(peerWalletAddr, msg.MessageId, msg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("send download block flights msg err: %s", err)

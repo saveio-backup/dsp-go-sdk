@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/core/chain"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	netcomm "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
@@ -722,7 +724,8 @@ func (this *Dsp) payForSendFile(taskId string) error {
 		return err
 	}
 	fileInfo, err := this.chain.GetFileInfo(taskInfo.FileHash)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), chain.ErrNoFileInfo) {
+		// FsGetFileInfo not found
 		log.Errorf("get file info err %s", err)
 	}
 	var paramsBuf, privateKey []byte
@@ -1047,13 +1050,13 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 	height, _ := this.chain.GetCurrentBlockHeight()
 	nodeListLen := len(nodeList)
 	action := func(res proto.Message, hostAddr string) bool {
-		p2pMsg := message.ReadMessage(res)
-		if p2pMsg.Error != nil && p2pMsg.Error.Code != dspErr.SUCCESS {
-			log.Errorf("get file fetch_ack msg err %s", p2pMsg.Error.Message)
-			return false
-		}
 		lock.Lock()
 		defer lock.Unlock()
+		p2pMsg := message.ReadMessage(res)
+		if p2pMsg.Error != nil && p2pMsg.Error.Code != dspErr.SUCCESS {
+			log.Errorf("get file fetch_ack msg err code %d, msg %s", p2pMsg.Error.Code, p2pMsg.Error.Message)
+			return false
+		}
 		if stop {
 			log.Debugf("break here after stop is true")
 			return true
@@ -1118,9 +1121,9 @@ func (this *Dsp) broadcastAskMsg(taskId string, msg *message.Message, nodeList [
 		return walletAddrs, nil
 	}
 	if len(walletAddrs)+len(backupAddrs) < minResponse {
-		return nil, dspErr.New(dspErr.RECEIVERS_NOT_ENOUGH,
-			"find %d primary nodes and %d back up nodes, but the file need %d nodes",
+		log.Errorf("find %d primary nodes and %d back up nodes, but the file need %d nodes",
 			len(walletAddrs), len(backupAddrs), minResponse)
+		return nil, dspErr.New(dspErr.RECEIVERS_NOT_ENOUGH, "no enough nodes, please retry later")
 	}
 	// append backup nodes to tail with random range
 	log.Debugf("backup list %v", backupAddrs)

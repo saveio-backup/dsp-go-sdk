@@ -123,7 +123,6 @@ func (p *FilePrefix) Deserialize(base64Buf []byte) error {
 	payloadSizeBuf := make([]byte, encodeSizeLen)
 	_, err := base64.StdEncoding.Decode(payloadSizeBuf, base64Buf[:encodeSizeLen])
 	if err != nil {
-		log.Errorf("decode size %d, err %s", encodeSizeLen, err)
 		return err
 	}
 	payloadSize := GetPayloadLenFromBuf(payloadSizeBuf)
@@ -131,7 +130,6 @@ func (p *FilePrefix) Deserialize(base64Buf []byte) error {
 	buf := make([]byte, payloadSize)
 	_, err = base64.StdEncoding.Decode(buf, base64Buf[encodeSizeLen:])
 	if err != nil {
-		log.Errorf("decode size %d, err %s", encodeSizeLen, err)
 		return err
 	}
 	log.Debugf("decode result %x, n %d\n", buf, payloadSize)

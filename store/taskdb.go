@@ -258,7 +258,7 @@ func (this *TaskDB) getTaskCount() (*TaskCount, error) {
 
 // GetTaskIdList. Get all task id list with offset, limit, task type
 func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uint64,
-	ft TaskType, allType, reverse, includeFailed bool) []string {
+	ft TaskType, complete, reverse, includeFailed bool) []string {
 	prefix := TaskIdIndexKey(0)
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
@@ -283,26 +283,21 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uin
 			continue
 		}
 
-		if !allType {
-			if info.Type != ft {
-				continue
-			}
-			if info.TaskState == TaskStateDone {
-				continue
-			}
+		if !complete && (info.Type != ft || info.TaskState == TaskStateDone) {
+			continue
+		}
+		if complete && info.TaskState != TaskStateDone {
+			continue
 		}
 		if !includeFailed && info.TaskState == TaskStateFailed {
 			continue
 		}
-		if info.CreatedAt < createdAt {
-			continue
-		}
-		if info.UpdatedAt < updatedAt {
+		if info.CreatedAt < createdAt || info.UpdatedAt < updatedAt {
 			continue
 		}
 		infos = append(infos, info)
 	}
-	if allType {
+	if complete {
 		sort.Sort(sort.Reverse(infos))
 	} else {
 		sort.Sort(TaskInfosByCreatedAt(infos))

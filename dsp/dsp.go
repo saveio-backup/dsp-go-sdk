@@ -111,6 +111,9 @@ func (this *Dsp) Start() error {
 	if this.config == nil {
 		return nil
 	}
+	if err := this.dns.SetupTrackers(); err != nil {
+		return err
+	}
 	// start dns service
 	if this.channel == nil {
 		if err := this.initChannelService(); err != nil {

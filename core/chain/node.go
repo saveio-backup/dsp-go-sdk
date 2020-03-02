@@ -10,6 +10,8 @@ import (
 	"github.com/saveio/themis/smartcontract/service/native/usdt"
 )
 
+var ErrNoFileInfo = "[FS Profit] FsGetFileInfo not found!"
+
 // RegisterNode. register node to chain
 func (this *Chain) RegisterNode(addr string, volume, serviceTime uint64) (string, error) {
 	txHash, err := this.themis.Native.Fs.NodeRegister(volume, serviceTime, addr)

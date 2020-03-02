@@ -705,6 +705,10 @@ func (d *DNS) requestTrackers(request func(string, chan *trackerResp)) interface
 	for _, u := range d.TrackerUrls {
 		reqArgs = append(reqArgs, []interface{}{u})
 	}
+	if len(reqArgs) == 0 {
+		log.Warnf("no args for request")
+		return nil
+	}
 	resp := utils.CallRequestOneWithArgs(req, reqArgs)
 	results := make([]interface{}, 0, len(reqArgs))
 	for _, r := range resp {

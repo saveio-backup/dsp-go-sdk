@@ -117,20 +117,32 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peerWalletAddr 
 	height, _ := this.chain.GetCurrentBlockHeight()
 	existTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
 	if len(existTaskId) == 0 {
-		newMsg := message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
-			message.WithSessionId(fileMsg.SessionId),
-			message.WithWalletAddress(this.chain.WalletAddress()),
-			message.WithSign(this.account),
-			message.ChainHeight(height),
-			message.WithSyn(msg.MessageId),
-		)
-		if err := client.P2pSend(peerWalletAddr, newMsg.MessageId, newMsg.ToProtoMsg()); err != nil {
-			log.Errorf("send new task %s file_ack msg to %s failed %s",
-				existTaskId, peerWalletAddr, err)
+		var replyMsg *message.Message
+		if this.taskMgr.GetDoingTaskNum(store.TaskTypeDownload) >= this.config.MaxDownloadTask {
+			log.Warnf("current downloading task num exceed %d, reject new task", this.config.MaxDownloadTask)
+			replyMsg = message.NewFileMsgWithError(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
+				serr.TOO_MANY_TASKS,
+				"",
+				message.WithSessionId(fileMsg.SessionId),
+				message.WithWalletAddress(this.chain.WalletAddress()),
+				message.WithSign(this.account),
+				message.ChainHeight(height),
+				message.WithSyn(msg.MessageId),
+			)
+		} else {
+			replyMsg = message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
+				message.WithSessionId(fileMsg.SessionId),
+				message.WithWalletAddress(this.chain.WalletAddress()),
+				message.WithSign(this.account),
+				message.ChainHeight(height),
+				message.WithSyn(msg.MessageId),
+			)
+		}
+		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			log.Errorf("send file_ack msg to %s failed %s", peerWalletAddr, err)
 			return
 		}
-		log.Debugf("send new task file_ack msg to %s success",
-			existTaskId, peerWalletAddr)
+		log.Debugf("send file_ack msg to %s success", peerWalletAddr)
 		return
 	}
 	// handle old task
@@ -537,7 +549,8 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 		return
 	}
 
-	if this.taskMgr.ShareTaskNum() >= common.MAX_TASKS_NUM {
+	if this.taskMgr.GetDoingTaskNum(store.TaskTypeShare) >= this.config.MaxShareTask {
+		log.Warnf("current sharing task num exceed %d, reject new task", this.config.MaxShareTask)
 		replyErr(sessionId, fileMsg.Hash, serr.TOO_MANY_TASKS, "", ctx)
 		return
 	}

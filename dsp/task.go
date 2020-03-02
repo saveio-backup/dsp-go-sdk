@@ -130,11 +130,11 @@ func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
 }
 
 func (this *Dsp) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uint64,
-	ft store.TaskType, allType, reverse, includeFailed bool) []string {
+	ft store.TaskType, complete, reverse, includeFailed bool) []string {
 	if this == nil || this.taskMgr == nil {
 		return nil
 	}
-	return this.taskMgr.GetTaskIdList(offset, limit, createdAt, updatedAt, ft, allType, reverse, includeFailed)
+	return this.taskMgr.GetTaskIdList(offset, limit, createdAt, updatedAt, ft, complete, reverse, includeFailed)
 }
 
 func (this *Dsp) DeleteTaskIds(ids []string) error {

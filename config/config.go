@@ -14,6 +14,10 @@ type DspConfig struct {
 	CheckDepositBlkNum uint64   // check deposit price of block num. if it is 0, no checking
 	BlockConfirm       uint32   // block confirmation of tx
 
+	MaxUploadTask   uint32 // max upload task num
+	MaxDownloadTask uint32 // max download task num
+	MaxShareTask    uint32 // max share task num
+
 	FsRepoRoot   string // fs block store repo root path
 	FsFileRoot   string // fs file store root path
 	FsType       FSType // fs type
@@ -45,6 +49,9 @@ func DefaultDspConfig() *DspConfig {
 		DBPath:               "./DB/dsp",
 		ChainRpcAddrs:        []string{"http://127.0.0.1:20336"},
 		CheckDepositBlkNum:   0,
+		MaxUploadTask:        30,
+		MaxDownloadTask:      30,
+		MaxShareTask:         30,
 		FsRepoRoot:           "./FS",
 		FsFileRoot:           "/",
 		FsType:               FS_FILESTORE,
