@@ -194,6 +194,30 @@ type RemoveAddrFromHealthCheckReq struct {
 	Response chan *P2pResp
 }
 
+type GetHostAddrReq struct {
+	NetType  P2pNetType
+	Address  string
+	Response chan *P2pStringResp
+}
+
+func P2pGetHostAddrFromWalletAddr(walletAddr string, netType P2pNetType) (string, error) {
+	chReq := &GetHostAddrReq{
+		Address:  walletAddr,
+		NetType:  netType,
+		Response: make(chan *P2pStringResp, 1),
+	}
+	P2pServerPid.Tell(chReq)
+	select {
+	case resp := <-chReq.Response:
+		if resp != nil {
+			return resp.Value, resp.Error
+		}
+		return "", dspErr.New(dspErr.NETWORK_CONNECT_ERROR, "[P2pGetHostAddrFromWalletAddr] no response")
+	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+		return "", dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pGetHostAddrFromWalletAddr] timeout")
+	}
+}
+
 func P2pConnectionExist(address string, netType P2pNetType) (bool, error) {
 	chReq := &ConnectionExistReq{
 		Address:  address,

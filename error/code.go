@@ -87,6 +87,7 @@ const (
 	DISPATCH_FILE_ERROR                                       // 50070
 	RECEIVE_ERROR_MSG                                         // 50071
 	MISSING_FILE_BLOCKS_ROOT                                  // 50072
+	GET_HOST_ADDR_ERROR                                       // 50073
 )
 
 // delete file error

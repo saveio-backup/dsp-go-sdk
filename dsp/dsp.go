@@ -19,7 +19,6 @@ import (
 	chActorClient "github.com/saveio/pylons/actor/client"
 
 	"github.com/saveio/themis/account"
-	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -224,16 +223,13 @@ func (this *Dsp) StartSeedService() {
 }
 
 func (this *Dsp) startDNSHealthCheckService() {
-	for _, dnsHostAddr := range this.dns.OnlineDNS {
-		client.P2pAppendAddrForHealthCheck(dnsHostAddr, client.P2pNetTypeChannel)
+	for walletAddr, _ := range this.dns.OnlineDNS {
+		client.P2pAppendAddrForHealthCheck(walletAddr, client.P2pNetTypeChannel)
 	}
 }
 
 func (this *Dsp) initChannelService() error {
-	getHostCallBack := func(addr chainCom.Address) (string, error) {
-		return this.dns.GetExternalIP(addr.ToBase58())
-	}
-	ch, err := channel.NewChannelService(this.config, this.chain.Themis(), getHostCallBack)
+	ch, err := channel.NewChannelService(this.config, this.chain.Themis())
 	if err != nil {
 		log.Errorf("init channel err %s", err)
 		return err

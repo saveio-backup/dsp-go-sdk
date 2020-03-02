@@ -113,6 +113,12 @@ func PrivateKey(priKey []byte) InfoOption {
 	})
 }
 
+func ProveParams(params []byte) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.ProveParams = params
+	})
+}
+
 func StoreTx(tx string) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.StoreTx = tx
@@ -155,21 +161,9 @@ func PrimaryNodes(pm []string) InfoOption {
 	})
 }
 
-func PrimaryHostAddrs(pm map[string]string) InfoOption {
-	return OptionFunc(func(info *store.TaskInfo) {
-		info.PrimaryHostAddrs = pm
-	})
-}
-
 func CandidateNodes(cn []string) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.CandidateNodes = cn
-	})
-}
-
-func CandidateHostAddrs(cm map[string]string) InfoOption {
-	return OptionFunc(func(info *store.TaskInfo) {
-		info.CandidateHostAddrs = cm
 	})
 }
 
@@ -266,6 +260,12 @@ func EncryptPassword(encryptPassword []byte) InfoOption {
 func WhiteList(whiteList []*store.WhiteList) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.WhiteList = whiteList
+	})
+}
+
+func NodeHostAddrs(walletHostAddrs map[string]string) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.NodeHostAddrs = walletHostAddrs
 	})
 }
 

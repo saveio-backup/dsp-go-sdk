@@ -57,7 +57,6 @@ func (p *FilePrefix) MakeSalt() error {
 // 4 byte + 1 byte  + 1 byte + 4 byte + 32 byte + 20 byte + 8 byte + 2 byte + ? byte + 4 byte + 4 byte = 80 + ?
 
 func (p *FilePrefix) Serialize() []byte {
-	log.Debugf("Serialize ++++")
 	var versionBuf [VERSION_LEN]byte
 	versionBuf[0] = byte(p.Version)
 	var cryptoBuf [CRYPTO_LEN]byte
@@ -86,7 +85,6 @@ func (p *FilePrefix) Serialize() []byte {
 	}
 	payloadSizeBuf := make([]byte, PAYLOAD_SIZE_LEN)
 	binary.BigEndian.PutUint32(payloadSizeBuf, payloadSize)
-	log.Debugf("total size %v, %.8x\n", payloadSize, payloadSizeBuf)
 
 	var result []byte
 	result = append(result, versionBuf[0])
@@ -121,7 +119,6 @@ func (p *FilePrefix) Serialize() []byte {
 }
 
 func (p *FilePrefix) Deserialize(base64Buf []byte) error {
-	log.Debugf("base64Buf %v, str %s", base64Buf, base64Buf)
 	encodeSizeLen := base64.StdEncoding.EncodedLen(PAYLOAD_SIZE_LEN)
 	payloadSizeBuf := make([]byte, encodeSizeLen)
 	_, err := base64.StdEncoding.Decode(payloadSizeBuf, base64Buf[:encodeSizeLen])

@@ -131,15 +131,10 @@ func (d *DNS) SetupTrackers() error {
 	} else {
 		d.TrackerUrls = d.TrackerUrls[:0]
 	}
-	existDNSMap := make(map[string]struct{}, 0)
-	for _, trackerUrl := range d.TrackerUrls {
-		existDNSMap[trackerUrl] = struct{}{}
-	}
 	dnsCfgMap := make(map[string]struct{}, 0)
 	for _, addr := range d.DNSWalletAddrsFromCfg {
 		dnsCfgMap[addr] = struct{}{}
 	}
-
 	for _, v := range ns {
 		_, ok := dnsCfgMap[v.WalletAddr.ToBase58()]
 		if len(dnsCfgMap) > 0 && !ok {
@@ -150,14 +145,9 @@ func (d *DNS) SetupTrackers() error {
 			break
 		}
 		trackerUrl := fmt.Sprintf("%s://%s:%d", d.TrackerProtocol, v.IP, common.TRACKER_SVR_DEFAULT_PORT)
-		_, ok = existDNSMap[trackerUrl]
-		if ok {
-			continue
-		}
 		d.TrackerUrls = append(d.TrackerUrls, trackerUrl)
-		existDNSMap[trackerUrl] = struct{}{}
 	}
-	d.TrackerUrls = append(d.TrackerUrls, d.TrackersFromCfg...)
+	d.TrackerUrls = utils.RemoveDuplicated(append(d.TrackerUrls, d.TrackersFromCfg...))
 	log.Debugf("d.TrackerUrls %v", d.TrackerUrls)
 	return nil
 }
@@ -629,7 +619,12 @@ func (d *DNS) GetExternalIP(walletAddr string) (string, error) {
 		if len(oldHostAddr) > 0 {
 			return oldHostAddr, nil
 		}
-		return "", dspErr.New(dspErr.DNS_REQ_TRACKER_ERROR, "request tracker result is nil : %v", result)
+		hostAddrFromChain, err := d.GetDNSHostAddrFromChain(walletAddr)
+		if err != nil {
+			return "", dspErr.New(dspErr.DNS_REQ_TRACKER_ERROR, "request tracker result is nil : %v", result)
+		}
+		log.Debugf("get host addr %s of %s from chain", walletAddr, hostAddrFromChain)
+		result = hostAddrFromChain
 	}
 	hostAddrStr, ok := result.(string)
 	if !ok {
@@ -644,6 +639,18 @@ func (d *DNS) GetExternalIP(walletAddr string) (string, error) {
 		UpdatedAt: utils.GetMilliSecTimestamp(),
 	})
 	return hostAddrStr, nil
+}
+
+func (d *DNS) GetDNSHostAddrFromChain(walletAddr string) (string, error) {
+	walletAddress, err := chaincom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return "", err
+	}
+	info, err := d.Chain.GetDnsNodeByAddr(walletAddress)
+	if err != nil {
+		return "", err
+	}
+	return utils.FullHostAddr(fmt.Sprintf("%s:%s", info.IP, info.Port), d.channelProtocol), nil
 }
 
 // requestTrackers. request trackers parallel

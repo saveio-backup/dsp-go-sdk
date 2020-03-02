@@ -435,7 +435,7 @@ func (this *TaskMgr) CloseShareNotification() {
 	this.shareNoticeCh = nil
 }
 
-func (this *TaskMgr) NewWorkers(taskId string, addrToWalletMap map[string]string, inOrder bool, job jobFunc) {
+func (this *TaskMgr) NewWorkers(taskId string, walletAddrs []string, inOrder bool, job jobFunc) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return
@@ -445,7 +445,7 @@ func (this *TaskMgr) NewWorkers(taskId string, addrToWalletMap map[string]string
 		log.Errorf("[TaskMgr NewWorkers] set task inOrder failed, err: %s", err)
 		return
 	}
-	v.NewWorkers(addrToWalletMap, job)
+	v.NewWorkers(walletAddrs, job)
 }
 
 func (this *TaskMgr) SetWorkerUnpaid(taskId, worker string, unpaid bool) {
@@ -569,10 +569,10 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 			}
 			if len(flights) > 0 {
 				log.Debugf("add flight %s-%s to %s-%s, worker %s",
-					fileHash, flights[0], fileHash, flights[len(flights)-1], worker.RemoteAddress())
+					fileHash, flights[0], fileHash, flights[len(flights)-1], worker.WalletAddr())
 			}
 			tsk.DelBlockReqFromPool(req)
-			tsk.SetWorkerWorking(worker.remoteAddr, true)
+			tsk.SetWorkerWorking(worker.walletAddr, true)
 			jobCh <- &job{
 				req:       req,
 				flightKey: flights,
@@ -602,7 +602,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					if resp.err != nil {
 						flightMap.Delete(v)
 						// remove the request from flight
-						log.Errorf("worker %s do job err continue %s", resp.worker.remoteAddr, resp.err)
+						log.Errorf("worker %s do job err continue %s", resp.worker.walletAddr, resp.err)
 						continue
 					}
 					blockCache.Store(v, resp.ret[k])
@@ -618,7 +618,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				if len(resp.flightKey) > 0 {
 					log.Debugf("store flight from %s to %s from peer %s",
-						resp.flightKey[0], resp.flightKey[len(resp.flightKey)-1], resp.worker.remoteAddr)
+						resp.flightKey[0], resp.flightKey[len(resp.flightKey)-1], resp.worker.walletAddr)
 				}
 				// notify outside
 				if inOrder {
@@ -697,25 +697,24 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				log.Debugf("start request block %s-%s-%d to %s-%d to %s, peer wallet: %s",
 					fileHash, job.req[0].Hash, job.req[0].Index, job.req[len(job.req)-1].Hash,
-					job.req[len(job.req)-1].Index, job.worker.RemoteAddress(), job.worker.WalletAddr())
-				ret, err := job.worker.Do(taskId, fileHash, job.worker.RemoteAddress(),
-					job.worker.WalletAddr(), flights)
-				tsk.SetWorkerWorking(job.worker.remoteAddr, false)
+					job.req[len(job.req)-1].Index, job.worker.WalletAddr(), job.worker.WalletAddr())
+				ret, err := job.worker.Do(taskId, fileHash, job.worker.WalletAddr(), flights)
+				tsk.SetWorkerWorking(job.worker.walletAddr, false)
 				if err != nil {
 					if derr, ok := err.(*dspErr.Error); ok && derr.Code == dspErr.PAY_UNPAID_BLOCK_FAILED {
 						log.Errorf("request blocks paid failed %v from %s, err %s",
-							job.req, job.worker.remoteAddr, err)
+							job.req, job.worker.walletAddr, err)
 					} else {
 					}
 					if len(job.req) > 0 {
 						log.Errorf("request blocks %s of %s to %s from %s, err %s",
-							fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.remoteAddr, err)
+							fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.walletAddr, err)
 					} else {
-						log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.remoteAddr, err)
+						log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.walletAddr, err)
 					}
 				} else {
 					log.Debugf("request blocks %s-%s to %s from %s success",
-						fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.remoteAddr)
+						fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.walletAddr)
 				}
 				stop := atomic.LoadUint32(&dropDoneCh) > 0
 				if stop {
@@ -980,23 +979,23 @@ func (this *TaskMgr) GetTaskWorkerIdleDuration(taskId, peerAddr string) (uint64,
 }
 
 // IsWorkerBusy. check if the worker is busy in 1 min, or net phase not equal to expected phase
-func (this *TaskMgr) IsWorkerBusy(taskId, peerAddr string, excludePhase int) bool {
+func (this *TaskMgr) IsWorkerBusy(taskId, walletAddr string, excludePhase int) bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	for id, t := range this.tasks {
 		if id == taskId {
 			continue
 		}
-		phase := t.GetWorkerNetPhase(peerAddr)
+		phase := t.GetWorkerNetPhase(walletAddr)
 		if phase == excludePhase {
-			log.Debugf("%s included phase %d", peerAddr, excludePhase)
+			log.Debugf("%s included phase %d", walletAddr, excludePhase)
 			return true
 		}
-		if !t.HasWorker(peerAddr) {
+		if !t.HasWorker(walletAddr) {
 			continue
 		}
-		if t.WorkerIdleDuration(peerAddr) > 0 && t.WorkerIdleDuration(peerAddr) < 60*1000 {
-			log.Debugf("%s is active", peerAddr)
+		if t.WorkerIdleDuration(walletAddr) > 0 && t.WorkerIdleDuration(walletAddr) < 60*1000 {
+			log.Debugf("%s is active", walletAddr)
 			return true
 		}
 	}

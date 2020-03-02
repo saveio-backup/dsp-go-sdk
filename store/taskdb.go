@@ -73,65 +73,65 @@ type WhiteList struct {
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type TaskInfo struct {
-	Id                 string            `json:"id"`                               // task id
-	Index              uint32            `json:"index"`                            // task index
-	FileHash           string            `json:"file_hash"`                        // file hash
-	BlocksRoot         string            `json:"blocks_root"`                      // blocks hash root
-	FileName           string            `json:"file_name"`                        // file name
-	FileDesc           string            `json:"file_desc,omitempty"`              // file desc
-	FilePath           string            `json:"file_path"`                        // file absolute path
-	FileOwner          string            `json:"file_owner"`                       // file owner wallet address
-	SimpleChecksum     string            `json:"simple_checksum,omitempty"`        // hash of first 128 KB and last 128 KB from file content
-	WalletAddress      string            `json:"wallet_address"`                   // task belong to
-	CopyNum            uint32            `json:"copy_num,omitempty"`               // copy num
-	Type               TaskType          `json:"file_info_type"`                   // task type
-	StoreTx            string            `json:"store_tx"`                         // store tx hash
-	StoreTxHeight      uint32            `json:"store_tx_height"`                  // store tx height
-	RegisterDNSTx      string            `json:"register_dns_tx,omitempty"`        // register dns tx
-	BindDNSTx          string            `json:"bind_dns_tx,omitempty"`            // bind dns tx
-	WhitelistTx        string            `json:"whitelist_tx,omitempty"`           // first op whitelist tx
-	TotalBlockCount    uint64            `json:"total_block_count"`                // total block count
-	TaskState          TaskState         `json:"task_state"`                       // task state
-	ProvePrivKey       []byte            `json:"prove_private_key,omitempty"`      // prove private key params
-	Prefix             []byte            `json:"prefix"`                           // file prefix
-	EncryptHash        string            `json:"encrypt_hash,omitempty"`           // encrypt hash
-	EncryptSalt        string            `json:"encrypt_salt,omitempty"`           // encrypt salt
-	Url                string            `json:"url"`                              // url
-	Link               string            `json:"link"`                             // url <=> link
-	CurrentBlock       string            `json:"current_block_hash,omitempty"`     // current transferred block
-	CurrentIndex       uint64            `json:"current_block_index,omitempty"`    // current transferred block index
-	StoreType          uint32            `json:"store_type"`                       // store type
-	InOrder            bool              `json:"in_order,omitempty"`               // is in order
-	OnlyBlock          bool              `json:"only_block,omitempty"`             // send only raw block data
-	TranferState       uint32            `json:"transfer_state"`                   // transfer state
-	ReferId            string            `json:"refer_id,omitempty"`               // refer task id
-	PrimaryNodes       []string          `json:"primary_nodes,omitempty"`          // primary nodes wallet address
-	PrimaryHostAddrs   map[string]string `json:"primary_node_hosts,omitempty"`     // primary nodes wallet address <=> host addrs
-	CandidateNodes     []string          `json:"candidate_nodes,omitempty"`        // candidate nodes wallet address
-	CandidateHostAddrs map[string]string `json:"candidate_node_hosts,omitempty"`   // candidate nodes wallet address <=> host addrs
-	CreatedAt          uint64            `json:"createdAt"`                        // createAt, unit ms
-	CreatedAtHeight    uint32            `json:"createdAt_block_height,omitempty"` // created at block height
-	UpdatedAt          uint64            `json:"updatedAt"`                        // updatedAt, unit ms
-	UpdatedAtHeight    uint32            `json:"updatedAt_block_height,omitempty"` // updatedAt block height
-	ExpiredHeight      uint64            `json:"expired_block_height,omitempty"`   // expiredAt block height
-	Asset              int32             `json:"asset,omitempty"`                  // download task pay asset
-	DecryptPwd         string            `json:"decrypt_pwd,omitempty"`            // download task with decrypt pwd
-	Free               bool              `json:"free,omitempty"`                   // download task with free opts
-	SetFileName        bool              `json:"set_file_name,omitempty"`          // download task with set file name
-	MaxPeerCnt         int               `json:"max_peer_count,omitempty"`         // download task with max peer count to download
-	RealFileSize       uint64            `json:"real_file_size"`                   // real file size in KB
-	FileSize           uint64            `json:"file_size"`                        // real file size in block
-	ProveInterval      uint64            `json:"prove_interval,omitempty"`         // prove interval
-	Privilege          uint64            `json:"privilege,omitempty"`              // file privilege
-	Encrypt            bool              `json:"encrypt,omitempty"`                // encrypt or not
-	EncryptPassword    []byte            `json:"encrypt_pwd,omitempty"`            // encrypted pwd
-	RegisterDNS        bool              `json:"register_dns,omitempty"`           // register dns or not
-	BindDNS            bool              `json:"bind_dns,omitempty"`               // bind dns or not
-	WhiteList          []*WhiteList      `json:"white_list,omitempty"`             // white list
-	Share              bool              `json:"share,omitempty"`                  // share or not
-	ErrorCode          uint32            `json:"error_code,omitempty"`             // error code
-	ErrorMsg           string            `json:"error_msg,omitempty"`              // error msg
-	Result             interface{}       `json:"result"`                           // task complete result
+	Id              string            `json:"id"`                               // task id
+	Index           uint32            `json:"index"`                            // task index
+	FileHash        string            `json:"file_hash"`                        // file hash
+	BlocksRoot      string            `json:"blocks_root"`                      // blocks hash root
+	FileName        string            `json:"file_name"`                        // file name
+	FileDesc        string            `json:"file_desc,omitempty"`              // file desc
+	FilePath        string            `json:"file_path"`                        // file absolute path
+	FileOwner       string            `json:"file_owner"`                       // file owner wallet address
+	SimpleChecksum  string            `json:"simple_checksum,omitempty"`        // hash of first 128 KB and last 128 KB from file content
+	WalletAddress   string            `json:"wallet_address"`                   // task belong to
+	CopyNum         uint32            `json:"copy_num,omitempty"`               // copy num
+	Type            TaskType          `json:"file_info_type"`                   // task type
+	StoreTx         string            `json:"store_tx"`                         // store tx hash
+	StoreTxHeight   uint32            `json:"store_tx_height"`                  // store tx height
+	RegisterDNSTx   string            `json:"register_dns_tx,omitempty"`        // register dns tx
+	BindDNSTx       string            `json:"bind_dns_tx,omitempty"`            // bind dns tx
+	WhitelistTx     string            `json:"whitelist_tx,omitempty"`           // first op whitelist tx
+	TotalBlockCount uint64            `json:"total_block_count"`                // total block count
+	TaskState       TaskState         `json:"task_state"`                       // task state
+	ProvePrivKey    []byte            `json:"prove_private_key,omitempty"`      // prove private key params
+	ProveParams     []byte            `json:"prove_params,omitempty"`           // pdp prove params
+	Prefix          []byte            `json:"prefix"`                           // file prefix
+	EncryptHash     string            `json:"encrypt_hash,omitempty"`           // encrypt hash
+	EncryptSalt     string            `json:"encrypt_salt,omitempty"`           // encrypt salt
+	Url             string            `json:"url"`                              // url
+	Link            string            `json:"link"`                             // url <=> link
+	CurrentBlock    string            `json:"current_block_hash,omitempty"`     // current transferred block
+	CurrentIndex    uint64            `json:"current_block_index,omitempty"`    // current transferred block index
+	StoreType       uint32            `json:"store_type"`                       // store type
+	InOrder         bool              `json:"in_order,omitempty"`               // is in order
+	OnlyBlock       bool              `json:"only_block,omitempty"`             // send only raw block data
+	TranferState    uint32            `json:"transfer_state"`                   // transfer state
+	ReferId         string            `json:"refer_id,omitempty"`               // refer task id
+	PrimaryNodes    []string          `json:"primary_nodes,omitempty"`          // primary nodes wallet address
+	CandidateNodes  []string          `json:"candidate_nodes,omitempty"`        // candidate nodes wallet address
+	NodeHostAddrs   map[string]string `json:"node_host_addrs,omitempty"`        //  nodes wallet address <=> host addrs
+	CreatedAt       uint64            `json:"createdAt"`                        // createAt, unit ms
+	CreatedAtHeight uint32            `json:"createdAt_block_height,omitempty"` // created at block height
+	UpdatedAt       uint64            `json:"updatedAt"`                        // updatedAt, unit ms
+	UpdatedAtHeight uint32            `json:"updatedAt_block_height,omitempty"` // updatedAt block height
+	ExpiredHeight   uint64            `json:"expired_block_height,omitempty"`   // expiredAt block height
+	Asset           int32             `json:"asset,omitempty"`                  // download task pay asset
+	DecryptPwd      string            `json:"decrypt_pwd,omitempty"`            // download task with decrypt pwd
+	Free            bool              `json:"free,omitempty"`                   // download task with free opts
+	SetFileName     bool              `json:"set_file_name,omitempty"`          // download task with set file name
+	MaxPeerCnt      int               `json:"max_peer_count,omitempty"`         // download task with max peer count to download
+	RealFileSize    uint64            `json:"real_file_size"`                   // real file size in KB
+	FileSize        uint64            `json:"file_size"`                        // real file size in block
+	ProveInterval   uint64            `json:"prove_interval,omitempty"`         // prove interval
+	Privilege       uint64            `json:"privilege,omitempty"`              // file privilege
+	Encrypt         bool              `json:"encrypt,omitempty"`                // encrypt or not
+	EncryptPassword []byte            `json:"encrypt_pwd,omitempty"`            // encrypted pwd
+	RegisterDNS     bool              `json:"register_dns,omitempty"`           // register dns or not
+	BindDNS         bool              `json:"bind_dns,omitempty"`               // bind dns or not
+	WhiteList       []*WhiteList      `json:"white_list,omitempty"`             // white list
+	Share           bool              `json:"share,omitempty"`                  // share or not
+	ErrorCode       uint32            `json:"error_code,omitempty"`             // error code
+	ErrorMsg        string            `json:"error_msg,omitempty"`              // error msg
+	Result          interface{}       `json:"result"`                           // task complete result
 }
 
 type FileProgress struct {
@@ -1452,7 +1452,7 @@ func (this *TaskDB) GetFileSessions(fileInfoId string) (map[string]*Session, err
 		if err != nil {
 			continue
 		}
-		res[session.HostAddr] = session
+		res[session.WalletAddr] = session
 	}
 	return res, nil
 }

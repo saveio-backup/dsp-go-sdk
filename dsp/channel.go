@@ -46,10 +46,6 @@ func (this *Dsp) NetworkProtocol() string {
 	return this.channel.NetworkProtocol()
 }
 
-func (this *Dsp) GetHostAddr(walletAddr string) (string, error) {
-	return this.channel.GetHostAddr(walletAddr)
-}
-
 func (this *Dsp) StartService() error {
 	return this.channel.StartService()
 }
@@ -119,10 +115,7 @@ func (this *Dsp) OpenChannel(targetAddress string, depositAmount uint64) (common
 	if info == nil {
 		return chId, nil
 	}
-	hostAddr, _ := this.GetExternalIP(targetAddress)
-	if len(hostAddr) > 0 {
-		client.P2pAppendAddrForHealthCheck(hostAddr, client.P2pNetTypeChannel)
-	}
+	client.P2pAppendAddrForHealthCheck(targetAddress, client.P2pNetTypeChannel)
 	return chId, nil
 }
 

@@ -46,6 +46,7 @@ type ProgressInfo struct {
 	Total         uint64                        // total file's blocks count
 	Progress      map[string]store.FileProgress // address <=> progress
 	SlaveProgress map[string]store.FileProgress // progress for slave nodes
+	NodeHostAddrs map[string]string             // node host addrs map
 	TaskState     store.TaskState               // task state
 	ProgressState TaskProgressState             // TaskProgressState
 	Result        interface{}                   // finish result
@@ -108,7 +109,7 @@ type Task struct {
 	lastWorkerIdx       int                          // last worker index
 	batch               bool                         // flag of batch set
 	db                  *store.TaskDB                // db
-	workerNetPhase      map[string]int               // network msg interact phase, used to check msg transaction, host addr <=> phase
+	workerNetPhase      map[string]int               // network msg interact phase, used to check msg transaction, wallet addr <=> phase
 }
 
 // NewTask. new task for file, and set the task info to DB.
@@ -700,6 +701,7 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 		FileSize:      this.info.FileSize,
 		RealFileSize:  this.info.RealFileSize,
 		Progress:      this.db.FileProgress(this.id),
+		NodeHostAddrs: this.info.NodeHostAddrs,
 		TaskState:     store.TaskState(this.info.TaskState),
 		ProgressState: TaskProgressState(this.info.TranferState),
 		CreatedAt:     this.info.CreatedAt / common.MILLISECOND_PER_SECOND,
@@ -717,7 +719,7 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 	if len(this.info.PrimaryNodes) == 0 {
 		return pInfo
 	}
-	masterNode := this.info.PrimaryHostAddrs[this.info.PrimaryNodes[0]]
+	masterNode := this.info.PrimaryNodes[0]
 	if len(masterNode) == 0 {
 		return pInfo
 	}
@@ -860,39 +862,39 @@ func (this *Task) GetCopyNum() uint32 {
 	return this.info.CopyNum
 }
 
-func (this *Task) NewWorkers(addrs map[string]string, job jobFunc) {
+func (this *Task) NewWorkers(addrs []string, job jobFunc) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if this.workers == nil {
 		this.workers = make(map[string]*Worker, 0)
 	}
-	for addr, walletAddr := range addrs {
-		w := NewWorker(addr, walletAddr, job)
-		this.workers[addr] = w
+	for _, walletAddr := range addrs {
+		w := NewWorker(walletAddr, job)
+		this.workers[walletAddr] = w
 	}
 }
 
-func (this *Task) SetWorkerWorking(remoteAddr string, working bool) {
+func (this *Task) SetWorkerWorking(walletAddr string, working bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	w, ok := this.workers[remoteAddr]
+	w, ok := this.workers[walletAddr]
 	if !ok {
-		log.Warnf("set remote peer %s working failed, peer not found", remoteAddr)
+		log.Warnf("set remote peer %s working failed, peer not found", walletAddr)
 		return
 	}
-	log.Debugf("set peer %s working %s", remoteAddr, working)
+	log.Debugf("set peer %s working %s", walletAddr, working)
 	w.SetWorking(working)
 }
 
-func (this *Task) SetWorkerUnPaid(remoteAddr string, unpaid bool) {
+func (this *Task) SetWorkerUnPaid(walletAddr string, unpaid bool) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	w, ok := this.workers[remoteAddr]
+	w, ok := this.workers[walletAddr]
 	if !ok {
-		log.Warnf("set remote peer %s unpaid failed, peer not found", remoteAddr)
+		log.Warnf("set remote peer %s unpaid failed, peer not found", walletAddr)
 		return
 	}
-	log.Debugf("set peer %s unpaid %s", remoteAddr, unpaid)
+	log.Debugf("set peer %s unpaid %s", walletAddr, unpaid)
 	w.SetUnpaid(unpaid)
 }
 
@@ -1063,7 +1065,7 @@ func (this *Task) IsTimeout() bool {
 	now := utils.GetMilliSecTimestamp()
 	for _, w := range this.workers {
 		if now-w.ActiveTime() < timeout {
-			log.Debugf("worker active time %s %d", w.RemoteAddress(), w.ActiveTime())
+			log.Debugf("worker active time %s %d", w.WalletAddr(), w.ActiveTime())
 			return false
 		}
 	}

@@ -1213,3 +1213,33 @@ func TestGetNodelist(t *testing.T) {
 	}
 
 }
+
+func TestGetDNSNodeInfo(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddrs: []string{"http://127.0.0.1:20336"},
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc, nil)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+
+	walletAddr, err := chainCom.AddressFromBase58("AaH1pqFW3YskUDwpg7XqrqxgviBb57JyK1")
+	if err != nil {
+
+	}
+	info, err := d.chain.GetDnsNodeByAddr(walletAddr)
+	if err != nil {
+
+	}
+	fmt.Printf("host %s:%s\n", info.IP, info.Port)
+
+}

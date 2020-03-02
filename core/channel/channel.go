@@ -56,7 +56,7 @@ type ChannelInfosResp struct {
 	Channels      []*channelInfo
 }
 
-func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallBack func(chaincomm.Address) (string, error)) (*Channel, error) {
+func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error) {
 	if cfg == nil {
 		cfg = config.DefaultDspConfig()
 	}
@@ -82,13 +82,6 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain, getHostAddrCallB
 	if err != nil {
 		return nil, dspErr.NewWithError(dspErr.CHANNEL_CREATE_ACTOR_ERROR, err)
 	}
-	hostAddrCallBack := func(addr common.Address) (string, error) {
-		return getHostAddrCallBack(chaincomm.Address(addr))
-	}
-	err = ch_actor.SetGetHostAddrCallback(hostAddrCallBack)
-	if err != nil {
-		return nil, dspErr.NewWithError(dspErr.CHANNEL_CREATE_DB_ERROR, err)
-	}
 	chnPid := channelActor.GetLocalPID()
 	return &Channel{
 		chActorId:  chnPid,
@@ -108,25 +101,6 @@ func (this *Channel) GetChannelPid() *actor.PID {
 
 func (this *Channel) NetworkProtocol() string {
 	return this.cfg.ChannelProtocol
-}
-
-// SetHostAddr. set host address for wallet
-func (this *Channel) GetHostAddr(walletAddr string) (string, error) {
-	log.Debugf("[dsp-go-sdk-channel] GetHostAddr %s", walletAddr)
-	addr, err := chaincomm.AddressFromBase58(walletAddr)
-	if err != nil {
-		return "", dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
-	}
-	log.Debugf("GetHostAddr %v", walletAddr)
-	host, err := ch_actor.GetHostAddr(common.Address(addr))
-	if err != nil {
-		return "", dspErr.NewWithError(dspErr.DNS_GET_HOSTADDR_ERROR, err)
-	}
-	prefix := this.cfg.ChannelProtocol + "://"
-	if strings.Contains(host, prefix) {
-		return host, nil
-	}
-	return prefix + host, nil
 }
 
 // StartService. start channel service

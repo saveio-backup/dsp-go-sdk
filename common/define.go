@@ -21,7 +21,6 @@ type PayStoreFileResult struct {
 	ParamsBuf            []byte           // PDP params buffer
 	PrivateKey           []byte           // PDP verify private key
 	MasterNodeWalletAddr chainCom.Address // master node wallet addr
-	MasterNodeHostAddr   string           // Master node
 }
 
 type PayInfo struct {

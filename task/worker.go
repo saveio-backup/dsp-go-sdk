@@ -8,13 +8,12 @@ import (
 	"github.com/saveio/dsp-go-sdk/utils"
 )
 
-type jobFunc func(string, string, string, string, []*block.Block) ([]*BlockResp, error)
+type jobFunc func(string, string, string, []*block.Block) ([]*BlockResp, error)
 
 type Worker struct {
 	id          string            // worker network peer id
 	activeTime  uint64            // worker active timestamp, millisecond
 	lock        *sync.RWMutex     // lock for private variables
-	remoteAddr  string            // worker remote host addr
 	walletAddr  string            // worker wallet addr
 	working     bool              // flag of working or not of worker
 	job         jobFunc           // job callback function
@@ -23,9 +22,8 @@ type Worker struct {
 	totalFailed map[string]uint32 // map fileHash <=> all request failed count
 }
 
-func NewWorker(addr, walletAddr string, j jobFunc) *Worker {
+func NewWorker(walletAddr string, j jobFunc) *Worker {
 	w := &Worker{
-		remoteAddr:  addr,
 		walletAddr:  walletAddr,
 		job:         j,
 		failed:      make(map[string]int, 0),
@@ -40,9 +38,9 @@ func (w *Worker) SetID(id string) {
 	w.id = id
 }
 
-func (w *Worker) Do(taskId, fileHash, peerAddr, walletAddr string, blocks []*block.Block) ([]*BlockResp, error) {
+func (w *Worker) Do(taskId, fileHash, walletAddr string, blocks []*block.Block) ([]*BlockResp, error) {
 	w.working = true
-	resp, err := w.job(taskId, fileHash, peerAddr, walletAddr, blocks)
+	resp, err := w.job(taskId, fileHash, walletAddr, blocks)
 	if err != nil {
 		if len(blocks) > 0 {
 			blockHash := blocks[0].Hash
@@ -55,10 +53,6 @@ func (w *Worker) Do(taskId, fileHash, peerAddr, walletAddr string, blocks []*blo
 	}
 	w.working = false
 	return resp, err
-}
-
-func (w *Worker) RemoteAddress() string {
-	return w.remoteAddr
 }
 
 func (w *Worker) WalletAddr() string {

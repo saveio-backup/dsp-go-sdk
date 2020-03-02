@@ -2,11 +2,13 @@ package utils
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/saveio/carrier/crypto"
 	"github.com/saveio/carrier/crypto/ed25519"
 	"github.com/saveio/themis-go-sdk/utils"
+	"github.com/saveio/themis/account"
 	"github.com/saveio/themis/core/types"
 	"github.com/saveio/themis/crypto/keypair"
 )
@@ -27,6 +29,28 @@ func (this accountReader) Read(buf []byte) (int, error) {
 		buf[i] = 0
 	}
 	return len(buf), nil
+}
+
+func NewNetworkKeyPairWithAccount(acc *account.Account) *crypto.KeyPair {
+	pub := keypair.SerializePublicKey(acc.PubKey())
+	priv := keypair.SerializePrivateKey(acc.PrivKey())
+	return &crypto.KeyPair{
+		PublicKey:  pub,
+		PrivateKey: priv,
+	}
+}
+
+func AddressFromPubkeyHex(pubKeyHex string) string {
+	pubKeyBuf, err := hex.DecodeString(pubKeyHex)
+	if err != nil {
+		return pubKeyHex
+	}
+	pubK, err := keypair.DeserializePublicKey(pubKeyBuf)
+	if err != nil {
+		return pubKeyHex
+	}
+	addr := types.AddressFromPubKey(pubK)
+	return addr.ToBase58()
 }
 
 func NewNetworkEd25519KeyPair(pubKey, salt []byte) *crypto.KeyPair {
