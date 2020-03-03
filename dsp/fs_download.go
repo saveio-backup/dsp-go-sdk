@@ -1555,7 +1555,7 @@ func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, peerWalletAddr string
 	}
 	for i := uint32(0); i < retry; i++ {
 		state, _ := this.taskMgr.GetTaskState(taskId)
-		log.Debugf("send download block flights msg sessionId %s of %s from %s, retry %d,"+
+		log.Debugf("send download block flights msg sessionId %s of %s retry %d,"+
 			" msgId %s, timeStamp %d, state %d",
 			sessionId, fileHashStr, i, msg.MessageId, timeStamp, state)
 		this.taskMgr.ActiveDownloadTaskPeer(peerWalletAddr)

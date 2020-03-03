@@ -882,7 +882,7 @@ func (this *Task) SetWorkerWorking(walletAddr string, working bool) {
 		log.Warnf("set remote peer %s working failed, peer not found", walletAddr)
 		return
 	}
-	log.Debugf("set peer %s working %s", walletAddr, working)
+	log.Debugf("set peer %s working %t", walletAddr, working)
 	w.SetWorking(working)
 }
 

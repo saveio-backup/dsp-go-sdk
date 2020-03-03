@@ -210,17 +210,17 @@ func (this *Dsp) StartSeedService() {
 	tick := time.NewTicker(time.Duration(this.config.SeedInterval) * time.Second)
 	defer tick.Stop()
 	for {
+		_, files, err := this.taskMgr.AllDownloadFiles()
+		if err != nil {
+			continue
+		}
+		this.dns.PushFilesToTrackers(files)
 		select {
 		case <-tick.C:
 			if !this.Running() {
 				log.Debugf("stop seed service")
 				return
 			}
-			_, files, err := this.taskMgr.AllDownloadFiles()
-			if err != nil {
-				continue
-			}
-			this.dns.PushFilesToTrackers(files)
 		}
 	}
 }
