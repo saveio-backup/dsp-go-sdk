@@ -106,6 +106,11 @@ func (this *Dsp) CloseProgressChannel() {
 	this.taskMgr.CloseProgressCh()
 }
 
+func (this *Dsp) GetTaskInfo(id string) *store.TaskInfo {
+	tsk, _ := this.taskMgr.GetTaskInfoCopy(id)
+	return tsk
+}
+
 func (this *Dsp) GetTaskFileName(id string) string {
 	fileName, _ := this.taskMgr.GetTaskFileName(id)
 	return fileName

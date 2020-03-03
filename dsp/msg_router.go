@@ -282,6 +282,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 		task.BlocksRoot(fileMsg.BlocksRoot),
 		task.Prefix(string(fileMsg.Prefix)),
 		task.Walletaddr(this.chain.WalletAddress()),
+		task.Privilege(info.Privilege),
 		task.FileOwner(info.FileOwner.ToBase58()),
 		task.StoreTx(fileMsg.Tx.Hash),
 		task.StoreTxHeight(uint32(fileMsg.Tx.Height)),

@@ -521,7 +521,7 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string, gasLimit uint64) ([]*comm
 			nodesFromTsk := utils.Base58ToWalletAddrs(this.taskMgr.GetUploadedBlockNodeList(taskId, fileHashStr, 0))
 			host, err := this.chain.GetNodeHostAddrListByWallets(nodesFromTsk)
 			if err != nil {
-				continue
+				log.Errorf("get nodes empty from wallets %v", nodesFromTsk)
 			}
 			storingNode = append(storingNode, host...)
 			log.Debugf("storingNode: %v", storingNode)

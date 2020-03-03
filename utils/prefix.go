@@ -120,6 +120,9 @@ func (p *FilePrefix) Serialize() []byte {
 
 func (p *FilePrefix) Deserialize(base64Buf []byte) error {
 	encodeSizeLen := base64.StdEncoding.EncodedLen(PAYLOAD_SIZE_LEN)
+	if len(base64Buf) < encodeSizeLen {
+		return nil
+	}
 	payloadSizeBuf := make([]byte, encodeSizeLen)
 	_, err := base64.StdEncoding.Decode(payloadSizeBuf, base64Buf[:encodeSizeLen])
 	if err != nil {
