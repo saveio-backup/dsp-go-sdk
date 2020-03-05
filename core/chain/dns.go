@@ -42,6 +42,15 @@ func (this *Chain) BindUrl(urlType uint64, url string, name, desc string, ttl ui
 	return tx, nil
 }
 
+func (this *Chain) DeleteUrl(url string) (string, error) {
+	txHash, err := this.themis.Native.Dns.DeleteUrl(url)
+	if err != nil {
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	return tx, nil
+}
+
 func (this *Chain) QueryUrl(url string, ownerAddr chainCom.Address) (*dns.NameInfo, error) {
 	info, err := this.themis.Native.Dns.QueryUrl(url, ownerAddr)
 	if err != nil {

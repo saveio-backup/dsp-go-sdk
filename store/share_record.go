@@ -121,14 +121,15 @@ func (s ShareRecords) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-// // FineShareRecordsByCreatedAt. find miner record by createdat interval
-func (this *ShareRecordDB) FineShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit int64) ([]*ShareRecord, error) {
+// FindShareRecordsByCreatedAt. find miner record by createdat interval
+func (this *ShareRecordDB) FindShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit int64) ([]*ShareRecord, int, error) {
 	prefix := []byte(ShareRecordKey(""))
 	keys, err := this.db.QueryStringKeysByPrefix(prefix)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	srs := make(ShareRecords, 0, limit)
+	count := 0
 	for _, k := range keys {
 		sr := &ShareRecord{}
 		data, _ := this.db.Get([]byte(k))
@@ -142,17 +143,18 @@ func (this *ShareRecordDB) FineShareRecordsByCreatedAt(beginedAt, endedAt, offse
 		if sr.CreatedAt < uint64(beginedAt) || sr.CreatedAt > uint64(endedAt) {
 			continue
 		}
+		count++
 		srs = append(srs, sr)
 	}
 	sort.Sort(sort.Reverse(srs))
 	if limit == 0 {
-		return srs[offset:], nil
+		return srs[offset:], count, nil
 	}
 	end := offset + limit
 	if end > int64(len(srs)) {
 		end = int64(len(srs))
 	}
-	return srs[offset:end], nil
+	return srs[offset:end], count, nil
 }
 
 func (this *ShareRecordDB) FindLastShareTime(fileHash string) (uint64, error) {

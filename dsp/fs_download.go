@@ -59,12 +59,12 @@ func (this *Dsp) FindShareRecordById(id string) (*store.ShareRecord, error) {
 	}
 	return this.shareRecordDB.FindShareRecordById(id)
 }
-func (this *Dsp) FineShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit int64) (
-	[]*store.ShareRecord, error) {
+func (this *Dsp) FindShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit int64) (
+	[]*store.ShareRecord, int, error) {
 	if this.shareRecordDB == nil {
-		return nil, nil
+		return nil, 0, nil
 	}
-	return this.shareRecordDB.FineShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit)
+	return this.shareRecordDB.FindShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit)
 }
 func (this *Dsp) FindLastShareTime(fileHash string) (uint64, error) {
 	if this.shareRecordDB == nil {

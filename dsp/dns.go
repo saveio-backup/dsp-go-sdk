@@ -63,6 +63,10 @@ func (this *Dsp) BindFileUrl(url, link string) (string, error) {
 	return this.dns.BindFileUrl(url, link)
 }
 
+func (this *Dsp) DeleteFileUrl(url string) (string, error) {
+	return this.dns.DeleteFileUrl(url)
+}
+
 func (this *Dsp) GenLink(fileHashStr, fileName, blocksRoot, fileOwner string, fileSize, totalCount uint64) string {
 	return utils.GenOniLinkJSONString(&utils.URLLink{
 		FileHashStr: fileHashStr,

@@ -871,25 +871,6 @@ func TestGetAllDNSNodes(t *testing.T) {
 
 }
 
-func TestRegEndpoint(t *testing.T) {
-	dspCfg := &config.DspConfig{
-		ChainRpcAddr: rpcAddr,
-	}
-	d := NewDsp(dspCfg, nil, nil)
-	d.dns.TrackerUrls = []string{"udp://127.0.0.1:6369/announce"}
-	addr, err := chainCom.AddressFromBase58("ARH2cGhdhZgMm69XcVVBNjAbEjxvX4ywpV")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = d.RegNodeEndpoint(addr, "tcp://127.0.0.1:10000")
-	fmt.Printf("reg err %s\n", err)
-	if err != nil {
-		t.Fatal(err)
-	}
-	addrStr, _ := d.GetExternalIP(addr.ToBase58())
-	fmt.Printf("addr %s, len:%d\n", addrStr, len(addrStr))
-}
-
 func TestGetPublicIPFromDNS(t *testing.T) {
 	d := &Dsp{}
 	dspCfg := &config.DspConfig{

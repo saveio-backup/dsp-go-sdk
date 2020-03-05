@@ -442,6 +442,22 @@ func (d *DNS) RegisterFileUrl(url, link string) (string, error) {
 	return tx, nil
 }
 
+func (d *DNS) DeleteFileUrl(url string) (string, error) {
+	urlPrefix := common.FILE_URL_CUSTOM_HEADER
+	if !strings.HasPrefix(url, urlPrefix) && !strings.HasPrefix(url, common.FILE_URL_CUSTOM_HEADER_PROTOCOL) {
+		return "", dspErr.New(dspErr.INTERNAL_ERROR, "url should start with %s", urlPrefix)
+	}
+	tx, err := d.Chain.DeleteUrl(url)
+	if err != nil {
+		return "", err
+	}
+	height, err := d.Chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, tx)
+	if err != nil || height == 0 {
+		return "", dspErr.New(dspErr.CHAIN_ERROR, "tx confirm err %s", err)
+	}
+	return tx, nil
+}
+
 func (d *DNS) BindFileUrl(url, link string) (string, error) {
 	tx, err := d.Chain.BindUrl(uint64(dns.NameTypeNormal), url, link, link, common.FILE_DNS_TTL)
 	if err != nil {
