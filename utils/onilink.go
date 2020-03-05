@@ -14,6 +14,16 @@ import (
 const PLUGIN_URLVERSION_SPLIT = "#PV#"
 const PLUGIN_URLVERSION_CHANGELOG_PREFIX = "#CL#"
 
+type ChangeLog struct {
+	ZH string
+	EN string
+}
+
+func (c *ChangeLog) String() string {
+	data, _ := json.Marshal(c)
+	return string(data)
+}
+
 type URLVERSION struct {
 	Type      uint64
 	Url       string
@@ -22,7 +32,7 @@ type URLVERSION struct {
 	Img       string
 	Title     string
 	Platform  int
-	ChangeLog string
+	ChangeLog ChangeLog
 }
 
 type UrlVersionType int
