@@ -4,7 +4,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/core/dns"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/utils"
-	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -94,10 +93,6 @@ func (this *Dsp) GetFileHashFromUrl(url string) string {
 
 func (this *Dsp) GetLinkValues(link string) (*utils.URLLink, error) {
 	return this.dns.GetLinkValues(link)
-}
-
-func (this *Dsp) RegNodeEndpoint(walletAddr chainCom.Address, endpointAddr string) error {
-	return this.dns.RegNodeEndpoint(walletAddr, endpointAddr)
 }
 
 func (this *Dsp) GetExternalIP(walletAddr string) (string, error) {

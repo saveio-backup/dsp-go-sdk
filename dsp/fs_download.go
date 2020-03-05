@@ -374,6 +374,7 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 	if sessions != nil {
 		// use original sessions
 		log.Debugf("use original sessions: %v", sessions)
+		oldSessionWg := new(sync.WaitGroup)
 		for _, session := range sessions {
 			peerPayInfos[session.WalletAddr] = &file.Payment{
 				WalletAddress: session.WalletAddr,
@@ -381,7 +382,15 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 				UnitPrice:     session.UnitPrice,
 			}
 			this.taskMgr.SetSessionId(taskInfo.Id, session.WalletAddr, session.SessionId)
+			oldSessionWg.Add(1)
+			go func(sesHostAddr string) {
+				if err := client.P2pConnect(sesHostAddr); err != nil {
+					log.Errorf("connect %s err %s", sesHostAddr, err)
+				}
+				oldSessionWg.Done()
+			}(session.HostAddr)
 		}
+		oldSessionWg.Wait()
 		log.Debugf("get session from db : %v", peerPayInfos)
 		return peerPayInfos, nil
 	}
@@ -800,18 +809,22 @@ func (this *Dsp) DeleteDownloadedFile(taskId string) error {
 // DeleteDownloadedLocalFile. Delete file in local.
 func (this *Dsp) DeleteDownloadedLocalFile(fileHash string) error {
 	taskId, _ := this.taskMgr.GetDownloadedTaskId(fileHash)
+	if len(fileHash) == 0 {
+		return dspErr.New(dspErr.DELETE_FILE_FAILED, "delete filehash is empty")
+	}
 	if len(taskId) == 0 {
 		return dspErr.New(dspErr.DELETE_FILE_FAILED, "delete taskId is empty")
 	}
-	filePath, _ := this.taskMgr.GetFilePath(taskId)
-	fileHashStr, _ := this.taskMgr.GetTaskFileHash(taskId)
-	err := this.fs.DeleteFile(fileHashStr, filePath)
+	tsk, err := this.taskMgr.GetTaskInfoCopy(taskId)
 	if err != nil {
-		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHashStr, filePath, err)
+		return dspErr.NewWithError(dspErr.DELETE_FILE_FAILED, err)
+	}
+	if err := this.fs.DeleteFile(fileHash, tsk.FilePath); err != nil {
+		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHash, tsk.FilePath, err)
 		return err
 	}
-	log.Debugf("delete local file success fileHash:%s, path:%s", fileHashStr, filePath)
-	return nil
+	log.Debugf("delete local file success fileHash:%s, path:%s", fileHash, tsk.FilePath)
+	return this.taskMgr.CleanTask(taskId)
 }
 
 // StartBackupFileService. start a backup file service to find backup jobs.

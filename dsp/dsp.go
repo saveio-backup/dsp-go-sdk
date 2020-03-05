@@ -36,6 +36,7 @@ type Dsp struct {
 	shareRecordDB     *store.ShareRecordDB     // share_record db
 	userspaceRecordDB *store.UserspaceRecordDB // user space db
 	running           bool                     // flag of service status
+	closeCh           chan struct{}            // close signal
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
@@ -82,8 +83,9 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 		if err := d.initChannelService(); err != nil {
 			log.Errorf("init channel err %s", err)
 			// return nil
+		} else {
+			chActorClient.SetP2pPid(p2pActor)
 		}
-		chActorClient.SetP2pPid(p2pActor)
 	}
 	d.dns = dns.NewDNS(d.chain, d.channel,
 		dns.MaxDNSNodeNum(d.config.DnsNodeMaxNum),
@@ -111,16 +113,11 @@ func (this *Dsp) Start() error {
 	if this.config == nil {
 		return nil
 	}
+	this.closeCh = make(chan struct{})
 	if err := this.dns.SetupTrackers(); err != nil {
 		return err
 	}
-	// start dns service
-	if this.channel == nil {
-		if err := this.initChannelService(); err != nil {
-			// return err
-			log.Errorf("init channel err %s", err)
-		}
-	}
+
 	if this.channel != nil {
 		if err := this.StartChannelService(); err != nil {
 			return err
@@ -144,6 +141,7 @@ func (this *Dsp) Start() error {
 		go this.startDNSHealthCheckService()
 	}
 	if this.IsClient() && this.config.HealthCheckDNS {
+		log.Debugf("startDNSHealthCheckService")
 		go this.startDNSHealthCheckService()
 	}
 	unSalve, _ := this.taskMgr.GetUnSlavedTasks()
@@ -151,6 +149,7 @@ func (this *Dsp) Start() error {
 		this.taskMgr.RunGetProgress()
 	}
 	this.running = true
+	log.Debugf("runing...")
 	return nil
 }
 
@@ -167,6 +166,7 @@ func (this *Dsp) StartChannelService() error {
 }
 
 func (this *Dsp) Stop() error {
+	close(this.closeCh)
 	err := this.taskMgr.CloseDB()
 	if err != nil {
 		log.Errorf("close fileDB err %s", err)
@@ -206,21 +206,25 @@ func (this *Dsp) UpdateConfig(field string, value interface{}) error {
 }
 
 func (this *Dsp) StartSeedService() {
-	log.Debugf("start seed service")
+	log.Debugf("start seed service %ds", this.config.SeedInterval)
 	tick := time.NewTicker(time.Duration(this.config.SeedInterval) * time.Second)
 	defer tick.Stop()
 	for {
 		_, files, err := this.taskMgr.AllDownloadFiles()
 		if err != nil {
-			continue
+			log.Errorf("get all file err %v", err)
+		} else {
+			this.dns.PushFilesToTrackers(files)
 		}
-		this.dns.PushFilesToTrackers(files)
 		select {
 		case <-tick.C:
 			if !this.Running() {
 				log.Debugf("stop seed service")
 				return
 			}
+		case <-this.closeCh:
+			log.Debugf("stop seed service")
+			return
 		}
 	}
 }

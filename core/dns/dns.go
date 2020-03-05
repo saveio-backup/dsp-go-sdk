@@ -154,13 +154,13 @@ func (d *DNS) SetupTrackers() error {
 
 // BootstrapDNS. bootstrap max 15 DNS from smart contract
 func (d *DNS) BootstrapDNS() {
-	log.Debugf("start bootstrapDNS... %v", d.Channel)
 	if d.Channel == nil {
 		return
 	}
 	if d.bootstraping {
 		return
 	}
+	log.Debugf("start bootstrapDNS...")
 	d.bootstraping = true
 	defer func() {
 		d.bootstraping = false
@@ -174,7 +174,6 @@ func (d *DNS) BootstrapDNS() {
 	if d.AutoBootstrap || len(d.OnlineDNS) == 0 {
 		return
 	}
-
 	channels, err := d.Channel.AllChannels()
 	if err != nil {
 		log.Errorf("get all channel err %s", err)

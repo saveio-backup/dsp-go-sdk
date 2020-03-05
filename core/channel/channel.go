@@ -80,9 +80,11 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 	//start channel and actor
 	channelActor, err := ch_actor.NewChannelActor(channelConfig, chain.Native.Channel.DefAcc)
 	if err != nil {
+		log.Debugf("channelActor+++ %v", channelActor)
 		return nil, dspErr.NewWithError(dspErr.CHANNEL_CREATE_ACTOR_ERROR, err)
 	}
 	chnPid := channelActor.GetLocalPID()
+	log.Debugf("channel actor %v, pid %v", channelActor, chnPid)
 	return &Channel{
 		chActorId:  chnPid,
 		chActor:    channelActor,
@@ -109,8 +111,8 @@ func (this *Channel) StartService() error {
 	log.Debugf("StartService")
 	this.firstSyncing = true
 	err := this.chActor.SyncBlockData()
-	log.Debugf("sync block data done")
 	this.firstSyncing = false
+	log.Debugf("sync block data done")
 	if err != nil {
 		log.Errorf("channel sync block err %s", err)
 		return dspErr.NewWithError(dspErr.CHANNEL_SYNC_BLOCK_ERROR, err)

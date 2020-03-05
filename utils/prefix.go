@@ -114,7 +114,6 @@ func (p *FilePrefix) Serialize() []byte {
 	totalSizeBase64 := make([]byte, base64.StdEncoding.EncodedLen(PAYLOAD_SIZE_LEN))
 	base64.StdEncoding.Encode(totalSizeBase64, payloadSizeBuf)
 
-	log.Debugf("raw result %x, %d, totalSizeBase64 %d %x totalSize %d\n", result, len(result), len(totalSizeBase64), totalSizeBase64, payloadSize)
 	return append(totalSizeBase64, base64Result...)
 }
 
@@ -129,13 +128,11 @@ func (p *FilePrefix) Deserialize(base64Buf []byte) error {
 		return err
 	}
 	payloadSize := GetPayloadLenFromBuf(payloadSizeBuf)
-	log.Debugf("payloadSize: %d\n", payloadSize)
 	buf := make([]byte, payloadSize)
 	_, err = base64.StdEncoding.Decode(buf, base64Buf[encodeSizeLen:])
 	if err != nil {
 		return err
 	}
-	log.Debugf("decode result %x, n %d\n", buf, payloadSize)
 	payload := buf[:payloadSize-CHECKSUM_LEN]
 	checkSum := crc32.ChecksumIEEE(payload)
 	check := binary.BigEndian.Uint32(buf[payloadSize-CHECKSUM_LEN:])
@@ -169,7 +166,6 @@ func (p *FilePrefix) Deserialize(base64Buf []byte) error {
 
 	copy(p.Reserved[:], buf[fileNameEnd:fileNameEnd+REVERSED_LEN])
 
-	log.Debugf("encodeSizeLen %d, payloadSize: %d  p.FileNameLen %d\n", encodeSizeLen, payloadSize, p.FileNameLen)
 	return nil
 }
 
@@ -228,19 +224,16 @@ func GetPrefixFromFile(fullFilePath string) (*FilePrefix, []byte, error) {
 	if _, err := sourceFile.Read(payloadSizeEncodeBuf); err != nil {
 		return nil, nil, err
 	}
-	log.Debugf("payloadSizeEncodeBuf %s", payloadSizeEncodeBuf)
 	if _, err := base64.StdEncoding.Decode(payloadSizeDecodeBuf, payloadSizeEncodeBuf); err != nil {
 		return nil, nil, err
 	}
 	payloadSize := GetPayloadLenFromBuf(payloadSizeDecodeBuf)
-	log.Debugf("fullFilePath %v, payloadSize %d, encodeSizeLen %d", fullFilePath, payloadSize, encodeSizeLen)
 	payloadEncodeBuf := make([]byte, base64.StdEncoding.EncodedLen(int(payloadSize)))
 	if _, err := sourceFile.ReadAt(payloadEncodeBuf, int64(encodeSizeLen)); err != nil {
 		return nil, nil, err
 	}
 
 	prefix := append(payloadSizeEncodeBuf, payloadEncodeBuf...)
-	log.Debugf("prefix %s", prefix)
 	filePrefix := &FilePrefix{}
 	filePrefix.Deserialize(prefix)
 	return filePrefix, prefix, nil
