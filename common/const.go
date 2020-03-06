@@ -56,7 +56,7 @@ const (
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT      = 10      // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT              = 20      // media transfer timeout
 
-	NETWORK_STREAM_WRITE_TIMEOUT  = 8                                                                                                // network write stream timeout for 128KB (128KB/8s=16KB/s)
+	NETWORK_STREAM_WRITE_TIMEOUT  = 16                                                                                               // network write stream timeout for 128KB (128KB/16s=8KB/s)
 	DOWNLOAD_STREAM_WRITE_TIMEOUT = 2                                                                                                // download stream timeout 128KB/2s 64KB/s
 	SHARE_BLOCKS_MIN_SPEED        = 100                                                                                              // share blocks min speed 100 KB/S
 	SHARE_BLOCKS_TIMEOUT          = CHUNK_SIZE / 1024 * MAX_REQ_BLOCK_COUNT / SHARE_BLOCKS_MIN_SPEED                                 // timeout = DataSize / 100 KB/s = 81s
