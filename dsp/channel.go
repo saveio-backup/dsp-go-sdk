@@ -78,6 +78,9 @@ func (this *Dsp) GetAllPartners() []string {
 	return this.channel.GetAllPartners()
 }
 func (this *Dsp) AddChannelInfo(id uint64, partnerAddr string) error {
+	if this.channel == nil {
+		return nil
+	}
 	return this.channel.AddChannelInfo(id, partnerAddr)
 }
 func (this *Dsp) GetChannelInfoFromDB(targetAddress string) (*store.ChannelInfo, error) {

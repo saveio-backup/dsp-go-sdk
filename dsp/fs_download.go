@@ -110,7 +110,7 @@ func (this *Dsp) IsFileEncrypted(fullFilePath string) bool {
 // inOrder: if true, the file will be downloaded block by block in order
 // free: if true, query nodes who can share file free
 // maxPeeCnt: download with max number peers who provide file at the less price
-func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOption) (err error) {
+func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *common.DownloadOption) (err error) {
 	// start a task
 	defer func() {
 		sdkErr, _ := err.(*dspErr.Error)
@@ -127,8 +127,8 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 			this.taskMgr.DeleteTask(taskId)
 		}
 	}()
-	if len(taskId) == 0 {
-		taskId, err = this.taskMgr.NewTask(store.TaskTypeDownload)
+	if newTask {
+		taskId, err = this.taskMgr.NewTask(taskId, store.TaskTypeDownload)
 		if err != nil {
 			return err
 		}
@@ -280,7 +280,7 @@ func (this *Dsp) CancelDownload(taskId string) error {
 }
 
 // DownloadFileByLink. download file by link, e.g oni://Qm...&name=xxx&tr=xxx
-func (this *Dsp) DownloadFileByLink(linkStr string, asset int32, inOrder bool, decryptPwd string,
+func (this *Dsp) DownloadFileByLink(id, linkStr string, asset int32, inOrder bool, decryptPwd string,
 	free, setFileName bool, maxPeerCnt int) error {
 	link, err := this.dns.GetLinkValues(linkStr)
 	if err != nil {
@@ -300,11 +300,11 @@ func (this *Dsp) DownloadFileByLink(linkStr string, asset int32, inOrder bool, d
 		SetFileName: setFileName,
 		MaxPeerCnt:  maxPeerCnt,
 	}
-	return this.downloadFileWithOpt(link.FileHashStr, opt)
+	return this.downloadFileWithOpt(id, link.FileHashStr, opt)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
-func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryptPwd string,
+func (this *Dsp) DownloadFileByUrl(id, url string, asset int32, inOrder bool, decryptPwd string,
 	free, setFileName bool, maxPeerCnt int) error {
 	fileHashStr := this.dns.GetFileHashFromUrl(url)
 	link, err := this.dns.GetLinkValues(this.dns.GetLinkFromUrl(url))
@@ -326,11 +326,11 @@ func (this *Dsp) DownloadFileByUrl(url string, asset int32, inOrder bool, decryp
 		MaxPeerCnt:  maxPeerCnt,
 		Url:         url,
 	}
-	return this.downloadFileWithOpt(fileHashStr, opt)
+	return this.downloadFileWithOpt(id, fileHashStr, opt)
 }
 
 // DownloadFileByUrl. download file by link, e.g dsp://file1
-func (this *Dsp) DownloadFileByHash(fileHashStr string, asset int32, inOrder bool, decryptPwd string,
+func (this *Dsp) DownloadFileByHash(id, fileHashStr string, asset int32, inOrder bool, decryptPwd string,
 	free, setFileName bool, maxPeerCnt int) error {
 	// TODO: get file name, fix url
 	info, _ := this.chain.GetFileInfo(fileHashStr)
@@ -354,7 +354,7 @@ func (this *Dsp) DownloadFileByHash(fileHashStr string, asset int32, inOrder boo
 		FileOwner:   fileOwner,
 		MaxPeerCnt:  maxPeerCnt,
 	}
-	return this.downloadFileWithOpt(fileHashStr, opt)
+	return this.downloadFileWithOpt(id, fileHashStr, opt)
 }
 
 // GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
@@ -949,7 +949,7 @@ func (this *Dsp) checkDNSState(dnsWalletAddr string) error {
 }
 
 // downloadFileWithOpt. internal helper, download or resume file with hash and options
-func (this *Dsp) downloadFileWithOpt(fileHashStr string, opt *common.DownloadOption) error {
+func (this *Dsp) downloadFileWithOpt(id string, fileHashStr string, opt *common.DownloadOption) error {
 	if len(opt.FileName) == 0 {
 		// TODO: get file name from chain if the file exists on chain
 		info, _ := this.chain.GetFileInfo(fileHashStr)
@@ -967,17 +967,17 @@ func (this *Dsp) downloadFileWithOpt(fileHashStr string, opt *common.DownloadOpt
 		} else {
 			log.Debugf("start a new download task of file %s", fileHashStr)
 		}
-		return this.DownloadFile("", fileHashStr, opt)
+		return this.DownloadFile(true, id, fileHashStr, opt)
 	}
 	if taskDone, _ := this.taskMgr.IsTaskDone(taskId); taskDone {
 		log.Debugf("task has done, start a new download task of id: %s, file %s", taskId, fileHashStr)
-		return this.DownloadFile("", fileHashStr, opt)
+		return this.DownloadFile(true, id, fileHashStr, opt)
 	}
 	if taskPreparing, taskDoing, _ := this.taskMgr.IsTaskPreparingOrDoing(taskId); taskPreparing || taskDoing {
 		return dspErr.New(dspErr.DOWNLOAD_REFUSED, "task exists, and it is preparing or doing")
 	}
 	log.Debugf("task exists, resume the download task of id: %s, file %s", taskId, fileHashStr)
-	return this.DownloadFile(taskId, fileHashStr, opt)
+	return this.DownloadFile(false, taskId, fileHashStr, opt)
 }
 
 // getPeersForDownload. get peers for download from tracker and fs contract
@@ -1020,7 +1020,7 @@ func (this *Dsp) checkIfResumeDownload(taskId string) error {
 		Url:         taskInfo.Url,
 	}
 	// TODO: record original workers
-	go this.DownloadFile(taskId, taskInfo.FileHash, opt)
+	go this.DownloadFile(false, taskId, taskInfo.FileHash, opt)
 	return nil
 }
 
@@ -1640,7 +1640,7 @@ func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []s
 	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
 	if len(taskId) == 0 {
 		var err error
-		taskId, err = this.taskMgr.NewTask(store.TaskTypeDownload)
+		taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
 		if err != nil {
 			return err
 		}
@@ -1724,7 +1724,7 @@ func (this *Dsp) backupFileFromPeer(fileInfo *fs.FileInfo, peer string, luckyNum
 		}
 	}()
 	if len(taskId) == 0 {
-		taskId, err = this.taskMgr.NewTask(store.TaskTypeDownload)
+		taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
 		if err != nil {
 			return err
 		}

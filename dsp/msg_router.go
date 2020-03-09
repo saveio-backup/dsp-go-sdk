@@ -222,7 +222,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 	if len(taskId) == 0 {
 		// handle new download task. use my wallet address
 		var err error
-		taskId, err = this.taskMgr.NewTask(store.TaskTypeDownload)
+		taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
 		log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
 		if err != nil {
 			log.Errorf("new task failed %s", err)
@@ -263,7 +263,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 			}
 			// handle new download task. use my wallet address
 			var err error
-			taskId, err = this.taskMgr.NewTask(store.TaskTypeDownload)
+			taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
 			log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
 			if err != nil {
 				log.Errorf("new task failed %s", err)
@@ -524,7 +524,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 		return
 	}
 	// TODO: check channel balance and router path
-	taskId, err := this.taskMgr.NewTask(store.TaskTypeShare)
+	taskId, err := this.taskMgr.NewTask("", store.TaskTypeShare)
 	if err != nil {
 		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return

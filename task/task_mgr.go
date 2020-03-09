@@ -58,10 +58,10 @@ func (this *TaskMgr) CloseDB() error {
 }
 
 // NewTask. start a task for a file
-func (this *TaskMgr) NewTask(taskT store.TaskType) (string, error) {
+func (this *TaskMgr) NewTask(taskId string, taskT store.TaskType) (string, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	t := NewTask(taskT, this.db)
+	t := NewTask(taskId, taskT, this.db)
 	if t == nil {
 		return "", dspErr.New(dspErr.NEW_TASK_FAILED, fmt.Sprintf("new task of type %d", taskT))
 	}
@@ -125,7 +125,7 @@ func (this *TaskMgr) RecoverDBLossTask(fileHashStrs []string, fileNameMap map[st
 		if ok && t != nil {
 			continue
 		}
-		newId, err := this.NewTask(store.TaskTypeUpload)
+		newId, err := this.NewTask(id, store.TaskTypeUpload)
 		if err != nil {
 			return err
 		}

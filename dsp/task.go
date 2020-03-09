@@ -111,6 +111,12 @@ func (this *Dsp) GetTaskInfo(id string) *store.TaskInfo {
 	return tsk
 }
 
+func (this *Dsp) GetUploadTaskInfoByHash(fileHashStr string) *store.TaskInfo {
+	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeUpload)
+	tsk, _ := this.taskMgr.GetTaskInfoCopy(taskId)
+	return tsk
+}
+
 func (this *Dsp) GetTaskFileName(id string) string {
 	fileName, _ := this.taskMgr.GetTaskFileName(id)
 	return fileName

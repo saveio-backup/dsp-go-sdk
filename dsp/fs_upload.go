@@ -80,7 +80,7 @@ func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
 }
 
 // UploadFile upload new file logic synchronously
-func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uploadRet *common.UploadResult, err error) {
+func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.UploadOption) (uploadRet *common.UploadResult, err error) {
 	// emit result finally
 	defer func() {
 		sdkErr, _ := err.(*dspErr.Error)
@@ -100,17 +100,15 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 			this.taskMgr.DeleteTask(taskId)
 		}
 	}()
-	newTask := false
-	if len(taskId) == 0 {
+	if newTask {
 		// new task because of task id is empty, generate a new task
-		if taskId, err = this.taskMgr.NewTask(store.TaskTypeUpload); err != nil {
+		if taskId, err = this.taskMgr.NewTask(taskId, store.TaskTypeUpload); err != nil {
 			return nil, err
 		}
 		if err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
 			return nil, err
 		}
 		this.taskMgr.EmitProgress(taskId, task.TaskCreate)
-		newTask = true
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
 	// check options valid
@@ -647,7 +645,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 	}
 	// send resume msg
 	if len(tsk.FileHash) == 0 {
-		go this.UploadFile(taskId, tsk.FilePath, opt)
+		go this.UploadFile(false, taskId, tsk.FilePath, opt)
 		return nil
 	}
 	if this.taskMgr.ExistSameUploadFile(taskId, tsk.FileHash) {
@@ -687,7 +685,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 	}
 
 	if len(tsk.PrimaryNodes) == 0 {
-		go this.UploadFile(taskId, tsk.FilePath, opt)
+		go this.UploadFile(false, taskId, tsk.FilePath, opt)
 		return nil
 	}
 	hostAddr := this.getMasterNodeHostAddr(tsk.PrimaryNodes[0])
@@ -713,7 +711,7 @@ func (this *Dsp) checkIfResume(taskId string) error {
 		return err
 	}
 	log.Debugf("resume upload file")
-	go this.UploadFile(taskId, tsk.FilePath, opt)
+	go this.UploadFile(false, taskId, tsk.FilePath, opt)
 	return nil
 }
 
@@ -1554,7 +1552,7 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 	totalCount := len(blockHashes)
 	if len(taskId) == 0 {
 		var err error
-		taskId, err = this.taskMgr.NewTask(store.TaskTypeUpload)
+		taskId, err = this.taskMgr.NewTask("", store.TaskTypeUpload)
 		log.Debugf("new task id %s upload file %s", taskId, fileHashStr)
 		if err != nil {
 			return err

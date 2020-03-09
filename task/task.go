@@ -113,14 +113,17 @@ type Task struct {
 }
 
 // NewTask. new task for file, and set the task info to DB.
-func NewTask(taskT store.TaskType, db *store.TaskDB) *Task {
-	id, _ := uuid.NewUUID()
-	info, err := db.NewTaskInfo(id.String(), taskT)
+func NewTask(taskId string, taskT store.TaskType, db *store.TaskDB) *Task {
+	if len(taskId) == 0 {
+		id, _ := uuid.NewUUID()
+		taskId = id.String()
+	}
+	info, err := db.NewTaskInfo(taskId, taskT)
 	if err != nil {
 		log.Errorf("new file info failed %s", err)
 		return nil
 	}
-	t := newTask(id.String(), info, db)
+	t := newTask(taskId, info, db)
 	t.info.TaskState = store.TaskStatePrepare
 	err = db.SaveTaskInfo(t.info)
 	if err != nil {
