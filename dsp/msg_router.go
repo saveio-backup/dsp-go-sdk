@@ -695,9 +695,9 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 			if len(sessionId) == 0 {
 				return
 			}
-			exist := this.taskMgr.TaskExist(sessionId)
-			if !exist {
-				log.Debugf("task %s not exist", blockMsg.FileHash)
+			existTsk, _ := this.taskMgr.GetTaskInfoCopy(sessionId)
+			if existTsk == nil {
+				log.Debugf("task %s, file %s not exist", sessionId, blockMsg.FileHash)
 				return
 			}
 		}

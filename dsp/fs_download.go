@@ -132,6 +132,7 @@ func (this *Dsp) DownloadFile(taskId, fileHashStr string, opt *common.DownloadOp
 		if err != nil {
 			return err
 		}
+		this.taskMgr.EmitProgress(taskId, task.TaskCreate)
 	}
 	log.Debugf("download file id: %s, fileHash: %s, option: %v", taskId, fileHashStr, opt)
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileStart)
@@ -615,10 +616,10 @@ func (this *Dsp) PayUnpaidPayments(taskId, fileHashStr string, quotation map[str
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocks)
 	for _, payInfo := range quotation {
 		payments, _ := this.taskMgr.GetUnpaidPayments(taskId, payInfo.WalletAddress, payInfo.Asset)
-		log.Debugf("unpaid amount %v", len(payments))
 		if len(payments) == 0 {
 			continue
 		}
+		log.Debugf("task %s, file %s ,unpaid amount %v", taskId, fileHashStr, len(payments))
 		for _, payment := range payments {
 			log.Debugf("pay to %s of the unpaid amount %d for task %s", payInfo.WalletAddress, payment.Amount, taskId)
 			_, err := this.PayForBlock(payInfo, fileHashStr, payment.Amount/payInfo.UnitPrice,
@@ -1225,10 +1226,10 @@ func (this *Dsp) decryptDownloadedFile(taskId string) error {
 
 func (this *Dsp) addDownloadBlockReq(taskId, fileHashStr string) error {
 	hashes, indexMap, err := this.taskMgr.GetUndownloadedBlockInfo(taskId, fileHashStr)
-	log.Debugf("undownload hashes %v", hashes)
 	if err != nil {
 		return err
 	}
+	log.Debugf("undownloaded hashes len %v", len(hashes))
 	reqs := make([]*task.GetBlockReq, 0)
 	if len(hashes) == 0 {
 		// TODO: check bug

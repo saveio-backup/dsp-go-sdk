@@ -35,4 +35,5 @@ const (
 	TaskDownloadCheckingFileDone                               // 29
 	TaskWaitForBlockConfirmed                                  // 30
 	TaskWaitForBlockConfirmedDone                              // 31
+	TaskCreate                                                 // 32
 )

@@ -109,6 +109,7 @@ func (this *Dsp) UploadFile(taskId, filePath string, opt *fs.UploadOption) (uplo
 		if err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
 			return nil, err
 		}
+		this.taskMgr.EmitProgress(taskId, task.TaskCreate)
 		newTask = true
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)

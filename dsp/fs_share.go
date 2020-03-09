@@ -222,9 +222,11 @@ func (this *Dsp) shareBlock(req []*task.GetBlockReq) {
 	}
 
 	msg := message.NewBlockFlightsMsg(flights, message.WithSyn(req[0].Syn))
-	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s, peer addr: %s, msgId: %s, syn %d",
+	log.Debugf("share block task: %s, req from %s-%s-%d to %s-%s-%d of peer wallet: %s,"+
+		" peer addr: %s, msgId: %s, syn %s, timeout %ds",
 		taskId, req[0].FileHash, req[0].Hash, req[0].Index, req[len(req)-1].FileHash, req[len(req)-1].Hash,
-		req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr, msg.MessageId, req[0].Syn)
+		req[len(req)-1].Index, req[len(req)-1].WalletAddress, req[len(req)-1].PeerAddr,
+		msg.MessageId, req[0].Syn, common.SHARE_BLOCKS_TIMEOUT)
 	if err := client.P2pStreamSend(req[0].PeerAddr, taskId, msg.MessageId, msg.ToProtoMsg(),
 		time.Duration(common.SHARE_BLOCKS_TIMEOUT)*time.Second); err != nil {
 		log.Errorf("share send block, err: %s", err)

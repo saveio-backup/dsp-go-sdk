@@ -1224,3 +1224,32 @@ func TestGetDNSNodeInfo(t *testing.T) {
 	fmt.Printf("host %s:%s\n", info.IP, info.Port)
 
 }
+
+func TestGetNodePubKey(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddrs: []string{"http://127.0.0.1:20336"},
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc, nil)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+
+	walletAddr, err := chainCom.AddressFromBase58("ALQ6RWJENsELE7ATuzHz4zgHrq573xJsnM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubKey, err := d.chain.Themis().Native.Channel.GetNodePubKey(walletAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("pubkey %x", pubKey)
+}
