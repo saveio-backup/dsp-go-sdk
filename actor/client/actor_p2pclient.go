@@ -344,7 +344,8 @@ func P2pSend(address, msgId string, data proto.Message) error {
 			return dspErr.NewWithError(dspErr.NETWORK_SEND_ERROR, resp.Error)
 		}
 		return nil
-	case <-time.After(time.Duration(common.MAX_ACTOR_P2P_REQ_TIMEOUT) * time.Second):
+	case <-time.After(time.Duration(200) * time.Second):
+		// case <-time.After(time.Duration(common.MAX_ACTOR_P2P_REQ_TIMEOUT) * time.Second):
 		return dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pSend] timeout")
 	}
 }

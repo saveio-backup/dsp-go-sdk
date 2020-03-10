@@ -257,7 +257,7 @@ func (this *TaskDB) getTaskCount() (*TaskCount, error) {
 }
 
 // GetTaskIdList. Get all task id list with offset, limit, task type
-func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uint64,
+func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,
 	ft TaskType, complete, reverse, includeFailed bool) []string {
 	prefix := TaskIdIndexKey(0)
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
@@ -282,7 +282,7 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uin
 			log.Warnf("get file info of id %s failed", id)
 			continue
 		}
-
+		log.Debugf("state %v, type %v, complete %v, include failed %v", info.TaskState, info.Type, complete, includeFailed)
 		if !complete && (info.Type != ft || info.TaskState == TaskStateDone) {
 			continue
 		}
@@ -292,7 +292,14 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uin
 		if !includeFailed && info.TaskState == TaskStateFailed {
 			continue
 		}
-		if info.CreatedAt < createdAt || info.UpdatedAt < updatedAt {
+		if createdAt != 0 && createdAtEnd != 0 && (info.CreatedAt <= createdAt || info.CreatedAt > createdAtEnd) {
+			// log.Debugf("created at %d, end %d, %d", createdAt, createdAtEnd, info.CreatedAt)
+			// os.Exit(1)
+			continue
+		}
+		if updatedAt != 0 && updatedAtEnd != 0 && (info.UpdatedAt <= updatedAt || info.UpdatedAt > updatedAtEnd) {
+			// log.Debugf("updatedAt at %d, end %d, %d", updatedAt, updatedAtEnd, info.UpdatedAt)
+			// os.Exit(1)
 			continue
 		}
 		infos = append(infos, info)

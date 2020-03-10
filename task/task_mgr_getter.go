@@ -287,9 +287,9 @@ func (this *TaskMgr) GetShareTaskReferId(id string) (string, error) {
 	return info.ReferId, nil
 }
 
-func (this *TaskMgr) GetTaskIdList(offset, limit uint32, createdAt, updatedAt uint64,
+func (this *TaskMgr) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,
 	ft store.TaskType, complete, reverse, includeFailed bool) []string {
-	return this.db.GetTaskIdList(offset, limit, createdAt, updatedAt, ft, complete, reverse, includeFailed)
+	return this.db.GetTaskIdList(offset, limit, createdAt, createdAtEnd, updatedAt, updatedAtEnd, ft, complete, reverse, includeFailed)
 }
 
 // GetUnpaidPayments. get unpaid payments
