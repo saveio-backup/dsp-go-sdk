@@ -1579,12 +1579,14 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 		blockData := this.fs.BlockDataOfAny(block)
 		tag, err := this.fs.GetTag(hash, fileHashStr, uint64(index))
 		if err != nil {
-			log.Errorf("get tag err %v", err)
+			log.Errorf("get tag of file %s, block %s, index %d err %v",
+				fileHashStr, hash, index, err)
 			return nil
 		}
 		offset, err := this.taskMgr.GetBlockOffset(referId, hash, index)
 		if err != nil {
-			log.Errorf("get block offset err %v", err)
+			log.Errorf("get block offset err %v, task id %s, file %s, block %s, index %d",
+				err, referId, fileHashStr, hash, index)
 			return nil
 		}
 		return &blockMsgData{

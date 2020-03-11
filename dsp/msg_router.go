@@ -53,48 +53,48 @@ func (this *Dsp) handleFileMsg(ctx *network.ComponentContext, peerWalletAddr str
 	fileMsg := msg.Payload.(*file.File)
 	switch fileMsg.Operation {
 	case netcom.FILE_OP_FETCH_ASK:
-		log.Debugf("handleFileMsg fetchAsk file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg fetchAsk %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileAskMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_FETCH_RDY:
-		log.Debugf("handleFileMsg fetchRdy file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg fetchRdy %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileRdyMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_FETCH_PAUSE:
-		log.Debugf("handleFileMsg fetchPause file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg fetchPause %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileFetchPauseMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_FETCH_RESUME:
-		log.Debugf("handleFileMsg fetchResume file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg fetchResume %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileFetchResumeMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_FETCH_DONE:
-		log.Debugf("handleFileMsg fetchDone file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg fetchDone %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileFetchDoneMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_FETCH_CANCEL:
-		log.Debugf("handleFileMsg fetchCancel file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg fetchCancel %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileFetchCancelMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_DELETE:
-		log.Debugf("handleFileMsg delete file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg delete %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileDeleteMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_DOWNLOAD_ASK:
-		log.Debugf("handleFileMsg downloadAsk file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg downloadAsk %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileDownloadAskMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_DOWNLOAD:
-		log.Debugf("handleFileMsg download file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg download %s  file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileDownloadMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_DOWNLOAD_OK:
-		log.Debugf("handleFileMsg downloadOk file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg downloadOk %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileDownloadOkMsg(ctx, peerWalletAddr, msg)
 	case netcom.FILE_OP_DOWNLOAD_CANCEL:
-		log.Debugf("handleFileMsg downloadCancel file %s from peer:%s, length:%d",
-			fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
+		log.Debugf("handleFileMsg downloadCancel %s file %s from peer:%s, length:%d",
+			msg.MessageId, fileMsg.Hash, peerWalletAddr, msg.Header.MsgLength)
 		this.handleFileDownloadCancelMsg(ctx, peerWalletAddr, msg)
 	default:
 	}
@@ -451,13 +451,14 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 	}
 	info, err := this.chain.GetFileInfo(fileMsg.Hash)
 	if err != nil || info == nil {
-		log.Errorf("file info not exist %s", fileMsg.Hash)
+		log.Errorf("handle download ask msg, get file info %s not exist from chain", fileMsg.Hash)
 		replyErr("", fileMsg.Hash, serr.FILEINFO_NOT_EXIST,
 			fmt.Sprintf("file %s is deleted", fileMsg.Hash), ctx)
 		return
 	}
 	if !this.chain.CheckFilePrivilege(info, fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
-		log.Errorf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress)
+		log.Errorf("user %s has no privilege to download this file %s",
+			fileMsg.PayInfo.WalletAddress, fileMsg.Hash)
 		replyErr("", fileMsg.Hash, serr.NO_PRIVILEGE_TO_DOWNLOAD,
 			fmt.Sprintf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress), ctx)
 		return
@@ -466,6 +467,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 	if err != nil || len(downloadedId) == 0 {
 		replyErr("", fileMsg.Hash, serr.FILEINFO_NOT_EXIST,
 			fmt.Sprintf("no downloaded task for file %s", fileMsg.Hash), ctx)
+		return
 	}
 	price, err := this.GetFileUnitPrice(fileMsg.PayInfo.Asset)
 	if err != nil {

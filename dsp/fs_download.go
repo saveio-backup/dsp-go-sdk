@@ -456,7 +456,7 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 	}
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {
-		return nil, dspErr.New(dspErr.REMOTE_PEER_DELETE_FILE, "remote peer has deleted the file")
+		return nil, dspErr.New(dspErr.REMOTE_PEER_DELETE_FILE, "no source available")
 	}
 	if !this.taskMgr.TaskExist(taskInfo.Id) {
 		return nil, dspErr.New(dspErr.TASK_NOT_EXIST, "task not exist")
