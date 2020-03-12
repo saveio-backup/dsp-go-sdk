@@ -779,17 +779,18 @@ func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext,
 		id := this.taskMgr.TaskId(progressMsg.Hash, this.WalletAddress(), store.TaskTypeUpload)
 		var prog *store.FileProgress
 		if len(id) != 0 {
-			prog = this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
+			prog = this.taskMgr.GetTaskPeerProgress(id, info.WalletAddr)
 		}
 		log.Debugf("handle req progress msg, get progress of id %s, file: %s, addr %s, count %d, ",
-			id, progressMsg.Hash, info.NodeAddr, prog)
+			id, progressMsg.Hash, info.WalletAddr, prog)
 		count := uint64(0)
 		if prog != nil {
 			count = prog.Progress
 		}
 		nodeInfos = append(nodeInfos, &progress.ProgressInfo{
-			NodeAddr: info.NodeAddr,
-			Count:    int32(count),
+			WalletAddr: info.WalletAddr,
+			NodeAddr:   info.NodeAddr,
+			Count:      int32(count),
 		})
 	}
 	resp := message.NewProgressMsg(this.WalletAddress(), progressMsg.Hash, netcom.FILE_OP_PROGRESS,

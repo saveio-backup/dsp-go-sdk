@@ -260,7 +260,7 @@ func (this *TaskDB) getTaskCount() (*TaskCount, error) {
 // GetTaskIdList. Get all task id list with offset, limit, task type
 func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,
 	ft TaskType, complete, reverse, includeFailed bool) []string {
-	prefix := TaskIdIndexKey(0)
+	prefix := TaskInfoKey("")
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
 		log.Errorf("get task id list query key %s err %s", prefix, err)
@@ -268,19 +268,9 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd,
 	}
 	infos := make(TaskInfos, 0)
 	for _, k := range keys {
-		buf, err := this.db.Get([]byte(k))
-		if err != nil && err != leveldb.ErrNotFound {
-			log.Errorf("get err %s", err)
-			continue
-		}
-		if len(buf) == 0 {
-			log.Errorf("get buf is 0 %s", k)
-			continue
-		}
-		id := string(buf)
-		info, err := this.GetTaskInfo(id)
+		info, err := this.getTaskInfoByKey(k)
 		if err != nil || info == nil {
-			log.Warnf("get file info of id %s failed", id)
+			log.Warnf("get file info of id %s failed", k)
 			continue
 		}
 		if !complete && (info.Type != ft || info.TaskState == TaskStateDone) {
@@ -304,6 +294,10 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd,
 		}
 		infos = append(infos, info)
 	}
+	// log.Debugf("offset = %d, limit = %d, createdAt = %d, createdAtEnd = %d, updatedAt = %d, updatedAtEnd = %d, "+
+	// 	"ft == %d, complete = %t, reverse = %t, includeFailed = %t, len = %d",
+	// 	offset, limit, createdAt, createdAtEnd, updatedAt, updatedAtEnd,
+	// 	ft, complete, reverse, includeFailed, len(infos))
 	if complete {
 		sort.Sort(sort.Reverse(infos))
 	} else {

@@ -34,6 +34,9 @@ const (
 
 // TaskInfoKey. Key of task
 func TaskInfoKey(id string) string {
+	if len(id) == 0 {
+		return fmt.Sprintf("[%s]", TASK_INFO_PREFIX)
+	}
 	return fmt.Sprintf("[%s]%s", TASK_INFO_PREFIX, id)
 }
 

@@ -140,6 +140,10 @@ func (this *Dsp) UpdateDNS(walletAddr, hostAddr string, use bool) {
 	}
 }
 
+func (this *Dsp) ResetDNSNode() {
+	this.dns.DNSNode = nil
+}
+
 func (this *Dsp) GetTrackerList() []string {
 	return this.dns.TrackerUrls
 }
