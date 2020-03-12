@@ -621,20 +621,17 @@ func (this *Channel) CleanUnitPrices(asset int32) {
 }
 
 func (this *Channel) ChannelExist(walletAddr string) bool {
-	if !this.isStart {
-		return false
-	}
 	all, _ := ch_actor.GetAllChannels()
 	if all == nil {
-		return true
+		return false
 	}
 	for _, ch := range all.Channels {
 		if ch.Address != walletAddr {
 			continue
 		}
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 func (this *Channel) GetChannelInfo(walletAddr string) (*ch_actor.ChannelInfo, error) {

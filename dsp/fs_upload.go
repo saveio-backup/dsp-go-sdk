@@ -1553,7 +1553,7 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 	if len(taskId) == 0 {
 		var err error
 		taskId, err = this.taskMgr.NewTask("", store.TaskTypeUpload)
-		log.Debugf("new task id %s upload file %s", taskId, fileHashStr)
+		log.Debugf("new task id %s upload file %s, total count %d", taskId, fileHashStr, totalCount)
 		if err != nil {
 			return err
 		}
