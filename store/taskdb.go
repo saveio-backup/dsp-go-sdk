@@ -113,6 +113,7 @@ type TaskInfo struct {
 	CreatedAtHeight uint32            `json:"createdAt_block_height,omitempty"` // created at block height
 	UpdatedAt       uint64            `json:"updatedAt"`                        // updatedAt, unit ms
 	UpdatedAtHeight uint32            `json:"updatedAt_block_height,omitempty"` // updatedAt block height
+	DoneAt          uint64            `json:"doneAt"`                           // task done timestamp
 	ExpiredHeight   uint64            `json:"expired_block_height,omitempty"`   // expiredAt block height
 	Asset           int32             `json:"asset,omitempty"`                  // download task pay asset
 	DecryptPwd      string            `json:"decrypt_pwd,omitempty"`            // download task with decrypt pwd
@@ -282,7 +283,6 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd,
 			log.Warnf("get file info of id %s failed", id)
 			continue
 		}
-		log.Debugf("state %v, type %v, complete %v, include failed %v", info.TaskState, info.Type, complete, includeFailed)
 		if !complete && (info.Type != ft || info.TaskState == TaskStateDone) {
 			continue
 		}
@@ -588,12 +588,9 @@ func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 		return err
 	}
 	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
-	fi.UpdatedAt = utils.GetMilliSecTimestamp()
-	fiBuf, err := json.Marshal(fi)
-	if err != nil {
+	if err := this.batchSaveTaskInfo(batch, fi); err != nil {
 		return err
 	}
-	this.db.BatchPut(batch, []byte(TaskInfoKey(fi.Id)), fiBuf)
 	return this.db.BatchCommit(batch)
 }
 
@@ -957,16 +954,13 @@ func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index 
 	}
 	fi.CurrentBlock = blockHashStr
 	fi.CurrentIndex = index
-	fi.UpdatedAt = utils.GetMilliSecTimestamp()
-	fiBuf, err := json.Marshal(fi)
-	if err != nil {
-		return err
-	}
 	batch := this.db.NewBatch()
 	log.Debugf("set block %s, len %d", blockKey, len(blockBuf))
+	if err := this.batchSaveTaskInfo(batch, fi); err != nil {
+		return err
+	}
 	this.db.BatchPut(batch, []byte(blockKey), blockBuf)
 	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
-	this.db.BatchPut(batch, []byte(TaskInfoKey(id)), fiBuf)
 	return this.db.BatchCommit(batch)
 }
 
@@ -1123,16 +1117,12 @@ func (this *TaskDB) SetUploadProgressDone(id, nodeAddr string) error {
 	if err != nil {
 		return err
 	}
+	batch := this.db.NewBatch()
 	// TODO: split save block count for each node
-	fi.UpdatedAt = utils.GetMilliSecTimestamp()
-	log.Debugf("save upload progress done after %v", progress.Progress)
-	fiBuf, err := json.Marshal(fi)
-	if err != nil {
+	if err := this.batchSaveTaskInfo(batch, fi); err != nil {
 		return err
 	}
-	batch := this.db.NewBatch()
 	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
-	this.db.BatchPut(batch, []byte(TaskInfoKey(fi.Id)), fiBuf)
 	return this.db.BatchCommit(batch)
 }
 
@@ -1770,7 +1760,12 @@ func appendToStringSlice(data []byte, value string) ([]byte, error) {
 }
 
 func (this *TaskDB) batchSaveTaskInfo(batch *leveldb.Batch, info *TaskInfo) error {
-	info.UpdatedAt = utils.GetMilliSecTimestamp()
+	if info.DoneAt == 0 {
+		info.UpdatedAt = utils.GetMilliSecTimestamp()
+	}
+	if info.TaskState == TaskStateDone && info.DoneAt == 0 {
+		info.DoneAt = utils.GetMilliSecTimestamp()
+	}
 	key := []byte(TaskInfoKey(info.Id))
 	buf, err := json.Marshal(info)
 	if err != nil {
