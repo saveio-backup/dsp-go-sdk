@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/themis/common/log"
@@ -19,8 +20,9 @@ import (
 
 // TaskDB. implement a db storage for save information of sending/downloading/downloaded files
 type TaskDB struct {
-	db   *LevelDBStore
-	lock *sync.RWMutex
+	db       *LevelDBStore
+	dbLock   *sync.RWMutex
+	taskLock *lru.ARCCache
 }
 
 type TaskType int
@@ -182,10 +184,33 @@ type TaskCount struct {
 }
 
 func NewTaskDB(db *LevelDBStore) *TaskDB {
-	return &TaskDB{
-		db:   db,
-		lock: new(sync.RWMutex),
+	cache, err := lru.NewARC(1000)
+	if err != nil || cache == nil {
+		return nil
 	}
+	return &TaskDB{
+		db:       db,
+		dbLock:   new(sync.RWMutex),
+		taskLock: cache,
+	}
+}
+
+func (this *TaskDB) GetTaskLock(id string) *sync.RWMutex {
+	this.dbLock.Lock()
+	defer this.dbLock.Unlock()
+	l, ok := this.taskLock.Get(id)
+	if ok {
+		return l.(*sync.RWMutex)
+	}
+	newL := new(sync.RWMutex)
+	this.taskLock.Add(id, newL)
+	return newL
+}
+
+func (this *TaskDB) DelTaskLock(id string) {
+	this.dbLock.Lock()
+	defer this.dbLock.Unlock()
+	this.taskLock.Remove(id)
 }
 
 func (this *TaskDB) Close() error {
@@ -193,8 +218,8 @@ func (this *TaskDB) Close() error {
 }
 
 func (this *TaskDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	this.dbLock.Lock()
+	defer this.dbLock.Unlock()
 	taskCount, err := this.getTaskCount()
 	if err != nil {
 		return nil, err
@@ -390,6 +415,7 @@ func (this *TaskDB) DeleteTaskIds(ids []string) error {
 
 // DeleteTaskInfo. delete file info from db
 func (this *TaskDB) DeleteTaskInfo(id string) error {
+	defer this.DelTaskLock(id)
 	taskCount, err := this.getTaskCount()
 	if err != nil {
 		return err
@@ -497,8 +523,9 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 }
 
 func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockInfo) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	fi, err := this.GetTaskInfo(id)
 	if err != nil {
 		log.Errorf("get info err %s", err)
@@ -590,8 +617,9 @@ func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 
 // UpdateTaskPeerProgress. increase count of progress for a peer
 func (this *TaskDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	batch := this.db.NewBatch()
 	// save upload progress info
 	progressKey := FileProgressKey(id, nodeAddr)
@@ -616,8 +644,9 @@ func (this *TaskDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) er
 
 // UpdateTaskPeerSpeed. update speed progress for a peer
 func (this *TaskDB) UpdateTaskPeerSpeed(id, nodeAddr string, speed uint64) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	batch := this.db.NewBatch()
 	// save upload progress info
 	progressKey := FileProgressKey(id, nodeAddr)
@@ -648,8 +677,9 @@ func (this *TaskDB) UpdateTaskPeerSpeed(id, nodeAddr string, speed uint64) error
 
 // GetTaskPeerProgress. get progress for a peer
 func (this *TaskDB) GetTaskPeerProgress(id, nodeAddr string) *FileProgress {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.RLock()
+	defer taskLock.RUnlock()
 	// save upload progress info
 	progressKey := FileProgressKey(id, nodeAddr)
 	progress, _ := this.getProgressInfo(progressKey)
@@ -682,8 +712,9 @@ func (this *TaskDB) GetBlockOffset(id, blockHash string, index uint64) (uint64, 
 }
 
 func (this *TaskDB) IsFileUploaded(id string, isDispatched bool) bool {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.RLock()
+	defer taskLock.RUnlock()
 	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
 		log.Errorf("query upload progress keys failed, file info not found %s", err)
@@ -758,8 +789,9 @@ func (this *TaskDB) AddFileBlockHashes(id string, blocks []string) error {
 }
 
 func (this *TaskDB) AddFileUnpaid(id, recipientWalAddr string, paymentId, asset int32, amount uint64) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	unpaidKey := FileUnpaidKey(id, recipientWalAddr, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {
@@ -799,8 +831,9 @@ func (this *TaskDB) AddFileUnpaid(id, recipientWalAddr string, paymentId, asset 
 
 // GetUnpaidPayments. get unpaid amount of task to payee
 func (this *TaskDB) GetUnpaidPayments(id, payToAddress string, asset int32) (map[int32]*Payment, error) {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.RLock()
+	defer taskLock.RUnlock()
 	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {
@@ -814,8 +847,9 @@ func (this *TaskDB) GetUnpaidPayments(id, payToAddress string, asset int32) (map
 }
 
 func (this *TaskDB) DeleteFileUnpaid(id, payToAddress string, paymentId, asset int32, amount uint64) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	unpaidKey := FileUnpaidKey(id, payToAddress, asset)
 	info, err := this.getFileUnpaidInfo(unpaidKey)
 	if err != nil {
@@ -896,8 +930,9 @@ func (this *TaskDB) FileProgress(id string) map[string]FileProgress {
 
 //  SetBlockStored set the flag of store state
 func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint64, offset int64, links []string) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	blockKey := BlockInfoKey(id, index, blockHashStr)
 	block, err := this.getBlockInfo(blockKey)
 	if block == nil || err != nil {
@@ -1084,8 +1119,9 @@ func (this *TaskDB) UndoneList(ft TaskType) ([]string, error) {
 }
 
 func (this *TaskDB) SetUploadProgressDone(id, nodeAddr string) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	log.Debugf("SetUploadProgressDone :%s, addr: %s", id, nodeAddr)
 	fi, err := this.GetTaskInfo(id)
 	if err != nil {
@@ -1121,8 +1157,9 @@ func (this *TaskDB) SetUploadProgressDone(id, nodeAddr string) error {
 }
 
 func (this *TaskDB) UpdateTaskProgress(id, nodeAddr string, prog uint64) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	log.Debugf("UpdateTaskProgress :%s, addr: %s, progress %d", id, nodeAddr, prog)
 	// save upload progress info
 	progressKey := FileProgressKey(id, nodeAddr)
@@ -1144,8 +1181,9 @@ func (this *TaskDB) UpdateTaskProgress(id, nodeAddr string, prog uint64) error {
 }
 
 func (this *TaskDB) UpdateTaskProgressState(id, nodeAddr string, state TaskState) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.Lock()
+	defer taskLock.Unlock()
 	log.Debugf("UpdateTaskProgress :%s, addr: %s, state %d", id, nodeAddr, state)
 	// save upload progress info
 	progressKey := FileProgressKey(id, nodeAddr)
@@ -1174,8 +1212,9 @@ func (this *TaskDB) UpdateTaskProgressState(id, nodeAddr string, state TaskState
 
 // IsNodeTaskDone. check if a node has done
 func (this *TaskDB) IsNodeTaskDoingOrDone(id, nodeAddr string) (bool, error) {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
+	taskLock := this.GetTaskLock(id)
+	taskLock.RLock()
+	defer taskLock.RUnlock()
 	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
 		return false, err
