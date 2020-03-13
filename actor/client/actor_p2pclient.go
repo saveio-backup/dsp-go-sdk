@@ -559,7 +559,7 @@ func P2pGetEndpointAddr(addr chainCom.Address, targetDnsAddr string) (string, er
 		}
 		return "", dspErr.New(dspErr.DNS_REQ_TRACKER_ERROR, "response is nil")
 	case <-time.After(time.Duration(common.ACTOR_P2P_REQ_TIMEOUT) * time.Second):
-		log.Errorf("[P2pGetEndpointAddr] timeout")
+		log.Errorf("[P2pGetEndpointAddr] get %s with dns %s timeout", addr.ToBase58(), targetDnsAddr)
 		return "", dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pGetEndpointAddr] timeout")
 	}
 }

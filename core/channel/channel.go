@@ -626,10 +626,9 @@ func (this *Channel) ChannelExist(walletAddr string) bool {
 		return false
 	}
 	for _, ch := range all.Channels {
-		if ch.Address != walletAddr {
-			continue
+		if ch.Address == walletAddr {
+			return true
 		}
-		return true
 	}
 	return false
 }
