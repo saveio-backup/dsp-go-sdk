@@ -17,9 +17,9 @@ import (
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/dsp-go-sdk/utils/ticker"
 	chActorClient "github.com/saveio/pylons/actor/client"
-
 	"github.com/saveio/themis/account"
 	"github.com/saveio/themis/common/log"
+	"github.com/saveio/themis/http/base/sys"
 )
 
 var Version string
@@ -139,6 +139,10 @@ func (this *Dsp) Start() error {
 		go this.StartCheckRemoveFiles()
 		go this.startDispatchFileService()
 		go this.startDNSHealthCheckService()
+	}
+	if this.IsClient() {
+		sys.MonitorEnable = false
+		log.Debugf("disable monitor")
 	}
 	if this.IsClient() && this.config.HealthCheckDNS {
 		log.Debugf("startDNSHealthCheckService")
