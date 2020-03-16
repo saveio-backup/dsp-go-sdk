@@ -818,29 +818,14 @@ func (this *TaskMgr) IsTaskCanResume(taskId string) (bool, error) {
 	if !ok {
 		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	state := v.State()
-	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
-		return false, dspErr.New(dspErr.WRONG_TASK_TYPE, "can't resume the task, it's state: %d", state)
-	}
-	if state == store.TaskStatePause {
-		return true, nil
-	}
-	return false, nil
+	return v.IsTaskCanResume(), nil
 }
-
 func (this *TaskMgr) IsTaskCanPause(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	state := v.State()
-	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
-		return false, dspErr.New(dspErr.WRONG_TASK_TYPE, "can't pause the task, it's state: %d", state)
-	}
-	if state == store.TaskStateDoing || state == store.TaskStatePrepare {
-		return true, nil
-	}
-	return false, nil
+	return v.IsTaskCanPause(), nil
 }
 
 func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
@@ -848,72 +833,58 @@ func (this *TaskMgr) IsTaskPause(taskId string) (bool, error) {
 	if !ok {
 		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	return v.State() == store.TaskStatePause, nil
+	return v.IsTaskPause(), nil
 }
-
 func (this *TaskMgr) IsTaskDone(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	return v.State() == store.TaskStateDone, nil
+	return v.IsTaskDone(), nil
 }
-
 func (this *TaskMgr) IsTaskCancel(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	log.Debugf("task state %s, %d", taskId, v.State())
-	return v.State() == store.TaskStateCancel, nil
+	return v.IsTaskCancel(), nil
 }
-
 func (this *TaskMgr) IsTaskPaying(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	log.Debugf("task detail state %s, %d", taskId, v.DetailState())
-	return v.DetailState() == TaskUploadFilePaying || v.DetailState() == TaskDownloadPayForBlocks, nil
+	return v.IsTaskPaying(), nil
 }
-
 func (this *TaskMgr) IsTaskPauseOrCancel(taskId string) (bool, bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	state := v.State()
-	return state == store.TaskStatePause, state == store.TaskStateCancel, nil
+	pause, cancel := v.IsTaskPauseOrCancel()
+	return pause, cancel, nil
 }
-
 func (this *TaskMgr) IsTaskStop(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	state := v.State()
-	if state != store.TaskStatePause && state != store.TaskStateCancel {
-		return false, nil
-	}
-	return state == store.TaskStatePause || state == store.TaskStateCancel, nil
+	return v.IsTaskStop(), nil
 }
-
 func (this *TaskMgr) IsTaskPreparingOrDoing(taskId string) (bool, bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	state := v.State()
-	return state == store.TaskStatePrepare, state == store.TaskStateDoing, nil
+	preparing, doing := v.IsTaskPreparingOrDoing()
+	return preparing, doing, nil
 }
-
 func (this *TaskMgr) IsTaskFailed(taskId string) (bool, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {
 		return false, dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task not found: %v", taskId)
 	}
-	log.Debugf("v.state: %d", v.State())
-	return v.State() == store.TaskStateFailed, nil
+	return v.IsTaskFailed(), nil
 }
 
 func (this *TaskMgr) GetDownloadTaskIdFromUrl(url string) string {

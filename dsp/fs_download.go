@@ -194,28 +194,24 @@ func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *com
 }
 
 func (this *Dsp) PauseDownload(taskId string) error {
-	if taskType, _ := this.taskMgr.GetTaskType(taskId); taskType != store.TaskTypeDownload {
-		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a download task", taskId)
+	tsk, ok := this.taskMgr.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
-	if canPause, err := this.taskMgr.IsTaskCanPause(taskId); err != nil || !canPause {
-		return err
-	}
-	if err := this.taskMgr.SetTaskState(taskId, store.TaskStatePause); err != nil {
-		return err
+	if err := tsk.Pause(); err != nil {
+		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskPause)
 	return nil
 }
 
 func (this *Dsp) ResumeDownload(taskId string) error {
-	if taskType, _ := this.taskMgr.GetTaskType(taskId); taskType != store.TaskTypeDownload {
-		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a download task", taskId)
+	tsk, ok := this.taskMgr.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
-	if canResume, err := this.taskMgr.IsTaskCanResume(taskId); err != nil || !canResume {
-		return err
-	}
-	if err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
-		return err
+	if err := tsk.Resume(); err != nil {
+		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
 	return this.checkIfResumeDownload(taskId)
@@ -1048,8 +1044,9 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet []string) err
 			return dspErr.NewWithError(dspErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
 		}
 		defer func() {
-			log.Debugf("close file")
-			file.Close()
+			if err := file.Close(); err != nil {
+				log.Errorf("close file err %s", err)
+			}
 		}()
 	}
 	if file == nil {
@@ -1490,10 +1487,11 @@ func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.B
 		if err := this.fs.PutBlock(blk); err != nil {
 			return err
 		}
+		log.Debugf("put block success %v-%s-%d", fileHashStr, value.Hash, value.Index)
 		if err := this.fs.PutTag(value.Hash, fileHashStr, uint64(value.Index), value.Tag); err != nil {
 			return err
 		}
-
+		log.Debugf(" put tag or done %s-%s-%d", fileHashStr, value.Hash, value.Index)
 		if err := this.taskMgr.SetBlockDownloaded(taskId, value.Hash,
 			value.PeerAddr, value.Index, value.Offset, nil); err != nil {
 			log.Errorf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d, err: %s",

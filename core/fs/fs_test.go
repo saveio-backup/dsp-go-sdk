@@ -1,19 +1,24 @@
 package fs
 
 import (
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/saveio/dsp-go-sdk/config"
 	"github.com/saveio/dsp-go-sdk/utils"
+	"github.com/saveio/max/merkledag"
+	ml "github.com/saveio/max/merkledag"
 	chain "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis-go-sdk/wallet"
 	"github.com/saveio/themis/common"
+	"github.com/saveio/themis/common/log"
 )
 
 var testbigFile = "../testdata/testuploadbigfile.txt"
@@ -351,45 +356,6 @@ func TestEncryptNodeToFiles(t *testing.T) {
 	}
 }
 
-func TestDecryptPrefixedFile(t *testing.T) {
-	cfg := &config.DspConfig{
-		FsRepoRoot: "./Repo",
-		FsFileRoot: "./Downloads",
-	}
-	fs, err := NewFs(cfg, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	encryptedFile, err := os.OpenFile(testFileEncrypted, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer encryptedFile.Close()
-	prefix := make([]byte, utils.PREFIX_LEN)
-	_, err = encryptedFile.ReadAt(prefix, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	filePrefix := &utils.FilePrefix{}
-	filePrefix.Deserialize(prefix)
-	fmt.Printf("new prefix: %v\n", prefix)
-	fmt.Printf("version: %d\n", filePrefix.Version)
-	fmt.Printf("encrypt: %t\n", filePrefix.Encrypt)
-	fmt.Printf("salt: %v\n", filePrefix.EncryptSalt)
-	fmt.Printf("hash: %v\n", filePrefix.EncryptHash)
-	fmt.Printf("owner: %s\n", filePrefix.Owner.ToBase58())
-	fmt.Printf("fileSize: %d\n", filePrefix.FileSize)
-	verify := utils.VerifyEncryptPassword(encryptPassword, filePrefix.EncryptSalt, filePrefix.EncryptHash)
-	fmt.Printf("verify : %t\n", verify)
-	fmt.Printf("len: %d\n", len(string(prefix)))
-	err = fs.AESDecryptFile(testFileEncrypted, string(prefix), encryptPassword, testFileDecrypted)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestReadBlock(t *testing.T) {
 	cfg := &config.DspConfig{
 		FsRepoRoot: "/Users/zhijie/Desktop/onchain/save-test/node5/FS/AFoUr6dKxGCAcx74nKfBBWavRCyNcengbJ",
@@ -429,4 +395,77 @@ func TestGetAllCid(t *testing.T) {
 	for i, h := range cids {
 		fmt.Printf("i = %d, h = %s\n", i, h)
 	}
+}
+
+func TestPutBlockAndTag(t *testing.T) {
+	log.InitLog(1, log.Stdout, "./Log/")
+	repoPath := "./Repo"
+	downloadPath := "./Downloads"
+
+	defer os.RemoveAll(repoPath)
+	defer os.RemoveAll(downloadPath)
+	cfg := &config.DspConfig{
+		FsRepoRoot: repoPath,
+		FsFileRoot: downloadPath,
+		FsType:     config.FS_BLOCKSTORE,
+	}
+	fs, err := NewFs(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blockCount := 10000
+	blockPerFile := 200
+	CHUNK_SIZE := 256 * 1024
+	fileCnt := blockCount / blockPerFile
+	buf := make([]byte, blockCount*CHUNK_SIZE)
+	rand.Read(buf)
+	type BlockData struct {
+		Blk   *merkledag.RawNode
+		Block []byte
+		Hash  string
+		Tag   []byte
+	}
+	blocksDataMap := make(map[int]*BlockData)
+	for i := 0; i < blockCount; i++ {
+		start := i * CHUNK_SIZE
+		end := (i + 1) * CHUNK_SIZE
+		block := ml.NewRawNode(buf[start:end])
+		blocksDataMap[i] = &BlockData{
+			Blk:  block,
+			Hash: block.Cid().String(),
+			Tag:  buf[start : start+100],
+		}
+	}
+	wg := new(sync.WaitGroup)
+	for i := 0; i < fileCnt; i++ {
+		blks := make([]*BlockData, 0)
+		for j := i * blockPerFile; j < (i+1)*blockPerFile; j++ {
+			blks = append(blks, blocksDataMap[j])
+		}
+		wg.Add(1)
+		go func(datas []*BlockData) {
+			defer wg.Done()
+			fileHashStr := datas[0].Hash
+			log.Infof("test %v", fileHashStr)
+			for index, value := range datas {
+				// blk := fs.EncodedToBlockWithCid(value.Block, value.Hash)
+				// if blk.Cid().String() != value.Hash {
+				// 	t.Fatalf("receive a wrong block: %s, expected: %s", blk.Cid().String(), value.Hash)
+				// }
+				blk := value.Blk
+				if err := fs.PutBlock(blk); err != nil {
+					t.Fatal(err)
+				}
+				log.Debugf("put block success %v-%s-%d", fileHashStr, value.Hash, index)
+				if err := fs.PutTag(value.Hash, fileHashStr, uint64(index), value.Tag); err != nil {
+					t.Fatal(err)
+				}
+				log.Debugf("put tag success %v-%s-%d", fileHashStr, value.Hash, index)
+			}
+			log.Infof("test %v done", fileHashStr)
+		}(blks)
+	}
+	wg.Wait()
+	log.Infof("test done")
 }

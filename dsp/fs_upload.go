@@ -285,45 +285,24 @@ func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.Uploa
 
 // PauseUpload. pause a task
 func (this *Dsp) PauseUpload(taskId string) error {
-	taskType, _ := this.taskMgr.GetTaskType(taskId)
-	if taskType != store.TaskTypeUpload {
-		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a upload task", taskId)
+	tsk, ok := this.taskMgr.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
-	canPause, err := this.taskMgr.IsTaskCanPause(taskId)
-	if err != nil {
-		log.Errorf("pause task err %s", err)
-		return err
-	}
-	if !canPause {
-		log.Debugf("task is pausing")
-		return nil
-	}
-	err = this.taskMgr.SetTaskState(taskId, store.TaskStatePause)
-	if err != nil {
-		return err
+	if err := tsk.Pause(); err != nil {
+		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskPause)
 	return nil
 }
 
 func (this *Dsp) ResumeUpload(taskId string) error {
-	taskType, _ := this.taskMgr.GetTaskType(taskId)
-	if taskType != store.TaskTypeUpload {
-		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a upload task", taskId)
+	tsk, ok := this.taskMgr.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
-	canResume, err := this.taskMgr.IsTaskCanResume(taskId)
-	if err != nil {
-		log.Errorf("resume task err %s", err)
-		return err
-	}
-	if !canResume {
-		log.Debugf("task is resuming")
-		return nil
-	}
-	err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
-	if err != nil {
-		log.Errorf("resume task err %s", err)
-		return err
+	if err := tsk.Resume(); err != nil {
+		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
 	return this.checkIfResume(taskId)

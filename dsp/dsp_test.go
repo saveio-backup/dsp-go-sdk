@@ -309,7 +309,7 @@ func TestUploadFile(t *testing.T) {
 		DnsURL:        []byte(fmt.Sprintf("dsp://file%d", time.Now().Unix())),
 	}
 
-	ret, err := d.UploadFile("", uploadTestFile, opt)
+	ret, err := d.UploadFile(true, "", uploadTestFile, opt)
 	log.Debugf("upload file ret %v", ret)
 	if err != nil {
 		log.Errorf("upload file failed, err:%s", err)
@@ -438,7 +438,7 @@ func TestDownloadFile(t *testing.T) {
 	log.Infof("wallet address:%s", acc.Address.ToBase58())
 	d.taskMgr.RegProgressCh()
 	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	err = d.DownloadFile("", fileHashStr, nil)
+	err = d.DownloadFile(true, "", fileHashStr, nil)
 	if err != nil {
 		log.Errorf("download err %s\n", err)
 	}

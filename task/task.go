@@ -332,6 +332,10 @@ func (this *Task) SetOwner(owner string) error {
 func (this *Task) SetTaskState(newState store.TaskState) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
+	return this.setTaskState(newState)
+}
+
+func (this *Task) setTaskState(newState store.TaskState) error {
 	oldState := store.TaskState(this.info.TaskState)
 	if oldState == newState {
 		log.Debugf("set task with same state id: %s, state: %d", this.id, oldState)
@@ -643,6 +647,114 @@ func (this *Task) State() store.TaskState {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return store.TaskState(this.info.TaskState)
+}
+
+func (this *Task) Pause() error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+
+	state := this.info.TaskState
+	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
+		return nil
+	}
+	if state == store.TaskStateDoing || state == store.TaskStatePrepare {
+		return this.setTaskState(store.TaskStatePause)
+	}
+	return nil
+}
+
+func (this *Task) Resume() error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+
+	state := this.info.TaskState
+	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
+		return nil
+	}
+	if state == store.TaskStatePause {
+		return this.setTaskState(store.TaskStateDoing)
+	}
+	return nil
+}
+
+func (this *Task) IsTaskCanResume() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	state := this.info.TaskState
+	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
+		return false
+	}
+	if state == store.TaskStatePause {
+		return true
+	}
+	return false
+}
+
+func (this *Task) IsTaskCanPause() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	state := this.info.TaskState
+	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
+		return false
+	}
+	if state == store.TaskStateDoing || state == store.TaskStatePrepare {
+		return true
+	}
+	return false
+}
+
+func (this *Task) IsTaskPause() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.info.TaskState == store.TaskStatePause
+}
+
+func (this *Task) IsTaskDone() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.info.TaskState == store.TaskStateDone
+}
+
+func (this *Task) IsTaskCancel() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.info.TaskState == store.TaskStateCancel
+}
+
+func (this *Task) IsTaskPaying() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return TaskProgressState(this.info.TranferState) == TaskUploadFilePaying || TaskProgressState(this.info.TranferState) == TaskDownloadPayForBlocks
+}
+
+func (this *Task) IsTaskPauseOrCancel() (bool, bool) {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	state := this.info.TaskState
+	return state == store.TaskStatePause, state == store.TaskStateCancel
+}
+
+func (this *Task) IsTaskStop() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	state := this.info.TaskState
+	if state != store.TaskStatePause && state != store.TaskStateCancel {
+		return false
+	}
+	return state == store.TaskStatePause || state == store.TaskStateCancel
+}
+
+func (this *Task) IsTaskPreparingOrDoing() (bool, bool) {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	state := this.info.TaskState
+	return state == store.TaskStatePrepare, state == store.TaskStateDoing
+}
+
+func (this *Task) IsTaskFailed() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.info.TaskState == store.TaskStateFailed
 }
 
 func (this *Task) DetailState() TaskProgressState {
