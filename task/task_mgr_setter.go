@@ -390,8 +390,8 @@ func (this *TaskMgr) DeleteFileUnpaid(id, walletAddress string, paymentId, asset
 	return nil
 }
 
-func (this *TaskMgr) DeleteTaskIds(ids []string) error {
-	err := this.db.DeleteTaskIds(ids)
+func (this *TaskMgr) HideTaskIds(ids []string) error {
+	err := this.db.HideTaskIds(ids)
 	if err != nil {
 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
 	}

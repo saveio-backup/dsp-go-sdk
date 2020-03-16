@@ -132,6 +132,7 @@ type TaskInfo struct {
 	BindDNS         bool              `json:"bind_dns,omitempty"`               // bind dns or not
 	WhiteList       []*WhiteList      `json:"white_list,omitempty"`             // white list
 	Share           bool              `json:"share,omitempty"`                  // share or not
+	Hide            bool              `json:"hide,omitempty"`                   // hide task in transfer list
 	ErrorCode       uint32            `json:"error_code,omitempty"`             // error code
 	ErrorMsg        string            `json:"error_msg,omitempty"`              // error msg
 	Result          interface{}       `json:"result"`                           // task complete result
@@ -284,7 +285,7 @@ func (this *TaskDB) getTaskCount() (*TaskCount, error) {
 
 // GetTaskIdList. Get all task id list with offset, limit, task type
 func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,
-	ft TaskType, complete, reverse, includeFailed bool) []string {
+	ft TaskType, complete, reverse, includeFailed, ignoreHide bool) []string {
 	prefix := TaskInfoKey("")
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
@@ -296,6 +297,9 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd,
 		info, err := this.getTaskInfoByKey(k)
 		if err != nil || info == nil {
 			log.Warnf("get file info of id %s failed", k)
+			continue
+		}
+		if ignoreHide && info.Hide {
 			continue
 		}
 		if !complete && (info.Type != ft || info.TaskState == TaskStateDone) {
@@ -400,15 +404,17 @@ func (this *TaskDB) SetFileName(id string, fileName string) error {
 	return this.batchSaveTaskInfo(nil, fi)
 }
 
-func (this *TaskDB) DeleteTaskIds(ids []string) error {
+func (this *TaskDB) HideTaskIds(ids []string) error {
 	batch := this.db.NewBatch()
 	for _, id := range ids {
 		taskInfo, err := this.GetTaskInfo(id)
 		if err != nil || taskInfo == nil {
 			continue
 		}
-		key := TaskIdIndexKey(taskInfo.Index)
-		this.db.BatchDelete(batch, []byte(key))
+		taskInfo.Hide = true
+		if err := this.batchSaveTaskInfo(batch, taskInfo); err != nil {
+			log.Errorf("hide task %s failed err %s", id, err)
+		}
 	}
 	return this.db.BatchCommit(batch)
 }

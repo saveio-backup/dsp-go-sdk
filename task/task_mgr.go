@@ -192,6 +192,16 @@ func (this *TaskMgr) CleanTask(taskId string) error {
 	return nil
 }
 
+// CleanTask. clean task from memory and DB
+func (this *TaskMgr) CleanTasks(taskId []string) error {
+	for _, id := range taskId {
+		if err := this.CleanTask(id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (this *TaskMgr) TaskNum() int {
 	return len(this.tasks)
 }

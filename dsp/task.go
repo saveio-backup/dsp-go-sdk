@@ -67,6 +67,10 @@ func (this *Dsp) IsTaskExist(taskId string) bool {
 	return this.taskMgr.TaskExist(taskId)
 }
 
+func (this *Dsp) CleanTasks(taskIds []string) error {
+	return this.taskMgr.CleanTasks(taskIds)
+}
+
 func (this *Dsp) Progress() {
 	this.RegProgressChannel()
 	go func() {
@@ -141,15 +145,16 @@ func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
 }
 
 func (this *Dsp) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,
-	ft store.TaskType, complete, reverse, includeFailed bool) []string {
+	ft store.TaskType, complete, reverse, includeFailed, ignoreHide bool) []string {
 	if this == nil || this.taskMgr == nil {
 		return nil
 	}
-	return this.taskMgr.GetTaskIdList(offset, limit, createdAt, createdAtEnd, updatedAt, updatedAtEnd, ft, complete, reverse, includeFailed)
+	return this.taskMgr.GetTaskIdList(offset, limit, createdAt, createdAtEnd, updatedAt, updatedAtEnd, ft,
+		complete, reverse, includeFailed, ignoreHide)
 }
 
-func (this *Dsp) DeleteTaskIds(ids []string) error {
-	return this.taskMgr.DeleteTaskIds(ids)
+func (this *Dsp) HideTaskIds(ids []string) error {
+	return this.taskMgr.HideTaskIds(ids)
 }
 
 // GetFileUploadSize. get file upload size
