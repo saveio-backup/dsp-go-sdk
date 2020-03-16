@@ -1469,6 +1469,7 @@ func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.B
 		return nil
 	}
 
+	blkInfos := make([]*store.BlockInfo, 0)
 	for _, value := range resps {
 		if len(value.Block) == 0 {
 			log.Errorf("receive empty block %d of file %s", len(value.Block), fileHashStr)
@@ -1492,15 +1493,27 @@ func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.B
 			return err
 		}
 		log.Debugf(" put tag or done %s-%s-%d", fileHashStr, value.Hash, value.Index)
-		if err := this.taskMgr.SetBlockDownloaded(taskId, value.Hash,
-			value.PeerAddr, value.Index, value.Offset, nil); err != nil {
-			log.Errorf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d, err: %s",
-				taskId, fileHashStr, value.Hash, value.Index, value.Offset, err)
+		blkInfos = append(blkInfos, &store.BlockInfo{
+			Hash:       value.Hash,
+			Index:      value.Index,
+			DataOffset: uint64(value.Offset),
+			NodeList:   []string{value.PeerAddr},
+		})
+
+	}
+	if len(blkInfos) > 0 {
+		if err := this.taskMgr.SetBlocksDownloaded(taskId, blkInfos); err != nil {
+			log.Errorf("SetBlocksDownloaded taskId:%s, %s-%s-%d-%d to %s-%d-%d, err: %s",
+				taskId, fileHashStr, blkInfos[0].Hash, blkInfos[0].Index, blkInfos[0].DataOffset,
+				blkInfos[len(blkInfos)-1].Hash, blkInfos[len(blkInfos)-1].Index, blkInfos[len(blkInfos)-1].DataOffset,
+				err)
 			return err
 		}
-		log.Debugf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d",
-			taskId, fileHashStr, value.Hash, value.Index, value.Offset)
+		log.Debugf("SetBlocksDownloaded taskId:%s, %s-%s-%d-%d to %s-%d-%d",
+			taskId, fileHashStr, blkInfos[0].Hash, blkInfos[0].Index, blkInfos[0].DataOffset,
+			blkInfos[len(blkInfos)-1].Hash, blkInfos[len(blkInfos)-1].Index, blkInfos[len(blkInfos)-1].DataOffset)
 	}
+
 	if !this.taskMgr.IsFileDownloaded(taskId) {
 		return nil
 	}

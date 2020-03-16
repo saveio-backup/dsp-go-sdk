@@ -580,6 +580,21 @@ func (this *Task) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index ui
 	return nil
 }
 
+func (this *Task) SetBlocksDownloaded(id string, blkInfos []*store.BlockInfo) error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	err := this.db.SetBlocksDownloaded(id, blkInfos)
+	if err != nil {
+		return err
+	}
+	newInfo, err := this.db.GetTaskInfo(id)
+	if err != nil {
+		return err
+	}
+	this.info = newInfo
+	return nil
+}
+
 // GetTaskInfoCopy. get task info deep copy object.
 // clone it for read-only
 func (this *Task) GetTaskInfoCopy() *store.TaskInfo {

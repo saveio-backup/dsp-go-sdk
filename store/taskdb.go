@@ -935,68 +935,97 @@ func (this *TaskDB) FileProgress(id string) map[string]FileProgress {
 }
 
 //  SetBlockStored set the flag of store state
-func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint64, offset int64, links []string) error {
+func (this *TaskDB) SetBlocksDownloaded(id string, blkInfos []*BlockInfo) error {
 	taskLock := this.GetTaskLock(id)
 	taskLock.Lock()
 	defer taskLock.Unlock()
-	blockKey := BlockInfoKey(id, index, blockHashStr)
-	block, err := this.getBlockInfo(blockKey)
-	if block == nil || err != nil {
-		block = &BlockInfo{
-			NodeList:   make([]string, 0),
-			LinkHashes: make([]string, 0),
-		}
-	}
-	if block.ReqTimes == nil {
-		block.ReqTimes = make(map[string]uint32)
-	}
-	count := block.ReqTimes[nodeAddr]
-	block.TaskId = id
-	block.Hash = blockHashStr
-	block.Index = index
-	block.DataOffset = uint64(offset)
-	block.NodeList = append(block.NodeList, nodeAddr)
-	block.LinkHashes = append(block.LinkHashes, links...)
-	block.ReqTimes[nodeAddr] = count + 1
-
-	blockBuf, err := json.Marshal(block)
-	if err != nil {
-		return err
-	}
-
-	if count > 0 {
-		log.Warnf("set a downloaded block to db task %s, %s-%d", id, blockHashStr, index)
-		return this.db.Put([]byte(blockKey), blockBuf)
-	}
-
-	progressKey := FileProgressKey(id, nodeAddr)
-	progress, err := this.getProgressInfo(progressKey)
-	if progress == nil || err != nil {
-		progress = &FileProgress{
-			TaskId:       id,
-			NodeHostAddr: nodeAddr,
-		}
-	}
-	progress.Progress++
-	progressBuf, err := json.Marshal(progress)
-	if err != nil {
-		return err
-	}
-
 	fi, err := this.GetTaskInfo(id)
 	if err != nil {
 		return err
 	}
-	fi.CurrentBlock = blockHashStr
-	fi.CurrentIndex = index
 	batch := this.db.NewBatch()
-	log.Debugf("set block %s, len %d", blockKey, len(blockBuf))
+	blockInfoCache := make(map[string]*BlockInfo)
+	progressCache := make(map[string]*FileProgress)
+	for _, blkInfo := range blkInfos {
+		blockHashStr := blkInfo.Hash
+		nodeAddr := blkInfo.NodeList[0]
+		index := blkInfo.Index
+		offset := blkInfo.DataOffset
+		links := blkInfo.LinkHashes
+		blockKey := BlockInfoKey(id, index, blockHashStr)
+		block, ok := blockInfoCache[blockKey]
+		if !ok {
+			block, err = this.getBlockInfo(blockKey)
+			if block == nil || err != nil {
+				block = &BlockInfo{
+					NodeList:   make([]string, 0),
+					LinkHashes: make([]string, 0),
+				}
+			}
+		}
+		if block.ReqTimes == nil {
+			block.ReqTimes = make(map[string]uint32)
+		}
+		count := block.ReqTimes[nodeAddr]
+		block.TaskId = id
+		block.Hash = blockHashStr
+		block.Index = index
+		block.DataOffset = uint64(offset)
+		block.NodeList = append(block.NodeList, nodeAddr)
+		block.LinkHashes = append(block.LinkHashes, links...)
+		block.ReqTimes[nodeAddr] = count + 1
+		blockInfoCache[blockKey] = block
+
+		blockBuf, err := json.Marshal(block)
+		if err != nil {
+			return err
+		}
+
+		if count > 0 {
+			log.Warnf("set a downloaded block to db task %s, %s-%d", id, blockHashStr, index)
+			this.db.BatchPut(batch, []byte(blockKey), blockBuf)
+			continue
+		}
+
+		progressKey := FileProgressKey(id, nodeAddr)
+		progress, ok := progressCache[progressKey]
+		if !ok {
+			progress, err = this.getProgressInfo(progressKey)
+			if progress == nil || err != nil {
+				progress = &FileProgress{
+					TaskId:       id,
+					NodeHostAddr: nodeAddr,
+				}
+			}
+		}
+		progress.Progress++
+		progressCache[progressKey] = progress
+		progressBuf, err := json.Marshal(progress)
+		if err != nil {
+			return err
+		}
+		fi.CurrentBlock = blockHashStr
+		fi.CurrentIndex = index
+		this.db.BatchPut(batch, []byte(blockKey), blockBuf)
+		this.db.BatchPut(batch, []byte(progressKey), progressBuf)
+	}
 	if err := this.batchSaveTaskInfo(batch, fi); err != nil {
 		return err
 	}
-	this.db.BatchPut(batch, []byte(blockKey), blockBuf)
-	this.db.BatchPut(batch, []byte(progressKey), progressBuf)
 	return this.db.BatchCommit(batch)
+
+}
+
+//  SetBlockStored set the flag of store state
+func (this *TaskDB) SetBlockDownloaded(id, blockHashStr, nodeAddr string, index uint64, offset int64, links []string) error {
+	blkInfo := &BlockInfo{
+		Hash:       blockHashStr,
+		Index:      index,
+		DataOffset: uint64(offset),
+		LinkHashes: links,
+		NodeList:   []string{nodeAddr},
+	}
+	return this.SetBlocksDownloaded(id, []*BlockInfo{blkInfo})
 }
 
 //  IsBlockDownloaded

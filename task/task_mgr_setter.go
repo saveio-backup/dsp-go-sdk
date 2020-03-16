@@ -340,6 +340,18 @@ func (this *TaskMgr) SetBlockDownloaded(taskId, blockHashStr, nodeAddr string, i
 	return nil
 }
 
+func (this *TaskMgr) SetBlocksDownloaded(taskId string, blkInfos []*store.BlockInfo) error {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
+	}
+	err := v.SetBlocksDownloaded(taskId, blkInfos)
+	if err != nil {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
+	}
+	return nil
+}
+
 func (this *TaskMgr) AddShareTo(id, walletAddress string) error {
 	err := this.db.AddShareTo(id, walletAddress)
 	if err != nil {
