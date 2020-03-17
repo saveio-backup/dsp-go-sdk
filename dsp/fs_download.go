@@ -370,7 +370,8 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 	peerPayInfos := make(map[string]*file.Payment, 0)
 	if sessions != nil {
 		// use original sessions
-		log.Debugf("use original sessions: %v", sessions)
+		log.Debugf("file %s is a breakpoint transfer task, use original sessions: %v",
+			taskInfo.FileHash, sessions)
 		oldSessionWg := new(sync.WaitGroup)
 		for _, session := range sessions {
 			peerPayInfos[session.WalletAddr] = &file.Payment{
@@ -388,7 +389,7 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 			}(session.HostAddr)
 		}
 		oldSessionWg.Wait()
-		log.Debugf("get session from db : %v", peerPayInfos)
+		log.Debugf("get session from db: %v", peerPayInfos)
 		return peerPayInfos, nil
 	}
 	msg := message.NewFileMsg(taskInfo.FileHash, netcom.FILE_OP_DOWNLOAD_ASK,
@@ -400,7 +401,9 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 	prefix := ""
 	replyLock := &sync.Mutex{}
 	nodeHostMap := make(map[string]string)
-	log.Debugf("will broadcast file download ask msg to %v", addrs)
+	sessionIds := make(map[string]string)
+	log.Debugf("broadcast file download ask msg %s to %v for file %s",
+		msg.MessageId, addrs, taskInfo.FileHash)
 	reply := func(msg proto.Message, hostAddr string) bool {
 		replyLock.Lock()
 		defer replyLock.Unlock()
@@ -410,6 +413,7 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 			return false
 		}
 		fileMsg := p2pMsg.Payload.(*file.File)
+		log.Debugf("receive file %s download ack msg from peer %s", fileMsg.Hash, hostAddr)
 		if len(fileMsg.BlockHashes) < len(blockHashes) {
 			return false
 		}
@@ -439,10 +443,10 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 			prefix = string(fileMsg.Prefix)
 		}
 		nodeHostMap[fileMsg.PayInfo.WalletAddress] = hostAddr
-		log.Debugf("prefix hex: %s %d, hash len %d", fileMsg.Prefix, fileMsg.TotalBlockCount, len(blockHashes))
+		log.Debugf("file %s, prefix %s, total %d, blockCnt %d",
+			fileMsg.Hash, fileMsg.Prefix, fileMsg.TotalBlockCount, len(blockHashes))
+		sessionIds[fileMsg.PayInfo.WalletAddress] = fileMsg.SessionId
 		peerPayInfos[fileMsg.PayInfo.WalletAddress] = fileMsg.PayInfo
-		this.taskMgr.AddFileSession(taskInfo.Id, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress, hostAddr,
-			uint32(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice)
 		return false
 	}
 	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), msg.MessageId, reply)
@@ -450,6 +454,7 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 	if err != nil {
 		return nil, err
 	}
+
 	log.Debugf("peer prices:%v", peerPayInfos)
 	if len(peerPayInfos) == 0 {
 		return nil, dspErr.New(dspErr.REMOTE_PEER_DELETE_FILE, "no source available")
@@ -477,6 +482,16 @@ func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) 
 		task.FileSize(getFileSizeWithBlockCount(uint64(totalBlockCount))),
 		task.TotalBlockCnt(uint64(totalBlockCount))); err != nil {
 		return nil, err
+	}
+	for peerWalletAddr, sessionId := range sessionIds {
+		sessionPeerPayInfo := peerPayInfos[peerWalletAddr]
+		if sessionPeerPayInfo == nil {
+			continue
+		}
+		if err := this.taskMgr.AddFileSession(taskInfo.Id, sessionId, peerWalletAddr, nodeHostMap[peerWalletAddr],
+			uint32(sessionPeerPayInfo.Asset), sessionPeerPayInfo.UnitPrice); err != nil {
+			return nil, err
+		}
 	}
 	return peerPayInfos, nil
 }
@@ -1035,6 +1050,9 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet []string) err
 	}
 	hasCutPrefix := false
 	prefix := string(taskInfo.Prefix)
+	if len(prefix) == 0 {
+		log.Warnf("task %s file prefix is empty", taskId)
+	}
 	isFileEncrypted := utils.GetPrefixEncrypted(taskInfo.Prefix)
 	var file *os.File
 	if this.config.FsType == config.FS_FILESTORE {
@@ -1101,8 +1119,9 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet []string) err
 				if value.Offset > 0 && !isFileEncrypted {
 					writeAtPos = value.Offset - int64(len(prefix))
 				}
-				log.Debugf("block %s block-len %d, offset %v prefix %v pos %d",
-					block.Cid().String(), len(data), value.Offset, len(prefix), writeAtPos)
+				log.Debugf("file %s append block %s index %d, the block data length %d, offset %v, pos %d",
+					taskInfo.FileHash, value.Index,
+					block.Cid().String(), len(data), value.Offset, writeAtPos)
 				if _, err := file.WriteAt(data, writeAtPos); err != nil {
 					return dspErr.NewWithError(dspErr.WRITE_FILE_DATA_FAILED, err)
 				}
@@ -1151,6 +1170,10 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet []string) err
 			}
 			if timeout, _ := this.taskMgr.IsTaskTimeout(taskInfo.Id); !timeout {
 				continue
+			}
+			if this.taskMgr.IsFileDownloaded(taskInfo.Id) {
+				log.Warnf("task %s is timeout but file has downloed", taskInfo.Id)
+				break
 			}
 			this.taskMgr.SetTaskState(taskInfo.Id, store.TaskStateFailed)
 			workerState := this.taskMgr.GetTaskWorkerState(taskInfo.Id)
@@ -1230,7 +1253,7 @@ func (this *Dsp) addDownloadBlockReq(taskId, fileHashStr string) error {
 	reqs := make([]*task.GetBlockReq, 0)
 	if len(hashes) == 0 {
 		// TODO: check bug
-		if this.taskMgr.IsFileDownloaded(fileHashStr) {
+		if this.taskMgr.IsFileDownloaded(taskId) {
 			log.Debugf("no undownloaded block %s %v", hashes, indexMap)
 			return nil
 		}

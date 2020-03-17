@@ -31,23 +31,28 @@ var testFileTemp = "./setup-temp.exe"
 var encryptPassword = "123456"
 
 func TestNodeFromFile(t *testing.T) {
+	log.InitLog(1, log.Stdout, "./Log/")
+	repoPath := "./Repo"
+	downloadPath := "./Downloads"
+
+	defer os.RemoveAll(repoPath)
+	defer os.RemoveAll(downloadPath)
+	defer os.RemoveAll("./Log")
 	cfg := &config.DspConfig{
-		FsRepoRoot: "./Repo",
-		FsFileRoot: "./Downloads",
+		FsRepoRoot: repoPath,
+		FsFileRoot: downloadPath,
 	}
 	fs, err := NewFs(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, err := fs.NodesFromFile(testFile, walletAddress, false, "")
+	list, err := fs.NodesFromFile("./T7-uploader.zip", "AAAAWg==AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADXFrE901BkX/lt3EyP1U4rB8YyzQAAAAAAADQvD1Q3LXVwbG9hZGVyLnppcAAAAABpc06H", false, "")
 	if err != nil {
 		return
 	}
 	hashMap := make(map[string]struct{})
 	for i, l := range list {
-		if i == 0 {
-			fmt.Printf("#%v hash = %s\n", i, l)
-		}
+		fmt.Printf("#%v hash = %s\n", i, l)
 		_, ok := hashMap[l]
 		if ok {
 			fmt.Printf("duplicated %s", l)

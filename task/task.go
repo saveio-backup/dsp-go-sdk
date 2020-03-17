@@ -272,6 +272,11 @@ func (this *Task) SetWalletaddr(walletAddr string) error {
 func (this *Task) SetFilePath(filePath string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
+	// TODO: temp solution for concurrent update path, will fixed by refactor code
+	if len(this.info.FilePath) != 0 {
+		log.Warnf("task %s has path %s, ignore new path", this.info.Id, this.info.FilePath)
+		return nil
+	}
 	this.info.FilePath = filePath
 	if this.batch {
 		return nil
