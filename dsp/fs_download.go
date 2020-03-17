@@ -160,6 +160,7 @@ func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *com
 		task.MaxPeerCnt(opt.MaxPeerCnt),
 		task.Url(opt.Url),
 		task.Inorder(opt.InOrder),
+		task.FileSize(getFileSizeWithBlockCount(opt.BlockNum)),
 		task.Walletaddr(this.chain.WalletAddress())); err != nil {
 		return err
 	}
@@ -295,6 +296,7 @@ func (this *Dsp) DownloadFileByLink(id, linkStr string, asset int32, inOrder boo
 		Free:        free,
 		SetFileName: setFileName,
 		MaxPeerCnt:  maxPeerCnt,
+		BlockNum:    link.BlockNum,
 	}
 	return this.downloadFileWithOpt(id, link.FileHashStr, opt)
 }
@@ -310,6 +312,7 @@ func (this *Dsp) DownloadFileByUrl(id, url string, asset int32, inOrder bool, de
 	if maxPeerCnt > common.MAX_PEERCNT_FOR_DOWNLOAD {
 		maxPeerCnt = common.MAX_PEERCNT_FOR_DOWNLOAD
 	}
+
 	opt := &common.DownloadOption{
 		FileName:    link.FileName,
 		BlocksRoot:  link.BlocksRoot,
@@ -321,6 +324,7 @@ func (this *Dsp) DownloadFileByUrl(id, url string, asset int32, inOrder bool, de
 		FileOwner:   link.FileOwner,
 		MaxPeerCnt:  maxPeerCnt,
 		Url:         url,
+		BlockNum:    link.BlockNum,
 	}
 	return this.downloadFileWithOpt(id, fileHashStr, opt)
 }
@@ -331,10 +335,12 @@ func (this *Dsp) DownloadFileByHash(id, fileHashStr string, asset int32, inOrder
 	// TODO: get file name, fix url
 	info, _ := this.chain.GetFileInfo(fileHashStr)
 	var fileName, fileOwner, blocksRoot string
+	var blockNum uint64
 	if info != nil {
 		fileName = string(info.FileDesc)
 		fileOwner = info.FileOwner.ToBase58()
 		blocksRoot = string(info.BlocksRoot)
+		blockNum = info.FileBlockNum
 	}
 	if maxPeerCnt > common.MAX_PEERCNT_FOR_DOWNLOAD {
 		maxPeerCnt = common.MAX_PEERCNT_FOR_DOWNLOAD
@@ -349,6 +355,7 @@ func (this *Dsp) DownloadFileByHash(id, fileHashStr string, asset int32, inOrder
 		SetFileName: setFileName,
 		FileOwner:   fileOwner,
 		MaxPeerCnt:  maxPeerCnt,
+		BlockNum:    blockNum,
 	}
 	return this.downloadFileWithOpt(id, fileHashStr, opt)
 }

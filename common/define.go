@@ -53,6 +53,7 @@ type DownloadOption struct {
 	SetFileName bool
 	MaxPeerCnt  int
 	Url         string
+	BlockNum    uint64
 }
 
 type WorkerNetMsgPhase int
