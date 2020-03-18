@@ -111,7 +111,9 @@ func (this *Channel) StartService() error {
 	log.Debugf("StartService")
 	this.firstSyncing = true
 	err := this.chActor.SyncBlockData()
-	this.firstSyncing = false
+	defer func() {
+		this.firstSyncing = false
+	}()
 	log.Debugf("sync block data done")
 	if err != nil {
 		log.Errorf("channel sync block err %s", err)
