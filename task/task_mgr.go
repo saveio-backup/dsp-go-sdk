@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,6 +24,7 @@ import (
 // only save needed information to db by fileDB, the other field save in memory
 type TaskMgr struct {
 	tasks          map[string]*Task
+	retryTasks     map[string]uint64 // retry task taskId <==> retry at timestamp
 	walletHostAddr map[string]string
 	lock           sync.RWMutex
 	blockReqCh     chan []*GetBlockReq // used for share blocks
@@ -39,6 +41,7 @@ func NewTaskMgr(t *ticker.Ticker) *TaskMgr {
 	}
 	tmgr.blockReqCh = make(chan []*GetBlockReq, common.MAX_GOROUTINES_FOR_WORK_TASK)
 	tmgr.progressTicker = t
+	tmgr.retryTasks = make(map[string]uint64)
 	return tmgr
 }
 
@@ -177,12 +180,14 @@ func (this *TaskMgr) DeleteTask(taskId string) {
 	defer this.lock.Unlock()
 	log.Debugf("delete task %s, %s", taskId, debug.Stack())
 	delete(this.tasks, taskId)
+	delete(this.retryTasks, taskId)
 }
 
 // CleanTask. clean task from memory and DB
 func (this *TaskMgr) CleanTask(taskId string) error {
 	this.lock.Lock()
 	delete(this.tasks, taskId)
+	delete(this.retryTasks, taskId)
 	this.lock.Unlock()
 	log.Debugf("clean task %s, %s", taskId, debug.Stack())
 	err := this.db.DeleteTaskInfo(taskId)
@@ -239,6 +244,43 @@ func (this *TaskMgr) GetTaskById(taskId string) (*Task, bool) {
 		this.tasks[taskId] = t
 	}
 	return t, true
+}
+
+func (this *TaskMgr) HasRetryTask() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return len(this.retryTasks) > 0
+}
+
+func (this *TaskMgr) GetUploadTaskToRetry() []string {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	if len(this.retryTasks) == 0 {
+		return nil
+	}
+	list := make(utils.Uint64PairList, 0)
+	for key, value := range this.retryTasks {
+		list = append(list, utils.Uint64Pair{
+			Key:   key,
+			Value: value,
+		})
+	}
+	sort.Sort(list)
+	taskIds := make([]string, 0)
+	for _, l := range list {
+		tsk, ok := this.tasks[l.Key]
+		if !ok {
+			continue
+		}
+		if !tsk.NeedRetry() {
+			continue
+		}
+		if tsk.GetTaskType() != store.TaskTypeUpload {
+			continue
+		}
+		taskIds = append(taskIds, l.Key)
+	}
+	return taskIds
 }
 
 // TaskExist. Check if task exist in memory
@@ -411,8 +453,10 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *dspErr.E
 		if err != nil {
 			log.Errorf("set task state err %s, %s", taskId, err)
 		}
+		this.AddTaskToRetry(v)
 		log.Debugf("EmitResult err %v, %v", err, sdkErr)
 	} else {
+		this.DeleteRetryTask(taskId)
 		log.Debugf("EmitResult ret %v ret == nil %t", ret, ret == nil)
 		err := v.SetResult(ret, 0, "")
 		if err != nil {
@@ -425,6 +469,26 @@ func (this *TaskMgr) EmitResult(taskId string, ret interface{}, sdkErr *dspErr.E
 	}
 	pInfo := v.GetProgressInfo()
 	this.progress <- pInfo
+}
+
+func (this *TaskMgr) AddTaskToRetry(task *Task) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	if task == nil {
+		return
+	}
+	log.Debugf("task %s need retry", task.GetId())
+	taskInfo := task.GetTaskInfoCopy()
+	if taskInfo == nil {
+		return
+	}
+	this.retryTasks[taskInfo.Id] = taskInfo.RetryAt
+}
+
+func (this *TaskMgr) DeleteRetryTask(taskId string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	delete(this.retryTasks, taskId)
 }
 
 // RegShareNotification. register share notification

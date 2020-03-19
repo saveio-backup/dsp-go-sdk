@@ -441,12 +441,24 @@ func (this *Task) SetStoreTx(tx string) error {
 func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	this.info.ErrorCode = errorCode
-	this.info.ErrorMsg = errorMsg
 	if errorCode != 0 {
-		this.info.TaskState = store.TaskStateFailed
+		if this.info.Type != store.TaskTypeUpload || this.info.Retry >= common.MAX_TASK_RETRY {
+			// task hasn't pay on chain, make it failed
+			this.info.TaskState = store.TaskStateFailed
+			this.info.ErrorCode = errorCode
+			this.info.ErrorMsg = errorMsg
+		} else {
+			// task has paid, retry it later
+			this.info.TaskState = store.TaskStateIdle
+			this.info.Retry++
+			this.info.RetryAt = utils.GetMilliSecTimestamp() + utils.GetJitterDelay(this.info.Retry, 30)*1000
+			log.Errorf("task %s is failed, retry %d times, retry at %d",
+				this.info.Id, this.info.Retry, this.info.RetryAt)
+		}
 	} else if result != nil {
 		log.Debugf("task: %s has done", this.id)
+		this.info.ErrorCode = 0
+		this.info.ErrorMsg = ""
 		this.info.Result = result
 		this.info.TaskState = store.TaskStateDone
 		switch this.info.Type {
@@ -727,6 +739,19 @@ func (this *Task) IsTaskPause() bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return this.info.TaskState == store.TaskStatePause
+}
+
+func (this *Task) NeedRetry() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	if this.info.TaskState != store.TaskStateIdle {
+		return false
+	}
+	log.Debugf("utils.GetMilliSecTimestamp() %d, retry at %d", utils.GetMilliSecTimestamp(), this.info.RetryAt)
+	if utils.GetMilliSecTimestamp() >= this.info.RetryAt {
+		return true
+	}
+	return false
 }
 
 func (this *Task) IsTaskDone() bool {

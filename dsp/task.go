@@ -4,6 +4,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/common"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
+	"github.com/saveio/dsp-go-sdk/state"
 
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	netcomm "github.com/saveio/dsp-go-sdk/network/common"
@@ -172,6 +173,26 @@ func (this *Dsp) GetFileUploadSize(fileHashStr, nodeAddr string) (uint64, error)
 		return uint64(progress.Progress) * common.CHUNK_SIZE, nil
 	}
 	return uint64(progressInfo.SlaveProgress[nodeAddr].Progress) * common.CHUNK_SIZE, nil
+}
+
+func (this *Dsp) retryTaskService() bool {
+	if this.state.Get() != state.ModuleStateActive {
+		log.Debugf("stop retry task since module is stopped")
+		return true
+	}
+	taskIds := this.taskMgr.GetUploadTaskToRetry()
+	if len(taskIds) == 0 {
+		return !this.taskMgr.HasRetryTask()
+	}
+	for _, taskId := range taskIds {
+		log.Debugf("retry task service running, retry %s", taskId)
+		if err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
+			log.Errorf("retry task set task state err %s", err)
+			return false
+		}
+		go this.resumeTask(taskId)
+	}
+	return false
 }
 
 func (this *Dsp) RunGetProgressTicker() bool {

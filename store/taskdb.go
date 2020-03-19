@@ -38,13 +38,14 @@ const (
 type TaskState int
 
 const (
-	TaskStatePause TaskState = iota
+	TaskStateNone TaskState = iota - 1
+	TaskStatePause
 	TaskStatePrepare
 	TaskStateDoing
 	TaskStateDone
 	TaskStateFailed
 	TaskStateCancel
-	TaskStateNone
+	TaskStateIdle
 )
 
 // blockInfo record a block infomation of a file
@@ -133,6 +134,8 @@ type TaskInfo struct {
 	WhiteList       []*WhiteList      `json:"white_list,omitempty"`             // white list
 	Share           bool              `json:"share,omitempty"`                  // share or not
 	Hide            bool              `json:"hide,omitempty"`                   // hide task in transfer list
+	Retry           int               `json:"retry"`                            // retry counter
+	RetryAt         uint64            `json:"retryAt"`                          // retry at timestamp
 	ErrorCode       uint32            `json:"error_code,omitempty"`             // error code
 	ErrorMsg        string            `json:"error_msg,omitempty"`              // error msg
 	Result          interface{}       `json:"result"`                           // task complete result

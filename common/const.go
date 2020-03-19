@@ -105,6 +105,7 @@ const (
 	FILE_DOWNLOADED_INDEX_OFFSET   = 3      // check file is downloaded start point
 	MAX_BLOCK_HEIGHT_DIFF          = 10     // max block height diff between peers
 	MAX_DNS_NODE_FOR_PAY           = 4      // max dns node used to pay
+	MAX_TASK_RETRY                 = 20     // max task retry times
 )
 
 // task

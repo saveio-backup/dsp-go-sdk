@@ -27,6 +27,9 @@ func NewWithError(code uint32, err error) *Error {
 	if dErr, ok := err.(*Error); ok {
 		msg = dErr.Message
 	}
+	if len(msg) == 0 {
+		msg = "internal error"
+	}
 	return &Error{
 		Code:    code,
 		Message: msg,

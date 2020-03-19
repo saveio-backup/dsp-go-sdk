@@ -85,12 +85,13 @@ func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.Uploa
 	defer func() {
 		sdkErr, _ := err.(*dspErr.Error)
 		if uploadRet == nil {
+			this.taskMgr.EmitResult(taskId, nil, sdkErr)
 			if sdkErr != nil {
-				log.Errorf("task %s upload finish %v, err: %v", err)
+				this.retryTaskTicker.Run()
+				log.Errorf("++++ task %s upload finish %v, err: %v", err)
 			} else {
 				log.Debugf("task %s is paused", taskId)
 			}
-			this.taskMgr.EmitResult(taskId, nil, sdkErr)
 		} else {
 			log.Debugf("task %v upload finish, result %v", taskId, uploadRet)
 			this.taskMgr.EmitResult(taskId, uploadRet, sdkErr)
@@ -305,7 +306,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
-	return this.checkIfResume(taskId)
+	return this.resumeTask(taskId)
 }
 
 func (this *Dsp) CancelUpload(taskId string, gasLimit uint64) (*common.DeleteUploadFileResp, error) {
@@ -391,7 +392,7 @@ func (this *Dsp) RetryUpload(taskId string) error {
 		return err
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
-	return this.checkIfResume(taskId)
+	return this.resumeTask(taskId)
 }
 
 func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string, gasLimit uint64) (string, uint32, error) {
@@ -601,7 +602,7 @@ func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, error) {
 	return pause, nil
 }
 
-func (this *Dsp) checkIfResume(taskId string) error {
+func (this *Dsp) resumeTask(taskId string) error {
 	tsk, err := this.taskMgr.GetTaskInfoCopy(taskId)
 	if err != nil || tsk == nil {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "can't find download options, please retry")
@@ -985,10 +986,6 @@ func (this *Dsp) findReceivers(taskId string, primaryNodes []chainCom.Address) (
 		if err != nil {
 			return nil, dspErr.NewWithError(dspErr.GET_STORAGE_NODES_FAILED, err)
 		}
-		// addr1, _ := chainCom.AddressFromBase58("AVR3MZhqbvG8wwqxmTMF45BJFJMJLvTh4i")
-		// addr2, _ := chainCom.AddressFromBase58("ARKjRDdJ1ABBus3UtPqGwn3ZyS4WzL23LK")
-		// addr3, _ := chainCom.AddressFromBase58("AdPV78xrEhmPo1ehVUNwvJtZ9BJd8mNJMw")
-		// nodeWalletAddrList = []chainCom.Address{addr1, addr2, addr3}
 		log.Debugf("uploading nodelist %v, opt.CopyNum %d", nodeWalletAddrList, taskInfo.CopyNum)
 		if len(nodeWalletAddrList) < int(taskInfo.CopyNum+1) {
 			return nil, dspErr.New(dspErr.ONLINE_NODES_NOT_ENOUGH, "node is not enough %d, copyNum %d",

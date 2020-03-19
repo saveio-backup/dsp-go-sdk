@@ -275,3 +275,14 @@ func TestJsonOmit(t *testing.T) {
 	}
 	fmt.Printf("json str %s\n", string(data))
 }
+
+func TestPrintTaskState(t *testing.T) {
+	fmt.Printf("state %v\n", TaskStateNone)
+	fmt.Printf("state %v\n", TaskStatePause)
+	fmt.Printf("state %v\n", TaskStatePrepare)
+	fmt.Printf("state %v\n", TaskStateDoing)
+	fmt.Printf("state %v\n", TaskStateDone)
+	fmt.Printf("state %v\n", TaskStateFailed)
+	fmt.Printf("state %v\n", TaskStateCancel)
+	fmt.Printf("state %v\n", TaskStateIdle)
+}

@@ -41,3 +41,11 @@ func TestGetDecryptedFilePath(t *testing.T) {
 
 	fmt.Println("file base ", filepath.Base(filePath))
 }
+
+func TestTotalJitterDelay(t *testing.T) {
+	sum := uint64(0)
+	for i := 1; i <= 50; i++ {
+		sum += GetJitterDelay(i, 30)
+	}
+	fmt.Printf("total sec %d, hour %v\n", sum, sum/3600)
+}

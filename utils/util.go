@@ -226,3 +226,11 @@ func RemoveDuplicated(input []string) []string {
 	}
 	return output
 }
+
+// GetJitterDelay. delay go up when attemp times up
+// initSec is the first delay in second
+// return second
+func GetJitterDelay(attempt, initSec int) uint64 {
+	jitter := (float64(attempt) + rand.Float64()) * float64(initSec)
+	return uint64(jitter)
+}

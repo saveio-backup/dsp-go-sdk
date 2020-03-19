@@ -38,6 +38,7 @@ type Dsp struct {
 	userspaceRecordDB *store.UserspaceRecordDB // user space db
 	state             *state.SyncState         // dsp state
 	closeCh           chan struct{}            // close signal
+	retryTaskTicker   *ticker.Ticker           // retry task ticker
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
@@ -54,6 +55,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	} else {
 		d.taskMgr = task.NewTaskMgr(nil)
 	}
+	d.retryTaskTicker = ticker.NewTicker(time.Second, d.retryTaskService)
 	d.chain = chain.NewChain(acc, c.ChainRpcAddrs, chain.IsClient(d.IsClient()))
 	d.account = acc
 	if len(c.DBPath) > 0 {
