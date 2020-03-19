@@ -985,10 +985,10 @@ func (this *Dsp) findReceivers(taskId string, primaryNodes []chainCom.Address) (
 		if err != nil {
 			return nil, dspErr.NewWithError(dspErr.GET_STORAGE_NODES_FAILED, err)
 		}
-		addr1, _ := chainCom.AddressFromBase58("AVR3MZhqbvG8wwqxmTMF45BJFJMJLvTh4i")
-		addr2, _ := chainCom.AddressFromBase58("ARKjRDdJ1ABBus3UtPqGwn3ZyS4WzL23LK")
-		addr3, _ := chainCom.AddressFromBase58("AdPV78xrEhmPo1ehVUNwvJtZ9BJd8mNJMw")
-		nodeWalletAddrList = []chainCom.Address{addr1, addr2, addr3}
+		// addr1, _ := chainCom.AddressFromBase58("AVR3MZhqbvG8wwqxmTMF45BJFJMJLvTh4i")
+		// addr2, _ := chainCom.AddressFromBase58("ARKjRDdJ1ABBus3UtPqGwn3ZyS4WzL23LK")
+		// addr3, _ := chainCom.AddressFromBase58("AdPV78xrEhmPo1ehVUNwvJtZ9BJd8mNJMw")
+		// nodeWalletAddrList = []chainCom.Address{addr1, addr2, addr3}
 		log.Debugf("uploading nodelist %v, opt.CopyNum %d", nodeWalletAddrList, taskInfo.CopyNum)
 		if len(nodeWalletAddrList) < int(taskInfo.CopyNum+1) {
 			return nil, dspErr.New(dspErr.ONLINE_NODES_NOT_ENOUGH, "node is not enough %d, copyNum %d",
