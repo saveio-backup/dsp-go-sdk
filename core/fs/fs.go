@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	dspErr "github.com/saveio/dsp-go-sdk/error"
+	"github.com/saveio/dsp-go-sdk/state"
 
 	cid "gx/ipfs/QmcZfnkapfECQGcLZaf9B79NRg7cRa9EnZh4LSbkCzwNvY/go-cid"
 	blocks "gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
@@ -33,6 +34,7 @@ type Fs struct {
 	cfg            *config.DspConfig
 	closeCh        chan struct{}
 	removeFileList utils.Queue
+	state          *state.SyncState
 }
 
 func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
@@ -60,18 +62,27 @@ func NewFs(cfg *config.DspConfig, chain *sdk.Chain) (*Fs, error) {
 		fs:      fs,
 		cfg:     cfg,
 		closeCh: make(chan struct{}, 1),
+		state:   state.NewSyncState(),
 	}
+	service.state.Set(state.ModuleStateActive)
 	go service.registerRemoveNotify()
 	return service, nil
 }
 
 func (this *Fs) Close() error {
 	close(this.closeCh)
+	this.state.Set(state.ModuleStateStopping)
 	err := this.fs.Close()
 	if err != nil {
+		this.state.Set(state.ModuleStateError)
 		return dspErr.NewWithError(dspErr.FS_CLOSE_ERROR, err)
 	}
+	this.state.Set(state.ModuleStateStopped)
 	return nil
+}
+
+func (this *Fs) State() state.ModuleState {
+	return this.state.Get()
 }
 
 func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) ([]string, error) {
@@ -94,7 +105,7 @@ func (this *Fs) GetAllOffsets(rootHash string) (map[string]uint64, error) {
 	}
 
 	if len(cids) != len(offsets) || len(cids) != len(indexes) {
-		return nil, dspErr.NewWithError(dspErr.FS_GET_ALL_OFFSET_ERROR,fmt.Errorf("length of cids, offsets, indexes no matching"))
+		return nil, dspErr.NewWithError(dspErr.FS_GET_ALL_OFFSET_ERROR, fmt.Errorf("length of cids, offsets, indexes no matching"))
 	}
 
 	for i, cid := range cids {

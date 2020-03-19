@@ -13,6 +13,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/core/dns"
 	"github.com/saveio/dsp-go-sdk/core/fs"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
+	"github.com/saveio/dsp-go-sdk/state"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/dsp-go-sdk/utils/ticker"
@@ -35,7 +36,7 @@ type Dsp struct {
 	levelDBStore      *store.LevelDBStore      // Level DB
 	shareRecordDB     *store.ShareRecordDB     // share_record db
 	userspaceRecordDB *store.UserspaceRecordDB // user space db
-	running           bool                     // flag of service status
+	state             *state.SyncState         // dsp state
 	closeCh           chan struct{}            // close signal
 }
 
@@ -43,6 +44,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	d := &Dsp{
 		dns: &dns.DNS{},
 	}
+	d.state = state.NewSyncState()
 	if c == nil {
 		return d
 	}
@@ -111,15 +113,19 @@ func (this *Dsp) IsFs() bool {
 
 func (this *Dsp) Start() error {
 	if this.config == nil {
+		this.state.Set(state.ModuleStateActive)
 		return nil
 	}
 	this.closeCh = make(chan struct{})
+	this.state.Set(state.ModuleStateStarting)
 	if err := this.dns.SetupTrackers(); err != nil {
+		this.state.Set(state.ModuleStateError)
 		return err
 	}
 
 	if this.channel != nil {
 		if err := this.StartChannelService(); err != nil {
+			this.state.Set(state.ModuleStateError)
 			return err
 		}
 		this.dns.Channel = this.channel
@@ -152,7 +158,8 @@ func (this *Dsp) Start() error {
 	if len(unSalve) > 0 {
 		this.taskMgr.RunGetProgress()
 	}
-	this.running = true
+	this.state.Set(state.ModuleStateStarted)
+	this.state.Set(state.ModuleStateActive)
 	log.Debugf("runing...")
 	return nil
 }
@@ -170,10 +177,12 @@ func (this *Dsp) StartChannelService() error {
 }
 
 func (this *Dsp) Stop() error {
+	this.state.Set(state.ModuleStateStopping)
 	close(this.closeCh)
 	err := this.taskMgr.CloseDB()
 	if err != nil {
 		log.Errorf("close fileDB err %s", err)
+		this.state.Set(state.ModuleStateError)
 		return err
 	}
 	if this.channel != nil {
@@ -184,16 +193,21 @@ func (this *Dsp) Stop() error {
 		err := this.fs.Close()
 		if err != nil {
 			log.Errorf("close fs err %s", err)
+			this.state.Set(state.ModuleStateError)
 			return err
 		}
 	}
 	log.Debugf("stop dsp success")
-	this.running = false
+	this.state.Set(state.ModuleStateStopped)
 	return nil
 }
 
 func (this *Dsp) Running() bool {
-	return this.running
+	return this.state.Get() == state.ModuleStateActive
+}
+
+func (this *Dsp) State() state.ModuleState {
+	return this.state.Get()
 }
 
 func (this *Dsp) UpdateConfig(field string, value interface{}) error {

@@ -23,9 +23,13 @@ func New(code uint32, format string, a ...interface{}) *Error {
 
 // NewWithError. new dsp error with non-nil error
 func NewWithError(code uint32, err error) *Error {
+	msg := ""
+	if dErr, ok := err.(*Error); ok {
+		msg = dErr.Message
+	}
 	return &Error{
 		Code:    code,
-		Message: err.Error(),
+		Message: msg,
 		Cause:   err,
 	}
 }

@@ -68,7 +68,7 @@ func (this *Dsp) ChannelRunning() bool {
 		log.Warnf("channel is not instance for service")
 		return false
 	}
-	return this.channel.Running()
+	return this.channel.Active()
 }
 
 func (this *Dsp) ChannelFirstSyncing() bool {
@@ -76,7 +76,7 @@ func (this *Dsp) ChannelFirstSyncing() bool {
 		log.Warnf("channel is not instance for service")
 		return false
 	}
-	return this.channel.FirstSyncing()
+	return this.channel.SyncingBlock()
 }
 
 func (this *Dsp) GetCurrentFilterBlockHeight() uint32 {

@@ -15,6 +15,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/core/chain"
 	"github.com/saveio/dsp-go-sdk/core/channel"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
+	"github.com/saveio/dsp-go-sdk/state"
 	"github.com/saveio/dsp-go-sdk/utils"
 	chaincom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
@@ -51,7 +52,7 @@ type DNS struct {
 	DNSWalletAddrsFromCfg []string          // specific dns wallet address from global config
 	PublicAddrCache       *lru.ARCCache     // get public addr cache
 	channelProtocol       string            // channel protocol
-	bootstraping          bool              // is bootstraping
+	state                 *state.SyncState  // module state
 }
 
 type DNSOption interface {
@@ -110,11 +111,17 @@ func NewDNS(chain *chain.Chain, channel *channel.Channel, opts ...DNSOption) *DN
 		PublicAddrCache: cache,
 		OnlineDNS:       make(map[string]string),
 		channelProtocol: "tcp",
+		state:           state.NewSyncState(),
 	}
+
 	for _, opt := range opts {
 		opt.apply(d)
 	}
 	return d
+}
+
+func (d *DNS) State() state.ModuleState {
+	return d.state.Get()
 }
 
 // SetupTrackers. setup DNS tracker url list
@@ -157,13 +164,14 @@ func (d *DNS) BootstrapDNS() {
 	if d.Channel == nil {
 		return
 	}
-	if d.bootstraping {
+	if d.state.Get() == state.ModuleStateStarting {
 		return
 	}
 	log.Debugf("start bootstrapDNS...")
-	d.bootstraping = true
+	d.state.Set(state.ModuleStateStarting)
 	defer func() {
-		d.bootstraping = false
+		d.state.Set(state.ModuleStateStarted)
+		d.state.Set(state.ModuleStateActive)
 	}()
 	connetedDNS, err := d.connectDNS(common.MAX_DNS_NUM)
 	if err != nil {

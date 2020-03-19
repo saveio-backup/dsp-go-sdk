@@ -12,6 +12,7 @@ import (
 	dspcom "github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
+	"github.com/saveio/dsp-go-sdk/state"
 	"github.com/saveio/dsp-go-sdk/store"
 	ch "github.com/saveio/pylons"
 	ch_actor "github.com/saveio/pylons/actor/server"
@@ -25,18 +26,17 @@ import (
 )
 
 type Channel struct {
-	chActor      *ch_actor.ChannelActorServer
-	chActorId    *actor.PID
-	closeCh      chan struct{}
-	unitPrices   map[int32]uint64
-	channelDB    *store.ChannelDB
-	walletAddr   string
-	isStart      bool
-	firstSyncing bool // first syncing block
-	chain        *sdk.Chain
-	cfg          *config.DspConfig
-	r            *rand.Rand
-	lock         *sync.Mutex
+	chActor    *ch_actor.ChannelActorServer
+	chActorId  *actor.PID
+	closeCh    chan struct{}
+	unitPrices map[int32]uint64
+	channelDB  *store.ChannelDB
+	walletAddr string
+	chain      *sdk.Chain
+	cfg        *config.DspConfig
+	r          *rand.Rand
+	lock       *sync.Mutex
+	state      *state.SyncState
 }
 
 type channelInfo struct {
@@ -94,6 +94,7 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 		cfg:        cfg,
 		r:          rand.New(rand.NewSource(time.Now().UnixNano())),
 		lock:       new(sync.Mutex),
+		state:      state.NewSyncState(),
 	}, nil
 }
 
@@ -109,35 +110,43 @@ func (this *Channel) NetworkProtocol() string {
 func (this *Channel) StartService() error {
 	//start connect target
 	log.Debugf("StartService")
-	this.firstSyncing = true
+	this.state.Set(state.ModuleStateStarting)
 	err := this.chActor.SyncBlockData()
-	defer func() {
-		this.firstSyncing = false
-	}()
 	log.Debugf("sync block data done")
 	if err != nil {
+		this.state.Set(state.ModuleStateError)
 		log.Errorf("channel sync block err %s", err)
 		return dspErr.NewWithError(dspErr.CHANNEL_SYNC_BLOCK_ERROR, err)
 	}
+	this.state.Set(state.ModuleStateStarted)
+	defer func() {
+		log.Debugf("in defer cunf")
+		if e := recover(); e != nil {
+			log.Errorf("send panic recover err %v", e)
+		}
+	}()
 	log.Debugf("start pylons")
 	err = ch_actor.StartPylons()
 	log.Debugf("start pylons done")
 	if err != nil {
+		this.state.Set(state.ModuleStateError)
 		return dspErr.NewWithError(dspErr.CHANNEL_START_INSTANCE_ERROR, err)
 	}
-	this.isStart = true
+	this.state.Set(state.ModuleStateActive)
 	this.OverridePartners()
 	return nil
 }
 
-// FirstSyncing. Is channel first syncing blocks
-func (this *Channel) FirstSyncing() bool {
-	return this.firstSyncing
+func (this *Channel) State() state.ModuleState {
+	return this.state.Get()
 }
 
-// Running. Is channel service running
-func (this *Channel) Running() bool {
-	return this.isStart
+func (this *Channel) SyncingBlock() bool {
+	return this.state.Get() == state.ModuleStateStarting
+}
+
+func (this *Channel) Active() bool {
+	return this.state.Get() == state.ModuleStateActive
 }
 
 func (this *Channel) GetCurrentFilterBlockHeight() uint32 {
@@ -152,20 +161,24 @@ func (this *Channel) StopService() {
 	if this.channelDB != nil {
 		this.channelDB.Close()
 	}
-	if !this.isStart {
+	if this.state.Get() != state.ModuleStateActive {
 		// if not start, there is no transport to receive for channel service
+		this.state.Set(state.ModuleStateStopping)
 		if this.chActor.GetChannelService().Service != nil &&
 			this.chActor.GetChannelService().Service.Wal != nil &&
 			this.chActor.GetChannelService().Service.Wal.Storage != nil {
 			// close channel DB if it is opened
 			this.chActor.GetChannelService().Service.Wal.Storage.Close()
 		}
+		this.state.Set(state.ModuleStateStopped)
 		return
 	}
+	this.state.Set(state.ModuleStateStopping)
 	log.Debug("[dsp-go-sdk-channel] StopService")
 	err := ch_actor.StopPylons()
 	log.Debug("[dsp-go-sdk-channel] StopService done")
 	if err != nil {
+		this.state.Set(state.ModuleStateError)
 		log.Errorf("stop pylons err %s", err)
 		return
 	}
@@ -173,7 +186,7 @@ func (this *Channel) StopService() {
 		this.chActorId.Stop()
 	}
 	close(this.closeCh)
-	this.isStart = false
+	this.state.Set(state.ModuleStateStopped)
 }
 
 func (this *Channel) GetCloseCh() chan struct{} {
@@ -216,7 +229,7 @@ func (this *Channel) GetChannelInfoFromDB(targetAddress string) (*store.ChannelI
 // OverridePartners. override local partners with neighbors from channel
 func (this *Channel) OverridePartners() error {
 	log.Debugf("[dsp-go-sdk-channel] OverridePartners")
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	newPartners := make([]string, 0)
@@ -275,7 +288,7 @@ func (this *Channel) HealthyCheckNodeState(walletAddr string) error {
 // OpenChannel. open channel for target of token.
 func (this *Channel) OpenChannel(targetAddress string, depositAmount uint64) (common.ChannelID, error) {
 	log.Debugf("[dsp-go-sdk-channel] OpenChannel %s", targetAddress)
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return 0, dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
@@ -323,7 +336,7 @@ func (this *Channel) SetChannelIsDNS(targetAddr string, isDNS bool) error {
 
 func (this *Channel) ChannelClose(targetAddress string) error {
 	log.Debugf("[dsp-go-sdk-channel] ChannelClose %s", targetAddress)
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	target, err := chaincomm.AddressFromBase58(targetAddress)
@@ -349,7 +362,7 @@ func (this *Channel) SetDeposit(targetAddress string, amount uint64) error {
 	if amount == 0 {
 		return nil
 	}
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
@@ -367,7 +380,7 @@ func (this *Channel) SetDeposit(targetAddress string, amount uint64) error {
 
 func (this *Channel) CanTransfer(to string, amount uint64) error {
 	log.Debugf("[dsp-go-sdk-channel] CanTransfer %s", to)
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	target, err := chaincomm.AddressFromBase58(to)
@@ -397,7 +410,7 @@ func (this *Channel) NewPaymentId() int32 {
 // DirectTransfer. direct transfer to with payment id, and amount
 func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) error {
 	log.Debugf("[dsp-go-sdk-channel] DirectTransfer %s", to)
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	err := this.CanTransfer(to, amount)
@@ -435,7 +448,7 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to str
 	log.Debugf("[dsp-go-sdk-channel] MediaTransfer %s", to)
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	err := this.CanTransfer(to, amount)
@@ -563,7 +576,7 @@ func (this *Channel) GetCurrentBalance(partnerAddress string) (uint64, error) {
 // Withdraw. withdraw balance with target address
 func (this *Channel) Withdraw(targetAddress string, amount uint64) (bool, error) {
 	log.Debugf("[dsp-go-sdk-channel] Withdraw %s", targetAddress)
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return false, dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	token := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
@@ -582,7 +595,7 @@ func (this *Channel) Withdraw(targetAddress string, amount uint64) (bool, error)
 // CooperativeSettle. settle channel cooperatively
 func (this *Channel) CooperativeSettle(targetAddress string) error {
 	log.Debugf("[dsp-go-sdk-channel] CooperativeSettle %s", targetAddress)
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
 	target, err := chaincomm.AddressFromBase58(targetAddress)
@@ -636,7 +649,7 @@ func (this *Channel) ChannelExist(walletAddr string) bool {
 }
 
 func (this *Channel) GetChannelInfo(walletAddr string) (*ch_actor.ChannelInfo, error) {
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return nil, nil
 	}
 	all, _ := ch_actor.GetAllChannels()
@@ -654,7 +667,7 @@ func (this *Channel) GetChannelInfo(walletAddr string) (*ch_actor.ChannelInfo, e
 
 func (this *Channel) AllChannels() (*ch_actor.ChannelsInfoResp, error) {
 	log.Debugf("[dsp-go-sdk-channel] AllChannels")
-	if !this.isStart {
+	if this.State() != state.ModuleStateActive {
 		return nil, nil
 	}
 	resp, err := ch_actor.GetAllChannels()

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	dspErr "github.com/saveio/dsp-go-sdk/error"
+	"github.com/saveio/dsp-go-sdk/state"
 	themisSDK "github.com/saveio/themis-go-sdk"
 	sdkCom "github.com/saveio/themis-go-sdk/common"
 	"github.com/saveio/themis/account"
@@ -19,6 +20,7 @@ type Chain struct {
 	themis   *themisSDK.Chain // chain sdk
 	isClient bool             // flag of is client or max node
 	r        *rand.Rand
+	s        *state.SyncState
 }
 
 type ChainOption interface {
@@ -47,7 +49,9 @@ func NewChain(acc *account.Account, rpcAddrs []string, opts ...ChainOption) *Cha
 		account: acc,
 		themis:  themis,
 		r:       rand.New(rand.NewSource(time.Now().UnixNano())),
+		s:       state.NewSyncState(),
 	}
+	ch.s.Set(state.ModuleStateActive)
 	for _, opt := range opts {
 		opt.apply(ch)
 	}
@@ -61,6 +65,10 @@ func (this *Chain) SetAccount(acc *account.Account) {
 
 func (this *Chain) CurrentAccount() *account.Account {
 	return this.account
+}
+
+func (this *Chain) State() state.ModuleState {
+	return this.s.Get()
 }
 
 func (this *Chain) WalletAddress() string {
