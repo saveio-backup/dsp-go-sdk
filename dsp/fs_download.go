@@ -1036,6 +1036,7 @@ func (this *Dsp) checkIfResumeDownload(taskId string) error {
 		SetFileName: taskInfo.SetFileName,
 		MaxPeerCnt:  taskInfo.MaxPeerCnt,
 		Url:         taskInfo.Url,
+		BlockNum:    taskInfo.TotalBlockCount,
 	}
 	// TODO: record original workers
 	go this.DownloadFile(false, taskId, taskInfo.FileHash, opt)
