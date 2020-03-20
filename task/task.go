@@ -170,7 +170,8 @@ func NewTaskFromDB(id string, db *store.TaskDB) (*Task, error) {
 		return nil, err
 	}
 	state := store.TaskState(info.TaskState)
-	if state == store.TaskStatePrepare || state == store.TaskStateDoing || state == store.TaskStateCancel {
+	if state == store.TaskStatePrepare || state == store.TaskStateDoing ||
+		state == store.TaskStateCancel || state == store.TaskStateIdle {
 		state = store.TaskStatePause
 	}
 	t := newTask(id, info, db)

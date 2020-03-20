@@ -39,7 +39,6 @@ type DeleteUploadFileResp struct {
 	Tx       string
 	FileHash string
 	FileName string
-	Nodes    []DeleteFileStatus
 }
 
 type DownloadOption struct {

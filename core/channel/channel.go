@@ -138,14 +138,23 @@ func (this *Channel) StartService() error {
 }
 
 func (this *Channel) State() state.ModuleState {
+	if this.state == nil {
+		return state.ModuleStateNone
+	}
 	return this.state.Get()
 }
 
 func (this *Channel) SyncingBlock() bool {
+	if this.state == nil {
+		return true
+	}
 	return this.state.Get() == state.ModuleStateNone || this.state.Get() == state.ModuleStateStarting || this.state.Get() == state.ModuleStateStarted
 }
 
 func (this *Channel) Active() bool {
+	if this.state == nil {
+		return false
+	}
 	return this.state.Get() == state.ModuleStateActive
 }
 
@@ -161,7 +170,7 @@ func (this *Channel) StopService() {
 	if this.channelDB != nil {
 		this.channelDB.Close()
 	}
-	if this.state.Get() != state.ModuleStateActive {
+	if this.State() != state.ModuleStateActive {
 		// if not start, there is no transport to receive for channel service
 		this.state.Set(state.ModuleStateStopping)
 		if this.chActor.GetChannelService().Service != nil &&

@@ -524,38 +524,38 @@ func (this *Dsp) DeleteUploadedFileByIds(ids []string, gasLimit uint64) ([]*comm
 			continue
 		}
 
-		log.Debugf("send delete msg to nodes :%v", storingNode)
-		msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_DELETE,
-			message.WithSessionId(taskId),
-			message.WithWalletAddress(this.chain.WalletAddress()),
-			message.WithTxHash(txHashStr),
-			message.WithTxHeight(uint64(txHeight)),
-			message.WithSign(this.chain.CurrentAccount()),
-		)
-		nodeStatusLock := new(sync.Mutex)
-		nodeStatus := make([]common.DeleteFileStatus, 0, len(storingNode))
-		reply := func(msg proto.Message, hostAddr string) bool {
-			ackMsg := message.ReadMessage(msg)
-			nodeStatusLock.Lock()
-			defer nodeStatusLock.Unlock()
-			errCode := uint32(0)
-			errMsg := ""
-			if ackMsg.Error != nil {
-				errCode = ackMsg.Error.Code
-				errMsg = ackMsg.Error.Message
+		go func() {
+			log.Debugf("send delete msg to nodes :%v", storingNode)
+			msg := message.NewFileMsg(fileHashStr, netcomm.FILE_OP_DELETE,
+				message.WithSessionId(taskId),
+				message.WithWalletAddress(this.chain.WalletAddress()),
+				message.WithTxHash(txHashStr),
+				message.WithTxHeight(uint64(txHeight)),
+				message.WithSign(this.chain.CurrentAccount()),
+			)
+			nodeStatusLock := new(sync.Mutex)
+			nodeStatus := make([]common.DeleteFileStatus, 0, len(storingNode))
+			reply := func(msg proto.Message, hostAddr string) bool {
+				ackMsg := message.ReadMessage(msg)
+				nodeStatusLock.Lock()
+				defer nodeStatusLock.Unlock()
+				errCode := uint32(0)
+				errMsg := ""
+				if ackMsg.Error != nil {
+					errCode = ackMsg.Error.Code
+					errMsg = ackMsg.Error.Message
+				}
+				nodeStatus = append(nodeStatus, common.DeleteFileStatus{
+					HostAddr: hostAddr,
+					Code:     errCode,
+					Error:    errMsg,
+				})
+				return false
 			}
-			nodeStatus = append(nodeStatus, common.DeleteFileStatus{
-				HostAddr: hostAddr,
-				Code:     errCode,
-				Error:    errMsg,
-			})
-			return false
-		}
-		m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), msg.MessageId, reply)
-		resp.Nodes = nodeStatus
-		log.Debugf("send delete msg done ret: %v, nodeStatus: %v, err: %s", m, nodeStatus, err)
-		err = this.taskMgr.CleanTask(taskId)
-		if err != nil {
+			m, err := client.P2pBroadcast(storingNode, msg.ToProtoMsg(), msg.MessageId, reply)
+			log.Debugf("send delete msg done ret: %v, nodeStatus: %v, err: %s", m, nodeStatus, err)
+		}()
+		if err := this.taskMgr.CleanTask(taskId); err != nil {
 			log.Errorf("delete upload info from db err: %s", err)
 			return nil, err
 		}
