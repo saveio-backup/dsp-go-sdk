@@ -294,6 +294,20 @@ func (this *TaskMgr) HasRunningTask() bool {
 	return false
 }
 
+func (this *TaskMgr) HasRunningDownloadTask() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	for _, tsk := range this.tasks {
+		if tsk.GetTaskType() != store.TaskTypeDownload {
+			continue
+		}
+		if prepare, doing := tsk.IsTaskPreparingOrDoing(); prepare || doing {
+			return true
+		}
+	}
+	return false
+}
+
 // TaskExist. Check if task exist in memory
 func (this *TaskMgr) TaskExist(taskId string) bool {
 	this.lock.RLock()
