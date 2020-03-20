@@ -80,7 +80,7 @@ func NewChannelService(cfg *config.DspConfig, chain *sdk.Chain) (*Channel, error
 	//start channel and actor
 	channelActor, err := ch_actor.NewChannelActor(channelConfig, chain.Native.Channel.DefAcc)
 	if err != nil {
-		log.Debugf("channelActor+++ %v", channelActor)
+		log.Debugf("channelActor+++ %s", err)
 		return nil, dspErr.NewWithError(dspErr.CHANNEL_CREATE_ACTOR_ERROR, err)
 	}
 	chnPid := channelActor.GetLocalPID()
@@ -118,7 +118,6 @@ func (this *Channel) StartService() error {
 		log.Errorf("channel sync block err %s", err)
 		return dspErr.NewWithError(dspErr.CHANNEL_SYNC_BLOCK_ERROR, err)
 	}
-	this.state.Set(state.ModuleStateStarted)
 	defer func() {
 		log.Debugf("in defer cunf")
 		if e := recover(); e != nil {
@@ -128,6 +127,7 @@ func (this *Channel) StartService() error {
 	log.Debugf("start pylons")
 	err = ch_actor.StartPylons()
 	log.Debugf("start pylons done")
+	this.state.Set(state.ModuleStateStarted)
 	if err != nil {
 		this.state.Set(state.ModuleStateError)
 		return dspErr.NewWithError(dspErr.CHANNEL_START_INSTANCE_ERROR, err)
@@ -142,7 +142,7 @@ func (this *Channel) State() state.ModuleState {
 }
 
 func (this *Channel) SyncingBlock() bool {
-	return this.state.Get() == state.ModuleStateStarting
+	return this.state.Get() == state.ModuleStateNone || this.state.Get() == state.ModuleStateStarting || this.state.Get() == state.ModuleStateStarted
 }
 
 func (this *Channel) Active() bool {
@@ -266,6 +266,9 @@ func (this *Channel) WaitForConnected(walletAddr string, timeout time.Duration) 
 
 // ChannelReachale. is channel open and reachable
 func (this *Channel) ChannelReachale(walletAddr string) bool {
+	if this.State() != state.ModuleStateActive {
+		return false
+	}
 	target, _ := chaincomm.AddressFromBase58(walletAddr)
 	reachable, _ := ch_actor.ChannelReachable(common.Address(target))
 	log.Debugf("[dsp-go-sdk-channel] ChannelReachale %s, reachable: %t", walletAddr, reachable)
@@ -274,6 +277,9 @@ func (this *Channel) ChannelReachale(walletAddr string) bool {
 
 func (this *Channel) HealthyCheckNodeState(walletAddr string) error {
 	log.Debugf("[dsp-go-sdk-channel] HealthyCheckNodeState %s", walletAddr)
+	if this.State() != state.ModuleStateActive {
+		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
+	}
 	target, err := chaincomm.AddressFromBase58(walletAddr)
 	if err != nil {
 		return dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
@@ -492,6 +498,9 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to str
 // GetTargetBalance. check total deposit balance
 func (this *Channel) GetTotalDepositBalance(targetAddress string) (uint64, error) {
 	log.Debugf("[dsp-go-sdk-channel] GetTotalDepositBalance %s", targetAddress)
+	if this.State() != state.ModuleStateActive {
+		return 0, dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
+	}
 	partner, err := chaincomm.AddressFromBase58(targetAddress)
 	if err != nil {
 		return 0, dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
@@ -506,6 +515,9 @@ func (this *Channel) GetTotalDepositBalance(targetAddress string) (uint64, error
 // GetAvaliableBalance. get avaliable balance
 func (this *Channel) GetAvailableBalance(partnerAddress string) (uint64, error) {
 	log.Debugf("[dsp-go-sdk-channel] GetAvailableBalance %s", partnerAddress)
+	if this.State() != state.ModuleStateActive {
+		return 0, dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
+	}
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)
 	if err != nil {
 		return 0, dspErr.NewWithError(dspErr.INVALID_ADDRESS, err)
@@ -518,6 +530,9 @@ func (this *Channel) GetAvailableBalance(partnerAddress string) (uint64, error) 
 }
 
 func (this *Channel) GetNextNonce(partnerAddress string) uint64 {
+	if this.State() != state.ModuleStateActive {
+		return 0
+	}
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)
 	if err != nil {
 		return 0
@@ -548,6 +563,9 @@ func (this *Channel) GetNextNonce(partnerAddress string) uint64 {
 }
 
 func (this *Channel) GetTotalWithdraw(partnerAddress string) (uint64, error) {
+	if this.State() != state.ModuleStateActive {
+		return 0, dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
+	}
 	log.Debugf("[dsp-go-sdk-channel] GetTotalWithdraw %s", partnerAddress)
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)
 	if err != nil {
@@ -561,6 +579,9 @@ func (this *Channel) GetTotalWithdraw(partnerAddress string) (uint64, error) {
 }
 
 func (this *Channel) GetCurrentBalance(partnerAddress string) (uint64, error) {
+	if this.State() != state.ModuleStateActive {
+		return 0, dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
+	}
 	log.Debugf("[dsp-go-sdk-channel] GetCurrentBalance %s", partnerAddress)
 	partner, err := chaincomm.AddressFromBase58(partnerAddress)
 	if err != nil {
@@ -636,6 +657,9 @@ func (this *Channel) CleanUnitPrices(asset int32) {
 }
 
 func (this *Channel) ChannelExist(walletAddr string) bool {
+	if this.State() != state.ModuleStateActive {
+		return false
+	}
 	all, _ := ch_actor.GetAllChannels()
 	if all == nil {
 		return false

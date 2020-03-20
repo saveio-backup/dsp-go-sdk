@@ -232,7 +232,7 @@ func (this *Dsp) StartSeedService() {
 	for {
 		_, files, err := this.taskMgr.AllDownloadFiles()
 		if err != nil {
-			log.Errorf("get all file err %v", err)
+			log.Errorf("push seed service err %v", err)
 		} else {
 			this.dns.PushFilesToTrackers(files)
 		}
