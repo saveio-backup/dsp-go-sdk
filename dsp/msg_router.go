@@ -194,9 +194,9 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 		return
 	}
 	// TODO: check rpc server avaliable
-	info, _ := this.chain.GetFileInfo(fileMsg.Hash)
+	info, err := this.chain.GetFileInfo(fileMsg.Hash)
 	if info == nil {
-		log.Errorf("fetch ask file info is nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+		log.Errorf("fetch ask file info is nil %s %s, err %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress, err)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.FILEINFO_NOT_EXIST, "fetch ask file info is nil")
 		return
 	}

@@ -14,6 +14,10 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
+func (this *Dsp) GetTaskMgr() *task.TaskMgr {
+	return this.taskMgr
+}
+
 func (this *Dsp) RecoverDBLossTask() error {
 	if this.chain == nil || this.account == nil {
 		return nil

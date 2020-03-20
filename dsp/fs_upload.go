@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/common"
-	"github.com/saveio/dsp-go-sdk/core/chain"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
 	netcomm "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
@@ -291,7 +289,7 @@ func (this *Dsp) PauseUpload(taskId string) error {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
 	if err := tsk.Pause(); err != nil {
-		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
+		return dspErr.NewWithError(dspErr.TASK_PAUSE_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskPause)
 	return nil
@@ -303,7 +301,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
 	if err := tsk.Resume(); err != nil {
-		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
+		return dspErr.NewWithError(dspErr.TASK_RESUME_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
 	return this.resumeTask(taskId)
@@ -381,16 +379,12 @@ func (this *Dsp) RetryUpload(taskId string) error {
 	if taskType != store.TaskTypeUpload {
 		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a upload task", taskId)
 	}
-	failed, err := this.taskMgr.IsTaskFailed(taskId)
-	if err != nil {
-		return err
+	tsk, ok := this.taskMgr.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
-	if !failed {
-		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not failed", taskId)
-	}
-	err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
-	if err != nil {
-		return err
+	if err := tsk.Retry(); err != nil {
+		return dspErr.NewWithError(dspErr.TASK_RETRY_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
 	return this.resumeTask(taskId)
@@ -705,9 +699,11 @@ func (this *Dsp) payForSendFile(taskId string) error {
 		return err
 	}
 	fileInfo, err := this.chain.GetFileInfo(taskInfo.FileHash)
-	if err != nil && !strings.Contains(err.Error(), chain.ErrNoFileInfo) {
-		// FsGetFileInfo not found
-		log.Errorf("get file info err %s", err)
+	if err != nil {
+		if derr, ok := err.(*dspErr.Error); ok && derr.Code != dspErr.FILE_NOT_FOUND_FROM_CHAIN {
+			// FsGetFileInfo not found
+			log.Errorf("get file info err %s", err)
+		}
 	}
 	var paramsBuf, privateKey []byte
 	var tx string

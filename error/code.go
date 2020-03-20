@@ -88,6 +88,8 @@ const (
 	RECEIVE_ERROR_MSG                                         // 50071
 	MISSING_FILE_BLOCKS_ROOT                                  // 50072
 	GET_HOST_ADDR_ERROR                                       // 50073
+	TASK_RESUME_ERROR                                         // 50074
+	TASK_RETRY_ERROR                                          // 50075
 )
 
 // delete file error

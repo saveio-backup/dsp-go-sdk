@@ -688,7 +688,7 @@ func (this *Task) Pause() error {
 
 	state := this.info.TaskState
 	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
-		return nil
+		return fmt.Errorf("state is %d, can't pause", state)
 	}
 	if state == store.TaskStateDoing || state == store.TaskStatePrepare {
 		return this.setTaskState(store.TaskStatePause)
@@ -702,9 +702,23 @@ func (this *Task) Resume() error {
 
 	state := this.info.TaskState
 	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
-		return nil
+		return fmt.Errorf("state is %d, can't resume", state)
 	}
 	if state == store.TaskStatePause {
+		return this.setTaskState(store.TaskStateDoing)
+	}
+	return nil
+}
+
+func (this *Task) Retry() error {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+
+	state := this.info.TaskState
+	if state != store.TaskStateFailed {
+		return fmt.Errorf("state is %d, can't retry", state)
+	}
+	if state == store.TaskStateFailed {
 		return this.setTaskState(store.TaskStateDoing)
 	}
 	return nil

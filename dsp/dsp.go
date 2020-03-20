@@ -1,6 +1,7 @@
 package dsp
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ontio/ontology-eventbus/actor"
@@ -180,6 +181,10 @@ func (this *Dsp) StartChannelService() error {
 
 func (this *Dsp) Stop() error {
 	this.state.Set(state.ModuleStateStopping)
+	if this.taskMgr.HasRunningTask() {
+		this.state.Set(state.ModuleStateActive)
+		return fmt.Errorf("exist running task")
+	}
 	close(this.closeCh)
 	err := this.taskMgr.CloseDB()
 	if err != nil {

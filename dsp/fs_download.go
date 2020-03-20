@@ -200,7 +200,7 @@ func (this *Dsp) PauseDownload(taskId string) error {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
 	if err := tsk.Pause(); err != nil {
-		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
+		return dspErr.NewWithError(dspErr.TASK_PAUSE_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskPause)
 	return nil
@@ -212,7 +212,7 @@ func (this *Dsp) ResumeDownload(taskId string) error {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
 	if err := tsk.Resume(); err != nil {
-		return dspErr.NewWithError(dspErr.SET_FILEINFO_DB_ERROR, err)
+		return dspErr.NewWithError(dspErr.TASK_RESUME_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
 	return this.checkIfResumeDownload(taskId)
@@ -222,11 +222,12 @@ func (this *Dsp) RetryDownload(taskId string) error {
 	if taskType, _ := this.taskMgr.GetTaskType(taskId); taskType != store.TaskTypeDownload {
 		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a download task", taskId)
 	}
-	if failed, err := this.taskMgr.IsTaskFailed(taskId); err != nil || !failed {
-		return err
+	tsk, ok := this.taskMgr.GetTaskById(taskId)
+	if !ok || tsk == nil {
+		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
-	if err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
-		return err
+	if err := tsk.Retry(); err != nil {
+		return dspErr.NewWithError(dspErr.TASK_RETRY_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
 	return this.checkIfResumeDownload(taskId)

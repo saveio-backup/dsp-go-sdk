@@ -1103,7 +1103,7 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	fileHash := "zb2rhoVpdEon9Jj583TGhf4vCgVELfF9RuQq5YBAUjCLeGCRn"
+	fileHash := "QmPCWq8eUVnrJgtuFCZ1UGUNZ12AncJTQ49jRxRZghBmRF"
 	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)
