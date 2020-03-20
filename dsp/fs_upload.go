@@ -310,6 +310,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 }
 
 func (this *Dsp) CancelUpload(taskId string, gasLimit uint64) (*common.DeleteUploadFileResp, error) {
+	log.Debugf("CancelUpload")
 	taskType, _ := this.taskMgr.GetTaskType(taskId)
 	if taskType != store.TaskTypeUpload {
 		return nil, dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a upload task", taskId)
@@ -398,16 +399,17 @@ func (this *Dsp) RetryUpload(taskId string) error {
 func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string, gasLimit uint64) (string, uint32, error) {
 	if len(fileHashStrs) == 0 {
 		return "", 0, nil
-		// return "", 0, dspErr.New(dspErr.DELETE_FILE_HASHES_EMPTY, "delete file hash string is empty")
 	}
 	needDeleteFile := false
 	for _, fileHashStr := range fileHashStrs {
 		info, err := this.chain.GetFileInfo(fileHashStr)
 		log.Debugf("delete file get fileinfo %v, err %v", info, err)
-		if err != nil && !this.chain.IsFileInfoDeleted(err) {
-			log.Debugf("info:%v, other err:%s", info, err)
-			return "", 0, dspErr.New(dspErr.FILE_NOT_FOUND_FROM_CHAIN,
-				"file info not found, %s has deleted", fileHashStr)
+		if err != nil {
+			if derr, ok := err.(*dspErr.Error); ok && derr.Code != dspErr.FILE_NOT_FOUND_FROM_CHAIN {
+				log.Debugf("info:%v, other err:%s", info, err)
+				return "", 0, dspErr.New(dspErr.FILE_NOT_FOUND_FROM_CHAIN,
+					"file info not found, %s has deleted", fileHashStr)
+			}
 		}
 		if info != nil && info.FileOwner.ToBase58() != this.chain.WalletAddress() {
 			return "", 0, dspErr.New(dspErr.DELETE_FILE_ACCESS_DENIED,

@@ -13,6 +13,9 @@ import (
 func (this *Chain) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
 	info, err := this.themis.Native.Fs.GetFileInfo(fileHashStr)
 	if err != nil {
+		if this.IsFileInfoDeleted(err) {
+			return nil, dspErr.NewWithError(dspErr.FILE_NOT_FOUND_FROM_CHAIN, err)
+		}
 		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
 	return info, nil
