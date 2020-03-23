@@ -135,6 +135,7 @@ func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *com
 		}
 		this.taskMgr.EmitProgress(taskId, task.TaskCreate)
 	}
+	log.Debugf(" task %s is new task %t", taskId, newTask)
 	log.Debugf("download file id: %s, fileHash: %s, option: %v", taskId, fileHashStr, opt)
 	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileStart)
 	if err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
@@ -979,7 +980,10 @@ func (this *Dsp) downloadFileWithOpt(id string, fileHashStr string, opt *common.
 			opt.FileOwner = string(info.FileOwner.ToBase58())
 		}
 	}
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
+	taskId := id
+	if len(taskId) == 0 {
+		taskId = this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
+	}
 	if !this.taskMgr.TaskExist(taskId) {
 		if len(taskId) > 0 {
 			log.Debugf("task not exist in memory, but has downloaded, start a new download task of id: %s, file %s",
