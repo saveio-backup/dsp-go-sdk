@@ -304,7 +304,7 @@ func (this *Dsp) ResumeUpload(taskId string) error {
 		return dspErr.NewWithError(dspErr.TASK_RESUME_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
-	return this.resumeTask(taskId)
+	return this.resumeUpload(taskId)
 }
 
 func (this *Dsp) CancelUpload(taskId string, gasLimit uint64) (*common.DeleteUploadFileResp, error) {
@@ -387,7 +387,7 @@ func (this *Dsp) RetryUpload(taskId string) error {
 		return dspErr.NewWithError(dspErr.TASK_RETRY_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
-	return this.resumeTask(taskId)
+	return this.resumeUpload(taskId)
 }
 
 func (this *Dsp) DeleteUploadFilesFromChain(fileHashStrs []string, gasLimit uint64) (string, uint32, error) {
@@ -598,7 +598,7 @@ func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, error) {
 	return pause, nil
 }
 
-func (this *Dsp) resumeTask(taskId string) error {
+func (this *Dsp) resumeUpload(taskId string) error {
 	tsk, err := this.taskMgr.GetTaskInfoCopy(taskId)
 	if err != nil || tsk == nil {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "can't find download options, please retry")

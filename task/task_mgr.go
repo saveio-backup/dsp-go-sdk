@@ -252,7 +252,7 @@ func (this *TaskMgr) HasRetryTask() bool {
 	return len(this.retryTasks) > 0
 }
 
-func (this *TaskMgr) GetUploadTaskToRetry() []string {
+func (this *TaskMgr) GetTasksToRetry() []string {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if len(this.retryTasks) == 0 {
@@ -273,9 +273,6 @@ func (this *TaskMgr) GetUploadTaskToRetry() []string {
 			continue
 		}
 		if !tsk.NeedRetry() {
-			continue
-		}
-		if tsk.GetTaskType() != store.TaskTypeUpload {
 			continue
 		}
 		taskIds = append(taskIds, l.Key)

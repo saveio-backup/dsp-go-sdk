@@ -442,8 +442,9 @@ func (this *Task) SetStoreTx(tx string) error {
 func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
+	log.Debugf("set task result %v %v", errorCode, errorMsg)
 	if errorCode != 0 {
-		if this.info.Type != store.TaskTypeUpload || this.info.Retry >= common.MAX_TASK_RETRY {
+		if this.info.Retry >= common.MAX_TASK_RETRY {
 			// task hasn't pay on chain, make it failed
 			this.info.TaskState = store.TaskStateFailed
 			this.info.ErrorCode = errorCode
@@ -1182,6 +1183,7 @@ func (this *Task) GetIdleWorker(addrs []string, fileHash, reqHash string) *Worke
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	var worker *Worker
+	backupWorkers := make([]*Worker, 0)
 	for i, _ := range addrs {
 		this.lastWorkerIdx++
 		if this.lastWorkerIdx >= len(addrs) {
@@ -1189,14 +1191,28 @@ func (this *Task) GetIdleWorker(addrs []string, fileHash, reqHash string) *Worke
 		}
 		idx := this.lastWorkerIdx
 		w := this.workers[addrs[idx]]
-		if w.Working() || w.WorkFailed(reqHash) || w.Unpaid() || w.FailedTooMuch(fileHash) {
-			log.Debugf("#%d worker is working: %t, failed: %t, unpaid: %t, file: %s, block: %s", i, w.Working(), w.WorkFailed(reqHash), w.Unpaid(), fileHash, reqHash)
+		working := w.Working()
+		workFailed := w.WorkFailed(reqHash)
+		workUnpaid := w.Unpaid()
+		failedTooMuch := w.FailedTooMuch(fileHash)
+		if working || workUnpaid || workFailed || failedTooMuch {
+			log.Debugf("#%d worker is working: %t, failed: %t, unpaid: %t, file: %s, block: %s",
+				i, working, workFailed, workUnpaid, fileHash, reqHash)
+			if workFailed && !working && !workUnpaid && !failedTooMuch {
+				backupWorkers = append(backupWorkers, w)
+			}
 			continue
 		}
 		worker = w
 		break
 	}
 	log.Debugf("GetIdleWorker %s, pool-len: %d, worker %v", reqHash, len(this.blockReqPool), worker)
+	if worker != nil {
+		return worker
+	}
+	if len(backupWorkers) > 0 {
+		return backupWorkers[0]
+	}
 	return worker
 }
 

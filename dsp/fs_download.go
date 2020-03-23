@@ -120,6 +120,7 @@ func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *com
 		log.Debugf("task %s has end, err %s", taskId, err)
 		if sdkErr != nil {
 			this.taskMgr.EmitResult(taskId, nil, sdkErr)
+			this.retryTaskTicker.Run()
 		}
 		// delete task from cache in the end
 		if this.taskMgr.IsFileDownloaded(taskId) && sdkErr == nil {
@@ -215,7 +216,7 @@ func (this *Dsp) ResumeDownload(taskId string) error {
 		return dspErr.NewWithError(dspErr.TASK_RESUME_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
-	return this.checkIfResumeDownload(taskId)
+	return this.resumeDownload(taskId)
 }
 
 func (this *Dsp) RetryDownload(taskId string) error {
@@ -230,7 +231,7 @@ func (this *Dsp) RetryDownload(taskId string) error {
 		return dspErr.NewWithError(dspErr.TASK_RETRY_ERROR, err)
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
-	return this.checkIfResumeDownload(taskId)
+	return this.resumeDownload(taskId)
 }
 
 func (this *Dsp) CancelDownload(taskId string) error {
@@ -1014,7 +1015,7 @@ func (this *Dsp) getPeersForDownload(fileHashStr string) ([]string, error) {
 	return nil, dspErr.New(dspErr.NO_DOWNLOAD_SEED, "No peer for downloading the file %s", fileHashStr)
 }
 
-func (this *Dsp) checkIfResumeDownload(taskId string) error {
+func (this *Dsp) resumeDownload(taskId string) error {
 	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
 	if err != nil {
 		return err
@@ -1184,7 +1185,7 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet []string) err
 				log.Warnf("task %s is timeout but file has downloed", taskInfo.Id)
 				break
 			}
-			this.taskMgr.SetTaskState(taskInfo.Id, store.TaskStateFailed)
+			// this.taskMgr.SetTaskState(taskInfo.Id, store.TaskStateFailed)
 			workerState := this.taskMgr.GetTaskWorkerState(taskInfo.Id)
 			for addr, state := range workerState {
 				log.Debugf("download timeout worker addr: %s, working : %t, unpaid: %t, totalFailed %v",

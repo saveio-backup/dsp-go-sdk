@@ -184,7 +184,7 @@ func (this *Dsp) retryTaskService() bool {
 		log.Debugf("stop retry task since module is stopped")
 		return true
 	}
-	taskIds := this.taskMgr.GetUploadTaskToRetry()
+	taskIds := this.taskMgr.GetTasksToRetry()
 	if len(taskIds) == 0 {
 		return !this.taskMgr.HasRetryTask()
 	}
@@ -194,7 +194,15 @@ func (this *Dsp) retryTaskService() bool {
 			log.Errorf("retry task set task state err %s", err)
 			return false
 		}
-		go this.resumeTask(taskId)
+		tskInfo, _ := this.taskMgr.GetTaskInfoCopy(taskId)
+		if tskInfo == nil {
+			continue
+		}
+		if tskInfo.Type == store.TaskTypeUpload {
+			go this.resumeUpload(taskId)
+		} else if tskInfo.Type == store.TaskTypeDownload {
+			go this.resumeDownload(taskId)
+		}
 	}
 	return false
 }
