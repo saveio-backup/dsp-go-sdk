@@ -173,6 +173,7 @@ func (d *DNS) BootstrapDNS() {
 		d.state.Set(state.ModuleStateStarted)
 		d.state.Set(state.ModuleStateActive)
 	}()
+	// TODO: connect dns async
 	connetedDNS, err := d.connectDNS(common.MAX_DNS_NUM)
 	if err != nil {
 		return

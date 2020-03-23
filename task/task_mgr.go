@@ -567,6 +567,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 	addrs := tsk.GetWorkerAddrs()
 	inOrder := tsk.GetInorder()
 	notifyIndex := uint64(0)
+	indexToBlkKey := &sync.Map{}
 	// lock for local go routines variables
 	max := len(addrs)
 	if max > common.MAX_GOROUTINES_FOR_WORK_TASK {
@@ -706,7 +707,12 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						log.Errorf("worker %s do job err continue %s", resp.worker.walletAddr, resp.err)
 						continue
 					}
-					blockCache.Store(v, resp.ret[k])
+					respBlk := resp.ret[k]
+					if respBlk == nil {
+						continue
+					}
+					blockCache.Store(v, respBlk)
+					indexToBlkKey.Store(respBlk.Index, v)
 					flightMap.Delete(v)
 				}
 				go func() {
@@ -723,21 +729,25 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 				}
 				// notify outside
 				if inOrder {
-					blockCache.Range(func(blkKey, blktemp interface{}) bool {
+					for {
+						blkKey, ok := indexToBlkKey.Load(notifyIndex)
+						if !ok {
+							break
+						}
 						blktemp, ok := blockCache.Load(blkKey)
 						if !ok {
 							log.Warnf("continue because block cache not has %v!", blkKey)
-							return true
+							break
 						}
-						blk := blktemp.(*BlockResp)
-						if blk.Index != notifyIndex {
-							return true
+						blk, ok := blktemp.(*BlockResp)
+						if !ok {
+							break
 						}
-						notifyIndex++
 						tsk.NotifyBlock(blk)
 						blockCache.Delete(blkKey)
-						return true
-					})
+						indexToBlkKey.Delete(notifyIndex)
+						notifyIndex++
+					}
 				} else {
 					for _, blkKey := range resp.flightKey {
 						blktemp, ok := blockCache.Load(blkKey)
@@ -748,6 +758,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						blk := blktemp.(*BlockResp)
 						tsk.NotifyBlock(blk)
 						blockCache.Delete(blkKey)
+						indexToBlkKey.Delete(blk.Index)
 					}
 				}
 				log.Debugf("remain %d response at block cache", getBlockCacheLen())
