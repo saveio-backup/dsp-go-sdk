@@ -737,6 +737,12 @@ func (this *Dsp) payForSendFile(taskId string) error {
 		if err != nil {
 			return err
 		}
+		if err = this.taskMgr.SetTaskInfoWithOptions(taskId,
+			task.ProveParams(paramsBuf),
+			task.PrivateKey(privateKey)); err != nil {
+			log.Errorf("set task info err %s", err)
+			return err
+		}
 		log.Debugf("primary nodes: %v, candidate nodes: %v", walletAddrs, candidateNodes)
 		tx, err = this.chain.StoreFile(taskInfo.FileHash, taskInfo.BlocksRoot, taskInfo.TotalBlockCount,
 			blockSizeInKB, taskInfo.ProveInterval, taskInfo.ExpiredHeight, uint64(taskInfo.CopyNum),
