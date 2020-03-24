@@ -598,8 +598,22 @@ func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, error) {
 	return pause, nil
 }
 
-func (this *Dsp) resumeUpload(taskId string) error {
+func (this *Dsp) resumeUpload(taskId string) (err error) {
 	tsk, err := this.taskMgr.GetTaskInfoCopy(taskId)
+	defer func() {
+		if err != nil {
+			sdkErr, _ := err.(*dspErr.Error)
+			if sdkErr != nil {
+				this.taskMgr.EmitResult(taskId, nil, sdkErr)
+			} else {
+				this.taskMgr.EmitResult(taskId, nil, dspErr.New(dspErr.INTERNAL_ERROR, err.Error()))
+			}
+			this.retryTaskTicker.Run()
+			log.Errorf("resume %s failed, err", taskId, err)
+		} else {
+			log.Debugf("resume %s success", taskId)
+		}
+	}()
 	if err != nil || tsk == nil {
 		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "can't find download options, please retry")
 	}
@@ -625,9 +639,7 @@ func (this *Dsp) resumeUpload(taskId string) error {
 		return nil
 	}
 	if this.taskMgr.ExistSameUploadFile(taskId, tsk.FileHash) {
-		err := dspErr.New(dspErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
-		this.taskMgr.EmitResult(taskId, nil, err)
-		return err
+		return dspErr.New(dspErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
 	}
 	fileInfo, _ := this.chain.GetFileInfo(tsk.FileHash)
 	if fileInfo != nil {

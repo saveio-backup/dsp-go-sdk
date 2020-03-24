@@ -1069,25 +1069,26 @@ func (this *TaskDB) IsFileDownloaded(id string) bool {
 }
 
 // GetUndownloadedBlockInfo. check undownloaded block in-order
-func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint64, error) {
+func (this *TaskDB) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]*BlockInfo, error) {
 	fi, err := this.GetTaskInfo(id)
 	if err != nil || fi == nil {
-		return nil, nil, errors.New("file not found")
+		return nil, errors.New("file not found")
 	}
 	blockHashes := this.FileBlockHashes(id)
 	if len(blockHashes) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
-	hashes := make([]string, 0)
-	indexMap := make(map[string]uint64)
+	blks := make([]*BlockInfo, 0)
 	for index, hash := range blockHashes {
 		if this.IsBlockDownloaded(id, hash, uint64(index)) {
 			continue
 		}
-		hashes = append(hashes, hash)
-		indexMap[hash] = uint64(index)
+		blks = append(blks, &BlockInfo{
+			Hash:  hash,
+			Index: uint64(index),
+		})
 	}
-	return hashes, indexMap, nil
+	return blks, nil
 }
 
 func (this *TaskDB) RemoveFromUndoneList(batch *leveldb.Batch, id string, ft TaskType) error {

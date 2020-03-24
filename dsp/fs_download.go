@@ -1022,13 +1022,26 @@ func (this *Dsp) getPeersForDownload(fileHashStr string) ([]string, error) {
 func (this *Dsp) resumeDownload(taskId string) error {
 	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
 	if err != nil {
+		sdkErr, _ := err.(*dspErr.Error)
+		if sdkErr != nil {
+			this.taskMgr.EmitResult(taskId, nil, sdkErr)
+		} else {
+			this.taskMgr.EmitResult(taskId, nil, dspErr.New(dspErr.INTERNAL_ERROR, err.Error()))
+		}
+		this.retryTaskTicker.Run()
 		return err
 	}
 	if taskInfo == nil {
-		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "can't find download options, please retry")
+		sdkErr := dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "can't find download options, please retry")
+		this.taskMgr.EmitResult(taskId, nil, sdkErr)
+		this.retryTaskTicker.Run()
+		return sdkErr
 	}
 	if len(taskInfo.FileHash) == 0 {
-		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "filehash not found %s", taskId)
+		sdkErr := dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "filehash not found %s", taskId)
+		this.taskMgr.EmitResult(taskId, nil, sdkErr)
+		this.retryTaskTicker.Run()
+		return sdkErr
 	}
 	log.Debugf("resume download file %s", taskId)
 	opt := &common.DownloadOption{
@@ -1259,16 +1272,15 @@ func (this *Dsp) decryptDownloadedFile(taskId string) error {
 }
 
 func (this *Dsp) addDownloadBlockReq(taskId, fileHashStr string) error {
-	hashes, indexMap, err := this.taskMgr.GetUndownloadedBlockInfo(taskId, fileHashStr)
+	blks, err := this.taskMgr.GetUndownloadedBlockInfo(taskId, fileHashStr)
 	if err != nil {
 		return err
 	}
-	log.Debugf("undownloaded hashes len %v", len(hashes))
+	log.Debugf("undownloaded hashes len %v", len(blks))
 	reqs := make([]*task.GetBlockReq, 0)
-	if len(hashes) == 0 {
+	if len(blks) == 0 {
 		// TODO: check bug
 		if this.taskMgr.IsFileDownloaded(taskId) {
-			log.Debugf("no undownloaded block %s %v", hashes, indexMap)
 			return nil
 		}
 		log.Warnf("all block has downloaded, but file not downloed")
@@ -1282,16 +1294,14 @@ func (this *Dsp) addDownloadBlockReq(taskId, fileHashStr string) error {
 		}
 		return nil
 	}
-	log.Debugf("start download at %s-%s-%d", fileHashStr, hashes[0], indexMap[hashes[0]])
-
-	blockIndex := uint64(0)
-	for _, hash := range hashes {
-		blockIndex = indexMap[hash]
+	log.Debugf("start download at %s-%s-%d", fileHashStr, blks[0].Hash, blks[0].Index)
+	for _, blk := range blks {
 		reqs = append(reqs, &task.GetBlockReq{
 			FileHash: fileHashStr,
-			Hash:     hash,
-			Index:    blockIndex,
+			Hash:     blk.Hash,
+			Index:    blk.Index,
 		})
+		log.Debugf("append hash %s index %v", blk.Hash, blk.Index)
 	}
 	return this.taskMgr.AddBlockReq(taskId, reqs)
 }

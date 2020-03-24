@@ -1103,7 +1103,7 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	fileHash := "QmR8gwdGW5QowBVRBaJCV4GsY1KVYaxaRjDXGDTVt3HyNJ"
+	fileHash := "QmaUUdwqPbuE9gHANNqNLH7rDL6EAPTc3UzA3gxdmbwt4n"
 	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)
@@ -1113,6 +1113,7 @@ func TestGetFileInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fmt.Printf("filename %s\n", info.FileDesc)
 	fmt.Printf("curHeight %d block num %d\n", curHeight, info.FileBlockNum)
 	fmt.Printf("height %d time: %d\n", info.BlockHeight, time.Now().Unix()-(int64(curHeight-uint32(info.BlockHeight)))*5)
 	fmt.Printf("expiredHeight %d\n", info.ExpiredHeight)

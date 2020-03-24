@@ -189,12 +189,12 @@ func (this *TaskMgr) GetProgressInfo(taskId string) *ProgressInfo {
 	return v.GetProgressInfo()
 }
 
-func (this *TaskMgr) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]string, map[string]uint64, error) {
-	undownloadedList, undownloadedMap, err := this.db.GetUndownloadedBlockInfo(id, rootBlockHash)
+func (this *TaskMgr) GetUndownloadedBlockInfo(id, rootBlockHash string) ([]*store.BlockInfo, error) {
+	blks, err := this.db.GetUndownloadedBlockInfo(id, rootBlockHash)
 	if err != nil {
-		return nil, nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
+		return blks, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, err.Error())
 	}
-	return undownloadedList, undownloadedMap, nil
+	return blks, nil
 }
 
 func (this *TaskMgr) GetFileSessions(fileInfoId string) (map[string]*store.Session, error) {

@@ -604,7 +604,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 
 	done := make(chan *getBlocksResp, 1)
 	maxFlightLen := this.GetMaxFlightLen(tsk)
-	log.Debugf("max flight len %d", maxFlightLen)
+	log.Debugf("task %s, max flight len %d", taskId, maxFlightLen)
 	// trigger to start
 	go tsk.notifyBlockReqPoolLen()
 	go func() {
@@ -749,7 +749,7 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					for _, blkKey := range resp.flightKey {
 						blktemp, ok := blockCache.Load(blkKey)
 						if !ok {
-							log.Warnf("continue because block cache not has %v!", blkKey)
+							log.Warnf("continue because block cache not has %v!", blkKey, resp.flightKey)
 							continue
 						}
 						blk := blktemp.(*BlockResp)
@@ -804,9 +804,9 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 					}
 					flights = append(flights, b)
 				}
-				log.Debugf("start request block %s-%s-%d to %s-%d to %s, peer wallet: %s",
+				log.Debugf("request blocks %s-%s-%d to %s-%d to %s, peer wallet: %s, length %d",
 					fileHash, job.req[0].Hash, job.req[0].Index, job.req[len(job.req)-1].Hash,
-					job.req[len(job.req)-1].Index, job.worker.WalletAddr(), job.worker.WalletAddr())
+					job.req[len(job.req)-1].Index, job.worker.WalletAddr(), job.worker.WalletAddr(), len(job.req))
 				ret, err := job.worker.Do(taskId, fileHash, job.worker.WalletAddr(), flights)
 				tsk.SetWorkerWorking(job.worker.walletAddr, false)
 				if err != nil {
@@ -846,10 +846,15 @@ func (this *TaskMgr) WorkBackground(taskId string) {
 						failedFlightReqs = append(failedFlightReqs, r)
 					}
 				}
-				if len(ret) > 0 {
-					log.Debugf("push flightskey from %s to %s",
-						fmt.Sprintf("%s-%d", ret[0].Hash, ret[0].Index),
-						fmt.Sprintf("%s-%d", ret[len(ret)-1].Hash, ret[len(ret)-1].Index))
+				if len(successFlightKeys) > 0 {
+					log.Debugf("push success flightskey from %s to %s",
+						successFlightKeys[0],
+						successFlightKeys[len(successFlightKeys)-1])
+				}
+				if len(failedFlightReqs) > 0 {
+					log.Debugf("push failed flightskey from %s-%d to %s-%d",
+						failedFlightReqs[0].Hash, failedFlightReqs[0].Index,
+						failedFlightReqs[len(failedFlightReqs)-1].Hash, failedFlightReqs[len(failedFlightReqs)-1].Index)
 				}
 
 				resp := &getBlocksResp{

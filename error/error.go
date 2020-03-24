@@ -24,8 +24,12 @@ func New(code uint32, format string, a ...interface{}) *Error {
 // NewWithError. new dsp error with non-nil error
 func NewWithError(code uint32, err error) *Error {
 	msg := ""
-	if dErr, ok := err.(*Error); ok {
-		msg = dErr.Message
+	if err != nil {
+		if dErr, ok := err.(*Error); ok {
+			msg = dErr.Message
+		} else {
+			msg = err.Error()
+		}
 	}
 	if len(msg) == 0 {
 		msg = "internal error"

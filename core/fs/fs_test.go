@@ -46,7 +46,7 @@ func TestNodeFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, err := fs.NodesFromFile("./T7-uploader.zip", "AAAAWg==AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADXFrE901BkX/lt3EyP1U4rB8YyzQAAAAAAADQvD1Q3LXVwbG9hZGVyLnppcAAAAABpc06H", false, "")
+	list, err := fs.NodesFromFile("./go-ipfs_v0.4.21_windows-amd64.zip.xltd", "AAAAcQ==AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD0OzBvczzxxsK/ge/TQXnCnxvVDgAAAAAAAEPzJmdvLWlwZnNfdjAuNC4yMV93aW5kb3dzLWFtZDY0LnppcC54bHRkAAAAAE+aQ9E=", false, "")
 	if err != nil {
 		return
 	}
@@ -55,7 +55,7 @@ func TestNodeFromFile(t *testing.T) {
 		fmt.Printf("#%v hash = %s\n", i, l)
 		_, ok := hashMap[l]
 		if ok {
-			fmt.Printf("duplicated %s", l)
+			fmt.Printf("duplicated %s\n", l)
 		}
 		hashMap[l] = struct{}{}
 	}
