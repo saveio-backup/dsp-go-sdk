@@ -64,6 +64,15 @@ func (this *TaskMgr) CloseDB() error {
 func (this *TaskMgr) NewTask(taskId string, taskT store.TaskType) (string, error) {
 	this.lock.Lock()
 	defer this.lock.Unlock()
+	if len(taskId) > 0 {
+		if _, ok := this.tasks[taskId]; ok {
+			return "", dspErr.New(dspErr.NEW_TASK_FAILED, fmt.Sprintf("task %s already exist", taskId))
+		}
+		info, _ := this.db.GetTaskInfo(taskId)
+		if info != nil {
+			return "", dspErr.New(dspErr.NEW_TASK_FAILED, fmt.Sprintf("task %s already exist", taskId))
+		}
+	}
 	t := NewTask(taskId, taskT, this.db)
 	if t == nil {
 		return "", dspErr.New(dspErr.NEW_TASK_FAILED, fmt.Sprintf("new task of type %d", taskT))

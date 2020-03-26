@@ -1103,7 +1103,7 @@ func TestGetFileInfo(t *testing.T) {
 	if d == nil {
 		t.Fatal("dsp init failed")
 	}
-	fileHash := "QmaUUdwqPbuE9gHANNqNLH7rDL6EAPTc3UzA3gxdmbwt4n"
+	fileHash := "QmTPpxU6QuKVs4aoVt7zUMSwqQmqwTheQ8egB19fvdj9Ai"
 	info, err := d.chain.GetFileInfo(fileHash)
 	if err != nil {
 		t.Fatal(err)
@@ -1129,6 +1129,34 @@ func TestGetFileInfo(t *testing.T) {
 	for _, d := range details.ProveDetails {
 		fmt.Printf("addr: %s, %s, %d \n", d.NodeAddr, d.WalletAddr.ToBase58(), d.ProveTimes)
 	}
+	os.RemoveAll(filepath.Base(".") + "/Log")
+}
+
+func TestGetChannelIdentifier(t *testing.T) {
+	dspCfg := &config.DspConfig{
+		ChainRpcAddrs: []string{"http://139.219.136.38:20336"},
+	}
+	w, err := wallet.OpenWallet(walletFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := w.GetDefaultAccount([]byte(walletPwd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Infof("wallet address:%s", acc.Address.ToBase58())
+	d := NewDsp(dspCfg, acc, nil)
+	if d == nil {
+		t.Fatal("dsp init failed")
+	}
+	addr1, _ := chainCom.AddressFromBase58("AVmZet4LgYATPoR5Zhat3GCd5PccKqJVVY")
+	addr2, _ := chainCom.AddressFromBase58("AHmUFP3au9odqgfm3FzSXRUyBxMcNTR8uS")
+	channelID, err := d.chain.Themis().Native.Channel.GetChannelIdentifier(addr1, addr2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("channel id %v\n", channelID)
+
 	os.RemoveAll(filepath.Base(".") + "/Log")
 }
 

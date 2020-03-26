@@ -80,7 +80,14 @@ func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
 // UploadFile upload new file logic synchronously
 func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.UploadOption) (uploadRet *common.UploadResult, err error) {
 	// emit result finally
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.INTERNAL_ERROR, err)
+	}
 	defer func() {
+		if err := file.Close(); err != nil {
+			log.Errorf("close file err %s", err)
+		}
 		sdkErr, _ := err.(*dspErr.Error)
 		if uploadRet == nil {
 			this.taskMgr.EmitResult(taskId, nil, sdkErr)
@@ -599,6 +606,7 @@ func (this *Dsp) checkIfPause(taskId, fileHashStr string) (bool, error) {
 }
 
 func (this *Dsp) resumeUpload(taskId string) (err error) {
+	log.Debugf("resume upload task %s", taskId)
 	tsk, err := this.taskMgr.GetTaskInfoCopy(taskId)
 	defer func() {
 		if err != nil {
@@ -1686,7 +1694,7 @@ func (this *Dsp) getMasterNodeHostAddr(walletAddr string) string {
 // uploadOptValid check upload opt valid
 func uploadOptValid(filePath string, opt *fs.UploadOption) error {
 	if !common.FileExisted(filePath) {
-		return dspErr.New(dspErr.INVALID_PARAMS, "file not exist")
+		return dspErr.New(dspErr.INVALID_PARAMS, "file %s not exist", filePath)
 	}
 	if opt.Encrypt && len(opt.EncryptPassword) == 0 {
 		return dspErr.New(dspErr.INVALID_PARAMS, "encrypt password is missing")

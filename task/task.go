@@ -454,8 +454,8 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 			this.info.TaskState = store.TaskStateIdle
 			this.info.Retry++
 			this.info.RetryAt = utils.GetMilliSecTimestamp() + utils.GetJitterDelay(this.info.Retry, 30)*1000
-			log.Errorf("task %s is failed, retry %d times, retry at %d",
-				this.info.Id, this.info.Retry, this.info.RetryAt)
+			log.Errorf("task %s, file %s  is failed, error code %d, error msg %v, retry %d times, retry at %d",
+				this.info.Id, this.info.FileHash, errorCode, errorMsg, this.info.Retry, this.info.RetryAt)
 		}
 	} else if result != nil {
 		log.Debugf("task: %s has done", this.id)
@@ -763,8 +763,8 @@ func (this *Task) NeedRetry() bool {
 	if this.info.TaskState != store.TaskStateIdle {
 		return false
 	}
-	log.Debugf("utils.GetMilliSecTimestamp() %d, retry at %d", utils.GetMilliSecTimestamp(), this.info.RetryAt)
 	if utils.GetMilliSecTimestamp() >= this.info.RetryAt {
+		log.Debugf("utils.GetMilliSecTimestamp() %d, retry at %d", utils.GetMilliSecTimestamp(), this.info.RetryAt)
 		return true
 	}
 	return false

@@ -634,7 +634,6 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, fileHashStr string, blockSiz
 
 // PayUnpaidFile. pay unpaid order for file
 func (this *Dsp) PayUnpaidPayments(taskId, fileHashStr string, quotation map[string]*file.Payment) error {
-	this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocks)
 	for _, payInfo := range quotation {
 		payments, _ := this.taskMgr.GetUnpaidPayments(taskId, payInfo.WalletAddress, payInfo.Asset)
 		if len(payments) == 0 {
@@ -643,14 +642,17 @@ func (this *Dsp) PayUnpaidPayments(taskId, fileHashStr string, quotation map[str
 		log.Debugf("task %s, file %s ,unpaid amount %v", taskId, fileHashStr, len(payments))
 		for _, payment := range payments {
 			log.Debugf("pay to %s of the unpaid amount %d for task %s", payInfo.WalletAddress, payment.Amount, taskId)
+			this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocks)
 			_, err := this.PayForBlock(payInfo, fileHashStr, payment.Amount/payInfo.UnitPrice,
 				payment.PaymentId, false)
 			if err != nil {
 				log.Errorf("pay unpaid payment err %s", err)
+				this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksFailed)
+			} else {
+				this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksDone)
 			}
 		}
 	}
-	this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksDone)
 	return nil
 }
 
