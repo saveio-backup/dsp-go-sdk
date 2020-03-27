@@ -785,7 +785,9 @@ func (this *Task) IsTaskCancel() bool {
 func (this *Task) IsTaskPaying() bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	return TaskProgressState(this.info.TranferState) == TaskUploadFilePaying || TaskProgressState(this.info.TranferState) == TaskDownloadPayForBlocks
+	return TaskProgressState(this.info.TranferState) == TaskUploadFilePaying ||
+		TaskProgressState(this.info.TranferState) == TaskWaitForBlockConfirmed ||
+		TaskProgressState(this.info.TranferState) == TaskDownloadPayForBlocks
 }
 
 func (this *Task) IsTaskPauseOrCancel() (bool, bool) {

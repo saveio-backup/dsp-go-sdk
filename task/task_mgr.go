@@ -464,7 +464,7 @@ func (this *TaskMgr) EmitProgress(taskId string, state TaskProgressState) {
 	}
 	v.SetTransferState(uint32(state))
 	pInfo := v.GetProgressInfo()
-	log.Debugf("EmitProgress taskId: %s, state: %v pInfo: %v", taskId, state, pInfo)
+	log.Debugf("EmitProgress taskId: %s, transfer state: %v pInfo: %v", taskId, state, pInfo)
 	this.progress <- pInfo
 }
 
