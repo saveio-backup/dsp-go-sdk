@@ -49,3 +49,11 @@ func TestTotalJitterDelay(t *testing.T) {
 	}
 	fmt.Printf("total sec %d, hour %v\n", sum, sum/3600)
 }
+
+func TestGetChecksumOfFile(t *testing.T) {
+	checkSum, err := GetChecksumOfFile("/Users/zhijie/Downloads/cn_windows_7_professional_x64_dvd_x15-65791.iso")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("check %v\n", checkSum)
+}

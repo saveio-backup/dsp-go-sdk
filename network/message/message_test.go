@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -117,5 +118,63 @@ func TestMsgId(t *testing.T) {
 		}()
 	}
 	for {
+	}
+}
+
+func BenchmarkMarshalBlockFlightsMsg(b *testing.B) {
+	blocks := make([]*block.Block, 0)
+	blockNum := 32
+	for index := 0; index < blockNum; index++ {
+		b := &block.Block{
+			SessionId: "12345678",
+			Index:     0,
+			FileHash:  "QmdLGeCa7gxrYNEyNESxUTQM5GgFBVpfyoYSC8y7xaBqhu",
+			Hash:      "QmdLGeCa7gxrYNEyNESxUTQM5GgFBVpfyoYSC8y7xaBqhu",
+			Operation: netcom.BLOCK_OP_GET,
+			Payment: &payment.Payment{
+				Sender: "AKuNEKrUcaLpmZNc2nEXCk3JSDHwKrQYJH",
+				Asset:  1,
+			},
+			Data: make([]byte, 1024*256),
+		}
+		rand.Read(b.Data)
+		blocks = append(blocks, b)
+	}
+	flight := &block.BlockFlights{
+		TimeStamp: time.Now().UnixNano(),
+		Blocks:    blocks,
+	}
+	for i := 0; i < b.N; i++ {
+		msg1 := NewBlockFlightsMsg(flight)
+		msg1.ToProtoMsg()
+	}
+}
+func BenchmarkMarshalBlockFlightsMsgWithReset(b *testing.B) {
+	blocks := make([]*block.Block, 0)
+	blockNum := 32
+	for index := 0; index < blockNum; index++ {
+		b := &block.Block{
+			SessionId: "12345678",
+			Index:     0,
+			FileHash:  "QmdLGeCa7gxrYNEyNESxUTQM5GgFBVpfyoYSC8y7xaBqhu",
+			Hash:      "QmdLGeCa7gxrYNEyNESxUTQM5GgFBVpfyoYSC8y7xaBqhu",
+			Operation: netcom.BLOCK_OP_GET,
+			Payment: &payment.Payment{
+				Sender: "AKuNEKrUcaLpmZNc2nEXCk3JSDHwKrQYJH",
+				Asset:  1,
+			},
+			Data: make([]byte, 1024*256),
+		}
+		rand.Read(b.Data)
+		blocks = append(blocks, b)
+	}
+	flight := &block.BlockFlights{
+		TimeStamp: time.Now().UnixNano(),
+		Blocks:    blocks,
+	}
+	for i := 0; i < b.N; i++ {
+		msg1 := NewBlockFlightsMsg(flight)
+		pMsg := msg1.ToProtoMsg()
+		pMsg.Reset()
 	}
 }
