@@ -44,6 +44,7 @@ type ProgressInfo struct {
 	FileSize      uint64                        // file size
 	RealFileSize  uint64                        // real file size
 	Total         uint64                        // total file's blocks count
+	Encrypt       bool                          // file encrypted or not
 	Progress      map[string]store.FileProgress // address <=> progress
 	SlaveProgress map[string]store.FileProgress // progress for slave nodes
 	NodeHostAddrs map[string]string             // node host addrs map
@@ -878,6 +879,7 @@ func (this *Task) GetProgressInfo() *ProgressInfo {
 		CopyNum:       this.info.CopyNum,
 		FileSize:      this.info.FileSize,
 		RealFileSize:  this.info.RealFileSize,
+		Encrypt:       this.info.Encrypt,
 		Progress:      this.db.FileProgress(this.id),
 		NodeHostAddrs: this.info.NodeHostAddrs,
 		TaskState:     store.TaskState(this.info.TaskState),

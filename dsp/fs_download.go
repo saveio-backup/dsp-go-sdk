@@ -805,6 +805,7 @@ func (this *Dsp) DownloadFileWithQuotation(taskInfo *store.TaskInfo, quotation m
 		if len(taskInfo.DecryptPwd) == 0 {
 			return nil
 		}
+		log.Debugf("decrypt task %s file with pwd %s", taskInfo.Id, taskInfo.DecryptPwd)
 		if err := this.decryptDownloadedFile(taskInfo.Id); err != nil {
 			return err
 		}
@@ -1251,7 +1252,7 @@ func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet []string) err
 
 func (this *Dsp) decryptDownloadedFile(taskId string) error {
 	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
-	if err != nil || taskInfo != nil {
+	if err != nil || taskInfo == nil {
 		return dspErr.New(dspErr.FILEINFO_NOT_EXIST, "task %s not exist", taskId)
 	}
 	if len(taskInfo.DecryptPwd) == 0 {
@@ -1269,6 +1270,7 @@ func (this *Dsp) decryptDownloadedFile(taskId string) error {
 		taskInfo.DecryptPwd, newFilePath); err != nil {
 		return dspErr.New(dspErr.DECRYPT_FILE_FAILED, err.Error())
 	}
+	log.Debugf("decrypt file success %s", newFilePath)
 	// return this.taskMgr.SetTaskInfoWithOptions(taskId, task.FilePath(newFilePath))
 	return nil
 }

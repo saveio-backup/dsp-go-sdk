@@ -42,6 +42,20 @@ type FilePrefix struct {
 	Reserved    [REVERSED_LEN]byte // reserved word field
 }
 
+func NewEncryptPrefix(password string, owner common.Address, fileSize uint64) *FilePrefix {
+	p := &FilePrefix{
+		Version:    PREFIX_VERSION,
+		Encrypt:    true,
+		EncryptPwd: password,
+		Owner:      owner,
+		FileSize:   fileSize,
+	}
+	if err := p.MakeSalt(); err != nil {
+		return nil
+	}
+	return p
+}
+
 // MakeSalt. make a random encrypt salt for prefix
 func (p *FilePrefix) MakeSalt() error {
 	var salt [SALT_LEN]byte

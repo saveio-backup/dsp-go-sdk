@@ -36,3 +36,4 @@ temp/*
 store/test_db/*
 test/*
 .idea
+.DS_Store

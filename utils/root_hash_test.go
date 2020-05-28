@@ -22,3 +22,10 @@ func BenchmarkTestComputeRootHash(b *testing.B) {
 	root := ComputeStringHashRoot(hashes)
 	fmt.Printf("root %x\n", root)
 }
+
+func TestHardCodeComputeStringHashRoot(t *testing.T) {
+	hashes := make([]string, 0)
+	hashes = append(hashes, "zb2rhbgXCa2eUAu5G3k9hUiFg9dTBAneSjwkLX9TH5LKPAG4t")
+	root := ComputeStringHashRoot(hashes)
+	fmt.Printf("root %s\n", root)
+}
