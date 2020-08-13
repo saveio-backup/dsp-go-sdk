@@ -8,6 +8,7 @@ import (
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
+	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
 )
 
 func (this *Chain) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
@@ -89,8 +90,8 @@ func (this *Chain) GetNodeList() (*fs.FsNodesInfo, error) {
 	return list, nil
 }
 
-func (this *Chain) ProveParamSer(g, g0, pubKey, fileId []byte) ([]byte, error) {
-	paramsBuf, err := this.themis.Native.Fs.ProveParamSer(g, g0, pubKey, fileId)
+func (this *Chain) ProveParamSer(rootHash []byte, fileId pdp.FileID) ([]byte, error) {
+	paramsBuf, err := this.themis.Native.Fs.ProveParamSer(rootHash, fileId)
 	if err != nil {
 		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
 	}
@@ -261,4 +262,42 @@ func (this *Chain) CheckHasProveFile(fileHashStr string, walletAddr chainCom.Add
 		}
 	}
 	return false
+}
+
+func (this *Chain) CreateSector(sectorId uint64, proveLevel uint64, size uint64) (string, error) {
+	txHash, err := this.themis.Native.Fs.CreateSector(sectorId, proveLevel, size)
+	if err != nil {
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
+}
+
+func (this *Chain) DeleteSector(sectorId uint64) (string, error) {
+	txHash, err := this.themis.Native.Fs.DeleteSector(sectorId)
+	if err != nil {
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
+}
+
+func (this *Chain) GetSectorInfo(sectorId uint64) (*fs.SectorInfo, error) {
+	sectorInfo, err := this.themis.Native.Fs.GetSectorInfo(sectorId)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return sectorInfo, nil
+}
+
+func (this *Chain) GetSectorInfosForNode(walletAddr string) (*fs.SectorInfos, error) {
+	address, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	sectorInfos, err := this.themis.Native.Fs.GetSectorInfosForNode(address)
+	if err != nil {
+		return nil, dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return sectorInfos, nil
 }

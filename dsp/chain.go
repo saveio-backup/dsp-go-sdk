@@ -284,3 +284,19 @@ func (this *Dsp) GetNodeHostAddrListByWallets(wallets []chainCom.Address) ([]str
 func (this *Dsp) QueryPluginsInfo() (*dns.NameInfoList, error) {
 	return this.chain.QueryPluginsInfo()
 }
+
+func (this *Dsp) CreateSector(sectorId uint64, proveLevel uint64, size uint64) (string, error) {
+	return this.chain.CreateSector(sectorId, proveLevel, size)
+}
+
+func (this *Dsp) DeleteSector(sectorId uint64) (string, error) {
+	return this.chain.DeleteSector(sectorId)
+}
+
+func (this *Dsp) GetSectorInfo(sectorId uint64) (*fs.SectorInfo, error) {
+	return this.chain.GetSectorInfo(sectorId)
+}
+
+func (this *Dsp) GetSectorInfosForNode(addr string) (*fs.SectorInfos, error) {
+	return this.chain.GetSectorInfosForNode(addr)
+}

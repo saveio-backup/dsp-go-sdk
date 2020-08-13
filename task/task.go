@@ -420,16 +420,6 @@ func (this *Task) SetTotalBlockCnt(cnt uint64) error {
 	return this.db.SaveTaskInfo(this.info)
 }
 
-func (this *Task) SetPrivateKey(priKey []byte) error {
-	this.lock.Lock()
-	defer this.lock.Unlock()
-	this.info.ProvePrivKey = priKey
-	if this.batch {
-		return nil
-	}
-	return this.db.SaveTaskInfo(this.info)
-}
-
 func (this *Task) SetStoreTx(tx string) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -825,12 +815,6 @@ func (this *Task) DetailState() TaskProgressState {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return TaskProgressState(this.info.TranferState)
-}
-
-func (this *Task) GetPrivateKey() []byte {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
-	return this.info.ProvePrivKey
 }
 
 func (this *Task) GetStoreTx() string {

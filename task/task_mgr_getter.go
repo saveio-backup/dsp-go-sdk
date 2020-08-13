@@ -117,14 +117,6 @@ func (this *TaskMgr) GetFileOwner(taskId string) (string, error) {
 	return v.GetFileOwner(), nil
 }
 
-func (this *TaskMgr) GetFilePrivateKey(taskId string) ([]byte, error) {
-	v, ok := this.GetTaskById(taskId)
-	if !ok {
-		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
-	}
-	return v.GetPrivateKey(), nil
-}
-
 func (this *TaskMgr) GetStoreTx(taskId string) (string, error) {
 	v, ok := this.GetTaskById(taskId)
 	if !ok {

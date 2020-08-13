@@ -95,7 +95,6 @@ type TaskInfo struct {
 	WhitelistTx     string            `json:"whitelist_tx,omitempty"`           // first op whitelist tx
 	TotalBlockCount uint64            `json:"total_block_count"`                // total block count
 	TaskState       TaskState         `json:"task_state"`                       // task state
-	ProvePrivKey    []byte            `json:"prove_private_key,omitempty"`      // prove private key params
 	ProveParams     []byte            `json:"prove_params,omitempty"`           // pdp prove params
 	Prefix          []byte            `json:"prefix"`                           // file prefix
 	EncryptHash     string            `json:"encrypt_hash,omitempty"`           // encrypt hash

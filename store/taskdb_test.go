@@ -178,7 +178,6 @@ func TestMarshalFileInfo(t *testing.T) {
 		StoreTx:         "27db5bae0138cb7a42ce161a57c1bdc514eef40a5a4ea1b9893b7fb24af74d8d",
 		TotalBlockCount: 82,
 		TaskState:       1,
-		ProvePrivKey:    nil,
 		Prefix:          nil,
 		EncryptSalt:     "",
 		EncryptHash:     "",
@@ -215,7 +214,6 @@ func TestMarshalFileInfo(t *testing.T) {
 	fmt.Printf("StoreTx: %v\n", info2.StoreTx)
 	fmt.Printf("TotalBlockCount: %v\n", info2.TotalBlockCount)
 	fmt.Printf("TaskState: %v\n", info2.TaskState)
-	fmt.Printf("ProvePrivKey: %v\n", info2.ProvePrivKey)
 	fmt.Printf("Prefix: %v\n", info2.Prefix)
 	fmt.Printf("EncryptSalt: %v\n", info2.EncryptSalt)
 	fmt.Printf("EncryptHash: %v\n", info2.EncryptHash)

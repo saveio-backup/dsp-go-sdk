@@ -107,12 +107,6 @@ func TotalBlockCnt(cnt uint64) InfoOption {
 	})
 }
 
-func PrivateKey(priKey []byte) InfoOption {
-	return OptionFunc(func(info *store.TaskInfo) {
-		info.ProvePrivKey = priKey
-	})
-}
-
 func ProveParams(params []byte) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.ProveParams = params

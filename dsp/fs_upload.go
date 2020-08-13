@@ -1,6 +1,7 @@
 package dsp
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -20,7 +21,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/utils"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
-	"github.com/saveio/themis/crypto/pdp"
+	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
 
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
@@ -240,8 +241,20 @@ func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.Uploa
 		}
 		return this.getFileUploadResult(taskInfo, opt)
 	}
+
+	fileID := getFileIDFromFileHash(fileHashStr)
+	tags, err := this.generatePdpTags(hashes, fileID)
+	if err != nil {
+		return nil, err
+	}
+
+	tagsRoot, err := this.getMerkleRootForTag(fileID, tags)
+	if err != nil {
+		return nil, err
+	}
+
 	// pay file
-	if err := this.payForSendFile(taskId); err != nil {
+	if err := this.payForSendFile(taskId, fileID, tagsRoot); err != nil {
 		// rollback transfer state
 		log.Errorf("task %s pay for file %s failed %s", taskId, fileHashStr, err)
 		this.taskMgr.EmitProgress(taskId, task.TaskUploadFileFindReceivers)
@@ -287,6 +300,39 @@ func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.Uploa
 	}
 	log.Debug("upload success result %v", uploadRet)
 	return uploadRet, nil
+}
+
+func (this *Dsp) generatePdpTags(hashes []string, fileID pdp.FileID) ([]pdp.Tag, error) {
+	p := pdp.NewPdp(0)
+	tags := make([]pdp.Tag, 0)
+	for index, hash := range hashes {
+		block := this.fs.GetBlock(hash)
+		blockData := this.fs.BlockDataOfAny(block)
+		if len(blockData) == 0 {
+			log.Warnf("get empty block of %s %d", hash, index)
+		}
+
+		tag, err := p.GenerateTag([]pdp.Block{blockData}, fileID)
+		if err != nil {
+			return nil, err
+		}
+		tags = append(tags, tag...)
+	}
+	return tags, nil
+}
+
+func (this *Dsp) getMerkleRootForTag(fileID pdp.FileID, tags []pdp.Tag) ([]byte, error) {
+	p := pdp.NewPdp(0)
+	nodes := make([]*pdp.MerkleNode, 0)
+	for index, tag := range tags {
+		node := pdp.InitNodeWithData(tag[:], uint64(index))
+		nodes = append(nodes, node)
+	}
+	err := p.InitMerkleTreeForFile(fileID, nodes)
+	if err != nil {
+		return nil, err
+	}
+	return p.GetRootHashForFile(fileID)
 }
 
 // PauseUpload. pause a task
@@ -713,7 +759,7 @@ func (this *Dsp) resumeUpload(taskId string) (err error) {
 
 // payForSendFile pay before send a file
 // return PoR params byte slice, PoR private key of the file or error
-func (this *Dsp) payForSendFile(taskId string) error {
+func (this *Dsp) payForSendFile(taskId string, fileID pdp.FileID, tagsRoot []byte) error {
 	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
 	if err != nil {
 		return err
@@ -725,7 +771,7 @@ func (this *Dsp) payForSendFile(taskId string) error {
 			log.Errorf("get file info err %s", err)
 		}
 	}
-	var paramsBuf, privateKey []byte
+	var paramsBuf []byte
 	var tx string
 
 	var primaryNodes []chainCom.Address
@@ -746,9 +792,7 @@ func (this *Dsp) payForSendFile(taskId string) error {
 	if fileInfo == nil {
 		log.Info("first upload file")
 		blockSizeInKB := uint64(math.Ceil(float64(common.CHUNK_SIZE) / 1024.0))
-		g, g0, pubKey, privKey, fileID := pdp.Init(taskInfo.FilePath)
-		paramsBuf, err = this.chain.ProveParamSer(g, g0, pubKey, fileID)
-		privateKey = privKey
+		paramsBuf, err = this.chain.ProveParamSer(tagsRoot, fileID)
 		if err != nil {
 			log.Errorf("serialization prove params failed:%s", err)
 			return err
@@ -758,8 +802,7 @@ func (this *Dsp) payForSendFile(taskId string) error {
 			return err
 		}
 		if err = this.taskMgr.SetTaskInfoWithOptions(taskId,
-			task.ProveParams(paramsBuf),
-			task.PrivateKey(privateKey)); err != nil {
+			task.ProveParams(paramsBuf)); err != nil {
 			log.Errorf("set task info err %s", err)
 			return err
 		}
@@ -806,25 +849,19 @@ func (this *Dsp) payForSendFile(taskId string) error {
 			task.PrimaryNodes(utils.WalletAddrsToBase58(walletAddrs)),
 			task.CandidateNodes(utils.WalletAddrsToBase58(candidateNodes)),
 			task.NodeHostAddrs(utils.MergeTwoAddressMap(primaryNodeMap, candidateNodeHostMap)),
-			task.ProveParams(paramsBuf),
-			task.PrivateKey(privateKey)); err != nil {
+			task.ProveParams(paramsBuf)); err != nil {
 			log.Errorf("set task info err %s", err)
 			return err
 		}
 	} else {
 		paramsBuf = fileInfo.FileProveParam
-		privateKey, err = this.taskMgr.GetFilePrivateKey(taskId)
-		log.Debugf("get private key from task %s, key: %d", taskId, len(privateKey))
-		if err != nil {
-			return err
-		}
 		tx, err = this.taskMgr.GetStoreTx(taskId)
 		if err != nil {
 			return err
 		}
 	}
-	if len(paramsBuf) == 0 || len(privateKey) == 0 {
-		log.Errorf("param buf len: %d, private key len: %d", len(paramsBuf), len(privateKey))
+	if len(paramsBuf) == 0 {
+		log.Errorf("param buf len: %d, private key len: %d", len(paramsBuf))
 		return dspErr.New(dspErr.PDP_PRIVKEY_NOT_FOUND,
 			"PDP private key is not found. Please delete file and retry to upload it")
 	}
@@ -1170,21 +1207,23 @@ func (this *Dsp) sendFetchReadyMsg(taskId, peerWalletAddr string) (*message.Mess
 }
 
 // generateBlockMsgData. generate blockdata, blockEncodedData, tagData with prove params
-func (this *Dsp) generateBlockMsgData(hash string, index, offset uint64,
-	fileID, g0, privateKey []byte) (*blockMsgData, error) {
+func (this *Dsp) generateBlockMsgData(hash string, index, offset uint64, fileID pdp.FileID) (*blockMsgData, error) {
 	// TODO: use disk fetch rather then memory access
 	block := this.fs.GetBlock(hash)
 	blockData := this.fs.BlockDataOfAny(block)
 	if len(blockData) == 0 {
 		log.Warnf("get empty block of %s %d", hash, index)
 	}
-	tag, err := pdp.SignGenerate(blockData, fileID, uint32(index+1), g0, privateKey)
+
+	p := pdp.NewPdp(0)
+	tag, err := p.GenerateTag([]pdp.Block{blockData}, fileID)
 	if err != nil {
 		return nil, err
 	}
+
 	msgData := &blockMsgData{
 		blockData: blockData,
-		tag:       tag,
+		tag:       tag[0][:],
 		offset:    offset,
 		refCnt:    1,
 	}
@@ -1232,7 +1271,7 @@ func (this *Dsp) sendBlocks(taskId string, hashes []string) error {
 		offsetKey := fmt.Sprintf("%s-%d", hash, index)
 		offset, _ := allOffset[offsetKey]
 		var err error
-		data, err = this.generateBlockMsgData(hash, index, offset, p.FileId, p.G0, tsk.ProvePrivKey)
+		data, err = this.generateBlockMsgData(hash, index, offset, p.FileID)
 		if err != nil {
 			return nil
 		}
@@ -1740,4 +1779,11 @@ func getFileSizeWithBlockCount(cnt uint64) uint64 {
 		return 1
 	}
 	return size
+}
+
+func getFileIDFromFileHash(fileHash string) pdp.FileID {
+	var fileID pdp.FileID
+	reader := bytes.NewReader(([]byte)(fileHash))
+	reader.Read(fileID[:])
+	return fileID
 }
