@@ -215,6 +215,12 @@ func ProveInterval(proveInterval uint64) InfoOption {
 	})
 }
 
+func ProveLevel(proveLevel uint64) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.ProveLevel = proveLevel
+	})
+}
+
 func Privilege(privilege uint64) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.Privilege = privilege

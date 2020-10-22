@@ -125,6 +125,7 @@ type TaskInfo struct {
 	RealFileSize    uint64            `json:"real_file_size"`                   // real file size in KB
 	FileSize        uint64            `json:"file_size"`                        // real file size in block
 	ProveInterval   uint64            `json:"prove_interval,omitempty"`         // prove interval
+	ProveLevel      uint64            `json:"prove_level,omitempty"`            // prove level
 	Privilege       uint64            `json:"privilege,omitempty"`              // file privilege
 	Encrypt         bool              `json:"encrypt,omitempty"`                // encrypt or not
 	EncryptPassword []byte            `json:"encrypt_pwd,omitempty"`            // encrypted pwd

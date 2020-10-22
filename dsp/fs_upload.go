@@ -133,6 +133,7 @@ func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.Uploa
 		task.StoreType(uint32(opt.StorageType)),
 		task.RealFileSize(opt.FileSize),
 		task.ProveInterval(opt.ProveInterval),
+		task.ProveLevel(opt.ProveLevel),
 		task.ExpiredHeight(opt.ExpiredHeight),
 		task.Privilege(opt.Privilege),
 		task.CopyNum(uint32(opt.CopyNum)),
@@ -157,7 +158,7 @@ func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.Uploa
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileMakeSlice)
 	var tx, fileHashStr, prefixStr string
 	var totalCount uint64
-	log.Debugf("upload task %s, will split for file", taskId)
+	log.Debugf("upload task %s, will split for file, prove level %v", taskId, opt.ProveLevel)
 	// split file to pieces
 	if pause, err := this.checkIfPause(taskId, ""); err != nil || pause {
 		return nil, err
@@ -808,7 +809,7 @@ func (this *Dsp) payForSendFile(taskId string, fileID pdp.FileID, tagsRoot []byt
 		}
 		log.Debugf("primary nodes: %v, candidate nodes: %v", walletAddrs, candidateNodes)
 		tx, err = this.chain.StoreFile(taskInfo.FileHash, taskInfo.BlocksRoot, taskInfo.TotalBlockCount,
-			blockSizeInKB, taskInfo.ProveInterval, taskInfo.ExpiredHeight, uint64(taskInfo.CopyNum),
+			blockSizeInKB, taskInfo.ProveLevel, taskInfo.ExpiredHeight, uint64(taskInfo.CopyNum),
 			[]byte(taskInfo.FileName), uint64(taskInfo.Privilege),
 			paramsBuf, uint64(taskInfo.StoreType), taskInfo.RealFileSize, walletAddrs, candidateNodes)
 		if err != nil {

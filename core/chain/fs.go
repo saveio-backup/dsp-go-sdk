@@ -106,9 +106,9 @@ func (this *Chain) ProveParamDes(buf []byte) (*fs.ProveParam, error) {
 	return arg, nil
 }
 
-func (this *Chain) StoreFile(fileHashStr, blocksRoot string, blockNum, blockSizeInKB, proveInterval, expiredHeight, copyNum uint64,
+func (this *Chain) StoreFile(fileHashStr, blocksRoot string, blockNum, blockSizeInKB, proveLevel, expiredHeight, copyNum uint64,
 	fileDesc []byte, privilege uint64, proveParam []byte, storageType, realFileSize uint64, primaryNodes, candidateNodes []chainCom.Address) (string, error) {
-	txHash, err := this.themis.Native.Fs.StoreFile(fileHashStr, blocksRoot, blockNum, blockSizeInKB, proveInterval,
+	txHash, err := this.themis.Native.Fs.StoreFile(fileHashStr, blocksRoot, blockNum, blockSizeInKB, proveLevel,
 		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes)
 	if err != nil {
 		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
