@@ -116,6 +116,7 @@ func (this *Dsp) IsFs() bool {
 
 func (this *Dsp) Start() error {
 	if this.config == nil {
+		log.Debugf("dsp config is nil")
 		this.state.Set(state.ModuleStateActive)
 		return nil
 	}
