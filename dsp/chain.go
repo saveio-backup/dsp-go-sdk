@@ -76,6 +76,10 @@ func (this *Dsp) NodeWithdrawProfit() (string, error) {
 	return this.chain.NodeWithdrawProfit()
 }
 
+func (this *Dsp) RegisterHeader(header, desc string, ttl uint64) (string, error) {
+	return this.chain.RegisterHeader(header, desc, ttl)
+}
+
 // CheckFilePrivilege. check if the downloader has privilege to download file
 func (this *Dsp) CheckFilePrivilege(info *fs.FileInfo, fileHashStr, walletAddr string) bool {
 	return this.chain.CheckFilePrivilege(info, fileHashStr, walletAddr)

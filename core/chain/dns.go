@@ -24,6 +24,15 @@ func (this *Chain) QueryPluginsInfo() (*dns.NameInfoList, error) {
 	return info, nil
 }
 
+func (this *Chain) RegisterHeader(header, desc string, ttl uint64) (string, error) {
+	txHash, err := this.themis.Native.Dns.RegisterHeader(header, desc, ttl)
+	if err != nil {
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	return tx, nil
+}
+
 func (this *Chain) RegisterUrl(url string, rType uint64, name, desc string, ttl uint64) (string, error) {
 	txHash, err := this.themis.Native.Dns.RegisterUrl(url, rType, name, desc, ttl)
 	if err != nil {
