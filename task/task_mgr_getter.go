@@ -347,3 +347,12 @@ func (this *TaskMgr) GetUploadTaskInfos() ([]*store.TaskInfo, error) {
 	}
 	return infos, nil
 }
+
+func (this *TaskMgr) IsTaskPayOnLayer1(taskId string) (bool, error) {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return false, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
+	}
+
+	return v.PayOnLayer1(), nil
+}

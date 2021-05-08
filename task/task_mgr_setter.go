@@ -434,3 +434,13 @@ func (this *TaskMgr) UpdateTaskPeerSpeed(id, nodeAddr string, speed uint64) erro
 	}
 	return nil
 }
+
+func (this *TaskMgr) SetPayOnLayer1(taskId string, payOnL1 bool) error {
+	v, ok := this.GetTaskById(taskId)
+	if !ok {
+		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, fmt.Sprintf("task: %s, not exist", taskId))
+	}
+	v.SetPayOnLayer1(payOnL1)
+
+	return nil
+}

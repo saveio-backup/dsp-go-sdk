@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/saveio/dsp-go-sdk/actor/client"
+	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
 
 	"github.com/saveio/carrier/network"
@@ -43,8 +44,47 @@ func (this *Dsp) Receive(ctx *network.ComponentContext, peerWalletAddr string) {
 		this.handleBlockFlightsMsg(ctx, peerWalletAddr, msg)
 	case netcom.MSG_TYPE_PROGRESS:
 		this.handleProgressMsg(ctx, peerWalletAddr, msg)
+	case netcom.MSG_TYPE_PAYMENT:
+		this.handlePaymentMsg(ctx, peerWalletAddr, msg)
 	default:
 		log.Debugf("unrecognized msg type %s", msg.Header.Type)
+	}
+}
+
+func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr string, msg *message.Message) {
+	paymentMsg := msg.Payload.(*payment.Payment)
+	taskId, err := this.taskMgr.GetTaskIdWithPaymentId(int32(paymentMsg.PaymentId))
+	if err != nil {
+		log.Errorf("get taskId with payment id failed %s", err)
+	}
+	fileHashStr, err := this.taskMgr.GetTaskFileHash(taskId)
+	if err != nil {
+		log.Errorf("get fileHash with task id failed %s", err)
+	}
+
+	// delete record
+	err = this.taskMgr.DeleteFileUnpaid(taskId, paymentMsg.Sender, int32(paymentMsg.PaymentId),
+		int32(paymentMsg.Asset), uint64(paymentMsg.Amount))
+	if err != nil {
+		log.Errorf("delete share file info %s", err)
+	}
+	downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(),
+		store.TaskTypeDownload)
+	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
+	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
+	log.Debugf("delete unpaid success taskId: %v, fileHash: %v, fileName: %v, owner: %v, sender: %v, amount: %v",
+		taskId, fileHashStr, fileName, fileOwner, paymentMsg.Sender, uint64(paymentMsg.Amount))
+	this.shareRecordDB.InsertShareRecord(taskId, fileHashStr, fileName, fileOwner,
+		paymentMsg.Sender, uint64(paymentMsg.Amount))
+
+	replyMsg := message.NewEmptyMsg(
+		message.WithSign(this.account),
+		message.WithSyn(msg.MessageId),
+	)
+	if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		log.Errorf("reply rdy ok msg failed", err)
+	} else {
+		log.Debugf("reply rdy ok msg success")
 	}
 }
 

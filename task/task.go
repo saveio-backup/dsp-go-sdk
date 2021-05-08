@@ -111,6 +111,7 @@ type Task struct {
 	batch               bool                         // flag of batch set
 	db                  *store.TaskDB                // db
 	workerNetPhase      map[string]int               // network msg interact phase, used to check msg transaction, wallet addr <=> phase
+	payOnL1             bool                         // pay on layer 1
 }
 
 // NewTask. new task for file, and set the task info to DB.
@@ -125,6 +126,7 @@ func NewTask(taskId string, taskT store.TaskType, db *store.TaskDB) *Task {
 		return nil
 	}
 	t := newTask(taskId, info, db)
+	t.payOnL1 = true
 	t.info.TaskState = store.TaskStatePrepare
 	err = db.SaveTaskInfo(t.info)
 	if err != nil {
@@ -672,6 +674,18 @@ func (this *Task) State() store.TaskState {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	return store.TaskState(this.info.TaskState)
+}
+
+func (this *Task) PayOnLayer1() bool {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	return this.payOnL1
+}
+
+func (this *Task) SetPayOnLayer1(payOnL1 bool) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	this.payOnL1 = payOnL1
 }
 
 func (this *Task) Pause() error {

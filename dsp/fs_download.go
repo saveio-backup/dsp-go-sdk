@@ -574,6 +574,10 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, fileHashStr string, blockSiz
 		}
 	}
 
+	if ok, _ := this.taskMgr.IsTaskPayOnLayer1(taskId); ok {
+		return this.FastTransfer(taskId, payInfo, paymentId, amount)
+	}
+
 	// use default dns to pay
 	if err := this.checkDNSState(this.dns.DNSNode.WalletAddr); err == nil {
 		log.Debugf("paying for file %s, to %s, id %v, use dns: %s",
@@ -621,7 +625,12 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, fileHashStr string, blockSiz
 		break
 	}
 	if !paySuccess {
-		return 0, fmt.Errorf("pay %d failed", paymentId)
+		_, err := this.FastTransfer(taskId, payInfo, paymentId, amount)
+		if err != nil {
+			return 0, fmt.Errorf("pay %d failed", paymentId)
+		}
+		this.taskMgr.SetPayOnLayer1(taskId, true)
+		return paymentId, nil
 	}
 	// clean unpaid order
 	if err := this.taskMgr.DeleteFileUnpaid(taskId, payInfo.WalletAddress, paymentId, payInfo.Asset,
@@ -629,6 +638,33 @@ func (this *Dsp) PayForBlock(payInfo *file.Payment, fileHashStr string, blockSiz
 		return 0, err
 	}
 	log.Debugf("delete unpaid %d", amount)
+	return paymentId, nil
+}
+
+func (this *Dsp) FastTransfer(taskId string, payInfo *file.Payment, paymentId int32, amount uint64) (int32, error) {
+	receiverAddr, err := chainCom.AddressFromBase58(payInfo.WalletAddress)
+	if err != nil {
+		return 0, err
+	}
+	_, err = this.chain.FastTransfer(uint64(paymentId), this.chain.Address(), receiverAddr, amount)
+	if err != nil {
+		return 0, err
+	}
+	if err := this.taskMgr.DeleteFileUnpaid(taskId, payInfo.WalletAddress, paymentId,
+		payInfo.Asset, amount); err != nil {
+		return 0, err
+	}
+	log.Debugf("delete unpaid %d", amount)
+	// active peer to prevent pay too long
+	this.taskMgr.ActiveDownloadTaskPeer(payInfo.WalletAddress)
+
+	msg := message.NewPaymentMsg(this.chain.WalletAddress(), payInfo.WalletAddress,
+		paymentId, common.ASSET_USDT, amount, "")
+	_, err = client.P2pSendAndWaitReply(payInfo.WalletAddress, msg.MessageId, msg.ToProtoMsg())
+	if err != nil {
+		return 0, err
+	}
+	log.Debugf("task %s sent fast transfer payment msg with paymentId %v", taskId, paymentId)
 	return paymentId, nil
 }
 

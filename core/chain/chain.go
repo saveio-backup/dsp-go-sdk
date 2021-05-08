@@ -291,3 +291,11 @@ func (this *Chain) GetChannelInfo(channelID uint64, participant1, participant2 c
 	}
 	return val, nil
 }
+
+func (this *Chain) FastTransfer(paymentId uint64, from, to chainCom.Address, amount uint64) (string, error) {
+	val, err := this.themis.Native.Channel.FastTransfer(paymentId, from, to, amount)
+	if err != nil {
+		return "", dspErr.NewWithError(dspErr.CHAIN_ERROR, err)
+	}
+	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+}
