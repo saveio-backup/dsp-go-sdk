@@ -650,6 +650,22 @@ func (this *Dsp) FastTransfer(taskId string, payInfo *file.Payment, paymentId in
 	if err != nil {
 		return 0, err
 	}
+
+	log.Debugf("task %s sending payment msg %s to %s", taskId, paymentId, payInfo.WalletAddress)
+	msg := message.NewPaymentMsg(
+		this.chain.WalletAddress(),
+		payInfo.WalletAddress,
+		paymentId,
+		common.ASSET_USDT,
+		amount,
+		"",
+		message.WithSign(this.account),
+	)
+	_, err = client.P2pSendAndWaitReply(payInfo.WalletAddress, msg.MessageId, msg.ToProtoMsg())
+	if err != nil {
+		return 0, err
+	}
+	log.Debugf("task %s sent fast transfer payment msg with paymentId %v", taskId, paymentId)
 	if err := this.taskMgr.DeleteFileUnpaid(taskId, payInfo.WalletAddress, paymentId,
 		payInfo.Asset, amount); err != nil {
 		return 0, err
@@ -657,14 +673,6 @@ func (this *Dsp) FastTransfer(taskId string, payInfo *file.Payment, paymentId in
 	log.Debugf("delete unpaid %d", amount)
 	// active peer to prevent pay too long
 	this.taskMgr.ActiveDownloadTaskPeer(payInfo.WalletAddress)
-
-	msg := message.NewPaymentMsg(this.chain.WalletAddress(), payInfo.WalletAddress,
-		paymentId, common.ASSET_USDT, amount, "")
-	_, err = client.P2pSendAndWaitReply(payInfo.WalletAddress, msg.MessageId, msg.ToProtoMsg())
-	if err != nil {
-		return 0, err
-	}
-	log.Debugf("task %s sent fast transfer payment msg with paymentId %v", taskId, paymentId)
 	return paymentId, nil
 }
 

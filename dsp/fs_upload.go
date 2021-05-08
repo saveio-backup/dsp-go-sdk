@@ -807,7 +807,7 @@ func (this *Dsp) payForSendFile(taskId string, fileID pdp.FileID, tagsRoot []byt
 			log.Errorf("set task info err %s", err)
 			return err
 		}
-		log.Debugf("primary nodes: %v, candidate nodes: %v", walletAddrs, candidateNodes)
+		log.Debugf("primary nodes: %v, candidate nodes: %v ProveLevel %v", walletAddrs, candidateNodes, taskInfo.ProveLevel)
 		tx, err = this.chain.StoreFile(taskInfo.FileHash, taskInfo.BlocksRoot, taskInfo.TotalBlockCount,
 			blockSizeInKB, taskInfo.ProveLevel, taskInfo.ExpiredHeight, uint64(taskInfo.CopyNum),
 			[]byte(taskInfo.FileName), uint64(taskInfo.Privilege),
