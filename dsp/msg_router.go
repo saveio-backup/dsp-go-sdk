@@ -60,6 +60,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		// TODO: reply err
 	}
 
+	log.Debugf("event %v", event)
 	valid := false
 	for _, n := range event.Notify {
 		log.Debugf("event states %T", n.States)
