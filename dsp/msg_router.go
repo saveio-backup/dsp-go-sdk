@@ -53,12 +53,20 @@ func (this *Dsp) Receive(ctx *network.ComponentContext, peerWalletAddr string) {
 
 func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr string, msg *message.Message) {
 	paymentMsg := msg.Payload.(*payment.Payment)
-	log.Debugf("handle payment msg txHash %s", paymentMsg.TxHash)
+	log.Debugf("handle payment msg txHash %s %v", paymentMsg.TxHash, paymentMsg)
 
 	event, err := this.chain.GetSmartContractEvent(paymentMsg.TxHash)
+	log.Debugf("event %v, err %v", event, err)
 	if err != nil {
 		log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, paymentMsg.TxHash)
 		// TODO: reply err
+	}
+	if event == nil {
+		log.Errorf("get event nil from tx %v", paymentMsg.TxHash)
+	}
+
+	if event.Notify == nil {
+		log.Errorf("event notify is nil")
 	}
 
 	valid := false

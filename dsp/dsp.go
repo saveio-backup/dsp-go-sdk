@@ -166,12 +166,16 @@ func (this *Dsp) Start() error {
 	this.state.Set(state.ModuleStateActive)
 	log.Debugf("runing...")
 
-	// event, err := this.chain.GetSmartContractEvent("d3a816705c045e821aba3c4e453760ccfceea8e43db116b1d53ace183d799ad3")
+	// event, err := this.chain.GetSmartContractEvent("10683ef403e11ebba57e22a4d50d462257ff1d4fb1995149283625c11761189f")
 	// if err != nil {
-	// 	log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, "")
+	// 	log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, "10683ef403e11ebba57e22a4d50d462257ff1d4fb1995149283625c11761189f")
 	// 	// TODO: reply err
 	// }
+	// if event == nil {
+	// 	log.Errorf("get event nil from tx %v", "10683ef403e11ebba57e22a4d50d462257ff1d4fb1995149283625c11761189f")
+	// }
 
+	// valid := false
 	// for _, n := range event.Notify {
 	// 	if n == nil || n.States == nil {
 	// 		continue
@@ -185,11 +189,18 @@ func (this *Dsp) Start() error {
 	// 		log.Errorf("payment id convert err %T", s["paymentId"])
 	// 		continue
 	// 	}
-	// 	log.Debugf("get payment id %v %T from event %v", s["paymentId"], s["paymentId"], paymentId)
+	// 	log.Debugf("get payment id %v %T from event %v, paymentMsg.PaymentId %v",
+	// 		s["paymentId"], s["paymentId"], paymentId, 1)
 	// 	if int32(paymentId) == int32(1) {
+	// 		valid = true
 	// 		break
 	// 	}
 	// }
+	// if !valid {
+	// 	// TODO: reply err
+
+	// }
+	// os.Exit(1)
 
 	return nil
 }
