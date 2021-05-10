@@ -650,9 +650,13 @@ func (this *Dsp) FastTransfer(taskId string, payInfo *file.Payment, paymentId in
 	if err != nil {
 		return 0, err
 	}
+	txHeight, err := this.chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
+	if err != nil {
+		return 0, err
+	}
 
-	log.Debugf("task %s sending payment msg %v to %s, txHash: %s",
-		taskId, paymentId, payInfo.WalletAddress, txHash)
+	log.Debugf("task %s sending payment msg %v to %s, txHash: %s txHeight: %v",
+		taskId, paymentId, payInfo.WalletAddress, txHash, txHeight)
 	msg := message.NewPaymentMsg(
 		this.chain.WalletAddress(),
 		payInfo.WalletAddress,

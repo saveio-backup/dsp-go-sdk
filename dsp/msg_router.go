@@ -56,17 +56,33 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 	log.Debugf("handle payment msg txHash %s %v", paymentMsg.TxHash, paymentMsg)
 
 	event, err := this.chain.GetSmartContractEvent(paymentMsg.TxHash)
-	log.Debugf("event %v, err %v", event, err)
 	if err != nil {
 		log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, paymentMsg.TxHash)
 		// TODO: reply err
+		replyMsg := message.NewEmptyMsg(
+			message.WithSign(this.account),
+			message.WithSyn(msg.MessageId),
+		)
+		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			log.Errorf("reply payment error msg failed", err)
+		} else {
+			log.Debugf("reply payment error msg success")
+		}
+		return
 	}
-	if event == nil {
+	if event == nil || event.Notify == nil {
 		log.Errorf("get event nil from tx %v", paymentMsg.TxHash)
-	}
-
-	if event.Notify == nil {
-		log.Errorf("event notify is nil")
+		// TODO: reply err
+		replyMsg := message.NewEmptyMsg(
+			message.WithSign(this.account),
+			message.WithSyn(msg.MessageId),
+		)
+		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			log.Errorf("reply payment error msg failed", err)
+		} else {
+			log.Debugf("reply payment error msg success")
+		}
+		return
 	}
 
 	valid := false
@@ -92,6 +108,16 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 	}
 	if !valid {
 		// TODO: reply err
+		replyMsg := message.NewEmptyMsg(
+			message.WithSign(this.account),
+			message.WithSyn(msg.MessageId),
+		)
+		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			log.Errorf("reply payment error msg failed", err)
+		} else {
+			log.Debugf("reply payment error msg success")
+		}
+		return
 
 	}
 
@@ -99,11 +125,31 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 	if err != nil {
 		log.Errorf("get taskId with payment id failed %s", err)
 		// TODO: reply err
+		replyMsg := message.NewEmptyMsg(
+			message.WithSign(this.account),
+			message.WithSyn(msg.MessageId),
+		)
+		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			log.Errorf("reply payment error msg failed", err)
+		} else {
+			log.Debugf("reply payment error msg success")
+		}
+		return
 	}
 	fileHashStr, err := this.taskMgr.GetTaskFileHash(taskId)
 	if err != nil {
 		log.Errorf("get fileHash with task id failed %s", err)
 		// TODO: reply err
+		replyMsg := message.NewEmptyMsg(
+			message.WithSign(this.account),
+			message.WithSyn(msg.MessageId),
+		)
+		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			log.Errorf("reply payment error msg failed", err)
+		} else {
+			log.Debugf("reply payment error msg success")
+		}
+		return
 	}
 
 	// delete record
@@ -112,6 +158,16 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 	if err != nil {
 		log.Errorf("delete share file info %s", err)
 		// TODO: reply err
+		replyMsg := message.NewEmptyMsg(
+			message.WithSign(this.account),
+			message.WithSyn(msg.MessageId),
+		)
+		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			log.Errorf("reply payment error msg failed", err)
+		} else {
+			log.Debugf("reply payment error msg success")
+		}
+		return
 	}
 	downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(),
 		store.TaskTypeDownload)
