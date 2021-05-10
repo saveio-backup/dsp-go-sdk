@@ -165,6 +165,32 @@ func (this *Dsp) Start() error {
 	this.state.Set(state.ModuleStateStarted)
 	this.state.Set(state.ModuleStateActive)
 	log.Debugf("runing...")
+
+	// event, err := this.chain.GetSmartContractEvent("d3a816705c045e821aba3c4e453760ccfceea8e43db116b1d53ace183d799ad3")
+	// if err != nil {
+	// 	log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, "")
+	// 	// TODO: reply err
+	// }
+
+	// for _, n := range event.Notify {
+	// 	if n == nil || n.States == nil {
+	// 		continue
+	// 	}
+	// 	s, ok := n.States.(map[string]interface{})
+	// 	if !ok {
+	// 		continue
+	// 	}
+	// 	paymentId, ok := s["paymentId"].(float64)
+	// 	if !ok {
+	// 		log.Errorf("payment id convert err %T", s["paymentId"])
+	// 		continue
+	// 	}
+	// 	log.Debugf("get payment id %v %T from event %v", s["paymentId"], s["paymentId"], paymentId)
+	// 	if int32(paymentId) == int32(1) {
+	// 		break
+	// 	}
+	// }
+
 	return nil
 }
 

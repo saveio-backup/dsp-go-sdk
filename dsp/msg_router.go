@@ -60,21 +60,22 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		// TODO: reply err
 	}
 
-	log.Debugf("event %v", event)
 	valid := false
 	for _, n := range event.Notify {
-		log.Debugf("event states %T", n.States)
-		s, ok := n.States.(map[string]interface{})
-		if !ok {
-			log.Errorf("States id convert err %T", n.States)
+		if n == nil || n.States == nil {
 			continue
 		}
-		paymentId, ok := s["paymentId"].(uint64)
+		s, ok := n.States.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		paymentId, ok := s["paymentId"].(float64)
 		if !ok {
 			log.Errorf("payment id convert err %T", s["paymentId"])
 			continue
 		}
-		log.Debugf("get payment id from event %s", paymentId)
+		log.Debugf("get payment id %v %T from event %v, paymentMsg.PaymentId %v",
+			s["paymentId"], s["paymentId"], paymentId, paymentMsg.PaymentId)
 		if int32(paymentId) == int32(paymentMsg.PaymentId) {
 			valid = true
 			break

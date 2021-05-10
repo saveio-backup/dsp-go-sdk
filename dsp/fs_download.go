@@ -651,7 +651,7 @@ func (this *Dsp) FastTransfer(taskId string, payInfo *file.Payment, paymentId in
 		return 0, err
 	}
 
-	log.Debugf("task %s sending payment msg %s to %s, txHash: %s",
+	log.Debugf("task %s sending payment msg %v to %s, txHash: %s",
 		taskId, paymentId, payInfo.WalletAddress, txHash)
 	msg := message.NewPaymentMsg(
 		this.chain.WalletAddress(),
