@@ -271,13 +271,13 @@ func NewFileMsgWithError(fileHashStr string, op int32, errorCode uint32, errorMs
 }
 
 // NewPaymentMsg. new payment msg
-func NewPaymentMsg(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string,
+func NewPaymentMsg(sender, receiver string, paymentId int32, asset int32, amount uint64, txHash string,
 	opts ...Option) *Message {
 	return NewPaymentMsgWithError(sender, receiver, paymentId, asset, amount,
-		fileHash, common.MSG_ERROR_CODE_NONE, opts...)
+		txHash, common.MSG_ERROR_CODE_NONE, opts...)
 }
 
-func NewPaymentMsgWithError(sender, receiver string, paymentId int32, asset int32, amount uint64, fileHash string,
+func NewPaymentMsgWithError(sender, receiver string, paymentId int32, asset int32, amount uint64, txHash string,
 	errorCode uint32, opts ...Option) *Message {
 	msg := &Message{
 		MessageId: GenMessageId(),
@@ -290,7 +290,7 @@ func NewPaymentMsgWithError(sender, receiver string, paymentId int32, asset int3
 		PaymentId: paymentId,
 		Asset:     asset,
 		Amount:    amount,
-		FileHash:  fileHash,
+		TxHash:    txHash,
 	}
 	msg.Payload = pay
 	if errorCode != common.MSG_ERROR_CODE_NONE {

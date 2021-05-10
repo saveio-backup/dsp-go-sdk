@@ -126,7 +126,7 @@ func NewTask(taskId string, taskT store.TaskType, db *store.TaskDB) *Task {
 		return nil
 	}
 	t := newTask(taskId, info, db)
-	// t.payOnL1 = true
+	t.payOnL1 = true
 	t.info.TaskState = store.TaskStatePrepare
 	err = db.SaveTaskInfo(t.info)
 	if err != nil {

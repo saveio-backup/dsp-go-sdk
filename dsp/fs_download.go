@@ -646,19 +646,20 @@ func (this *Dsp) FastTransfer(taskId string, payInfo *file.Payment, paymentId in
 	if err != nil {
 		return 0, err
 	}
-	_, err = this.chain.FastTransfer(uint64(paymentId), this.chain.Address(), receiverAddr, amount)
+	txHash, err := this.chain.FastTransfer(uint64(paymentId), this.chain.Address(), receiverAddr, amount)
 	if err != nil {
 		return 0, err
 	}
 
-	log.Debugf("task %s sending payment msg %s to %s", taskId, paymentId, payInfo.WalletAddress)
+	log.Debugf("task %s sending payment msg %s to %s, txHash: %s",
+		taskId, paymentId, payInfo.WalletAddress, txHash)
 	msg := message.NewPaymentMsg(
 		this.chain.WalletAddress(),
 		payInfo.WalletAddress,
 		paymentId,
 		common.ASSET_USDT,
 		amount,
-		"",
+		txHash,
 		message.WithSign(this.account),
 	)
 	_, err = client.P2pSendAndWaitReply(payInfo.WalletAddress, msg.MessageId, msg.ToProtoMsg())

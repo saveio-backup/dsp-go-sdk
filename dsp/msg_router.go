@@ -53,13 +53,46 @@ func (this *Dsp) Receive(ctx *network.ComponentContext, peerWalletAddr string) {
 
 func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr string, msg *message.Message) {
 	paymentMsg := msg.Payload.(*payment.Payment)
+
+	event, err := this.chain.GetSmartContractEvent(paymentMsg.TxHash)
+	if err != nil {
+		log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, paymentMsg.TxHash)
+		// TODO: reply err
+	}
+
+	valid := false
+	for _, n := range event.Notify {
+		log.Debugf("event states %T", n.States)
+		s, ok := n.States.(map[string]interface{})
+		if !ok {
+			log.Errorf("States id convert err %T", n.States)
+			continue
+		}
+		paymentId, ok := s["paymentId"].(uint64)
+		if !ok {
+			log.Errorf("payment id convert err %T", s["paymentId"])
+			continue
+		}
+		log.Debugf("get payment id from event %s", paymentId)
+		if int32(paymentId) == int32(paymentMsg.PaymentId) {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		// TODO: reply err
+
+	}
+
 	taskId, err := this.taskMgr.GetTaskIdWithPaymentId(int32(paymentMsg.PaymentId))
 	if err != nil {
 		log.Errorf("get taskId with payment id failed %s", err)
+		// TODO: reply err
 	}
 	fileHashStr, err := this.taskMgr.GetTaskFileHash(taskId)
 	if err != nil {
 		log.Errorf("get fileHash with task id failed %s", err)
+		// TODO: reply err
 	}
 
 	// delete record
@@ -67,6 +100,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		int32(paymentMsg.Asset), uint64(paymentMsg.Amount))
 	if err != nil {
 		log.Errorf("delete share file info %s", err)
+		// TODO: reply err
 	}
 	downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(),
 		store.TaskTypeDownload)
@@ -82,9 +116,9 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		message.WithSyn(msg.MessageId),
 	)
 	if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
-		log.Errorf("reply rdy ok msg failed", err)
+		log.Errorf("reply payment ok msg failed", err)
 	} else {
-		log.Debugf("reply rdy ok msg success")
+		log.Debugf("reply payment ok msg success")
 	}
 }
 
