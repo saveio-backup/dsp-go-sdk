@@ -676,6 +676,7 @@ func (this *Dsp) resumeUpload(taskId string) (err error) {
 		FileDesc:        []byte(tsk.FileName),
 		FileSize:        tsk.RealFileSize,
 		ProveInterval:   tsk.ProveInterval,
+		ProveLevel:      tsk.ProveLevel,
 		ExpiredHeight:   tsk.ExpiredHeight,
 		Privilege:       tsk.Privilege,
 		CopyNum:         uint64(tsk.CopyNum),
