@@ -858,7 +858,31 @@ func (this *Dsp) payForSendFile(taskId string, fileID pdp.FileID, tagsRoot []byt
 	} else {
 		paramsBuf = fileInfo.FileProveParam
 		tx, err = this.taskMgr.GetStoreTx(taskId)
+		log.Debugf("file %s already paid, tx %s", taskInfo.FileHash, tx)
 		if err != nil {
+			return err
+		}
+
+		primaryWallets := make([]chainCom.Address, 0)
+		primaryWallets = append(primaryWallets, fileInfo.PrimaryNodes.AddrList...)
+
+		candidateWallets := make([]chainCom.Address, 0)
+		candidateWallets = append(candidateWallets, fileInfo.CandidateNodes.AddrList...)
+
+		primaryNodeHostAddrs, _ := this.chain.GetNodeHostAddrListByWallets(primaryWallets)
+		candidateNodeHostAddrs, _ := this.chain.GetNodeHostAddrListByWallets(candidateWallets)
+		primaryNodeMap := utils.WalletHostAddressMap(primaryWallets, primaryNodeHostAddrs)
+		candidateNodeHostMap := utils.WalletHostAddressMap(candidateWallets, candidateNodeHostAddrs)
+
+		if err = this.taskMgr.SetTaskInfoWithOptions(taskId,
+			task.StoreTx(tx),
+			task.StoreTxHeight(uint32(fileInfo.BlockHeight)),
+			task.FileOwner(this.chain.WalletAddress()),
+			task.PrimaryNodes(utils.WalletAddrsToBase58(primaryWallets)),
+			task.CandidateNodes(utils.WalletAddrsToBase58(candidateWallets)),
+			task.NodeHostAddrs(utils.MergeTwoAddressMap(primaryNodeMap, candidateNodeHostMap)),
+			task.ProveParams(paramsBuf)); err != nil {
+			log.Errorf("set task info err %s", err)
 			return err
 		}
 	}
@@ -867,7 +891,7 @@ func (this *Dsp) payForSendFile(taskId string, fileID pdp.FileID, tagsRoot []byt
 		return dspErr.New(dspErr.PDP_PRIVKEY_NOT_FOUND,
 			"PDP private key is not found. Please delete file and retry to upload it")
 	}
-	log.Debugf("pay for file success")
+	log.Debugf("pay for file %s success, tx %s", taskInfo.FileHash, tx)
 	return nil
 }
 
