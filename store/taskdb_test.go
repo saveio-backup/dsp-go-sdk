@@ -106,21 +106,6 @@ func TestGetUploadedBlockNodeList(t *testing.T) {
 	fmt.Printf("nodes:%v\n", nodes)
 }
 
-func TestGetUndownloadedBlockIndex(t *testing.T) {
-	dbPath := "../testdata/db3"
-	db, err := NewLevelDBStore(dbPath)
-	if err != nil || db == nil {
-		return
-	}
-	fileDB := NewTaskDB(db)
-	if fileDB == nil {
-		return
-	}
-	fileHashStr := "QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
-	hash, index, err := fileDB.GetUndownloadedBlockInfo(fileHashStr, fileHashStr)
-	fmt.Printf("undownloaded hash:%s index:%v, err :%s\n", hash, index, err)
-}
-
 func TestGetPrefix(t *testing.T) {
 	dbPath := "../testdata/db1"
 	db, err := NewLevelDBStore(dbPath)

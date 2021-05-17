@@ -400,28 +400,6 @@ func P2pGetPublicAddr() string {
 	}
 }
 
-// // P2pRequestWithRetry. send p2p msg by request method, with <retry> times. Each retry has timeout of <timeout> sec
-// func P2pRequestWithRetry(msg proto.Message, peer string, retry, timeout int) (proto.Message, error) {
-// 	chReq := &RequestWithRetryReq{
-// 		Address:  peer,
-// 		Data:     msg,
-// 		Retry:    retry,
-// 		Timeout:  timeout,
-// 		Response: make(chan *RequestWithRetryResp, 1),
-// 	}
-// 	P2pServerPid.Tell(chReq)
-// 	select {
-// 	case resp := <-chReq.Response:
-// 		if resp != nil && resp.Error != nil {
-// 			log.Errorf("[P2pRequestWithRetry] resp.Error %s", resp.Error)
-// 			return nil, dspErr.NewWithError(dspErr.NETWORK_REQ_ERROR, resp.Error)
-// 		}
-// 		return resp.Data, nil
-// 	case <-time.After(time.Duration(common.ACTOR_MAX_P2P_REQ_TIMEOUT+1) * time.Second):
-// 		return nil, dspErr.New(dspErr.NETWORK_TIMEOUT, "[P2pRequestWithRetry] send request msg to %s timeout", peer)
-// 	}
-// }
-
 // P2pSendAndWaitReply.
 func P2pSendAndWaitReply(peer, msgId string, msg proto.Message) (proto.Message, error) {
 	chReq := &SendAndWaitReplyReq{

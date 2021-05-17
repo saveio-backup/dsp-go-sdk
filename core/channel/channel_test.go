@@ -102,7 +102,7 @@ func TestDepositChannel(t *testing.T) {
 		ChannelProtocol:      "tcp",
 		ChannelRevealTimeout: "1000",
 	}
-	c, _ := NewChannelService(cfg, chain, nil)
+	c, _ := NewChannelService(cfg, chain)
 	id, err := c.OpenChannel(acc.Address.ToBase58(), 0)
 	if err != nil {
 		t.Fatal(err)
@@ -147,7 +147,7 @@ func TestGetTargetBalance(t *testing.T) {
 	target := "ANa3f9jm2FkWu4NrVn6L1FGu7zadKdvPjL"
 	if target == "" {
 	}
-	c, _ := NewChannelService(cfg, chain, nil)
+	c, _ := NewChannelService(cfg, chain)
 
 	err = c.StartService()
 	if err != nil {
