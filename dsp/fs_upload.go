@@ -1593,6 +1593,7 @@ func (this *Dsp) dispatchBlocks(taskId, referId, fileHashStr string) error {
 			continue
 		}
 		if len(taskId) > 0 {
+			// FIXME: state check is error when restart up
 			doingOrDone, _ := this.taskMgr.IsNodeTaskDoingOrDone(taskId, n.ToBase58())
 			log.Debugf("upload task %s transfer to %s is doing or done %t",
 				taskId, n.ToBase58(), doingOrDone)

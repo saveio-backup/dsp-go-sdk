@@ -258,6 +258,7 @@ func (this *Dsp) StartSeedService() {
 
 func (this *Dsp) startDNSHealthCheckService() {
 	for walletAddr, _ := range this.dns.OnlineDNS {
+		log.Infof("append walletAddr %s to health check", walletAddr)
 		client.P2pAppendAddrForHealthCheck(walletAddr, client.P2pNetTypeChannel)
 	}
 }

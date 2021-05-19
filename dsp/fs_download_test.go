@@ -90,3 +90,18 @@ func TestWriteConcurrent(t *testing.T) {
 	md5Hash = md5.Sum(fileData[:])
 	fmt.Printf("md5: %x\n", md5Hash)
 }
+
+func TestWgLimiter(t *testing.T) {
+	wg := new(sync.WaitGroup)
+
+	go func() {
+		<-time.After(time.Duration(2) * time.Second)
+		fmt.Println("wg done")
+		wg.Done()
+	}()
+	wg.Add(1)
+	wg.Wait()
+	fmt.Println("out+++")
+	wg.Wait()
+	fmt.Println("finish")
+}
