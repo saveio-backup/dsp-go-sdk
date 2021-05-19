@@ -2,6 +2,11 @@ module github.com/saveio/dsp-go-sdk
 
 go 1.14
 
+replace (
+	github.com/saveio/themis  => ../themis
+	github.com/saveio/themis-go-sdk  => ../themis-go-sdk
+)
+
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.3.2
