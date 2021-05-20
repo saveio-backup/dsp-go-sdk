@@ -466,11 +466,6 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to str
 	if this.State() != state.ModuleStateActive {
 		return dspErr.New(dspErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
-	err := this.CanTransfer(to, amount)
-	if err != nil {
-		log.Errorf("can't transter id %d, err %s", paymentId, err)
-		return err
-	}
 	registryAddress := common.PaymentNetworkID(utils.MicroPayContractAddress)
 	tokenAddress := common.TokenAddress(usdt.USDT_CONTRACT_ADDRESS)
 	target, err := chaincomm.AddressFromBase58(to)
