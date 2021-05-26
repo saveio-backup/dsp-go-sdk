@@ -729,6 +729,10 @@ func (this *TaskDB) IsFileUploaded(id string, isDispatched bool) bool {
 		log.Errorf("query upload progress keys failed, file info not found %s", err)
 		return false
 	}
+	var masterNodeAddr string
+	if len(fi.PrimaryNodes) != 0 {
+		masterNodeAddr = fi.PrimaryNodes[0]
+	}
 	progressPrefix := FileProgressKey(fi.Id, "")
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(progressPrefix))
 	if err != nil {
@@ -739,6 +743,9 @@ func (this *TaskDB) IsFileUploaded(id string, isDispatched bool) bool {
 	for _, key := range keys {
 		progress, _ := this.getProgressInfo(key)
 		if progress == nil {
+			continue
+		}
+		if !isDispatched && masterNodeAddr != progress.NodeWalletAddr {
 			continue
 		}
 		sum += progress.Progress
