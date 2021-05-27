@@ -924,7 +924,7 @@ func (this *Dsp) addWhitelist(taskId, fileHashStr string, opt *fs.UploadOption) 
 	return addWhiteListTx, nil
 }
 
-func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.UploadOption) (string, string) {
+func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.UploadOption) (string, string, error) {
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileRegisterDNS)
 	var dnsRegTx, dnsBindTx string
 	var err error
@@ -932,6 +932,7 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.Uplo
 		dnsRegTx, err = this.dns.RegisterFileUrl(string(opt.DnsURL), saveLink)
 		if err != nil {
 			log.Errorf("register url err: %s", err)
+			return "", "", err
 		}
 		log.Debugf("acc %s, reg dns %s for %s", this.chain.WalletAddress(), dnsRegTx, fileHashStr)
 	}
@@ -939,6 +940,7 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.Uplo
 		dnsBindTx, err = this.dns.BindFileUrl(string(opt.DnsURL), saveLink)
 		if err != nil {
 			log.Errorf("bind url err: %s", err)
+			return "", "", err
 		}
 		log.Debugf("bind dns %s for file %s", dnsBindTx, fileHashStr)
 	}
@@ -950,11 +952,11 @@ func (this *Dsp) registerUrls(taskId, fileHashStr, saveLink string, opt *fs.Uplo
 		this.taskMgr.EmitProgress(taskId, task.TaskWaitForBlockConfirmedDone)
 		if err != nil {
 			log.Errorf("[Dsp registerUrls] wait for generate block failed, err %s", err)
-			return "", ""
+			return "", "", err
 		}
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileRegisterDNSDone)
-	return dnsRegTx, dnsBindTx
+	return dnsRegTx, dnsBindTx, nil
 }
 
 // addWhitelistsForFile. add whitelist for file with added blockcount to current height
@@ -1539,7 +1541,11 @@ func (this *Dsp) checkProveAndCommitUrlTxs(taskId, fileHashStr, dnsRegTx, dnsBin
 	}
 	this.taskMgr.EmitProgress(taskId, task.TaskUploadFileWaitForPDPProveDone)
 	if len(dnsRegTx) == 0 || len(dnsBindTx) == 0 {
-		dnsRegTx, dnsBindTx = this.registerUrls(taskId, fileHashStr, saveLink, opt)
+		var err error
+		dnsRegTx, dnsBindTx, err = this.registerUrls(taskId, fileHashStr, saveLink, opt)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
 	if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
