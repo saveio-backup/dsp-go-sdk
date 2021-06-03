@@ -18,7 +18,7 @@ func (this *DispatchTask) Start() error {
 	fileHashStr := this.GetFileHash()
 	referId := this.GetReferId()
 	taskId := this.GetId()
-	log.Debugf("task %s dispatch blocks, refer to download task %s, file %s", taskId, referId, fileHashStr)
+	log.Debugf("task %s dispatch file %v, refer to download task %s", taskId, fileHashStr, referId)
 	fileInfo, err := this.Mgr.Chain().GetFileInfo(fileHashStr)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.FILEINFO_NOT_EXIST, err)

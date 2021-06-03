@@ -672,6 +672,7 @@ func (this *DownloadTask) workBackground() {
 	dropDoneCh := uint32(0)
 
 	done := make(chan *getBlocksResp, 1)
+	doneNotify := make(chan bool)
 	maxFlightLen := this.GetMaxFlightLen()
 	log.Debugf("task %s, max flight len %d", this.GetId(), maxFlightLen)
 	// trigger to start
@@ -682,7 +683,7 @@ func (this *DownloadTask) workBackground() {
 				log.Debugf("task job break because task is done")
 				close(jobCh)
 				atomic.AddUint32(&dropDoneCh, 1)
-				close(done)
+				close(doneNotify)
 				break
 			}
 			if this.State() == store.TaskStatePause || this.State() == store.TaskStateFailed {
@@ -832,7 +833,7 @@ func (this *DownloadTask) workBackground() {
 			if this.State() == store.TaskStatePause || this.State() == store.TaskStateFailed {
 				log.Debugf("receive state %d", this.State())
 				atomic.AddUint32(&dropDoneCh, 1)
-				close(done)
+				close(doneNotify)
 				break
 			}
 		}
@@ -844,99 +845,111 @@ func (this *DownloadTask) workBackground() {
 	for i := 0; i < max; i++ {
 		go func() {
 			for {
-				state := this.State()
-				if state == store.TaskStateDone || state == store.TaskStatePause || state == store.TaskStateFailed {
-					log.Debugf("task is break, state: %d", state)
-					break
-				}
-				job, ok := <-jobCh
-				if !ok {
-					log.Debugf("job channel has close")
-					break
-				}
-				flights := make([]*block.Block, 0)
-				sessionId := this.GetSessionId(job.worker.WalletAddr())
-				if len(sessionId) == 0 {
-					log.Warnf("task %s get session id failed of peer %s", this.GetId(), job.worker.WalletAddr())
-				}
-				for _, v := range job.req {
-					b := &block.Block{
-						SessionId: sessionId,
-						Index:     v.Index,
-						FileHash:  v.FileHash,
-						Hash:      v.Hash,
-						Operation: netCom.BLOCK_OP_GET,
-						Payment: &payment.Payment{
-							Sender: tskWalletAddr,
-							Asset:  consts.ASSET_USDT,
-						},
+				select {
+				case <-doneNotify:
+					log.Debugf("recv done notify")
+					close(done)
+					return
+				default:
+					state := this.State()
+					if state == store.TaskStateDone || state == store.TaskStatePause || state == store.TaskStateFailed {
+						log.Debugf("task is break, state: %d", state)
+						return
 					}
-					flights = append(flights, b)
-				}
-				log.Debugf("request blocks %s-%s-%d to %s-%d to %s, peer wallet: %s, length %d",
-					fileHash, job.req[0].Hash, job.req[0].Index, job.req[len(job.req)-1].Hash,
-					job.req[len(job.req)-1].Index, job.worker.WalletAddr(), job.worker.WalletAddr(), len(job.req))
-				ret, err := job.worker.Do(this.GetId(), fileHash, job.worker.WalletAddr(), flights)
-				this.SetWorkerWorking(job.worker.WalletAddr(), false)
-				if err != nil {
-					if serr, ok := err.(*sdkErr.Error); ok && serr.Code == sdkErr.PAY_UNPAID_BLOCK_FAILED {
-						log.Errorf("request blocks paid failed %v from %s, err %s",
-							job.req, job.worker.WalletAddr(), err)
-					} else {
+					job, ok := <-jobCh
+					if !ok {
+						log.Debugf("job channel has close")
+						return
 					}
-					if len(job.req) > 0 {
-						log.Errorf("request blocks %s of %s to %s from %s, err %s",
-							fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.WalletAddr(), err)
-					} else {
-						log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.WalletAddr(), err)
+					flights := make([]*block.Block, 0)
+					sessionId := this.GetSessionId(job.worker.WalletAddr())
+					if len(sessionId) == 0 {
+						log.Warnf("task %s get session id failed of peer %s", this.GetId(), job.worker.WalletAddr())
 					}
-				} else {
-					log.Debugf("request blocks %s-%s to %s from %s success",
-						fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.WalletAddr())
-				}
-				stop := atomic.LoadUint32(&dropDoneCh) > 0
-				if stop {
-					log.Debugf("stop when drop channel is not 0")
-					break
-				}
-				successFlightKeys := make([]string, 0)
-				failedFlightReqs := make([]*types.GetBlockReq, 0)
-				successFlightMap := make(map[string]struct{}, 0)
-				for _, v := range ret {
-					key := blockIndexKey(v.Hash, v.Index)
-					successFlightMap[key] = struct{}{}
-					successFlightKeys = append(successFlightKeys, key)
-				}
-				if len(successFlightKeys) != len(job.req) {
-					for _, r := range job.req {
-						if _, ok := successFlightMap[blockIndexKey(r.Hash, r.Index)]; ok {
-							continue
+					for _, v := range job.req {
+						b := &block.Block{
+							SessionId: sessionId,
+							Index:     v.Index,
+							FileHash:  v.FileHash,
+							Hash:      v.Hash,
+							Operation: netCom.BLOCK_OP_GET,
+							Payment: &payment.Payment{
+								Sender: tskWalletAddr,
+								Asset:  consts.ASSET_USDT,
+							},
 						}
-						failedFlightReqs = append(failedFlightReqs, r)
+						flights = append(flights, b)
 					}
-				}
-				if len(successFlightKeys) > 0 {
-					log.Debugf("push success flightskey from %s to %s",
-						successFlightKeys[0],
-						successFlightKeys[len(successFlightKeys)-1])
-				}
-				if len(failedFlightReqs) > 0 {
-					log.Debugf("push failed flightskey from %s-%d to %s-%d",
-						failedFlightReqs[0].Hash, failedFlightReqs[0].Index,
-						failedFlightReqs[len(failedFlightReqs)-1].Hash, failedFlightReqs[len(failedFlightReqs)-1].Index)
-				}
+					log.Debugf("request blocks %s-%s-%d to %s-%d to %s, peer wallet: %s, length %d",
+						fileHash, job.req[0].Hash, job.req[0].Index, job.req[len(job.req)-1].Hash,
+						job.req[len(job.req)-1].Index, job.worker.WalletAddr(), job.worker.WalletAddr(), len(job.req))
+					ret, err := job.worker.Do(this.GetId(), fileHash, job.worker.WalletAddr(), flights)
+					this.SetWorkerWorking(job.worker.WalletAddr(), false)
+					if err != nil {
+						if serr, ok := err.(*sdkErr.Error); ok && serr.Code == sdkErr.PAY_UNPAID_BLOCK_FAILED {
+							log.Errorf("request blocks paid failed %v from %s, err %s",
+								job.req, job.worker.WalletAddr(), err)
+						} else {
+						}
+						if len(job.req) > 0 {
+							log.Errorf("request blocks %s of %s to %s from %s, err %s",
+								fileHash, job.req[0].Hash, job.req[len(job.req)-1].Hash, job.worker.WalletAddr(), err)
+						} else {
+							log.Errorf("request blocks %v from %s, err %s", job.req, job.worker.WalletAddr(), err)
+						}
+					} else {
+						log.Debugf("request blocks %s-%s to %s from %s success",
+							fileHash, ret[0].Hash, ret[len(ret)-1].Hash, job.worker.WalletAddr())
+					}
+					stop := atomic.LoadUint32(&dropDoneCh) > 0
+					if stop {
+						log.Debugf("stop when drop channel is not 0")
+						return
+					}
+					successFlightKeys := make([]string, 0)
+					failedFlightReqs := make([]*types.GetBlockReq, 0)
+					successFlightMap := make(map[string]struct{}, 0)
+					for _, v := range ret {
+						key := blockIndexKey(v.Hash, v.Index)
+						successFlightMap[key] = struct{}{}
+						successFlightKeys = append(successFlightKeys, key)
+					}
+					if len(successFlightKeys) != len(job.req) {
+						for _, r := range job.req {
+							if _, ok := successFlightMap[blockIndexKey(r.Hash, r.Index)]; ok {
+								continue
+							}
+							failedFlightReqs = append(failedFlightReqs, r)
+						}
+					}
+					if len(successFlightKeys) > 0 {
+						log.Debugf("push success flightskey from %s to %s",
+							successFlightKeys[0],
+							successFlightKeys[len(successFlightKeys)-1])
+					}
+					if len(failedFlightReqs) > 0 {
+						log.Debugf("push failed flightskey from %s-%d to %s-%d",
+							failedFlightReqs[0].Hash, failedFlightReqs[0].Index,
+							failedFlightReqs[len(failedFlightReqs)-1].Hash, failedFlightReqs[len(failedFlightReqs)-1].Index)
+					}
 
-				resp := &getBlocksResp{
-					worker:        job.worker,        // worker info
-					flightKey:     successFlightKeys, // success flight keys
-					failedFlights: failedFlightReqs,  // failed flight keys
-					ret:           ret,               // success flight response
-					err:           err,               // job error
+					resp := &getBlocksResp{
+						worker:        job.worker,        // worker info
+						flightKey:     successFlightKeys, // success flight keys
+						failedFlights: failedFlightReqs,  // failed flight keys
+						ret:           ret,               // success flight response
+						err:           err,               // job error
+					}
+					if len(failedFlightReqs) > 0 {
+						this.InsertBlockReqToPool(failedFlightReqs)
+					}
+					stop = atomic.LoadUint32(&dropDoneCh) > 0
+					if stop {
+						log.Debugf("stop when drop channel is not 0")
+						return
+					}
+					done <- resp
 				}
-				if len(failedFlightReqs) > 0 {
-					this.InsertBlockReqToPool(failedFlightReqs)
-				}
-				done <- resp
 			}
 			log.Debugf("workers outside for loop")
 		}()

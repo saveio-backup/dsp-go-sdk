@@ -122,7 +122,7 @@ const (
 	MAX_TASK_SESSION_NUM           = 100    // max task session num
 	MAX_TASK_BLOCK_REQ             = 100    // max task request block
 	MAX_TASK_BLOCK_NOTIFY          = 100    // max task notify
-	MAX_PDP_PROVE_TIME             = 60     // wait 60s for pdp prove
+	MAX_PDP_PROVE_TIME             = 120    // wait 60s for pdp prove
 )
 
 // go routine

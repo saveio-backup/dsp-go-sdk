@@ -149,7 +149,7 @@ func (this *UploadTask) addWhitelist(taskId, fileHashStr string, opt *fs.UploadO
 	return addWhiteListTx, nil
 }
 
-func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (string, string) {
+func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (string, string, error) {
 
 	this.EmitProgress(types.TaskUploadFileRegisterDNS)
 	var dnsRegTx, dnsBindTx string
@@ -158,6 +158,7 @@ func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (str
 		dnsRegTx, err = this.Mgr.DNS().RegisterFileUrl(string(opt.DnsURL), saveLink)
 		if err != nil {
 			log.Errorf("register url err: %s", err)
+			return "", "", err
 		}
 		log.Debugf("acc %s, reg dns %s for %s", this.Mgr.Chain().WalletAddress(), dnsRegTx, this.GetFileHash())
 	}
@@ -165,6 +166,7 @@ func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (str
 		dnsBindTx, err = this.Mgr.DNS().BindFileUrl(string(opt.DnsURL), saveLink)
 		if err != nil {
 			log.Errorf("bind url err: %s", err)
+			return "", "", err
 		}
 		log.Debugf("bind dns %s for file %s", dnsBindTx, this.GetFileHash())
 	}
@@ -175,11 +177,11 @@ func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (str
 		this.EmitProgress(types.TaskWaitForBlockConfirmedDone)
 		if err != nil {
 			log.Errorf("[Dsp registerUrls] wait for generate block failed, err %s", err)
-			return "", ""
+			return "", "", err
 		}
 	}
 	this.EmitProgress(types.TaskUploadFileRegisterDNSDone)
-	return dnsRegTx, dnsBindTx
+	return dnsRegTx, dnsBindTx, nil
 }
 
 // getNodesFromChain. get nodelist from chain
@@ -299,7 +301,12 @@ func (this *UploadTask) publishFile(opt *fs.UploadOption) (*types.UploadResult, 
 
 	var dnsRegTx, dnsBindTx string
 	if len(this.GetRegUrlTx()) == 0 || len(this.GetBindUrlTx()) == 0 {
-		dnsRegTx, dnsBindTx = this.registerUrls(fileLinkStr, opt)
+		var err error
+		dnsRegTx, dnsBindTx, err = this.registerUrls(fileLinkStr, opt)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	if err := this.SetInfoWithOptions(
