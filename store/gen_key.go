@@ -18,6 +18,7 @@ const (
 	TASK_OPTIONS_PREFIX          = DB_PREFIX + "_" + "task_options" + "_" + DB_VERSION
 	TASK_UPLOAD_UNDONE_PREFIX    = DB_PREFIX + "_" + "task_upload_undone" + "_" + DB_VERSION
 	TASK_DOWNLOAD_UNDONE_PREFIX  = DB_PREFIX + "_" + "task_download_undone" + "_" + DB_VERSION
+	TASK_DISPATCH_UNDONE_PREFIX  = DB_PREFIX + "_" + "task_dispatch_undone" + "_" + DB_VERSION
 	TASK_SESSIONS_COUNT_PREFIX   = DB_PREFIX + "_" + "task_session_count" + "_" + DB_VERSION
 	TASK_SESSIONS_PREFIX         = DB_PREFIX + "_" + "task_sessions" + "_" + DB_VERSION
 	TASK_OF_PAYMENT_ID_PREFIX    = DB_PREFIX + "_" + "task_payment_id" + "_" + DB_VERSION
@@ -100,6 +101,10 @@ func FileUploadUndoneKey() string {
 // FileDownloadUndoneKey. Key of undone download task
 func FileDownloadUndoneKey() string {
 	return fmt.Sprintf("[%s]", TASK_DOWNLOAD_UNDONE_PREFIX)
+}
+
+func FileDispatchUndoneKey() string {
+	return fmt.Sprintf("[%s]", TASK_DISPATCH_UNDONE_PREFIX)
 }
 
 // FileSessionCountKey. Key of session total count

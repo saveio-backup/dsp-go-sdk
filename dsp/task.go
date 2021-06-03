@@ -1,79 +1,37 @@
 package dsp
 
 import (
-	"github.com/saveio/dsp-go-sdk/common"
+	"github.com/saveio/dsp-go-sdk/consts"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
-	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
-	"github.com/saveio/dsp-go-sdk/state"
+	"github.com/saveio/dsp-go-sdk/task/types"
+	"github.com/saveio/dsp-go-sdk/taskmgr"
 
-	"github.com/saveio/dsp-go-sdk/actor/client"
-	netcomm "github.com/saveio/dsp-go-sdk/network/common"
-	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/store"
-	"github.com/saveio/dsp-go-sdk/task"
 	"github.com/saveio/themis/common/log"
 )
 
-func (this *Dsp) GetTaskMgr() *task.TaskMgr {
-	return this.taskMgr
+func (this *Dsp) GetTaskMgr() *taskmgr.TaskMgr {
+	return this.TaskMgr
 }
 
 func (this *Dsp) RecoverDBLossTask() error {
-	if this.chain == nil || this.account == nil {
-		return nil
-	}
-	list, err := this.chain.GetFileList(this.account.Address)
-	if err != nil {
-		log.Errorf("get file list err %s", err)
-	}
-	if list == nil {
-		return nil
-	}
-	uploadHashes := make([]string, 0, int(list.FileNum))
-	nameMap := make(map[string]string, 0)
-	for _, h := range list.List {
-		fileHashStr := string(h.Hash)
-		id := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeUpload)
-		exist := this.taskMgr.TaskExistInDB(id)
-		if exist {
-			continue
-		}
-		info, _ := this.chain.GetFileInfo(fileHashStr)
-		if info == nil {
-			log.Debugf("info is nil : %v", fileHashStr)
-			continue
-		}
-		uploadHashes = append(uploadHashes, string(h.Hash))
-		nameMap[fileHashStr] = string(info.FileDesc)
-	}
-	if len(uploadHashes) == 0 {
-		return nil
-	}
-	log.Debugf("recover task : %v, %v", uploadHashes, nameMap)
-	err = this.taskMgr.RecoverDBLossTask(uploadHashes, nameMap, this.chain.WalletAddress())
-	if err != nil {
-		log.Errorf("recover DB loss task err %s", err)
-	}
-	return err
+	return this.TaskMgr.RecoverLossTaskFromDB()
 }
 
-func (this *Dsp) GetProgressInfo(taskId string) *task.ProgressInfo {
-	return this.taskMgr.GetProgressInfo(taskId)
+func (this *Dsp) GetProgressInfo(taskId string) *types.ProgressInfo {
+	return this.TaskMgr.GetProgressInfo(taskId)
 }
 
 func (this *Dsp) GetTaskState(taskId string) (store.TaskState, error) {
-	if this.taskMgr == nil {
-		return store.TaskStateNone, nil
-	}
-	return this.taskMgr.GetTaskState(taskId)
+	return this.TaskMgr.GetTaskState(taskId), nil
 }
 
 func (this *Dsp) IsTaskExist(taskId string) bool {
-	return this.taskMgr.TaskExist(taskId)
+	return this.TaskMgr.TaskExist(taskId)
 }
 
 func (this *Dsp) CleanTasks(taskIds []string) error {
-	return this.taskMgr.CleanTasks(taskIds)
+	return this.TaskMgr.CleanTasks(taskIds)
 }
 
 func (this *Dsp) Progress() {
@@ -102,207 +60,92 @@ func (this *Dsp) RegProgressChannel() {
 	if this == nil {
 		log.Errorf("this.taskMgr == nil")
 	}
-	this.taskMgr.RegProgressCh()
+	this.TaskMgr.RegProgressCh()
 }
 
 // GetProgressChannel.
-func (this *Dsp) ProgressChannel() chan *task.ProgressInfo {
-	return this.taskMgr.ProgressCh()
+func (this *Dsp) ProgressChannel() chan *types.ProgressInfo {
+	return this.TaskMgr.ProgressCh()
 }
 
 // CloseProgressChannel.
 func (this *Dsp) CloseProgressChannel() {
-	this.taskMgr.CloseProgressCh()
+	this.TaskMgr.CloseProgressCh()
 }
 
 func (this *Dsp) GetTaskInfo(id string) *store.TaskInfo {
-	tsk, _ := this.taskMgr.GetTaskInfoCopy(id)
-	return tsk
+	return this.TaskMgr.GetTaskInfoCopy(id)
 }
 
 func (this *Dsp) GetUploadTaskInfoByHash(fileHashStr string) *store.TaskInfo {
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeUpload)
-	tsk, _ := this.taskMgr.GetTaskInfoCopy(taskId)
-	return tsk
+	return this.TaskMgr.GetUploadTaskByFileHash(fileHashStr)
 }
 
 func (this *Dsp) GetTaskFileName(id string) string {
-	fileName, _ := this.taskMgr.GetTaskFileName(id)
-	return fileName
+	return this.TaskMgr.GetTaskFileName(id)
 }
 
 func (this *Dsp) GetTaskFileHash(id string) string {
-	fileHash, _ := this.taskMgr.GetTaskFileHash(id)
-	return fileHash
+	return this.TaskMgr.GetTaskFileHash(id)
 }
 
 func (this *Dsp) GetUploadTaskId(fileHashStr string) string {
-	return this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeUpload)
+	tsk := this.GetUploadTaskInfoByHash(fileHashStr)
+	if tsk == nil {
+		return ""
+	}
+	return tsk.Id
 }
 
 func (this *Dsp) GetDownloadTaskIdByUrl(url string) string {
-	fileHash := this.dns.GetFileHashFromUrl(url)
-	return this.taskMgr.TaskId(fileHash, this.chain.WalletAddress(), store.TaskTypeDownload)
+	fileHash := this.DNS.GetFileHashFromUrl(url)
+	return this.TaskMgr.GetDownloadedTaskId(fileHash, this.Chain.WalletAddress())
 }
 
 func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
-	return this.taskMgr.GetUrlOfUploadedfile(fileHashStr, this.chain.WalletAddress())
+	tsk := this.TaskMgr.GetUploadTaskByFileHash(fileHashStr)
+	if tsk == nil {
+		return ""
+	}
+	return tsk.Url
 }
 
 func (this *Dsp) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,
 	ft store.TaskType, complete, reverse, includeFailed, ignoreHide bool) []string {
-	if this == nil || this.taskMgr == nil {
+	if this == nil || this.TaskMgr == nil {
 		return nil
 	}
-	return this.taskMgr.GetTaskIdList(offset, limit, createdAt, createdAtEnd, updatedAt, updatedAtEnd, ft,
+	return this.TaskMgr.GetTaskIdList(offset, limit, createdAt, createdAtEnd, updatedAt, updatedAtEnd, ft,
 		complete, reverse, includeFailed, ignoreHide)
 }
 
 func (this *Dsp) HideTaskIds(ids []string) error {
-	return this.taskMgr.HideTaskIds(ids)
+	return this.TaskMgr.HideTaskIds(ids)
 }
 
 // GetFileUploadSize. get file upload size
 func (this *Dsp) GetFileUploadSize(fileHashStr, nodeAddr string) (uint64, error) {
-	id := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeUpload)
+	info := this.TaskMgr.GetUploadTaskByFileHash(fileHashStr)
+	if info == nil {
+		return 0, dspErr.New(dspErr.TASK_NOT_EXIST, "task not found for file %s", fileHashStr)
+	}
+	id := info.Id
 	if len(id) == 0 {
 		return 0, dspErr.New(dspErr.TASK_NOT_EXIST, "task id is empty")
 	}
-	progressInfo := this.taskMgr.GetProgressInfo(id)
+	progressInfo := this.TaskMgr.GetProgressInfo(id)
 	if progressInfo == nil {
 		return 0, nil
 	}
 	progress, ok := progressInfo.Progress[nodeAddr]
 	if ok {
-		return uint64(progress.Progress) * common.CHUNK_SIZE, nil
+		return uint64(progress.Progress) * consts.CHUNK_SIZE, nil
 	}
-	return uint64(progressInfo.SlaveProgress[nodeAddr].Progress) * common.CHUNK_SIZE, nil
-}
-
-func (this *Dsp) retryTaskService() bool {
-	if this.state.Get() != state.ModuleStateActive {
-		log.Debugf("stop retry task since module is stopped")
-		return true
-	}
-	taskIds := this.taskMgr.GetTasksToRetry()
-	if len(taskIds) == 0 {
-		return !this.taskMgr.HasRetryTask()
-	}
-	for _, taskId := range taskIds {
-		log.Debugf("retry task service running, retry %s", taskId)
-		if err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
-			log.Errorf("retry task set task state err %s", err)
-			return false
-		}
-		tskInfo, _ := this.taskMgr.GetTaskInfoCopy(taskId)
-		if tskInfo == nil {
-			continue
-		}
-		if tskInfo.Type == store.TaskTypeUpload {
-			go this.resumeUpload(taskId)
-		} else if tskInfo.Type == store.TaskTypeDownload {
-			go this.resumeDownload(taskId)
-		}
-	}
-	return false
-}
-
-func (this *Dsp) RunGetProgressTicker() bool {
-	ids, err := this.taskMgr.GetUnSlavedTasks()
-	if err != nil {
-		return false
-	}
-	log.Debugf("un slaved task %v", ids)
-	taskHasDone := 0
-	for _, id := range ids {
-		taskInfo, _ := this.taskMgr.GetTaskInfoCopy(id)
-		if taskInfo == nil {
-			log.Warnf("task %s not exist, remove it", id)
-			this.taskMgr.RemoveUnSlavedTasks(id)
-			continue
-		}
-		nodeAddr, _ := this.taskMgr.GetUploadDoneNodeAddr(id)
-		if len(nodeAddr) == 0 {
-			continue
-		}
-		fileHash, err := this.taskMgr.GetTaskFileHash(id)
-		if err != nil {
-			continue
-		}
-
-		// TODO: use mem cache instread of request rpc
-		info, err := this.chain.GetFileInfo(fileHash)
-		if err != nil || info == nil {
-			continue
-		}
-		if info.PrimaryNodes.AddrNum == 1 {
-			taskHasDone++
-			this.taskMgr.RemoveUnSlavedTasks(id)
-			continue
-		}
-		proveDetail, _ := this.chain.GetFileProveDetails(fileHash)
-		if proveDetail != nil && proveDetail.ProveDetailNum == proveDetail.CopyNum+1 {
-			taskHasDone++
-			this.taskMgr.RemoveUnSlavedTasks(id)
-			continue
-		}
-
-		toReqPeers := make([]*progress.ProgressInfo, 0)
-		hostAddrs, err := this.chain.GetNodeHostAddrListByWallets(info.PrimaryNodes.AddrList)
-		if err != nil || len(hostAddrs) == 0 {
-			continue
-		}
-		for i := 0; i < len(hostAddrs); i++ {
-			if i == 0 {
-				continue
-			}
-			toReqPeers = append(toReqPeers, &progress.ProgressInfo{
-				WalletAddr: info.PrimaryNodes.AddrList[i].ToBase58(),
-				NodeAddr:   hostAddrs[i],
-			})
-		}
-		log.Debugf("send req progress msg to %v for %s", toReqPeers, fileHash)
-		msg := message.NewProgressMsg(this.WalletAddress(), fileHash, netcomm.FILE_OP_PROGRESS_REQ, toReqPeers, message.WithSign(this.CurrentAccount()))
-		// send req progress msg
-		resp, err := client.P2pSendAndWaitReply(nodeAddr, msg.MessageId, msg.ToProtoMsg())
-		if err != nil {
-			continue
-		}
-		p2pMsg := message.ReadMessage(resp)
-		progress := p2pMsg.Payload.(*progress.Progress)
-		if progress.Hash != fileHash {
-			continue
-		}
-		// update progress
-		progressSum := uint64(0)
-		for _, info := range progress.Infos {
-			log.Debugf("receive %s-%s progress wallet: %v, progress: %d", progress.Hash, fileHash, info.NodeAddr, info.Count)
-			oldProgress := this.taskMgr.GetTaskPeerProgress(id, info.NodeAddr)
-			if oldProgress != nil && oldProgress.Progress > uint64(info.Count) {
-				progressSum += oldProgress.Progress
-				continue
-			}
-			if err := this.taskMgr.UpdateTaskPeerProgress(id, info.NodeAddr, uint64(info.Count)); err != nil {
-				continue
-			}
-			progressSum += uint64(info.Count)
-		}
-		log.Debugf("progressSum: %d, total: %d", progressSum, uint64(len(toReqPeers))*info.FileBlockNum)
-		if progressSum != uint64(len(toReqPeers))*uint64(info.FileBlockNum) {
-			continue
-		}
-		taskHasDone++
-		log.Debugf("remove unslaved task %s", id)
-		this.taskMgr.RemoveUnSlavedTasks(id)
-	}
-	if taskHasDone == len(ids) {
-		return true
-	}
-	return false
+	return uint64(progressInfo.SlaveProgress[nodeAddr].Progress) * consts.CHUNK_SIZE, nil
 }
 
 func (this *Dsp) GetDownloadTaskRemainSize(taskId string) uint64 {
-	progress := this.taskMgr.GetProgressInfo(taskId)
+	progress := this.TaskMgr.GetProgressInfo(taskId)
 	sum := uint64(0)
 	for _, c := range progress.Progress {
 		sum += c.Progress
@@ -328,5 +171,5 @@ func (this *Dsp) SelectUserspaceRecordByWalletAddr(
 }
 
 func (this *Dsp) GetUploadTaskInfos() ([]*store.TaskInfo, error) {
-	return this.taskMgr.GetUploadTaskInfos()
+	return this.TaskMgr.GetUploadTaskInfos()
 }

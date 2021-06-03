@@ -10,7 +10,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
-	"github.com/saveio/dsp-go-sdk/utils"
+	"github.com/saveio/dsp-go-sdk/utils/crypto"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -86,7 +86,7 @@ func ReadMessage(msg proto.Message) *Message {
 				log.Debugf("file msg missing pay info field")
 				return nil
 			}
-			if err := utils.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, file.PayInfo.WalletAddress); err != nil {
+			if err := crypto.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, file.PayInfo.WalletAddress); err != nil {
 				log.Debugf("receive a invalid file msg")
 				return nil
 			}
@@ -102,7 +102,7 @@ func ReadMessage(msg proto.Message) *Message {
 			if err != nil {
 				return nil
 			}
-			if err := utils.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, pay.Sender); err != nil {
+			if err := crypto.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, pay.Sender); err != nil {
 				log.Debugf("receive a invalid payment msg")
 				return nil
 			}
@@ -118,7 +118,7 @@ func ReadMessage(msg proto.Message) *Message {
 			if err != nil {
 				return nil
 			}
-			if err := utils.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, progress.Sender); err != nil {
+			if err := crypto.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, progress.Sender); err != nil {
 				log.Debugf("receive a invalid payment msg")
 				return nil
 			}
@@ -175,7 +175,7 @@ func isMsgVerified(pbMsg *pb.Message) bool {
 
 	// msg data length too large
 	if len(data) < common.MAX_SIG_DATA_LEN {
-		err := utils.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
+		err := crypto.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
 		if err != nil {
 			log.Errorf("verified failed %x %x %x", pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
 			return false
@@ -184,7 +184,7 @@ func isMsgVerified(pbMsg *pb.Message) bool {
 	}
 
 	hashData := sha256.Sum256(data[:common.MAX_SIG_DATA_LEN])
-	err := utils.VerifyMsg(pbMsg.Sig.PublicKey, hashData[:], pbMsg.Sig.SigData)
+	err := crypto.VerifyMsg(pbMsg.Sig.PublicKey, hashData[:], pbMsg.Sig.SigData)
 	if err != nil {
 		log.Errorf("verified failed %x %x %x", pbMsg.Sig.PublicKey, hashData, pbMsg.Sig.SigData)
 		return false

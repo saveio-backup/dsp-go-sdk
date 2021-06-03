@@ -3,21 +3,22 @@ package dsp
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/saveio/dsp-go-sdk/actor/client"
+	"github.com/saveio/dsp-go-sdk/consts"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
+	"github.com/saveio/dsp-go-sdk/task/base"
+	"github.com/saveio/dsp-go-sdk/task/download"
+	"github.com/saveio/dsp-go-sdk/task/types"
 
 	"github.com/saveio/carrier/network"
-	"github.com/saveio/dsp-go-sdk/common"
 	serr "github.com/saveio/dsp-go-sdk/error"
 	netcom "github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/store"
-	"github.com/saveio/dsp-go-sdk/task"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
@@ -55,15 +56,15 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 	paymentMsg := msg.Payload.(*payment.Payment)
 	log.Debugf("handle payment msg txHash %s %v", paymentMsg.TxHash, paymentMsg)
 
-	event, err := this.chain.GetSmartContractEvent(paymentMsg.TxHash)
+	event, err := this.Chain.GetSmartContractEvent(paymentMsg.TxHash)
 	if err != nil {
 		log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, paymentMsg.TxHash)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.account),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply payment error msg failed", err)
 		} else {
 			log.Debugf("reply payment error msg success")
@@ -74,10 +75,10 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		log.Errorf("get event nil from tx %v", paymentMsg.TxHash)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.account),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply payment error msg failed", err)
 		} else {
 			log.Debugf("reply payment error msg success")
@@ -109,42 +110,41 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 	if !valid {
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.account),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply payment error msg failed", err)
 		} else {
 			log.Debugf("reply payment error msg success")
 		}
 		return
-
 	}
 
-	taskId, err := this.taskMgr.GetTaskIdWithPaymentId(int32(paymentMsg.PaymentId))
+	taskId, err := this.TaskMgr.GetTaskIdWithPaymentId(int32(paymentMsg.PaymentId))
 	if err != nil {
 		log.Errorf("get taskId with payment id failed %s", err)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.account),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply payment error msg failed", err)
 		} else {
 			log.Debugf("reply payment error msg success")
 		}
 		return
 	}
-	fileHashStr, err := this.taskMgr.GetTaskFileHash(taskId)
-	if err != nil {
-		log.Errorf("get fileHash with task id failed %s", err)
+	shareTask := this.TaskMgr.GetShareTask(taskId)
+	if shareTask == nil {
+		log.Errorf("get share taskId with id %s not found", taskId)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.account),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply payment error msg failed", err)
 		} else {
 			log.Debugf("reply payment error msg success")
@@ -152,37 +152,41 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		return
 	}
 
+	fileHashStr := shareTask.GetFileHash()
+	fileName := shareTask.GetFileName()
+	fileOwner := shareTask.GetFileOwner()
+
 	// delete record
-	err = this.taskMgr.DeleteFileUnpaid(taskId, paymentMsg.Sender, int32(paymentMsg.PaymentId),
-		int32(paymentMsg.Asset), uint64(paymentMsg.Amount))
+	err = shareTask.DeleteFileUnpaid(
+		paymentMsg.Sender,
+		int32(paymentMsg.PaymentId),
+		int32(paymentMsg.Asset),
+		uint64(paymentMsg.Amount),
+	)
 	if err != nil {
 		log.Errorf("delete share file info %s", err)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.account),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply payment error msg failed", err)
 		} else {
 			log.Debugf("reply payment error msg success")
 		}
 		return
 	}
-	downloadTaskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(),
-		store.TaskTypeDownload)
-	fileName, _ := this.taskMgr.GetFileName(downloadTaskId)
-	fileOwner, _ := this.taskMgr.GetFileOwner(downloadTaskId)
 	log.Debugf("delete unpaid success taskId: %v, fileHash: %v, fileName: %v, owner: %v, sender: %v, amount: %v",
 		taskId, fileHashStr, fileName, fileOwner, paymentMsg.Sender, uint64(paymentMsg.Amount))
-	this.shareRecordDB.InsertShareRecord(taskId, fileHashStr, fileName, fileOwner,
+	this.TaskMgr.InsertShareRecord(taskId, fileHashStr, fileName, fileOwner,
 		paymentMsg.Sender, uint64(paymentMsg.Amount))
 
 	replyMsg := message.NewEmptyMsg(
-		message.WithSign(this.account),
+		message.WithSign(this.Chain.CurrentAccount()),
 		message.WithSyn(msg.MessageId),
 	)
-	if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 		log.Errorf("reply payment ok msg failed", err)
 	} else {
 		log.Debugf("reply payment ok msg success")
@@ -255,31 +259,31 @@ func (this *Dsp) handleProgressMsg(ctx *network.ComponentContext, peerWalletAddr
 func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peerWalletAddr string, msg *message.Message) {
 	// try to find a exist task id
 	fileMsg := msg.Payload.(*file.File)
-	height, _ := this.chain.GetCurrentBlockHeight()
-	existTaskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
+	height, _ := this.Chain.GetCurrentBlockHeight()
+	existTaskId := this.TaskMgr.GetDownloadedTaskId(fileMsg.Hash, this.Chain.WalletAddress())
 	if len(existTaskId) == 0 {
 		var replyMsg *message.Message
-		if this.taskMgr.GetDoingTaskNum(store.TaskTypeDownload) >= this.config.MaxDownloadTask {
+		if this.TaskMgr.GetDoingTaskNum(store.TaskTypeDownload) >= this.config.MaxDownloadTask {
 			log.Warnf("current downloading task num exceed %d, reject new task", this.config.MaxDownloadTask)
 			replyMsg = message.NewFileMsgWithError(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 				serr.TOO_MANY_TASKS,
 				"",
 				message.WithSessionId(fileMsg.SessionId),
-				message.WithWalletAddress(this.chain.WalletAddress()),
-				message.WithSign(this.account),
+				message.WithWalletAddress(this.Chain.WalletAddress()),
+				message.WithSign(this.Chain.CurrentAccount()),
 				message.ChainHeight(height),
 				message.WithSyn(msg.MessageId),
 			)
 		} else {
 			replyMsg = message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 				message.WithSessionId(fileMsg.SessionId),
-				message.WithWalletAddress(this.chain.WalletAddress()),
-				message.WithSign(this.account),
+				message.WithWalletAddress(this.Chain.WalletAddress()),
+				message.WithSign(this.Chain.CurrentAccount()),
 				message.ChainHeight(height),
 				message.WithSyn(msg.MessageId),
 			)
 		}
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("send file_ack msg to %s failed %s", peerWalletAddr, err)
 			return
 		}
@@ -287,19 +291,19 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peerWalletAddr 
 		return
 	}
 	// handle old task
-	state, _ := this.taskMgr.GetTaskState(existTaskId)
-	log.Debugf("download task exist %s, file %s, state: %d", existTaskId, fileMsg.Hash, state)
-	if state == store.TaskStateCancel || state == store.TaskStateFailed || state == store.TaskStateDone {
-		log.Warnf("the task has a wrong state of file_ask %s", state)
-	}
+	// state, _ := this.taskMgr.GetTaskState(existTaskId)
+	// log.Debugf("download task exist %s, file %s, state: %d", existTaskId, fileMsg.Hash, state)
+	// if state == store.TaskStateCancel || state == store.TaskStateFailed || state == store.TaskStateDone {
+	// 	log.Warnf("the task has a wrong state of file_ask %s", state)
+	// }
 	newMsg := message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 		message.WithSessionId(fileMsg.SessionId),
-		message.WithWalletAddress(this.chain.WalletAddress()),
-		message.WithSign(this.account),
+		message.WithWalletAddress(this.Chain.WalletAddress()),
+		message.WithSign(this.Chain.CurrentAccount()),
 		message.ChainHeight(height),
 		message.WithSyn(msg.MessageId),
 	)
-	if err := client.P2pSend(peerWalletAddr, newMsg.MessageId, newMsg.ToProtoMsg()); err != nil {
+	if err := client.P2PSend(peerWalletAddr, newMsg.MessageId, newMsg.ToProtoMsg()); err != nil {
 		log.Errorf("send exist task %s file_ack msg to %s failed %s",
 			existTaskId, peerWalletAddr, err)
 		return
@@ -314,11 +318,11 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 	replyErr := func(fileHash, synMsgId string, errorCode uint32, errorMsg string) error {
 		replyMsg := message.NewFileMsgWithError(fileHash,
 			netcom.FILE_OP_FETCH_RDY_OK, errorCode, errorMsg,
-			message.WithWalletAddress(this.chain.WalletAddress()),
-			message.WithSign(this.account),
+			message.WithWalletAddress(this.Chain.WalletAddress()),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(synMsgId),
 		)
-		err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg())
+		err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg())
 		if err != nil {
 			log.Errorf("reply rdy ok msg failed %s", err)
 		}
@@ -329,13 +333,13 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 		replyErr(fileMsg.Hash, msg.MessageId, serr.MISS_UPLOADED_FILE_TX, "upload file tx is required")
 		return
 	}
-	if err := this.waitForTxConfirmed(fileMsg.Tx.Height); err != nil {
+	if err := this.Chain.WaitForTxConfirmed(fileMsg.Tx.Height); err != nil {
 		log.Errorf("get block height err %s", err)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.CHECK_UPLOADED_TX_ERROR, "get block height err "+err.Error())
 		return
 	}
 	// TODO: check rpc server avaliable
-	info, err := this.chain.GetFileInfo(fileMsg.Hash)
+	info, err := this.Chain.GetFileInfo(fileMsg.Hash)
 	if info == nil {
 		log.Errorf("fetch ask file info is nil %s %s, err %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress, err)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.FILEINFO_NOT_EXIST, "fetch ask file info is nil")
@@ -359,91 +363,99 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 		log.Warnf("file %s has not blocks root", fileMsg.Hash)
 	}
 	// my task. use my wallet address
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
+	var downloadTask *download.DownloadTask
+	taskId := this.TaskMgr.GetDownloadedTaskId(fileMsg.Hash, this.Chain.WalletAddress())
 	if len(taskId) == 0 {
 		// handle new download task. use my wallet address
-		var err error
-		taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
-		log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
-		if err != nil {
+		log.Debugf("task not exist, create new download task")
+		downloadTask, err = this.TaskMgr.NewDownloadTask("")
+		log.Debugf("task not exist, create new download task %v, err %v", downloadTask, err)
+		if err != nil || downloadTask == nil {
 			log.Errorf("new task failed %s", err)
 			replyErr(fileMsg.Hash, msg.MessageId, serr.NEW_TASK_FAILED, "new task failed")
 			return
 		}
+		taskId = downloadTask.GetId()
+		log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
 	} else {
-		storeTx, err := this.taskMgr.GetStoreTx(taskId)
-		if err != nil {
+		downloadTask = this.TaskMgr.GetDownloadTask(taskId)
+		if downloadTask == nil {
 			replyErr(fileMsg.Hash, msg.MessageId, serr.GET_TASK_PROPERTY_ERROR, err.Error())
 			return
 		}
-		if storeTx == fileMsg.Tx.Hash {
-			fileHashDone := this.taskMgr.IsFileDownloaded(taskId)
-			if fileHashDone && this.IsFs() && !this.chain.CheckHasProveFile(fileMsg.Hash, this.Address()) {
+		if downloadTask.GetStoreTx() == fileMsg.Tx.Hash {
+			fileHashDone := this.TaskMgr.IsFileDownloaded(taskId)
+			if fileHashDone && this.IsFs() && !this.Chain.CheckHasProveFile(fileMsg.Hash, this.Address()) {
 				// file has downloaded but not proved
-				if err := this.fs.StartPDPVerify(fileMsg.Hash, 0, 0, 0, chainCom.ADDRESS_EMPTY); err != nil {
+				if err := this.Fs.StartPDPVerify(fileMsg.Hash, 0, 0, 0, chainCom.ADDRESS_EMPTY); err != nil {
 					replyErr(fileMsg.Hash, msg.MessageId, serr.SET_FILEINFO_DB_ERROR, err.Error())
 					return
 				}
 			}
-			state, _ := this.taskMgr.GetTaskState(taskId)
-			if state != store.TaskStateDone {
+			if downloadTask.State() != store.TaskStateDone {
 				if fileHashDone {
-					this.taskMgr.SetTaskState(taskId, store.TaskStateDone)
+					downloadTask.SetTaskState(store.TaskStateDone)
 				} else {
 					// set a new task state
-					err := this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
-					log.Debugf("set task state err: %s", err)
+					downloadTask.SetTaskState(store.TaskStateDoing)
 				}
 			}
 		} else {
-			log.Debugf("task %s store tx not match %s-%s", taskId, storeTx, fileMsg.Tx.Hash)
+			log.Debugf("task %s store tx not match %s-%s",
+				taskId, downloadTask.GetStoreTx(), fileMsg.Tx.Hash)
 			// receive a new file info tx, delete old task info
-			if err := this.taskMgr.CleanTask(taskId); err != nil {
+			if err := this.TaskMgr.CleanDownloadTask(taskId); err != nil {
 				replyErr(fileMsg.Hash, msg.MessageId, serr.SET_FILEINFO_DB_ERROR, err.Error())
 				return
 			}
 			// handle new download task. use my wallet address
-			var err error
-			taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
-			log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
+			downloadTask, err = this.TaskMgr.NewDownloadTask("")
 			if err != nil {
 				log.Errorf("new task failed %s", err)
 				replyErr(fileMsg.Hash, msg.MessageId, serr.NEW_TASK_FAILED, "new task failed")
 				return
 			}
+			taskId = downloadTask.GetId()
+			log.Debugf("fetch_ask new task %s of file: %s", taskId, fileMsg.Hash)
 		}
 	}
-	if !this.taskMgr.IsFileInfoExist(taskId) {
+
+	if !this.TaskMgr.IsFileInfoExist(taskId) {
 		log.Warnf("new task is deleted immediately")
 		replyErr(fileMsg.Hash, msg.MessageId, serr.NEW_TASK_FAILED, "new task failed")
 		return
 	}
-	if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
-		task.FileHash(fileMsg.Hash),
-		task.BlocksRoot(fileMsg.BlocksRoot),
-		task.Prefix(string(fileMsg.Prefix)),
-		task.Walletaddr(this.chain.WalletAddress()),
-		task.Privilege(info.Privilege),
-		task.FileOwner(info.FileOwner.ToBase58()),
-		task.StoreTx(fileMsg.Tx.Hash),
-		task.StoreTxHeight(uint32(fileMsg.Tx.Height)),
-		task.TotalBlockCnt(fileMsg.TotalBlockCount)); err != nil {
+	if err := downloadTask.SetInfoWithOptions(
+		base.FileHash(fileMsg.Hash),
+		base.FileName(string(info.FileDesc)),
+		base.BlocksRoot(fileMsg.BlocksRoot),
+		base.Prefix(string(fileMsg.Prefix)),
+		base.Walletaddr(this.Chain.WalletAddress()),
+		base.Privilege(info.Privilege),
+		base.FileOwner(info.FileOwner.ToBase58()),
+		base.StoreTx(fileMsg.Tx.Hash),
+		base.CopyNum(uint32(info.CopyNum)),
+		base.StoreTxHeight(uint32(fileMsg.Tx.Height)),
+		base.TotalBlockCnt(fileMsg.TotalBlockCount),
+		base.PeerToSessionIds(map[string]string{fileMsg.PayInfo.WalletAddress: fileMsg.SessionId}),
+	); err != nil {
 		log.Errorf("batch set file info fetch ask %s", err)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR, "new task failed")
 		return
 	}
-	if err := this.taskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress,
+	if err := this.TaskMgr.AddFileSession(taskId, fileMsg.SessionId, fileMsg.PayInfo.WalletAddress,
 		peerWalletAddr, uint32(fileMsg.PayInfo.Asset), fileMsg.PayInfo.UnitPrice); err != nil {
 		log.Errorf("add session err in file fetch ask %s", err)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR, "new task failed")
 		return
 	}
-	if err := this.taskMgr.BindTaskId(taskId); err != nil {
-		log.Errorf("set task info err in file fetch ask %s", err)
-		replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR, "new task failed")
-		return
-	}
-	currentBlockHash, currentBlockIndex, err := this.taskMgr.GetCurrentSetBlock(taskId)
+	// deprecated
+	// if err := this.taskMgr.BindTaskId(taskId); err != nil {
+	// 	log.Errorf("set task info err in file fetch ask %s", err)
+	// 	replyErr(fileMsg.Hash, msg.MessageId, serr.SET_TASK_PROPERTY_ERROR, "new task failed")
+	// 	return
+	// }
+	currentBlockHash, currentBlockIndex, err := this.TaskMgr.GetCurrentSetBlock(taskId)
 	if err != nil {
 		replyErr(fileMsg.Hash, msg.MessageId, serr.GET_TASK_PROPERTY_ERROR,
 			"get current received block hash failed"+err.Error())
@@ -451,13 +463,13 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 	}
 	replyMsg := message.NewFileMsgWithError(fileMsg.Hash,
 		netcom.FILE_OP_FETCH_RDY_OK, 0, "",
-		message.WithWalletAddress(this.chain.WalletAddress()),
+		message.WithWalletAddress(this.Chain.WalletAddress()),
 		message.WithBreakpointHash(currentBlockHash),
 		message.WithBreakpointIndex(uint64(currentBlockIndex)),
-		message.WithSign(this.account),
+		message.WithSign(this.Chain.CurrentAccount()),
 		message.WithSyn(msg.MessageId),
 	)
-	if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 		log.Errorf("reply rdy ok msg failed", err)
 	} else {
 		log.Debugf("reply rdy ok msg success")
@@ -469,12 +481,18 @@ func (this *Dsp) handleFileFetchPauseMsg(ctx *network.ComponentContext,
 	peerWalletAddr string, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
 	// my task. use my wallet address
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
+	taskId := this.TaskMgr.GetDownloadedTaskId(fileMsg.Hash, this.Chain.WalletAddress())
+
 	log.Debugf("handleFileFetchPauseMsg: of %s, taskId: %s from", fileMsg.Hash, taskId, peerWalletAddr)
-	if !this.taskMgr.IsFileInfoExist(taskId) {
+	if !this.TaskMgr.IsFileInfoExist(taskId) {
 		return
 	}
-	this.taskMgr.SetTaskState(taskId, store.TaskStatePause)
+	downloadTask := this.TaskMgr.GetDownloadTask(taskId)
+	if downloadTask == nil {
+		return
+	}
+
+	downloadTask.SetTaskState(store.TaskStatePause)
 }
 
 // handleFileFetchResumeMsg. handle resume msg from client
@@ -482,37 +500,56 @@ func (this *Dsp) handleFileFetchResumeMsg(ctx *network.ComponentContext,
 	peerWalletAddr string, msg *message.Message) {
 	// my task. use my wallet address
 	fileMsg := msg.Payload.(*file.File)
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
+	taskId := this.TaskMgr.GetDownloadedTaskId(fileMsg.Hash, this.Chain.WalletAddress())
+
 	log.Debugf("handleFileFetchResumeMsg: of %s, taskId: %s from", fileMsg.Hash, taskId, peerWalletAddr)
-	if !this.taskMgr.IsFileInfoExist(taskId) {
+	if !this.TaskMgr.IsFileInfoExist(taskId) {
 		return
 	}
-	this.taskMgr.SetTaskState(taskId, store.TaskStateDoing)
+	downloadTask := this.TaskMgr.GetDownloadTask(taskId)
+	if downloadTask == nil {
+		return
+	}
+
+	downloadTask.SetTaskState(store.TaskStateDoing)
 }
 
 func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext,
 	peerWalletAddr string, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeUpload)
-	if !this.taskMgr.IsFileInfoExist(taskId) {
+
+	taskId := this.TaskMgr.GetUploadTaskId(fileMsg.Hash, this.Chain.WalletAddress())
+	log.Debugf("handleFileFetchDoneMsg: of %s, taskId: %s from", fileMsg.Hash, taskId, peerWalletAddr)
+	if !this.TaskMgr.IsFileInfoExist(taskId) {
+		return
+	}
+	uploadTask := this.TaskMgr.GetUploadTask(taskId)
+	if uploadTask == nil {
 		return
 	}
 	log.Debugf("receive fetch done msg, save task id:%s fileHash: %s, from %s done",
 		taskId, fileMsg.Hash, peerWalletAddr)
-	this.taskMgr.SetUploadProgressDone(taskId, peerWalletAddr)
+	uploadTask.SetUploadProgressDone(taskId, peerWalletAddr)
 }
 
 func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext,
 	peerWalletAddr string, msg *message.Message) {
 	// my task. use my wallet address
 	fileMsg := msg.Payload.(*file.File)
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
+
+	// my task. use my wallet address
+	taskId := this.TaskMgr.GetDownloadedTaskId(fileMsg.Hash, this.Chain.WalletAddress())
+
 	log.Debugf("handleFileFetchCancelMsg: of %s, taskId: %s from", fileMsg.Hash, taskId, peerWalletAddr)
-	if !this.taskMgr.IsFileInfoExist(taskId) {
-		log.Debugf("file info not exist of canceling file %s", fileMsg.Hash)
+	if !this.TaskMgr.IsFileInfoExist(taskId) {
 		return
 	}
-	this.taskMgr.SetTaskState(taskId, store.TaskStateCancel)
+	downloadTask := this.TaskMgr.GetDownloadTask(taskId)
+	if downloadTask == nil {
+		return
+	}
+
+	downloadTask.SetTaskState(store.TaskStateCancel)
 }
 
 // handleFileDeleteMsg. client send delete msg to storage nodes for telling them to delete the file and release the resources.
@@ -520,16 +557,16 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext,
 	peerWalletAddr string, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
 	if fileMsg.Tx != nil && fileMsg.Tx.Height > 0 {
-		if err := this.waitForTxConfirmed(fileMsg.Tx.Height); err != nil {
+		if err := this.Chain.WaitForTxConfirmed(fileMsg.Tx.Height); err != nil {
 			log.Errorf("get block height err %s", err)
 			replyMsg := message.NewFileMsgWithError(fileMsg.Hash,
 				netcom.FILE_OP_DELETE_ACK, serr.DELETE_FILE_TX_UNCONFIRMED, err.Error(),
 				message.WithSessionId(fileMsg.SessionId),
-				message.WithWalletAddress(this.chain.WalletAddress()),
-				message.WithSign(this.account),
+				message.WithWalletAddress(this.Chain.WalletAddress()),
+				message.WithSign(this.Chain.CurrentAccount()),
 				message.WithSyn(msg.MessageId),
 			)
-			if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 				log.Errorf("reply delete ok msg failed", err)
 				return
 			}
@@ -537,17 +574,17 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext,
 			return
 		}
 	}
-	info, err := this.chain.GetFileInfo(fileMsg.Hash)
+	info, err := this.Chain.GetFileInfo(fileMsg.Hash)
 	if info != nil || (err != nil && strings.Index(err.Error(), "FsGetFileInfo not found") == -1) {
 		log.Errorf("delete file info is not nil %s %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 		replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK,
 			serr.DELETE_FILE_FILEINFO_EXISTS, "file info hasn't been deleted",
 			message.WithSessionId(fileMsg.SessionId),
-			message.WithWalletAddress(this.chain.WalletAddress()),
-			message.WithSign(this.account),
+			message.WithWalletAddress(this.Chain.WalletAddress()),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply delete ok msg failed", err)
 			return
 		}
@@ -556,17 +593,17 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext,
 	}
 	replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK,
 		message.WithSessionId(fileMsg.SessionId),
-		message.WithWalletAddress(this.chain.WalletAddress()),
-		message.WithSign(this.account),
+		message.WithWalletAddress(this.Chain.WalletAddress()),
+		message.WithSign(this.Chain.CurrentAccount()),
 		message.WithSyn(msg.MessageId),
 	)
-	if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 		log.Errorf("reply delete ok msg failed", err)
 	} else {
 		log.Debugf("reply delete ack msg success")
 	}
 	// TODO: check file owner
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, this.chain.WalletAddress(), store.TaskTypeDownload)
+	taskId := this.TaskMgr.GetDownloadedTaskId(fileMsg.Hash, this.Chain.WalletAddress())
 	err = this.DeleteDownloadedFile(taskId)
 	if err != nil {
 		log.Errorf("delete downloaded file failed", err)
@@ -580,106 +617,97 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 	replyErr := func(sessionId, fileHash string, errorCode uint32, errorMsg string, ctx *network.ComponentContext) {
 		replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK, errorCode, errorMsg,
 			message.WithSessionId(sessionId),
-			message.WithWalletAddress(this.chain.WalletAddress()),
+			message.WithWalletAddress(this.Chain.WalletAddress()),
 			message.WithUnitPrice(0),
 			message.WithAsset(0),
-			message.WithSign(this.account),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 			log.Errorf("reply download ack err msg failed", err)
 		}
 	}
-	info, err := this.chain.GetFileInfo(fileMsg.Hash)
+	info, err := this.Chain.GetFileInfo(fileMsg.Hash)
 	if err != nil || info == nil {
 		log.Errorf("handle download ask msg, get file info %s not exist from chain", fileMsg.Hash)
 		replyErr("", fileMsg.Hash, serr.FILEINFO_NOT_EXIST,
 			fmt.Sprintf("file %s is deleted", fileMsg.Hash), ctx)
 		return
 	}
-	if !this.chain.CheckFilePrivilege(info, fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
+	if !this.Chain.CheckFilePrivilege(info, fileMsg.Hash, fileMsg.PayInfo.WalletAddress) {
 		log.Errorf("user %s has no privilege to download this file %s",
 			fileMsg.PayInfo.WalletAddress, fileMsg.Hash)
 		replyErr("", fileMsg.Hash, serr.NO_PRIVILEGE_TO_DOWNLOAD,
 			fmt.Sprintf("user %s has no privilege to download this file", fileMsg.PayInfo.WalletAddress), ctx)
 		return
 	}
-	downloadedId, err := this.taskMgr.GetDownloadedTaskId(fileMsg.Hash)
-	if err != nil || len(downloadedId) == 0 {
+	downloadedId := this.TaskMgr.GetDownloadedTaskId(fileMsg.Hash, this.Chain.WalletAddress())
+	if len(downloadedId) == 0 {
 		replyErr("", fileMsg.Hash, serr.FILEINFO_NOT_EXIST,
 			fmt.Sprintf("no downloaded task for file %s", fileMsg.Hash), ctx)
 		return
 	}
-	price, err := this.GetFileUnitPrice(fileMsg.PayInfo.Asset)
-	if err != nil {
-		replyErr("", fileMsg.Hash, serr.UNITPRICE_ERROR, err.Error(), ctx)
+	downloadedTask := this.TaskMgr.GetDownloadTask(downloadedId)
+	if downloadedTask == nil {
+		replyErr("", fileMsg.Hash, serr.FILEINFO_NOT_EXIST,
+			fmt.Sprintf("no downloaded task for file %s", fileMsg.Hash), ctx)
 		return
 	}
-	prefix, err := this.taskMgr.GetFilePrefix(downloadedId)
+	prefix := downloadedTask.GetPrefix()
 	log.Debugf("get prefix from local: %s", prefix)
-	if err != nil {
-		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
-		return
-	}
-	if this.channel != nil && this.dns != nil && this.dns.DNSNode != nil {
-		dnsBalance, err := this.channel.GetAvailableBalance(this.dns.DNSNode.WalletAddr)
+
+	if this.Channel != nil && this.DNS != nil && this.DNS.HasDNS() {
+		dnsBalance, err := this.Channel.GetAvailableBalance(this.DNS.CurrentDNSWallet())
 		if err != nil || dnsBalance == 0 {
 			replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR,
-				"no enough balance with dns"+this.dns.DNSNode.WalletAddr, ctx)
+				"no enough balance with dns"+this.DNS.CurrentDNSWallet(), ctx)
 			return
 		}
 	} else {
-		log.Errorf("channel is nil %t or dns is nil %t", this.channel == nil, this.dns == nil)
+		log.Errorf("channel is nil %t or dns is nil %t", this.Channel == nil, this.DNS == nil)
 	}
 
-	localId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, store.TaskTypeShare)
-	if this.taskMgr.TaskExist(localId) {
+	sharedTask := this.TaskMgr.GetShareTaskByFileHash(fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+	if sharedTask != nil {
 		// old task
-		sessionId, err := this.taskMgr.GetSessionId(localId, "")
-		if err != nil {
-			replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
-			return
-		}
-		canShare := this.canShareTo(localId, fileMsg.PayInfo.WalletAddress, fileMsg.PayInfo.Asset)
-		if !canShare {
+		sessionId := sharedTask.GetId()
+		if !sharedTask.CanShareTo(fileMsg.PayInfo.WalletAddress, fileMsg.PayInfo.Asset) {
 			replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR,
 				fmt.Sprintf("can't share %s to, err: %v", fileMsg.Hash, err), ctx)
 			return
 		}
-		totalCount, _ := this.taskMgr.GetFileTotalBlockCount(downloadedId)
+		totalCount := downloadedTask.GetTotalBlockCnt()
 		replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK,
 			message.WithSessionId(sessionId),
-			message.WithBlockHashes(this.taskMgr.FileBlockHashes(downloadedId)),
+			message.WithBlockHashes(this.TaskMgr.FileBlockHashes(downloadedId)),
 			message.WithTotalBlockCount(totalCount),
-			message.WithWalletAddress(this.chain.WalletAddress()),
+			message.WithWalletAddress(this.Chain.WalletAddress()),
 			message.WithPrefix(prefix),
-			message.WithUnitPrice(price),
+			message.WithUnitPrice(consts.DOWNLOAD_BLOCK_PRICE),
 			message.WithAsset(fileMsg.PayInfo.Asset),
-			message.WithSign(this.account),
+			message.WithSign(this.Chain.CurrentAccount()),
 			message.WithSyn(msg.MessageId),
 		)
-		if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
-			log.Errorf("reply download ack  msg failed", err)
+		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+			log.Errorf("reply download ack msg failed", err)
 		} else {
-			this.taskMgr.SetTaskState(localId, store.TaskStateDoing)
+			sharedTask.SetTaskState(store.TaskStateDoing)
 			log.Debugf("reply download ack msg success")
 		}
 		return
 	}
+	// share task not found, create new share task
 	// TODO: check channel balance and router path
-	taskId, err := this.taskMgr.NewTask("", store.TaskTypeShare)
+	sharedTask, err = this.TaskMgr.NewShareTask("")
 	if err != nil {
 		replyErr("", fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
 		return
 	}
-	sessionId, err := this.taskMgr.GetSessionId(taskId, "")
-	if err != nil {
-		replyErr(sessionId, fileMsg.Hash, serr.INTERNAL_ERROR, err.Error(), ctx)
-		return
-	}
-	rootBlk := this.fs.GetBlock(fileMsg.Hash)
+	taskId := sharedTask.GetId()
+	sessionId := sharedTask.GetId()
+	rootBlk := this.Fs.GetBlock(fileMsg.Hash)
 
-	if !this.taskMgr.IsFileInfoExist(downloadedId) {
+	if !this.TaskMgr.IsFileInfoExist(downloadedId) {
 		replyErr(sessionId, fileMsg.Hash, serr.FILEINFO_NOT_EXIST, "", ctx)
 		return
 	}
@@ -693,62 +721,74 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 		return
 	}
 
-	if this.taskMgr.GetDoingTaskNum(store.TaskTypeShare) >= this.config.MaxShareTask {
+	if this.TaskMgr.GetDoingTaskNum(store.TaskTypeShare) >= this.config.MaxShareTask {
 		log.Warnf("current sharing task num exceed %d, reject new task", this.config.MaxShareTask)
 		replyErr(sessionId, fileMsg.Hash, serr.TOO_MANY_TASKS, "", ctx)
 		return
 	}
-	totalBlockCount := uint64(len(this.taskMgr.FileBlockHashes(downloadedId)))
+
+	// TODO: there will be large packet if block hashes slice too big
+	allBlockHashes := this.TaskMgr.FileBlockHashes(downloadedId)
+	totalBlockCount := uint64(len(allBlockHashes))
 	log.Debugf("sessionId %s blockCount %v %s prefix %s", sessionId, totalBlockCount,
 		downloadedId, prefix)
 	replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK,
 		message.WithSessionId(sessionId),
-		message.WithBlockHashes(this.taskMgr.FileBlockHashes(downloadedId)),
+		message.WithBlockHashes(allBlockHashes),
 		message.WithTotalBlockCount(totalBlockCount),
-		message.WithWalletAddress(this.chain.WalletAddress()),
+		message.WithWalletAddress(this.Chain.WalletAddress()),
 		message.WithPrefix(prefix),
-		message.WithUnitPrice(price),
+		message.WithUnitPrice(consts.DOWNLOAD_BLOCK_PRICE),
 		message.WithAsset(fileMsg.PayInfo.Asset),
-		message.WithSign(this.account),
+		message.WithSign(this.Chain.CurrentAccount()),
 		message.WithSyn(msg.MessageId),
 	)
-	if err := client.P2pSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
 		log.Errorf("reply download ack  msg failed", err)
 	} else {
 		log.Debugf("reply download ack msg success")
 	}
-	log.Debugf("reply download ack success new share task %s, file %s", taskId, fileMsg.Hash)
-	if err := this.taskMgr.SetTaskInfoWithOptions(taskId,
-		task.FileHash(fileMsg.Hash),
-		task.ReferId(downloadedId),
-		task.Walletaddr(fileMsg.PayInfo.WalletAddress)); err != nil {
+	log.Debugf("reply download ack success new share task %s, file %s, fileName %s, owner %s",
+		taskId, fileMsg.Hash, downloadedTask.GetFileName(), downloadedTask.GetFileOwner())
+	if err := sharedTask.SetInfoWithOptions(
+		base.FileName(downloadedTask.GetFileName()),
+		base.FileOwner(downloadedTask.GetFileOwner()),
+		base.FileHash(fileMsg.Hash),
+		base.ReferId(downloadedId),
+		base.Walletaddr(fileMsg.PayInfo.WalletAddress),
+		base.Prefix(string(prefix)),
+		base.TotalBlockCnt(totalBlockCount),
+	); err != nil {
 		log.Errorf("batch commit file info failed, err: %s", err)
 	}
-	this.taskMgr.BindTaskId(taskId)
 }
 
 // handleFileDownloadMsg. client send to peers and telling them the file will be downloaded soon
 func (this *Dsp) handleFileDownloadMsg(ctx *network.ComponentContext, peerWalletAddr string, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	taskKey := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, store.TaskTypeShare)
-	// TODO: check channel balance and router path
-	this.taskMgr.AddShareTo(taskKey, fileMsg.PayInfo.WalletAddress)
-	hostAddr, _ := this.dns.GetExternalIP(fileMsg.PayInfo.WalletAddress)
+	sharedTask := this.TaskMgr.GetShareTaskByFileHash(fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+	if sharedTask == nil {
+		log.Errorf("shared task not found for file %s, wallet %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+		return
+	}
+	this.TaskMgr.AddShareTo(sharedTask.GetId(), fileMsg.PayInfo.WalletAddress)
+	hostAddr, _ := this.DNS.GetExternalIP(fileMsg.PayInfo.WalletAddress)
 	log.Debugf("Set host addr after recv file download %s - %s", fileMsg.PayInfo.WalletAddress, hostAddr)
 }
 
 func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peerWalletAddr string, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, store.TaskTypeShare)
-	if !this.taskMgr.TaskExist(taskId) {
-		log.Warnf("share task not exist %s", fileMsg.Hash)
+	sharedTask := this.TaskMgr.GetShareTaskByFileHash(fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+	if sharedTask == nil {
+		log.Errorf("shared task not found for file %s, wallet %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 		return
 	}
 	// TODO: check unpaid amount
-	if err := client.P2pClosePeerSession(peerWalletAddr, taskId); err != nil {
+	taskId := sharedTask.GetId()
+	if err := client.P2PClosePeerSession(peerWalletAddr, taskId); err != nil {
 		log.Errorf("close peer failed")
 	}
-	this.taskMgr.CleanTask(taskId)
+	this.TaskMgr.CleanShareTask(taskId)
 	log.Debugf("delete share task of %s", taskId)
 }
 
@@ -756,16 +796,17 @@ func (this *Dsp) handleFileDownloadCancelMsg(ctx *network.ComponentContext, peer
 func (this *Dsp) handleFileDownloadOkMsg(ctx *network.ComponentContext,
 	peerWalletAddr string, msg *message.Message) {
 	fileMsg := msg.Payload.(*file.File)
-	taskId := this.taskMgr.TaskId(fileMsg.Hash, fileMsg.PayInfo.WalletAddress, store.TaskTypeShare)
-	if !this.taskMgr.TaskExist(taskId) {
-		log.Errorf("share task not exist %s", fileMsg.Hash)
+	sharedTask := this.TaskMgr.GetShareTaskByFileHash(fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
+	if sharedTask == nil {
+		log.Errorf("shared task not found for file %s, wallet %s", fileMsg.Hash, fileMsg.PayInfo.WalletAddress)
 		return
 	}
 	// TODO: check unpaid amount
-	if err := client.P2pClosePeerSession(peerWalletAddr, taskId); err != nil {
+	taskId := sharedTask.GetId()
+	if err := client.P2PClosePeerSession(peerWalletAddr, taskId); err != nil {
 		log.Errorf("close peer failed")
 	}
-	this.taskMgr.CleanTask(taskId)
+	this.TaskMgr.CleanShareTask(taskId)
 	log.Debugf("delete share task of %s", taskId)
 }
 
@@ -783,22 +824,22 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 	}
 	switch blockFlightsMsg.Blocks[0].Operation {
 	case netcom.BLOCK_OP_NONE:
-		taskId := this.taskMgr.TaskId(blockFlightsMsg.Blocks[0].FileHash,
-			this.chain.WalletAddress(), store.TaskTypeDownload)
-		log.Debugf("taskId: %s, sessionId: %s receive %d blocks from peer:%s",
+		// receive blocks for download task
+		taskId := this.TaskMgr.GetDownloadedTaskId(blockFlightsMsg.Blocks[0].FileHash, this.Chain.WalletAddress())
+		log.Debugf("download task %s, sessionId %s receive %d blocks from peer:%s",
 			taskId, blockFlightsMsg.Blocks[0].SessionId, len(blockFlightsMsg.Blocks), peerWalletAddr)
-		exist := this.taskMgr.TaskExist(taskId)
-		if !exist {
-			log.Debugf("task %s, file: %s not exist", taskId, blockFlightsMsg.Blocks[0].FileHash)
+		downloadTask := this.TaskMgr.GetDownloadTask(taskId)
+		if downloadTask == nil {
+			log.Debugf("download task %s, file %s not exist", taskId, blockFlightsMsg.Blocks[0].FileHash)
 			return
 		}
 		// active worker
-		this.taskMgr.ActiveDownloadTaskPeer(peerWalletAddr)
-		blocks := make([]*task.BlockResp, 0)
+		downloadTask.ActiveWorker(peerWalletAddr)
+		blocks := make([]*types.BlockResp, 0)
 		for _, blockMsg := range blockFlightsMsg.Blocks {
-			isDownloaded := this.taskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint64(blockMsg.Index))
+			isDownloaded := this.TaskMgr.IsBlockDownloaded(taskId, blockMsg.Hash, uint64(blockMsg.Index))
 			if !isDownloaded {
-				b := &task.BlockResp{
+				b := &types.BlockResp{
 					Hash:      blockMsg.Hash,
 					Index:     blockMsg.Index,
 					PeerAddr:  peerWalletAddr,
@@ -819,41 +860,42 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 		log.Debugf("task %s, push blocks from %s-%s-%d to %s-%d",
 			taskId, blockFlightsMsg.Blocks[0].FileHash, blocks[0].Hash, blocks[0].Index,
 			blocks[len(blocks)-1].Hash, blocks[len(blocks)-1].Index)
-		if this.taskMgr.BlockFlightsChannelExists(taskId, blockFlightsMsg.Blocks[0].SessionId,
+		if downloadTask.BlockFlightsChannelExists(blockFlightsMsg.Blocks[0].SessionId,
 			blockFlightsMsg.TimeStamp) {
-			this.taskMgr.PushGetBlockFlights(taskId, blockFlightsMsg.Blocks[0].SessionId,
+			downloadTask.PushGetBlockFlights(blockFlightsMsg.Blocks[0].SessionId,
 				blocks, blockFlightsMsg.TimeStamp)
 			return
 		}
 		// put to receive block logic
-		if err := this.putBlocks(taskId, blockFlightsMsg.Blocks[0].FileHash, peerWalletAddr, blocks); err != nil {
+		if err := downloadTask.PutBlocks(peerWalletAddr, blocks); err != nil {
 			log.Errorf("put blocks failed %s", err)
 		}
 	case netcom.BLOCK_OP_GET:
 		blockMsg := blockFlightsMsg.Blocks[0]
 		sessionId := blockMsg.SessionId
+		var taskType store.TaskType
 		for _, blk := range blockFlightsMsg.Blocks {
 			log.Debugf("session: %s handle get block %s-%s-%d from %s",
 				sessionId, blk.FileHash, blk.Hash, blk.Index, peerWalletAddr)
 			if len(sessionId) == 0 {
 				return
 			}
-			existTsk, _ := this.taskMgr.GetTaskInfoCopy(sessionId)
-			if existTsk == nil {
+			origTaskInfo := this.TaskMgr.GetTaskInfoCopy(sessionId)
+			if origTaskInfo == nil {
 				log.Debugf("task %s, file %s not exist", sessionId, blockMsg.FileHash)
 				return
 			}
+			taskType = origTaskInfo.Type
 		}
-		taskType, _ := this.taskMgr.GetTaskType(sessionId)
-		log.Debugf("task key:%s type %d", sessionId, taskType)
+		log.Debugf("task key: %s type %d", sessionId, taskType)
 		switch taskType {
 		case store.TaskTypeDownload, store.TaskTypeShare:
-			reqCh := this.taskMgr.BlockReqCh()
-			req := make([]*task.GetBlockReq, 0)
+			reqCh := this.TaskMgr.BlockReqCh()
+			req := make([]*types.GetBlockReq, 0)
 			for _, v := range blockFlightsMsg.Blocks {
 				log.Debugf("push get block req: %s-%s-%d from %s - %s",
 					v.GetSessionId(), v.GetFileHash(), blockFlightsMsg.TimeStamp, v.Payment.Sender, peerWalletAddr)
-				r := &task.GetBlockReq{
+				r := &types.GetBlockReq{
 					TimeStamp:     blockFlightsMsg.TimeStamp,
 					FileHash:      v.FileHash,
 					Hash:          v.Hash,
@@ -869,41 +911,43 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 			reqCh <- req
 			log.Debugf("push get block flights req done")
 		case store.TaskTypeUpload:
-			if len(blockFlightsMsg.Blocks) == 0 {
-				log.Warnf("receive get blocks msg empty")
-				return
-			}
-			pause, sdkerr := this.checkIfPause(sessionId, blockFlightsMsg.Blocks[0].FileHash)
-			if sdkerr != nil {
-				log.Debugf("handle get block pause %v %t", sdkerr, pause)
-				return
-			}
-			if pause {
-				log.Debugf("handle get block pause %v %t", sdkerr, pause)
-				return
-			}
-			reqCh, err := this.taskMgr.TaskBlockReq(sessionId)
-			if err != nil {
-				log.Errorf("get task block reqCh err: %s", err)
-				return
-			}
-			req := make([]*task.GetBlockReq, 0)
-			for _, v := range blockFlightsMsg.Blocks {
-				log.Debugf("push get block req: %s-%s-%d from %s - %s",
-					v.GetSessionId(), v.GetFileHash(), blockFlightsMsg.TimeStamp, v.Payment.Sender, peerWalletAddr)
-				r := &task.GetBlockReq{
-					TimeStamp:     blockFlightsMsg.TimeStamp,
-					FileHash:      v.FileHash,
-					Hash:          v.Hash,
-					Index:         v.Index,
-					PeerAddr:      peerWalletAddr,
-					WalletAddress: v.Payment.Sender,
-					Asset:         v.Payment.Asset,
-				}
-				req = append(req, r)
-			}
-			log.Debugf("push get block to request")
-			reqCh <- req
+			// deprecated
+
+			// if len(blockFlightsMsg.Blocks) == 0 {
+			// 	log.Warnf("receive get blocks msg empty")
+			// 	return
+			// }
+			// uploadTask := this.TaskMgr.GetUploadTask(sessionId)
+			// if uploadTask == nil {
+			// 	log.Debugf("handle get block get upload task %s is nil", sessionId)
+			// 	return
+			// }
+			// if uploadTask.IsTaskPaused() {
+			// 	log.Debugf("handle get block get upload task %s is paused", sessionId)
+			// 	return
+			// }
+			// reqCh := uploadTask.GetBlockReq()
+			// if reqCh == nil {
+			// 	log.Errorf("get task block reqCh is nil for task %s", sessionId)
+			// 	return
+			// }
+			// req := make([]*types.GetBlockReq, 0)
+			// for _, v := range blockFlightsMsg.Blocks {
+			// 	log.Debugf("push get block req: %s-%s-%d from %s - %s",
+			// 		v.GetSessionId(), v.GetFileHash(), blockFlightsMsg.TimeStamp, v.Payment.Sender, peerWalletAddr)
+			// 	r := &types.GetBlockReq{
+			// 		TimeStamp:     blockFlightsMsg.TimeStamp,
+			// 		FileHash:      v.FileHash,
+			// 		Hash:          v.Hash,
+			// 		Index:         v.Index,
+			// 		PeerAddr:      peerWalletAddr,
+			// 		WalletAddress: v.Payment.Sender,
+			// 		Asset:         v.Payment.Asset,
+			// 	}
+			// 	req = append(req, r)
+			// }
+			// log.Debugf("push get block to request")
+			// reqCh <- req
 		default:
 			log.Debugf("handle block flights get msg, tasktype not support")
 		}
@@ -917,10 +961,10 @@ func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext,
 	progressMsg := msg.Payload.(*progress.Progress)
 	nodeInfos := make([]*progress.ProgressInfo, 0)
 	for _, info := range progressMsg.Infos {
-		id := this.taskMgr.TaskId(progressMsg.Hash, this.WalletAddress(), store.TaskTypeUpload)
+		id := this.TaskMgr.GetUploadTaskId(progressMsg.Hash, this.WalletAddress())
 		var prog *store.FileProgress
 		if len(id) != 0 {
-			prog = this.taskMgr.GetTaskPeerProgress(id, info.WalletAddr)
+			prog = this.TaskMgr.GetTaskPeerProgress(id, info.WalletAddr)
 		}
 		log.Debugf("handle req progress msg, get progress of id %s, file: %s, addr %s, count %d, ",
 			id, progressMsg.Hash, info.WalletAddr, prog)
@@ -936,29 +980,5 @@ func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext,
 	}
 	resp := message.NewProgressMsg(this.WalletAddress(), progressMsg.Hash, netcom.FILE_OP_PROGRESS,
 		nodeInfos, message.WithSign(this.CurrentAccount()), message.WithSyn(msg.MessageId))
-	client.P2pSend(peerWalletAddr, resp.MessageId, resp.ToProtoMsg())
-}
-
-func (this *Dsp) waitForTxConfirmed(blockHeight uint64) error {
-	currentBlockHeight, err := this.chain.GetCurrentBlockHeight()
-	log.Debugf("wait for tx confirmed height: %d, now: %d", blockHeight, currentBlockHeight)
-	if err != nil {
-		log.Errorf("get block height err %s", err)
-		return err
-	}
-	if blockHeight <= uint64(currentBlockHeight) {
-		return nil
-	}
-
-	timeout := common.WAIT_FOR_GENERATEBLOCK_TIMEOUT * uint32(blockHeight-uint64(currentBlockHeight))
-	if timeout > common.DOWNLOAD_FILE_TIMEOUT {
-		timeout = common.DOWNLOAD_FILE_TIMEOUT
-	}
-	waitSuccess, err := this.chain.WaitForGenerateBlock(time.Duration(timeout)*time.Second,
-		uint32(blockHeight-uint64(currentBlockHeight)))
-	if err != nil || !waitSuccess {
-		log.Errorf("get block height err %s %d %d", err, currentBlockHeight, blockHeight)
-		return fmt.Errorf("get block height err %d %d", currentBlockHeight, blockHeight)
-	}
-	return nil
+	client.P2PSend(peerWalletAddr, resp.MessageId, resp.ToProtoMsg())
 }

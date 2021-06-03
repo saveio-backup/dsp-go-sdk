@@ -12,7 +12,8 @@ import (
 	"testing"
 
 	"github.com/saveio/dsp-go-sdk/config"
-	"github.com/saveio/dsp-go-sdk/utils"
+	"github.com/saveio/dsp-go-sdk/consts"
+	"github.com/saveio/dsp-go-sdk/types/prefix"
 	"github.com/saveio/max/merkledag"
 	ml "github.com/saveio/max/merkledag"
 	chain "github.com/saveio/themis-go-sdk"
@@ -38,11 +39,11 @@ func TestNodeFromFile(t *testing.T) {
 	defer os.RemoveAll(repoPath)
 	defer os.RemoveAll(downloadPath)
 	defer os.RemoveAll("./Log")
-	cfg := &config.DspConfig{
-		FsRepoRoot: repoPath,
-		FsFileRoot: downloadPath,
-	}
-	fs, err := NewFs(cfg, nil)
+	// cfg := &config.DspConfig{
+	// 	FsRepoRoot: repoPath,
+	// 	FsFileRoot: downloadPath,
+	// }
+	fs, err := NewFs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,58 +60,6 @@ func TestNodeFromFile(t *testing.T) {
 		}
 		hashMap[l] = struct{}{}
 	}
-}
-
-func TestBlockToBytes(t *testing.T) {
-	cfg := &config.DspConfig{
-		FsRepoRoot: "./Repo",
-		FsFileRoot: "./Downloads",
-	}
-	fs, err := NewFs(cfg, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	list, err := fs.NodesFromFile(testbigFile, "", false, "")
-	if err != nil {
-		fmt.Printf("node from file err:%s\n", err)
-		return
-	}
-	root := fs.GetBlock(list[0])
-	data := fs.BlockData(root)
-	fmt.Printf("len:%d, blockdata:%v\n", len(data), data)
-
-	blockBytes, err := fs.BlockToBytes(root)
-	if err != nil {
-		fmt.Printf("block to bytes err:%s\n", err)
-		return
-	}
-	fmt.Printf("len:%d, blockbytes:%v\n", len(blockBytes), blockBytes)
-}
-
-func TestEncodedToBlock(t *testing.T) {
-	fileRoot, err := filepath.Abs("../testdata")
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	dspCfg := &config.DspConfig{
-		FsRepoRoot: fileRoot + "/testdata/max_test",
-		FsFileRoot: fileRoot,
-		FsType:     config.FS_FILESTORE,
-	}
-	fs, _ := NewFs(dspCfg, nil)
-	list, err := fs.NodesFromFile(testbigFile, "AWaE84wqVf1yffjaR6VJ4NptLdqBAm8G9c", false, "")
-	if err != nil {
-		fmt.Printf("node from file err:%s\n", err)
-		return
-	}
-	root := fs.GetBlock(list[0])
-	rootData := fs.BlockDataOfAny(root)
-	fmt.Printf("rootData :%d\n", len(rootData))
-	rootBlock := fs.EncodedToBlockWithCid(rootData, root.Cid().String())
-	fmt.Printf("blockDataLen:%d\n", len(fs.BlockData(rootBlock)))
-	rootBytes, _ := fs.BlockToBytes(root)
-	fmt.Printf("rootBlock cid:%s, len:%d, lenbtes :%d \n", rootBlock.Cid(), len(rootBlock.RawData()), len(rootBytes))
 }
 
 func TestReadWithOffset(t *testing.T) {
@@ -145,7 +94,7 @@ func TestGetBlock(t *testing.T) {
 		DBPath:        fmt.Sprintf("%s/db%d", fileRoot, 1),
 		FsRepoRoot:    fileRoot + "/max1",
 		FsFileRoot:    fileRoot,
-		FsType:        config.FS_BLOCKSTORE,
+		FsType:        consts.FS_BLOCKSTORE,
 		FsGcPeriod:    "1h",
 		FsMaxStorage:  "10G",
 		ChainRpcAddrs: []string{"http://localhost:20336"},
@@ -161,7 +110,7 @@ func TestGetBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.SetDefaultAccount(acc)
-	fs, _ := NewFs(dspCfg, c)
+	fs, _ := NewFs(c)
 	if fs == nil {
 		t.Fatal("fs is nil")
 	}
@@ -187,9 +136,10 @@ func TestNewFs(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		FsRepoRoot: fileRoot + "/testdata/max_test",
 		FsFileRoot: fileRoot,
-		FsType:     config.FS_FILESTORE,
+		FsType:     consts.FS_FILESTORE,
 	}
-	fs, _ := NewFs(dspCfg, nil)
+	fmt.Println(dspCfg)
+	fs, _ := NewFs(nil)
 	if fs == nil {
 		t.Fatal(fs)
 	}
@@ -207,9 +157,10 @@ func Test2GetBlockFromFileStore(t *testing.T) {
 	dspCfg := &config.DspConfig{
 		FsRepoRoot: fileRoot + "/testdata/max_test",
 		FsFileRoot: fileRoot,
-		FsType:     config.FS_FILESTORE,
+		FsType:     consts.FS_FILESTORE,
 	}
-	fs2, _ := NewFs(dspCfg, nil)
+	fmt.Println(dspCfg)
+	fs2, _ := NewFs(nil)
 	fullFilePath := "../testdata/QmUQTgbTc1y4a8cq1DyA548B71kSrnVm7vHuBsatmnMBib"
 	l0data := []byte{}
 	for i := 850000; i <= 887443; i++ {
@@ -243,7 +194,8 @@ func TestDownloadFile(t *testing.T) {
 		FsRepoRoot: "./Repo",
 		FsFileRoot: "./Downloads",
 	}
-	fs, err := NewFs(cfg, nil)
+	fmt.Println(cfg)
+	fs, err := NewFs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +238,8 @@ func TestEncryptFile(t *testing.T) {
 		FsRepoRoot: "./Repo",
 		FsFileRoot: "./Downloads",
 	}
-	fs, err := NewFs(cfg, nil)
+	fmt.Println(cfg)
+	fs, err := NewFs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +254,8 @@ func TestDecryptFile(t *testing.T) {
 		FsRepoRoot: "./Repo",
 		FsFileRoot: "./Downloads",
 	}
-	fs, err := NewFs(cfg, nil)
+	fmt.Println(cfg)
+	fs, err := NewFs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +270,8 @@ func TestEncryptNodeToFiles(t *testing.T) {
 		FsRepoRoot: "./Repo",
 		FsFileRoot: "./Downloads",
 	}
-	fs, err := NewFs(cfg, nil)
+	fmt.Println(cfg)
+	fs, err := NewFs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +281,7 @@ func TestEncryptNodeToFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prefix := &utils.FilePrefix{
+	prefix := &prefix.FilePrefix{
 		Version:    1,
 		Encrypt:    true,
 		EncryptPwd: encryptPassword,
@@ -366,7 +321,8 @@ func TestReadBlock(t *testing.T) {
 		FsRepoRoot: "/Users/zhijie/Desktop/onchain/save-test/node5/FS/AFoUr6dKxGCAcx74nKfBBWavRCyNcengbJ",
 		FsType:     0,
 	}
-	fs, err := NewFs(cfg, nil)
+	fmt.Println(cfg)
+	fs, err := NewFs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +336,8 @@ func TestGetAllCid(t *testing.T) {
 		FsRepoRoot: "./Repo",
 		FsFileRoot: "./Downloads",
 	}
-	fs, err := NewFs(cfg, nil)
+	fmt.Println(cfg)
+	fs, err := NewFs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,9 +369,10 @@ func TestPutBlockAndTag(t *testing.T) {
 	cfg := &config.DspConfig{
 		FsRepoRoot: repoPath,
 		FsFileRoot: downloadPath,
-		FsType:     config.FS_BLOCKSTORE,
+		FsType:     consts.FS_BLOCKSTORE,
 	}
-	fs, err := NewFs(cfg, nil)
+	fmt.Println(cfg)
+	fs, err := NewFs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

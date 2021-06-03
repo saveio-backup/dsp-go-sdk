@@ -1,12 +1,5 @@
 package config
 
-type FSType int
-
-const (
-	FS_FILESTORE = iota
-	FS_BLOCKSTORE
-)
-
 type DspConfig struct {
 	DBPath             string   // level DB data path
 	ChainRpcAddr       string   // chain rpc address
@@ -20,7 +13,7 @@ type DspConfig struct {
 
 	FsRepoRoot   string // fs block store repo root path
 	FsFileRoot   string // fs file store root path
-	FsType       FSType // fs type
+	FsType       int    // fs type
 	FsGcPeriod   string // fs gc period
 	FsMaxStorage string // fs max storage
 	EnableBackup bool   // enable backup file
@@ -54,7 +47,7 @@ func DefaultDspConfig() *DspConfig {
 		MaxShareTask:         30,
 		FsRepoRoot:           "./FS",
 		FsFileRoot:           "/",
-		FsType:               FS_FILESTORE,
+		FsType:               0,
 		FsGcPeriod:           "1h",
 		FsMaxStorage:         "10G",
 		ChannelClientType:    "rpc",

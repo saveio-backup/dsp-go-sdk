@@ -1,105 +1,67 @@
 package dsp
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"os"
-	"runtime/debug"
-	"sync"
-	"time"
-
-	"github.com/gogo/protobuf/proto"
-	"github.com/saveio/dsp-go-sdk/actor/client"
-	"github.com/saveio/dsp-go-sdk/common"
-	"github.com/saveio/dsp-go-sdk/config"
-	dspErr "github.com/saveio/dsp-go-sdk/error"
-	netcom "github.com/saveio/dsp-go-sdk/network/common"
-	"github.com/saveio/dsp-go-sdk/network/message"
-	"github.com/saveio/dsp-go-sdk/network/message/types/block"
-	"github.com/saveio/dsp-go-sdk/network/message/types/file"
-	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
+	"github.com/saveio/dsp-go-sdk/consts"
+	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
-	"github.com/saveio/dsp-go-sdk/task"
-	"github.com/saveio/dsp-go-sdk/utils"
-	chainCom "github.com/saveio/themis/common"
+	"github.com/saveio/dsp-go-sdk/task/base"
+	"github.com/saveio/dsp-go-sdk/task/types"
+	"github.com/saveio/dsp-go-sdk/types/prefix"
 	"github.com/saveio/themis/common/log"
-	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 func (this *Dsp) AESEncryptFile(file, password, outputPath string) error {
-	return this.fs.AESEncryptFile(file, password, outputPath)
+	return this.Fs.AESEncryptFile(file, password, outputPath)
 }
 
 func (this *Dsp) GetFileNameWithPath(filePath string) string {
-	return this.taskMgr.GetFileNameWithPath(filePath)
+	return this.TaskMgr.GetFileNameWithPath(filePath)
 }
 
 func (this *Dsp) AESDecryptFile(file, prefix, password, outputPath string) error {
-	return this.fs.AESDecryptFile(file, prefix, password, outputPath)
+	return this.Fs.AESDecryptFile(file, prefix, password, outputPath)
 }
 
 func (this *Dsp) InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr string, profit uint64) error {
-	if this.shareRecordDB == nil {
-		return nil
-	}
-	return this.shareRecordDB.InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr, profit)
+	return this.TaskMgr.InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr, profit)
 }
 
 func (this *Dsp) IncreaseShareRecordProfit(id string, profit uint64) error {
-	if this.shareRecordDB == nil {
-		return nil
-	}
-	return this.shareRecordDB.IncreaseShareRecordProfit(id, profit)
+	return this.TaskMgr.IncreaseShareRecordProfit(id, profit)
 }
 
 func (this *Dsp) FindShareRecordById(id string) (*store.ShareRecord, error) {
-	if this.shareRecordDB == nil {
-		return nil, nil
-	}
-	return this.shareRecordDB.FindShareRecordById(id)
+	return this.TaskMgr.FindShareRecordById(id)
 }
+
 func (this *Dsp) FindShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit int64) (
 	[]*store.ShareRecord, int, error) {
-	if this.shareRecordDB == nil {
-		return nil, 0, nil
-	}
-	return this.shareRecordDB.FindShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit)
+	return this.TaskMgr.FindShareRecordsByCreatedAt(beginedAt, endedAt, offset, limit)
 }
+
 func (this *Dsp) FindLastShareTime(fileHash string) (uint64, error) {
-	if this.shareRecordDB == nil {
-		return 0, nil
-	}
-	return this.shareRecordDB.FindLastShareTime(fileHash)
+	return this.TaskMgr.FindLastShareTime(fileHash)
 }
+
 func (this *Dsp) CountRecordByFileHash(fileHash string) (uint64, error) {
-	if this.shareRecordDB == nil {
-		return 0, nil
-	}
-	return this.shareRecordDB.CountRecordByFileHash(fileHash)
+	return this.TaskMgr.CountRecordByFileHash(fileHash)
 }
+
 func (this *Dsp) SumRecordsProfit() (uint64, error) {
-	if this.shareRecordDB == nil {
-		return 0, nil
-	}
-	return this.shareRecordDB.SumRecordsProfit()
+	return this.TaskMgr.SumRecordsProfit()
 }
+
 func (this *Dsp) SumRecordsProfitByFileHash(fileHashStr string) (uint64, error) {
-	if this.shareRecordDB == nil {
-		return 0, nil
-	}
-	return this.shareRecordDB.SumRecordsProfitByFileHash(fileHashStr)
+	return this.TaskMgr.SumRecordsProfitByFileHash(fileHashStr)
 }
+
 func (this *Dsp) SumRecordsProfitById(id string) (uint64, error) {
-	if this.shareRecordDB == nil {
-		return 0, nil
-	}
-	return this.shareRecordDB.SumRecordsProfitById(id)
+	return this.TaskMgr.SumRecordsProfitById(id)
 }
 
 // IsFileEncrypted. read prefix of file to check it's encrypted or not
 func (this *Dsp) IsFileEncrypted(fullFilePath string) bool {
-	filePrefix, _, err := utils.GetPrefixFromFile(fullFilePath)
+	filePrefix, _, err := prefix.GetPrefixFromFile(fullFilePath)
 	if err != nil {
 		return false
 	}
@@ -110,186 +72,119 @@ func (this *Dsp) IsFileEncrypted(fullFilePath string) bool {
 // inOrder: if true, the file will be downloaded block by block in order
 // free: if true, query nodes who can share file free
 // maxPeeCnt: download with max number peers who provide file at the less price
-func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *common.DownloadOption) (err error) {
+func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *types.DownloadOption) (err error) {
 	// start a task
 	defer func() {
-		sdkErr, _ := err.(*dspErr.Error)
+		sdkErr, _ := err.(*sdkErr.Error)
 		if err != nil {
 			log.Errorf("download file %s err %s", fileHashStr, err)
 		}
 		log.Debugf("task %s has end, err %s", taskId, err)
 		if sdkErr != nil {
-			this.taskMgr.EmitResult(taskId, nil, sdkErr)
-			this.retryTaskTicker.Run()
+			this.TaskMgr.EmitDownloadResult(taskId, nil, sdkErr)
 		}
 		// delete task from cache in the end
-		if this.taskMgr.IsFileDownloaded(taskId) && sdkErr == nil {
-			this.taskMgr.EmitResult(taskId, "", nil)
-			this.taskMgr.DeleteTask(taskId)
+		if this.TaskMgr.IsFileDownloaded(taskId) && sdkErr == nil {
+			this.TaskMgr.EmitDownloadResult(taskId, "", nil)
+			this.TaskMgr.DeleteDownloadTask(taskId)
 		}
 	}()
 	if newTask {
-		taskId, err = this.taskMgr.NewTask(taskId, store.TaskTypeDownload)
+		downloadTask, err := this.TaskMgr.NewDownloadTask(taskId)
 		if err != nil {
 			return err
 		}
-		this.taskMgr.EmitProgress(taskId, task.TaskCreate)
+		taskId = downloadTask.GetId()
 	}
-	log.Debugf(" task %s is new task %t", taskId, newTask)
-	log.Debugf("download file id: %s, fileHash: %s, option: %v", taskId, fileHashStr, opt)
-	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileStart)
-	if err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
-		return err
+	downloadTask := this.TaskMgr.GetDownloadTask(taskId)
+	if downloadTask == nil {
+		return sdkErr.New(sdkErr.INTERNAL_ERROR, "task %s is nil", taskId)
 	}
+	if err := downloadTask.SetInfoWithOptions(
+		base.FileHash(fileHashStr),
+	); err != nil {
+		return sdkErr.New(sdkErr.INTERNAL_ERROR, "set file hash %s for task %s err %s",
+			fileHashStr, taskId, err)
+	}
+
+	log.Debugf("task %s is new task %t", taskId, newTask)
+
 	if len(fileHashStr) == 0 {
 		log.Errorf("taskId %s no filehash for download", taskId)
-		return dspErr.New(dspErr.DOWNLOAD_FILEHASH_NOT_FOUND, "no filehash for download")
+		return sdkErr.New(sdkErr.DOWNLOAD_FILEHASH_NOT_FOUND, "no filehash for download")
 	}
-	if this.dns.DNSNode == nil {
-		return dspErr.New(dspErr.NO_CONNECTED_DNS, "no online dns node")
-	}
-	log.Debugf("download file dns node %s %s", this.dns.DNSNode.WalletAddr, opt.Url)
-	// store task info
-	if err = this.taskMgr.SetTaskInfoWithOptions(taskId,
-		task.FileHash(fileHashStr),
-		task.BlocksRoot(opt.BlocksRoot),
-		task.FileName(opt.FileName),
-		task.FileOwner(opt.FileOwner),
-		task.Asset(opt.Asset),
-		task.DecryptPwd(opt.DecryptPwd),
-		task.Free(opt.Free),
-		task.SetFileName(opt.SetFileName),
-		task.MaxPeerCnt(opt.MaxPeerCnt),
-		task.Url(opt.Url),
-		task.Inorder(opt.InOrder),
-		task.FileSize(getFileSizeWithBlockCount(opt.BlockNum)),
-		task.Walletaddr(this.chain.WalletAddress())); err != nil {
-		return err
-	}
-	// bind task id to (file hash, wallet address)
-	if err = this.taskMgr.BindTaskId(taskId); err != nil {
-		return err
-	}
-	this.taskMgr.EmitProgress(taskId, task.TaskDownloadFileStart)
-	if stop, err := this.taskMgr.IsTaskStop(taskId); err != nil || stop {
-		return err
-	}
-	this.taskMgr.EmitProgress(taskId, task.TaskDownloadSearchPeers)
-	addrs, err := this.getPeersForDownload(fileHashStr)
-	if err != nil {
-		return err
-	}
-	log.Debugf("get addr from peer %v, hash %s", addrs, fileHashStr)
-	if opt.MaxPeerCnt > common.MAX_DOWNLOAD_PEERS_NUM {
-		opt.MaxPeerCnt = common.MAX_DOWNLOAD_PEERS_NUM
-	}
-	if stop, err := this.taskMgr.IsTaskStop(taskId); err != nil || stop {
-		return err
-	}
-	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
-	if err != nil {
-		return err
-	}
-	if err = this.downloadFileFromPeers(taskInfo, addrs); err != nil {
-		return err
-	}
-	return nil
+
+	err = downloadTask.Start(opt)
+	return err
 }
 
 func (this *Dsp) PauseDownload(taskId string) error {
-	tsk, ok := this.taskMgr.GetTaskById(taskId)
-	if !ok || tsk == nil {
-		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
+	tsk := this.TaskMgr.GetDownloadTask(taskId)
+	if tsk == nil {
+		return sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
 	if err := tsk.Pause(); err != nil {
-		return dspErr.NewWithError(dspErr.TASK_PAUSE_ERROR, err)
+		return sdkErr.NewWithError(sdkErr.TASK_PAUSE_ERROR, err)
 	}
-	this.taskMgr.EmitProgress(taskId, task.TaskPause)
 	return nil
 }
 
 func (this *Dsp) ResumeDownload(taskId string) error {
-	tsk, ok := this.taskMgr.GetTaskById(taskId)
-	if !ok || tsk == nil {
-		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
+	tsk := this.TaskMgr.GetDownloadTask(taskId)
+	if tsk == nil {
+		return sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
 	if err := tsk.Resume(); err != nil {
-		return dspErr.NewWithError(dspErr.TASK_RESUME_ERROR, err)
+		serr, _ := err.(*sdkErr.Error)
+		if serr != nil {
+			this.TaskMgr.EmitDownloadResult(taskId, nil, serr)
+		} else {
+			this.TaskMgr.EmitDownloadResult(taskId, nil, sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error()))
+		}
+		return sdkErr.NewWithError(sdkErr.TASK_RESUME_ERROR, err)
 	}
-	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
-	return this.resumeDownload(taskId)
+	return nil
 }
 
 func (this *Dsp) RetryDownload(taskId string) error {
-	if taskType, _ := this.taskMgr.GetTaskType(taskId); taskType != store.TaskTypeDownload {
-		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a download task", taskId)
-	}
-	tsk, ok := this.taskMgr.GetTaskById(taskId)
-	if !ok || tsk == nil {
-		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
+	tsk := this.TaskMgr.GetDownloadTask(taskId)
+	if tsk == nil {
+		return sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
 	if err := tsk.Retry(); err != nil {
-		return dspErr.NewWithError(dspErr.TASK_RETRY_ERROR, err)
+		serr, _ := err.(*sdkErr.Error)
+		if serr != nil {
+			this.TaskMgr.EmitDownloadResult(taskId, nil, serr)
+		} else {
+			this.TaskMgr.EmitDownloadResult(taskId, nil, sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error()))
+		}
+		return sdkErr.NewWithError(sdkErr.TASK_RETRY_ERROR, err)
 	}
-	this.taskMgr.EmitProgress(taskId, task.TaskDoing)
-	return this.resumeDownload(taskId)
+	return nil
 }
 
 func (this *Dsp) CancelDownload(taskId string) error {
-	if taskType, _ := this.taskMgr.GetTaskType(taskId); taskType != store.TaskTypeDownload {
-		return dspErr.New(dspErr.WRONG_TASK_TYPE, "task %s is not a download task", taskId)
+	tsk := this.TaskMgr.GetDownloadTask(taskId)
+	if tsk == nil {
+		return sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
-	cancel, err := this.taskMgr.IsTaskCancel(taskId)
-	if err != nil {
+	if err := tsk.Cancel(); err != nil {
 		return err
 	}
-	if cancel {
-		return fmt.Errorf("task is cancelling: %s", taskId)
-	}
-	fileHashStr, _ := this.taskMgr.GetTaskFileHash(taskId)
-	sessions, err := this.taskMgr.GetFileSessions(taskId)
-	if err != nil {
-		return err
-	}
-	if len(sessions) == 0 {
-		log.Debugf("no sessions to cancel")
-		err := this.DeleteDownloadedFile(taskId)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	log.Debugf("sessions %v", sessions)
-	// TODO: broadcast download cancel msg, need optimize
-	wg := sync.WaitGroup{}
-	for walletAddr, session := range sessions {
-		wg.Add(1)
-		go func(a string, ses *store.Session) {
-			msg := message.NewFileMsg(fileHashStr, netcom.FILE_OP_DOWNLOAD_CANCEL,
-				message.WithSessionId(ses.SessionId),
-				message.WithWalletAddress(this.chain.WalletAddress()),
-				message.WithAsset(int32(ses.Asset)),
-				message.WithSign(this.account),
-			)
-			client.P2pSend(a, msg.MessageId, msg.ToProtoMsg())
-			wg.Done()
-		}(walletAddr, session)
-	}
-	wg.Wait()
 	return this.DeleteDownloadedFile(taskId)
 }
 
 // DownloadFileByLink. download file by link, e.g oni://Qm...&name=xxx&tr=xxx
 func (this *Dsp) DownloadFileByLink(id, linkStr string, asset int32, inOrder bool, decryptPwd string,
 	free, setFileName bool, maxPeerCnt int) error {
-	link, err := this.dns.GetLinkValues(linkStr)
+	link, err := this.DNS.GetLinkValues(linkStr)
 	if err != nil {
 		return err
 	}
-	if maxPeerCnt > common.MAX_PEERCNT_FOR_DOWNLOAD {
-		maxPeerCnt = common.MAX_PEERCNT_FOR_DOWNLOAD
+	if maxPeerCnt > consts.MAX_PEERCNT_FOR_DOWNLOAD {
+		maxPeerCnt = consts.MAX_PEERCNT_FOR_DOWNLOAD
 	}
-	opt := &common.DownloadOption{
+	opt := &types.DownloadOption{
 		FileName:    link.FileName,
 		FileOwner:   link.FileOwner,
 		BlocksRoot:  link.BlocksRoot,
@@ -307,16 +202,16 @@ func (this *Dsp) DownloadFileByLink(id, linkStr string, asset int32, inOrder boo
 // DownloadFileByUrl. download file by link, e.g dsp://file1
 func (this *Dsp) DownloadFileByUrl(id, url string, asset int32, inOrder bool, decryptPwd string,
 	free, setFileName bool, maxPeerCnt int) error {
-	fileHashStr := this.dns.GetFileHashFromUrl(url)
-	link, err := this.dns.GetLinkValues(this.dns.GetLinkFromUrl(url))
+	fileHashStr := this.DNS.GetFileHashFromUrl(url)
+	link, err := this.DNS.GetLinkValues(this.DNS.GetLinkFromUrl(url))
 	if err != nil {
 		return err
 	}
-	if maxPeerCnt > common.MAX_PEERCNT_FOR_DOWNLOAD {
-		maxPeerCnt = common.MAX_PEERCNT_FOR_DOWNLOAD
+	if maxPeerCnt > consts.MAX_PEERCNT_FOR_DOWNLOAD {
+		maxPeerCnt = consts.MAX_PEERCNT_FOR_DOWNLOAD
 	}
 
-	opt := &common.DownloadOption{
+	opt := &types.DownloadOption{
 		FileName:    link.FileName,
 		BlocksRoot:  link.BlocksRoot,
 		Asset:       asset,
@@ -336,7 +231,7 @@ func (this *Dsp) DownloadFileByUrl(id, url string, asset int32, inOrder bool, de
 func (this *Dsp) DownloadFileByHash(id, fileHashStr string, asset int32, inOrder bool, decryptPwd string,
 	free, setFileName bool, maxPeerCnt int) error {
 	// TODO: get file name, fix url
-	info, _ := this.chain.GetFileInfo(fileHashStr)
+	info, _ := this.Chain.GetFileInfo(fileHashStr)
 	var fileName, fileOwner, blocksRoot string
 	var blockNum uint64
 	if info != nil {
@@ -345,10 +240,10 @@ func (this *Dsp) DownloadFileByHash(id, fileHashStr string, asset int32, inOrder
 		blocksRoot = string(info.BlocksRoot)
 		blockNum = info.FileBlockNum
 	}
-	if maxPeerCnt > common.MAX_PEERCNT_FOR_DOWNLOAD {
-		maxPeerCnt = common.MAX_PEERCNT_FOR_DOWNLOAD
+	if maxPeerCnt > consts.MAX_PEERCNT_FOR_DOWNLOAD {
+		maxPeerCnt = consts.MAX_PEERCNT_FOR_DOWNLOAD
 	}
-	opt := &common.DownloadOption{
+	opt := &types.DownloadOption{
 		FileName:    fileName,
 		Asset:       asset,
 		InOrder:     inOrder,
@@ -363,1575 +258,136 @@ func (this *Dsp) DownloadFileByHash(id, fileHashStr string, asset int32, inOrder
 	return this.downloadFileWithOpt(id, fileHashStr, opt)
 }
 
-// GetDownloadQuotation. get peers and the download price of the file. if free flag is set, return price-free peers.
-// taskInfo. task info data struct
-// opt. download options
-// map[string]*file.Payment ( wallet addr <=> payment )
-func (this *Dsp) GetDownloadQuotation(taskInfo *store.TaskInfo, addrs []string) (
-	map[string]*file.Payment, error) {
-	if len(addrs) == 0 {
-		return nil, dspErr.New(dspErr.NO_DOWNLOAD_SEED, "no peer for download")
-	}
-	// taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	sessions, err := this.taskMgr.GetFileSessions(taskInfo.Id)
-	if err != nil {
-		return nil, err
-	}
-	peerPayInfos := make(map[string]*file.Payment, 0)
-	if sessions != nil {
-		// use original sessions
-		log.Debugf("file %s is a breakpoint transfer task, use original sessions: %v",
-			taskInfo.FileHash, sessions)
-		oldSessionWg := new(sync.WaitGroup)
-		for _, session := range sessions {
-			peerPayInfos[session.WalletAddr] = &file.Payment{
-				WalletAddress: session.WalletAddr,
-				Asset:         int32(session.Asset),
-				UnitPrice:     session.UnitPrice,
-			}
-			this.taskMgr.SetSessionId(taskInfo.Id, session.WalletAddr, session.SessionId)
-			oldSessionWg.Add(1)
-			go func(sesHostAddr string) {
-				if err := client.P2pConnect(sesHostAddr); err != nil {
-					log.Errorf("connect %s err %s", sesHostAddr, err)
-				}
-				oldSessionWg.Done()
-			}(session.HostAddr)
-		}
-		oldSessionWg.Wait()
-		log.Debugf("get session from db: %v", peerPayInfos)
-		return peerPayInfos, nil
-	}
-	msg := message.NewFileMsg(taskInfo.FileHash, netcom.FILE_OP_DOWNLOAD_ASK,
-		message.WithWalletAddress(this.chain.WalletAddress()),
-		message.WithAsset(taskInfo.Asset),
-		message.WithSign(this.account),
-	)
-	blockHashes := make([]string, 0)
-	prefix := ""
-	replyLock := &sync.Mutex{}
-	nodeHostMap := make(map[string]string)
-	sessionIds := make(map[string]string)
-	log.Debugf("broadcast file download ask msg %s to %v for file %s",
-		msg.MessageId, addrs, taskInfo.FileHash)
-	reply := func(msg proto.Message, hostAddr string) bool {
-		replyLock.Lock()
-		defer replyLock.Unlock()
-		p2pMsg := message.ReadMessage(msg)
-		if p2pMsg.Error != nil {
-			log.Errorf("get download ask err %s from %s", p2pMsg.Error.Message, hostAddr)
-			return false
-		}
-		fileMsg := p2pMsg.Payload.(*file.File)
-		log.Debugf("receive file %s download ack msg from peer %s", fileMsg.Hash, hostAddr)
-		if len(fileMsg.BlockHashes) < len(blockHashes) {
-			return false
-		}
-		if len(prefix) > 0 && string(fileMsg.Prefix) != prefix {
-			return false
-		}
-
-		filePrefix := &utils.FilePrefix{}
-		filePrefix.Deserialize(fileMsg.Prefix)
-		if len(taskInfo.DecryptPwd) > 0 && !utils.VerifyEncryptPassword(taskInfo.DecryptPwd, filePrefix.EncryptSalt,
-			filePrefix.EncryptHash) {
-			log.Warnf("encrypt password not match hash")
-			return false
-		}
-
-		if taskInfo.Free && (fileMsg.PayInfo != nil && fileMsg.PayInfo.UnitPrice != 0) {
-			return false
-		}
-		// check block hashes valid
-		if utils.ComputeStringHashRoot(fileMsg.BlockHashes) != taskInfo.BlocksRoot {
-			return false
-		}
-		if len(blockHashes) == 0 {
-			blockHashes = fileMsg.BlockHashes
-		}
-		if len(prefix) == 0 {
-			prefix = string(fileMsg.Prefix)
-		}
-		nodeHostMap[fileMsg.PayInfo.WalletAddress] = hostAddr
-		log.Debugf("file %s, prefix %s, total %d, blockCnt %d",
-			fileMsg.Hash, fileMsg.Prefix, fileMsg.TotalBlockCount, len(blockHashes))
-		sessionIds[fileMsg.PayInfo.WalletAddress] = fileMsg.SessionId
-		peerPayInfos[fileMsg.PayInfo.WalletAddress] = fileMsg.PayInfo
-		return false
-	}
-	ret, err := client.P2pBroadcast(addrs, msg.ToProtoMsg(), msg.MessageId, reply)
-	log.Debugf("broadcast file download msg result %v err %s", ret, err)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Debugf("peer prices:%v", peerPayInfos)
-	if len(peerPayInfos) == 0 {
-		return nil, dspErr.New(dspErr.REMOTE_PEER_DELETE_FILE, "no source available")
-	}
-	if !this.taskMgr.TaskExist(taskInfo.Id) {
-		return nil, dspErr.New(dspErr.TASK_NOT_EXIST, "task not exist")
-	}
-	log.Debugf("get file total count :%d", taskInfo.TotalBlockCount)
-	// check has add file block hashes
-	if uint64(len(this.taskMgr.FileBlockHashes(taskInfo.Id))) == taskInfo.TotalBlockCount &&
-		taskInfo.TotalBlockCount != 0 {
-		return peerPayInfos, nil
-	}
-	// add file block hashes
-	log.Debugf("add file blockHashes task id %v hashes %s-%s, prefix %s, prefix len: %d",
-		taskInfo.Id, blockHashes[0], blockHashes[len(blockHashes)-1], prefix, len(prefix))
-	if err := this.taskMgr.AddFileBlockHashes(taskInfo.Id, blockHashes); err != nil {
-		return nil, err
-	}
-	totalBlockCount := len(blockHashes)
-	// update total block count and prefix
-	if err := this.taskMgr.SetTaskInfoWithOptions(taskInfo.Id,
-		task.Prefix(prefix),
-		task.NodeHostAddrs(nodeHostMap),
-		task.FileSize(getFileSizeWithBlockCount(uint64(totalBlockCount))),
-		task.TotalBlockCnt(uint64(totalBlockCount))); err != nil {
-		return nil, err
-	}
-	for peerWalletAddr, sessionId := range sessionIds {
-		sessionPeerPayInfo := peerPayInfos[peerWalletAddr]
-		if sessionPeerPayInfo == nil {
-			continue
-		}
-		if err := this.taskMgr.AddFileSession(taskInfo.Id, sessionId, peerWalletAddr, nodeHostMap[peerWalletAddr],
-			uint32(sessionPeerPayInfo.Asset), sessionPeerPayInfo.UnitPrice); err != nil {
-			return nil, err
-		}
-	}
-	return peerPayInfos, nil
-}
-
-// DepositChannelForFile. deposit channel. peerPrices: peer network address <=> payment info
-func (this *Dsp) DepositChannelForFile(fileHashStr string, peerPrices map[string]*file.Payment) error {
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	if !this.taskMgr.IsFileInfoExist(taskId) {
-		return dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "download info not exist")
-	}
-	if !this.config.AutoSetupDNSEnable {
-		return nil
-	}
-	totalCount, _ := this.taskMgr.GetFileTotalBlockCount(taskId)
-	log.Debugf("get blockhashes from %s, totalCount %d", taskId, totalCount)
-	if totalCount == 0 {
-		return dspErr.New(dspErr.NO_BLOCK_TO_DOWNLOAD, "no blocks")
-	}
-	totalAmount := common.FILE_DOWNLOAD_UNIT_PRICE * uint64(totalCount) * uint64(common.CHUNK_SIZE)
-	log.Debugf("deposit to channel price:%d, cnt:%d, chunksize:%d, total:%d",
-		common.FILE_DOWNLOAD_UNIT_PRICE, totalCount, common.CHUNK_SIZE, totalAmount)
-	if totalAmount/common.FILE_DOWNLOAD_UNIT_PRICE != uint64(totalCount)*uint64(common.CHUNK_SIZE) {
-		return dspErr.New(dspErr.INTERNAL_ERROR, "deposit amount overflow")
-	}
-	curBal, _ := this.channel.GetAvailableBalance(this.dns.DNSNode.WalletAddr)
-	if curBal >= totalAmount {
-		return nil
-	}
-	log.Debugf("depositing...")
-	if err := this.channel.SetDeposit(this.dns.DNSNode.WalletAddr, totalAmount); err != nil {
-		log.Debugf("deposit result %s", err)
-		return err
-	}
-	return nil
-}
-
-// PayForBlock. Pay for block with media transfer. PayInfo is some payment info of receiver,
-// addr is a host address of receiver.
-// BlockSize is the size to pay in KB. If newpayment flag is set, it is set to a new payment
-// and will accumulate to unpaid amount.
-// PaymentId, a unique id for payment, if it's zero. It will be generated by a random integer
-func (this *Dsp) PayForBlock(payInfo *file.Payment, fileHashStr string, blockSize uint64,
-	paymentId int32, newPayment bool) (int32, error) {
-	if payInfo == nil {
-		log.Warn("payinfo is nil")
-		return 0, nil
-	}
-	if payInfo.WalletAddress == this.chain.WalletAddress() {
-		return 0, dspErr.New(dspErr.PAY_BLOCK_TO_SELF, "can't pay to self : %s", payInfo.WalletAddress)
-	}
-	if this.dns == nil || this.dns.DNSNode == nil {
-		return 0, dspErr.New(dspErr.NO_CONNECTED_DNS, "no dns")
-	}
-	amount := blockSize * payInfo.UnitPrice
-	if amount/blockSize != payInfo.UnitPrice {
-		return 0, dspErr.New(dspErr.INTERNAL_ERROR, "total price overflow")
-	}
-	if amount == 0 {
-		log.Warn("pay amount is 0")
-		return 0, nil
-	}
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	if paymentId == 0 {
-		paymentId = this.channel.NewPaymentId()
-	}
-	if newPayment {
-		if err := this.taskMgr.AddFileUnpaid(taskId, payInfo.WalletAddress, paymentId, payInfo.Asset,
-			amount); err != nil {
-			return 0, err
-		}
-	}
-
-	if ok, _ := this.taskMgr.IsTaskPayOnLayer1(taskId); ok {
-		return this.FastTransfer(taskId, payInfo, paymentId, amount)
-	}
-
-	// use default dns to pay
-	if err := this.checkDNSState(this.dns.DNSNode.WalletAddr); err == nil {
-		log.Debugf("paying for file %s, to %s, id %v, use dns: %s",
-			fileHashStr, payInfo.WalletAddress, paymentId, this.dns.DNSNode.WalletAddr)
-		if err := this.channel.MediaTransfer(paymentId, amount, this.dns.DNSNode.WalletAddr,
-			payInfo.WalletAddress); err == nil {
-			// clean unpaid order
-			if err := this.taskMgr.DeleteFileUnpaid(taskId, payInfo.WalletAddress, paymentId,
-				payInfo.Asset, amount); err != nil {
-				return 0, err
-			}
-			log.Debugf("delete unpaid %d", amount)
-			// active peer to prevent pay too long
-			this.taskMgr.ActiveDownloadTaskPeer(payInfo.WalletAddress)
-			return paymentId, nil
-		} else {
-			this.taskMgr.ActiveDownloadTaskPeer(payInfo.WalletAddress)
-			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s",
-				paymentId, payInfo.WalletAddress, err)
-		}
-	}
-
-	// use other dns to pay
-	allCh, err := this.channel.AllChannels()
-	if err != nil {
-		return 0, err
-	}
-	paySuccess := false
-	for _, ch := range allCh.Channels {
-		if ch.Address == this.dns.DNSNode.WalletAddr {
-			continue
-		}
-		if err := this.checkDNSState(ch.Address); err == nil {
-			continue
-		}
-		log.Debugf("paying for file %s, to %s, id %v, use dns: %s", fileHashStr, payInfo.WalletAddress, paymentId, ch.Address)
-		if err := this.channel.MediaTransfer(paymentId, amount, ch.Address, payInfo.WalletAddress); err != nil {
-			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s", paymentId, payInfo.WalletAddress, err)
-			this.taskMgr.ActiveDownloadTaskPeer(payInfo.WalletAddress)
-			continue
-		}
-		this.taskMgr.ActiveDownloadTaskPeer(payInfo.WalletAddress)
-		paySuccess = true
-		log.Debugf("paying for file %s ,to %s, id %v success", fileHashStr, payInfo.WalletAddress, paymentId)
-		break
-	}
-	if !paySuccess {
-		_, err := this.FastTransfer(taskId, payInfo, paymentId, amount)
-		if err != nil {
-			return 0, fmt.Errorf("pay %d failed", paymentId)
-		}
-		this.taskMgr.SetPayOnLayer1(taskId, true)
-		return paymentId, nil
-	}
-	// clean unpaid order
-	if err := this.taskMgr.DeleteFileUnpaid(taskId, payInfo.WalletAddress, paymentId, payInfo.Asset,
-		amount); err != nil {
-		return 0, err
-	}
-	log.Debugf("delete unpaid %d", amount)
-	return paymentId, nil
-}
-
-func (this *Dsp) FastTransfer(taskId string, payInfo *file.Payment, paymentId int32, amount uint64) (int32, error) {
-	receiverAddr, err := chainCom.AddressFromBase58(payInfo.WalletAddress)
-	if err != nil {
-		return 0, err
-	}
-	txHash, err := this.chain.FastTransfer(uint64(paymentId), this.chain.Address(), receiverAddr, amount)
-	if err != nil {
-		return 0, err
-	}
-	txHeight, err := this.chain.PollForTxConfirmed(time.Duration(common.TX_CONFIRM_TIMEOUT)*time.Second, txHash)
-	if err != nil {
-		return 0, err
-	}
-
-	log.Debugf("task %s sending payment msg %v to %s, txHash: %s txHeight: %v",
-		taskId, paymentId, payInfo.WalletAddress, txHash, txHeight)
-	msg := message.NewPaymentMsg(
-		this.chain.WalletAddress(),
-		payInfo.WalletAddress,
-		paymentId,
-		common.ASSET_USDT,
-		amount,
-		txHash,
-		message.WithSign(this.account),
-	)
-	_, err = client.P2pSendAndWaitReply(payInfo.WalletAddress, msg.MessageId, msg.ToProtoMsg())
-	if err != nil {
-		return 0, err
-	}
-	log.Debugf("task %s sent fast transfer payment msg with paymentId %v", taskId, paymentId)
-	if err := this.taskMgr.DeleteFileUnpaid(taskId, payInfo.WalletAddress, paymentId,
-		payInfo.Asset, amount); err != nil {
-		return 0, err
-	}
-	log.Debugf("delete unpaid %d", amount)
-	// active peer to prevent pay too long
-	this.taskMgr.ActiveDownloadTaskPeer(payInfo.WalletAddress)
-	return paymentId, nil
-}
-
-// PayUnpaidFile. pay unpaid order for file
-func (this *Dsp) PayUnpaidPayments(taskId, fileHashStr string, quotation map[string]*file.Payment) error {
-	for _, payInfo := range quotation {
-		payments, _ := this.taskMgr.GetUnpaidPayments(taskId, payInfo.WalletAddress, payInfo.Asset)
-		if len(payments) == 0 {
-			continue
-		}
-		log.Debugf("task %s, file %s ,unpaid amount %v", taskId, fileHashStr, len(payments))
-		for _, payment := range payments {
-			log.Debugf("pay to %s of the unpaid amount %d for task %s", payInfo.WalletAddress, payment.Amount, taskId)
-			this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocks)
-			_, err := this.PayForBlock(payInfo, fileHashStr, payment.Amount/payInfo.UnitPrice,
-				payment.PaymentId, false)
-			if err != nil {
-				log.Errorf("pay unpaid payment err %s", err)
-				this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksFailed)
-			} else {
-				this.taskMgr.EmitProgress(taskId, task.TaskDownloadPayForBlocksDone)
-			}
-		}
-	}
-	return nil
-}
-
-// DownloadFileWithQuotation. download file, piece by piece from addrs.
-// inOrder: if true, the file will be downloaded block by block in order
-func (this *Dsp) DownloadFileWithQuotation(taskInfo *store.TaskInfo, quotation map[string]*file.Payment) error {
-	// task exist at runtime
-	if len(quotation) == 0 {
-		return dspErr.New(dspErr.GET_DOWNLOAD_INFO_FAILED_FROM_PEERS,
-			"no peer quotation for download: %s", taskInfo.FileHash)
-	}
-	if taskInfo == nil {
-		return dspErr.New(dspErr.FILEINFO_NOT_EXIST, "download info not exist")
-	}
-	if !this.taskMgr.IsFileInfoExist(taskInfo.Id) {
-		return dspErr.New(dspErr.FILEINFO_NOT_EXIST, "download info not exist: %s", taskInfo.FileHash)
-	}
-	// pay unpaid order of the file after last download
-	if err := this.PayUnpaidPayments(taskInfo.Id, taskInfo.FileHash, quotation); err != nil {
-		return dspErr.NewWithError(dspErr.PAY_UNPAID_BLOCK_FAILED, err)
-	}
-	if stop, err := this.taskMgr.IsTaskStop(taskInfo.Id); err != nil || stop {
-		return err
-	}
-	// TODO: new download logic
-	peerAddrWallet := make([]string, 0)
-	wg := sync.WaitGroup{}
-	for _, payInfo := range quotation {
-		wg.Add(1)
-		sessionId, err := this.taskMgr.GetSessionId(taskInfo.Id, payInfo.WalletAddress)
-		if err != nil {
-			continue
-		}
-		peerAddrWallet = append(peerAddrWallet, payInfo.WalletAddress)
-		go func(walletAddr string) {
-			msg := message.NewFileMsg(taskInfo.FileHash, netcom.FILE_OP_DOWNLOAD,
-				message.WithSessionId(sessionId),
-				message.WithWalletAddress(this.chain.WalletAddress()),
-				message.WithAsset(taskInfo.Asset),
-				message.WithSign(this.account),
-			)
-			log.Debugf("broadcast file_download msg to %v", walletAddr)
-			hostAddr, err := client.P2pGetHostAddrFromWalletAddr(walletAddr, client.P2pNetTypeDsp)
-			if err != nil {
-				log.Errorf("get host addr failed %s", err)
-			}
-			broadcastRet, err := client.P2pBroadcast([]string{hostAddr}, msg.ToProtoMsg(), msg.MessageId)
-			log.Debugf("brocast file download msg %v err %v", broadcastRet, err)
-			wg.Done()
-		}(payInfo.WalletAddress)
-	}
-	wg.Wait()
-	blockHashes := this.taskMgr.FileBlockHashes(taskInfo.Id)
-	log.Debugf("filehashstr:%v, blockhashes-len:%v, prefix:%s", taskInfo.FileHash, len(blockHashes), taskInfo.Prefix)
-	fullFilePath := taskInfo.FilePath
-	if len(fullFilePath) == 0 {
-		if taskInfo.SetFileName {
-			fullFilePath = utils.GetFileFullPath(this.config.FsFileRoot, taskInfo.FileHash, taskInfo.FileName,
-				utils.GetPrefixEncrypted(taskInfo.Prefix))
-		} else {
-			fullFilePath = utils.GetFileFullPath(this.config.FsFileRoot, taskInfo.FileHash, "",
-				utils.GetPrefixEncrypted(taskInfo.Prefix))
-		}
-		log.Debugf("get fullFilePath of id :%s, filehashstr %s, filename %s,  path %s",
-			taskInfo.Id, taskInfo.FileHash, taskInfo.FileName, fullFilePath)
-		if err := this.taskMgr.SetFilePath(taskInfo.Id, fullFilePath); err != nil {
-			return err
-		}
-	}
-	if stop, err := this.taskMgr.IsTaskStop(taskInfo.Id); err != nil || stop {
-		return err
-	}
-	this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadFileDownloading)
-	// declare job for workers
-	job := func(tId, fHash, walletAddr string, blocks []*block.Block) ([]*task.BlockResp, error) {
-		if stop, err := this.taskMgr.IsTaskStop(tId); err != nil || stop {
-			log.Debugf("stop download task %s", tId)
-			return nil, err
-		}
-		// if state
-		this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadRequestBlocks)
-		startedAt := utils.GetMilliSecTimestamp()
-		resp, err := this.downloadBlockFlights(tId, fHash, walletAddr, blocks, 1,
-			common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT)
-		if err != nil {
-			this.taskMgr.UpdateTaskPeerSpeed(taskInfo.Id, walletAddr, 0)
-			return nil, err
-		}
-		if resp == nil || len(resp) == 0 {
-			this.taskMgr.UpdateTaskPeerSpeed(taskInfo.Id, walletAddr, 0)
-			return nil, dspErr.New(dspErr.DOWNLOAD_BLOCK_FAILED, "download blocks is nil %s from  %s, err %s",
-				fHash, walletAddr, err)
-		}
-		this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadReceiveBlocks)
-		payInfo := quotation[walletAddr]
-		var totalBytes int
-		for _, v := range resp {
-			totalBytes += len(v.Block)
-		}
-		if totalBytes == 0 {
-			return nil, dspErr.New(dspErr.DOWNLOAD_BLOCK_FAILED, "request total bytes count 0")
-		}
-		endedAt := utils.GetMilliSecTimestamp()
-		speed := uint64(totalBytes)
-		if endedAt > startedAt {
-			speed = uint64(totalBytes) / (endedAt - startedAt)
-		}
-		this.taskMgr.UpdateTaskPeerSpeed(taskInfo.Id, walletAddr, speed)
-		this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadPayForBlocks)
-		log.Debugf("download block of file %s-%s-%d to %s-%s-%d from %s success, start paying to it, "+
-			"size is %d speed: %d", fHash, resp[0].Hash, resp[0].Index,
-			fHash, resp[len(resp)-1].Hash, resp[len(resp)-1].Index, walletAddr, totalBytes, speed)
-		this.taskMgr.SetWorkerUnpaid(tId, walletAddr, true)
-		paymentId, err := this.PayForBlock(payInfo, fHash, uint64(totalBytes), resp[0].PaymentId, true)
-		if err != nil {
-			log.Errorf("pay for blocks err %s", err)
-			this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadPayForBlocksFailed)
-			return nil, dspErr.New(dspErr.PAY_UNPAID_BLOCK_FAILED, err.Error())
-		}
-		this.taskMgr.SetWorkerUnpaid(tId, walletAddr, false)
-		this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadPayForBlocksDone)
-		log.Debugf("pay for block: %s to %s, wallet: %s success, paymentId: %d",
-			fHash, walletAddr, paymentId)
-		return resp, nil
-	}
-	this.taskMgr.NewWorkers(taskInfo.Id, peerAddrWallet, taskInfo.InOrder, job)
-	go this.taskMgr.WorkBackground(taskInfo.Id)
-	log.Debugf("start download file in order %t", taskInfo.InOrder)
-	if !taskInfo.InOrder {
-		if err := this.receiveBlockNoOrder(taskInfo.Id, peerAddrWallet); err != nil {
-			log.Debugf("stack %s", debug.Stack())
-			return err
-		}
-		log.Debugf("will check file hash task id %s, file hash %s, downloaded %t",
-			taskInfo.Id, taskInfo.FileHash, this.taskMgr.IsFileDownloaded(taskInfo.Id))
-		if this.IsClient() && this.taskMgr.IsFileDownloaded(taskInfo.Id) && !utils.GetPrefixEncrypted(taskInfo.Prefix) {
-			this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadCheckingFile)
-			checkFileList, err := this.fs.NodesFromFile(fullFilePath, string(taskInfo.Prefix), false, "")
-			if err != nil {
-				return err
-			}
-			log.Debugf("checking file hash %s", checkFileList[0])
-			if len(checkFileList) == 0 || checkFileList[0] != taskInfo.FileHash {
-				this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadCheckingFileFailed)
-				err = dspErr.New(dspErr.CHECK_FILE_FAILED, "file hash not match")
-				return err
-			}
-			this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadCheckingFileDone)
-		}
-		if len(taskInfo.DecryptPwd) == 0 {
-			return nil
-		}
-		log.Debugf("decrypt task %s file with pwd %s", taskInfo.Id, taskInfo.DecryptPwd)
-		if err := this.decryptDownloadedFile(taskInfo.Id); err != nil {
-			return err
-		}
-		return nil
-	}
-	// TODO: support in-order download
-	return nil
-}
-
 // DeleteDownloadedFile. Delete downloaded file in local.
 func (this *Dsp) DeleteDownloadedFile(taskId string) error {
-	if len(taskId) == 0 {
-		return dspErr.New(dspErr.DELETE_FILE_FAILED, "delete taskId is empty")
-	}
-	filePath, _ := this.taskMgr.GetFilePath(taskId)
-	fileHashStr, _ := this.taskMgr.GetTaskFileHash(taskId)
-	err := this.fs.DeleteFile(fileHashStr, filePath)
-	if err != nil {
-		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHashStr, filePath, err)
-		return err
-	}
-	log.Debugf("delete local file success fileHash:%s, path:%s", fileHashStr, filePath)
-	return this.taskMgr.CleanTask(taskId)
+	return this.TaskMgr.DeleteDownloadedFile(taskId)
 }
 
 // DeleteDownloadedLocalFile. Delete file in local.
 func (this *Dsp) DeleteDownloadedLocalFile(fileHash string) error {
-	taskId, _ := this.taskMgr.GetDownloadedTaskId(fileHash)
+	taskId := this.TaskMgr.GetDownloadedTaskId(fileHash, this.Chain.WalletAddress())
 	if len(fileHash) == 0 {
-		return dspErr.New(dspErr.DELETE_FILE_FAILED, "delete filehash is empty")
+		return sdkErr.New(sdkErr.DELETE_FILE_FAILED, "delete filehash is empty")
 	}
-	if len(taskId) == 0 {
-		return dspErr.New(dspErr.DELETE_FILE_FAILED, "delete taskId is empty")
-	}
-	tsk, err := this.taskMgr.GetTaskInfoCopy(taskId)
-	if err != nil {
-		return dspErr.NewWithError(dspErr.DELETE_FILE_FAILED, err)
-	}
-	if err := this.fs.DeleteFile(fileHash, tsk.FilePath); err != nil {
-		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHash, tsk.FilePath, err)
-		return err
-	}
-	log.Debugf("delete local file success fileHash:%s, path:%s", fileHash, tsk.FilePath)
-	return this.taskMgr.CleanTask(taskId)
-}
-
-// StartBackupFileService. start a backup file service to find backup jobs.
-func (this *Dsp) StartBackupFileService() {
-	backupingCnt := 0
-	ticker := time.NewTicker(time.Duration(common.BACKUP_FILE_DURATION) * time.Second)
-	backupFailedMap := make(map[string]int)
-	for {
-		select {
-		case <-ticker.C:
-			if !this.Running() {
-				log.Debugf("stop backup file service")
-				ticker.Stop()
-				return
-			}
-			if this.chain == nil {
-				break
-			}
-			tasks, err := this.chain.GetExpiredProveList()
-			if err != nil || tasks == nil || len(tasks.Tasks) == 0 {
-				break
-			}
-			log.Debugf("get %d task to back up", len(tasks.Tasks))
-			if backupingCnt > 0 {
-				log.Debugf("doing backup jobs %d", backupingCnt)
-				break
-			}
-			// TODO: optimize with parallel download
-			for _, t := range tasks.Tasks {
-				addrCheckFailed := (t.LuckyAddr.ToBase58() != this.WalletAddress()) ||
-					(t.BackUpAddr.ToBase58() == this.WalletAddress()) ||
-					(t.BrokenAddr.ToBase58() == this.WalletAddress()) ||
-					(t.BrokenAddr.ToBase58() == t.BackUpAddr.ToBase58())
-				if addrCheckFailed {
-					continue
-				}
-				if len(t.FileHash) == 0 || len(t.BakSrvAddr) == 0 || len(t.BackUpAddr.ToBase58()) == 0 {
-					continue
-				}
-				if v, ok := backupFailedMap[string(t.FileHash)]; ok && v >= common.MAX_BACKUP_FILE_FAILED {
-					log.Debugf("skip backup this file, because has failed")
-					continue
-				}
-				backupingCnt++
-				log.Debugf("go backup file:%s, from backup svr addr:%s, backupWalletAddr: %s,"+
-					"brokenAddr: %s, luckyWalletAddr: %s, luckyIndex: %d",
-					t.FileHash, t.BakSrvAddr, t.BackUpAddr.ToBase58(), t.BrokenAddr.ToBase58(),
-					t.LuckyAddr.ToBase58(), t.LuckyNum)
-				fileInfo, err := this.chain.GetFileInfo(string(t.FileHash))
-				if err != nil {
-					continue
-				}
-				if err = this.backupFileFromPeer(fileInfo, string(t.BakSrvAddr), t.LuckyNum,
-					t.BakHeight, t.BakNum, t.BrokenAddr); err != nil {
-					backupFailedMap[string(t.FileHash)]++
-					continue
-				}
-			}
-			log.Debugf("finish backup one round")
-			// reset
-			backupingCnt = 0
-		}
-	}
-}
-
-// StartCheckRemoveFiles. check to remove files after prove PDP done
-func (this *Dsp) StartCheckRemoveFiles() {
-	log.Debugf("StartCheckRemoveFiles ")
-	ticker := time.NewTicker(time.Duration(common.REMOVE_FILES_DURATION) * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			if !this.Running() {
-				log.Debugf("stop check remove files service")
-				ticker.Stop()
-				return
-			}
-			files := this.fs.RemovedExpiredFiles()
-			if len(files) == 0 {
-				continue
-			}
-			for _, f := range files {
-				hash, ok := f.(string)
-				if !ok {
-					continue
-				}
-				taskId := this.taskMgr.TaskId(hash, this.chain.WalletAddress(), store.TaskTypeDownload)
-				log.Debugf("delete removed file %s %s", taskId, hash)
-				this.DeleteDownloadedFile(taskId)
-			}
-		}
-	}
+	return this.TaskMgr.DeleteDownloadedFile(taskId)
 }
 
 // AllDownloadFiles. get all downloaded file names
 func (this *Dsp) AllDownloadFiles() ([]*store.TaskInfo, []string, error) {
-	return this.taskMgr.AllDownloadFiles()
+	return this.TaskMgr.AllDownloadFiles()
 }
 
 func (this *Dsp) DownloadedFileInfo(fileHashStr string) (*store.TaskInfo, error) {
 	// my task. use my wallet address
-	fileInfoKey := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	return this.taskMgr.GetFileInfo(fileInfoKey)
-}
-
-// checkDNSState. check the p2p state of a dns
-func (this *Dsp) checkDNSState(dnsWalletAddr string) error {
-	exist, err := client.P2pConnectionExist(dnsWalletAddr, client.P2pNetTypeChannel)
-	if exist && err == nil {
-		return nil
-	}
-	log.Debugf("DNS connection not exist reconnect...")
-	if err = client.P2pReconnectPeer(dnsWalletAddr, client.P2pNetTypeChannel); err != nil {
-		return err
-	}
-	if err = client.P2pWaitForConnected(dnsWalletAddr,
-		time.Duration(common.WAIT_CHANNEL_CONNECT_TIMEOUT)); err != nil {
-		return err
-	}
-	return nil
+	return this.TaskMgr.GetDownloadTaskInfoByFileHash(fileHashStr), nil
 }
 
 // downloadFileWithOpt. internal helper, download or resume file with hash and options
-func (this *Dsp) downloadFileWithOpt(id string, fileHashStr string, opt *common.DownloadOption) error {
+func (this *Dsp) downloadFileWithOpt(taskId string, fileHashStr string, opt *types.DownloadOption) error {
 	if len(opt.FileName) == 0 {
 		// TODO: get file name from chain if the file exists on chain
-		info, _ := this.chain.GetFileInfo(fileHashStr)
+		info, _ := this.Chain.GetFileInfo(fileHashStr)
 		if info != nil {
 			opt.FileName = string(info.FileDesc)
 			opt.BlocksRoot = string(info.BlocksRoot)
 			opt.FileOwner = string(info.FileOwner.ToBase58())
 		}
 	}
-	taskId := id
-	if len(taskId) == 0 {
-		taskId = this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	}
-	if !this.taskMgr.TaskExist(taskId) {
+
+	downloadTask := this.TaskMgr.GetDownloadTaskByFileHash(fileHashStr)
+	if downloadTask == nil {
+		// task is not downloading
 		if len(taskId) > 0 {
-			log.Debugf("task not exist in memory, but has downloaded, start a new download task of id: %s, file %s",
+			log.Debugf("start a new download task of id: %s, file %s",
 				taskId, fileHashStr)
 		} else {
 			log.Debugf("start a new download task of file %s", fileHashStr)
 		}
-		return this.DownloadFile(true, id, fileHashStr, opt)
+		return this.DownloadFile(true, taskId, fileHashStr, opt)
 	}
-	if taskDone, _ := this.taskMgr.IsTaskDone(taskId); taskDone {
-		log.Debugf("task has done, start a new download task of id: %s, file %s", taskId, fileHashStr)
-		return this.DownloadFile(true, id, fileHashStr, opt)
+
+	// task is downloading
+	if downloadTask.IsTaskDone() {
+		log.Debugf("download task %s has done, start a new download task of id: %s, file %s",
+			downloadTask.GetId(), taskId, fileHashStr)
+		return this.DownloadFile(true, taskId, fileHashStr, opt)
 	}
-	if taskPreparing, taskDoing, _ := this.taskMgr.IsTaskPreparingOrDoing(taskId); taskPreparing || taskDoing {
-		return dspErr.New(dspErr.DOWNLOAD_REFUSED, "task exists, and it is preparing or doing")
+	if taskPreparing, taskDoing := downloadTask.IsTaskPreparingOrDoing(); taskPreparing || taskDoing {
+		return sdkErr.New(sdkErr.DOWNLOAD_REFUSED, "task exists, and it is preparing or doing")
 	}
 	log.Debugf("task exists, resume the download task of id: %s, file %s", taskId, fileHashStr)
 	return this.DownloadFile(false, taskId, fileHashStr, opt)
 }
 
-// getPeersForDownload. get peers for download from tracker and fs contract
-func (this *Dsp) getPeersForDownload(fileHashStr string) ([]string, error) {
-	addrs := this.dns.GetPeerFromTracker(fileHashStr, this.dns.TrackerUrls)
-	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.dns.TrackerUrls)
-	if len(addrs) > 0 {
-		return addrs, nil
-	}
-	log.Warnf("get 0 peer from tracker of file %s, tracker num %d", fileHashStr, len(this.dns.TrackerUrls))
-	addrs = this.getFileProvedNode(fileHashStr)
-	if len(addrs) > 0 {
-		return addrs, nil
-	}
-	return nil, dspErr.New(dspErr.NO_DOWNLOAD_SEED, "No peer for downloading the file %s", fileHashStr)
-}
-
-func (this *Dsp) resumeDownload(taskId string) error {
-	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
-	if err != nil {
-		sdkErr, _ := err.(*dspErr.Error)
-		if sdkErr != nil {
-			this.taskMgr.EmitResult(taskId, nil, sdkErr)
-		} else {
-			this.taskMgr.EmitResult(taskId, nil, dspErr.New(dspErr.INTERNAL_ERROR, err.Error()))
-		}
-		this.retryTaskTicker.Run()
-		return err
-	}
-	if taskInfo == nil {
-		sdkErr := dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "can't find download options, please retry")
-		this.taskMgr.EmitResult(taskId, nil, sdkErr)
-		this.retryTaskTicker.Run()
-		return sdkErr
-	}
-	if len(taskInfo.FileHash) == 0 {
-		sdkErr := dspErr.New(dspErr.GET_FILEINFO_FROM_DB_ERROR, "filehash not found %s", taskId)
-		this.taskMgr.EmitResult(taskId, nil, sdkErr)
-		this.retryTaskTicker.Run()
-		return sdkErr
-	}
-	log.Debugf("resume download file %s", taskId)
-	opt := &common.DownloadOption{
-		FileName:    taskInfo.FileName,
-		FileOwner:   taskInfo.FileOwner,
-		BlocksRoot:  taskInfo.BlocksRoot,
-		Asset:       taskInfo.Asset,
-		InOrder:     taskInfo.InOrder,
-		DecryptPwd:  taskInfo.DecryptPwd,
-		Free:        taskInfo.Free,
-		SetFileName: taskInfo.SetFileName,
-		MaxPeerCnt:  taskInfo.MaxPeerCnt,
-		Url:         taskInfo.Url,
-		BlockNum:    taskInfo.TotalBlockCount,
-	}
-	// TODO: record original workers
-	go this.DownloadFile(false, taskId, taskInfo.FileHash, opt)
-	return nil
-}
-
-// receiveBlockNoOrder. receive blocks in order
-func (this *Dsp) receiveBlockNoOrder(taskId string, peerAddrWallet []string) error {
-	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
-	if err != nil || taskInfo == nil {
-		return dspErr.New(dspErr.FILEINFO_NOT_EXIST, "task info is nil")
-	}
-	if this.taskMgr.IsFileDownloaded(taskInfo.Id) {
-		log.Debugf("task %s, file %s has downloaded", taskInfo.Id, taskInfo.FileHash)
-		return nil
-	}
-	if err := this.addDownloadBlockReq(taskInfo.Id, taskInfo.FileHash); err != nil {
-		return dspErr.NewWithError(dspErr.GET_UNDOWNLOADED_BLOCK_FAILED, err)
-	}
-	hasCutPrefix := false
-	prefix := string(taskInfo.Prefix)
-	if len(prefix) == 0 {
-		log.Warnf("task %s file prefix is empty", taskId)
-	}
-	isFileEncrypted := utils.GetPrefixEncrypted(taskInfo.Prefix)
-	var file *os.File
-	if this.config.FsType == config.FS_FILESTORE {
-		var createFileErr error
-		file, createFileErr = createDownloadFile(this.config.FsFileRoot, taskInfo.FilePath)
-		if createFileErr != nil {
-			return dspErr.NewWithError(dspErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
-		}
-		defer func() {
-			if err := file.Close(); err != nil {
-				log.Errorf("close file err %s", err)
-			}
-		}()
-	}
-	if file == nil {
-		return dspErr.New(dspErr.CREATE_DOWNLOAD_FILE_FAILED, "create file failed")
-	}
-	stateCheckTicker := time.NewTicker(time.Duration(common.TASK_STATE_CHECK_DURATION) * time.Second)
-	defer stateCheckTicker.Stop()
-	for {
-		select {
-		case value, ok := <-this.taskMgr.TaskNotify(taskInfo.Id):
-			if !ok {
-				return dspErr.New(dspErr.DOWNLOAD_BLOCK_FAILED, "download internal error")
-			}
-			if stop, err := this.taskMgr.IsTaskStop(taskInfo.Id); err != nil || stop {
-				log.Debugf("stop download task %s", taskInfo.Id)
-				return err
-			}
-			log.Debugf("received block %s-%s-%d from %s", taskInfo.FileHash, value.Hash, value.Index, value.PeerAddr)
-			if this.taskMgr.IsBlockDownloaded(taskInfo.Id, value.Hash, uint64(value.Index)) &&
-				!this.taskMgr.IsFileDownloaded(taskInfo.Id) {
-				log.Debugf("%s-%s-%d is downloaded", taskInfo.FileHash, value.Hash, value.Index)
-				continue
-			}
-			block := this.fs.EncodedToBlockWithCid(value.Block, value.Hash)
-			links, err := this.fs.GetBlockLinks(block)
-			if err != nil {
-				return err
-			}
-			if block.Cid().String() != value.Hash {
-				log.Warnf("receive a unmatched hash block %s %s", block.Cid().String(), value.Hash)
-			}
-			if block.Cid().String() == taskInfo.FileHash && this.config.FsType == config.FS_FILESTORE {
-				if !isFileEncrypted {
-					this.fs.SetFsFilePrefix(taskInfo.FilePath, prefix)
-				} else {
-					this.fs.SetFsFilePrefix(taskInfo.FilePath, "")
-				}
-			}
-			if len(links) == 0 && this.config.FsType == config.FS_FILESTORE {
-				data := this.fs.BlockData(block)
-				// cut prefix
-				// TEST: why not use filesize == 0
-				if !isFileEncrypted && !hasCutPrefix && len(data) >= len(prefix) &&
-					string(data[:len(prefix)]) == prefix {
-					log.Debugf("cut prefix data-len %d, prefix %s, prefix-len: %d, str %s",
-						len(data), prefix, len(prefix), string(data[:len(prefix)]))
-					data = data[len(prefix):]
-					hasCutPrefix = true
-				}
-				// TEST: offset
-				writeAtPos := value.Offset
-				if value.Offset > 0 && !isFileEncrypted {
-					writeAtPos = value.Offset - int64(len(prefix))
-				}
-				log.Debugf("file %s append block %s index %d, the block data length %d, offset %v, pos %d",
-					taskInfo.FileHash, value.Index,
-					block.Cid().String(), len(data), value.Offset, writeAtPos)
-				if _, err := file.WriteAt(data, writeAtPos); err != nil {
-					return dspErr.NewWithError(dspErr.WRITE_FILE_DATA_FAILED, err)
-				}
-			}
-			if this.config.FsType == config.FS_FILESTORE {
-				err = this.fs.PutBlockForFileStore(taskInfo.FilePath, block, uint64(value.Offset))
-				log.Debugf("put block for store err %v", err)
-			} else {
-				err = this.fs.PutBlock(block)
-				if err != nil {
-					return err
-				}
-				log.Debugf("block %s value.index %d, value.tag:%d", block.Cid(), value.Index, len(value.Tag))
-				err = this.fs.PutTag(block.Cid().String(), taskInfo.FileHash, uint64(value.Index), value.Tag)
-			}
-			log.Debugf("put block for file %s block: %s, offset:%d", taskInfo.FilePath, block.Cid(), value.Offset)
-			if err != nil {
-				log.Errorf("put block err %s", err)
-				return err
-			}
-			if err := this.taskMgr.SetBlockDownloaded(taskInfo.Id, value.Hash, value.PeerAddr, value.Index,
-				value.Offset, links); err != nil {
-				return err
-			}
-			this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadFileDownloading)
-			log.Debugf("%s-%s-%d set downloaded", taskInfo.FileHash, value.Hash, value.Index)
-			poolLen, err := this.taskMgr.GetBlockReqPoolLen(taskInfo.Id)
-			if err != nil {
-				return err
-			}
-			if poolLen != 0 {
-				continue
-			}
-			if !this.taskMgr.IsFileDownloaded(taskInfo.Id) {
-				continue
-			}
-			log.Debugf("file has downloaded: %t, last block index: %d",
-				this.taskMgr.IsFileDownloaded(taskInfo.Id), value.Index)
-			// last block
-			this.taskMgr.SetTaskState(taskInfo.Id, store.TaskStateDone)
-			break
-		case <-stateCheckTicker.C:
-			if stop, err := this.taskMgr.IsTaskStop(taskInfo.Id); err != nil || stop {
-				log.Debugf("stop download task %s", taskInfo.Id)
-				return err
-			}
-			if timeout, _ := this.taskMgr.IsTaskTimeout(taskInfo.Id); !timeout {
-				continue
-			}
-			if this.taskMgr.IsFileDownloaded(taskInfo.Id) {
-				log.Warnf("task %s is timeout but file has downloed", taskInfo.Id)
-				break
-			}
-			// this.taskMgr.SetTaskState(taskInfo.Id, store.TaskStateFailed)
-			workerState := this.taskMgr.GetTaskWorkerState(taskInfo.Id)
-			for addr, state := range workerState {
-				log.Debugf("download timeout worker addr: %s, working : %t, unpaid: %t, totalFailed %v",
-					addr, state.Working, state.Unpaid, state.TotalFailed)
-			}
-			if paidFail, _ := this.taskMgr.AllPeerPaidFailed(taskInfo.Id); paidFail {
-				log.Errorf("Download file %s failed, pay failed to all peers", taskInfo.Id)
-				return dspErr.New(dspErr.DOWNLOAD_FILE_TIMEOUT, "Download file failed, pay failed to all peers")
-			}
-			return dspErr.New(dspErr.DOWNLOAD_FILE_TIMEOUT, "Download file timeout")
-		}
-		done, err := this.taskMgr.IsTaskDone(taskInfo.Id)
-		if err != nil {
-			return err
-		}
-		if done {
-			log.Debugf("download task is done")
-			break
-		}
-	}
-	this.taskMgr.EmitProgress(taskInfo.Id, task.TaskDownloadFileMakeSeed)
-	go this.dns.PushToTrackers(taskInfo.FileHash, this.dns.TrackerUrls, client.P2pGetPublicAddr())
-	for _, walletAddr := range peerAddrWallet {
-		sessionId, err := this.taskMgr.GetSessionId(taskInfo.Id, walletAddr)
-		if err != nil {
-			continue
-		}
-		go func(w, sid string) {
-			fileDownloadOkMsg := message.NewFileMsg(taskInfo.FileHash, netcom.FILE_OP_DOWNLOAD_OK,
-				message.WithSessionId(sid),
-				message.WithWalletAddress(this.chain.WalletAddress()),
-				message.WithAsset(taskInfo.Asset),
-				message.WithSign(this.account),
-			)
-			hostAddr, err := client.P2pGetHostAddrFromWalletAddr(w, client.P2pNetTypeDsp)
-			if err != nil {
-				log.Errorf("get host addr failed %s", err)
-			}
-			client.P2pBroadcast([]string{hostAddr}, fileDownloadOkMsg.ToProtoMsg(), fileDownloadOkMsg.MessageId)
-		}(walletAddr, sessionId)
-	}
-	return nil
-}
-
-func (this *Dsp) decryptDownloadedFile(taskId string) error {
-	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
-	if err != nil || taskInfo == nil {
-		return dspErr.New(dspErr.FILEINFO_NOT_EXIST, "task %s not exist", taskId)
-	}
-	if len(taskInfo.DecryptPwd) == 0 {
-		return dspErr.New(dspErr.DECRYPT_FILE_FAILED, "no decrypt password")
-	}
-	filePrefix, prefix, err := utils.GetPrefixFromFile(taskInfo.FilePath)
-	if err != nil {
-		return dspErr.New(dspErr.DECRYPT_FILE_FAILED, err.Error())
-	}
-	if !utils.VerifyEncryptPassword(taskInfo.DecryptPwd, filePrefix.EncryptSalt, filePrefix.EncryptHash) {
-		return dspErr.New(dspErr.DECRYPT_WRONG_PASSWORD, "wrong password")
-	}
-	newFilePath := utils.GetDecryptedFilePath(taskInfo.FilePath, taskInfo.FileName)
-	if err := this.fs.AESDecryptFile(taskInfo.FilePath, string(prefix),
-		taskInfo.DecryptPwd, newFilePath); err != nil {
-		return dspErr.New(dspErr.DECRYPT_FILE_FAILED, err.Error())
-	}
-	log.Debugf("decrypt file success %s", newFilePath)
-	// return this.taskMgr.SetTaskInfoWithOptions(taskId, task.FilePath(newFilePath))
-	return nil
-}
-
-func (this *Dsp) addDownloadBlockReq(taskId, fileHashStr string) error {
-	blks, err := this.taskMgr.GetUndownloadedBlockInfo(taskId, fileHashStr)
-	if err != nil {
-		return err
-	}
-	log.Debugf("undownloaded hashes len %v", len(blks))
-	reqs := make([]*task.GetBlockReq, 0)
-	if len(blks) == 0 {
-		// TODO: check bug
-		if this.taskMgr.IsFileDownloaded(taskId) {
-			return nil
-		}
-		log.Warnf("all block has downloaded, but file not downloed")
-		reqs = append(reqs, &task.GetBlockReq{
-			FileHash: fileHashStr,
-			Hash:     fileHashStr,
-			Index:    0,
-		})
-		if err := this.taskMgr.AddBlockReq(taskId, reqs); err != nil {
-			return err
-		}
-		return nil
-	}
-	log.Debugf("start download at %s-%s-%d", fileHashStr, blks[0].Hash, blks[0].Index)
-	for _, blk := range blks {
-		reqs = append(reqs, &task.GetBlockReq{
-			FileHash: fileHashStr,
-			Hash:     blk.Hash,
-			Index:    blk.Index,
-		})
-		log.Debugf("append hash %s index %v", blk.Hash, blk.Index)
-	}
-	return this.taskMgr.AddBlockReq(taskId, reqs)
-}
-
-// downloadFileFromPeers. downloadfile base methods. download file from peers.
-func (this *Dsp) downloadFileFromPeers(taskInfo *store.TaskInfo, addrs []string) error {
-	quotation, err := this.GetDownloadQuotation(taskInfo, addrs)
-	log.Debugf("downloadFileFromPeers :%v", quotation)
-	if err != nil {
-		return dspErr.New(dspErr.GET_DOWNLOAD_INFO_FAILED_FROM_PEERS, err.Error())
-	}
-	if len(quotation) == 0 {
-		return dspErr.New(dspErr.NO_DOWNLOAD_SEED, "no quotation from peers")
-	}
-	if stop, err := this.taskMgr.IsTaskStop(taskInfo.Id); err != nil || stop {
-		log.Debugf("stop download task %s", taskInfo.Id)
-		return err
-	}
-	if !taskInfo.Free && len(addrs) > taskInfo.MaxPeerCnt {
-		log.Debugf("filter peers free %t len %d max %d", taskInfo.Free, len(addrs), taskInfo.MaxPeerCnt)
-		// filter peers
-		quotation = utils.SortPeersByPrice(quotation, taskInfo.MaxPeerCnt)
-	}
-	if err := this.DepositChannelForFile(taskInfo.FileHash, quotation); err != nil {
-		return dspErr.New(dspErr.PREPARE_CHANNEL_ERROR, err.Error())
-	}
-	if stop, err := this.taskMgr.IsTaskStop(taskInfo.Id); err != nil || stop {
-		log.Debugf("stop download task %s", taskInfo.Id)
-		return err
-	}
-	log.Debugf("set up channel success: %v", quotation)
-	// get new task info because task info has updated
-	newTaskInfo, err := this.taskMgr.GetTaskInfoCopy(taskInfo.Id)
-	if err != nil {
-		return err
-	}
-	return this.DownloadFileWithQuotation(newTaskInfo, quotation)
-}
-
-// [Deprecated] startFetchBlocks for store node, fetch blocks one by one after receive fetch_rdy msg
-func (this *Dsp) startFetchBlocks(fileHashStr string, addr, peerWalletAddr string) error {
-	// my task. use my wallet address
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	log.Debugf("startFetchBlocks taskId: %s, fileHash: %s", taskId, fileHashStr)
-	if this.taskMgr.IsFileDownloaded(taskId) {
-		log.Debugf("file has downloaded: %s", fileHashStr)
-		return this.fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
-	}
-	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
-	if err != nil {
-		return err
-	}
-	if err = client.P2pConnect(addr); err != nil {
-		return err
-	}
-	this.taskMgr.NewWorkers(taskId, []string{peerWalletAddr}, true, nil)
-	pause, cancel := false, false
-	defer func() {
-		if cancel {
-			return
-		}
-		err := this.fs.PinRoot(context.TODO(), fileHashStr)
-		if err != nil {
-			log.Errorf("pin root file err %s", err)
-		}
-	}()
-	downloadQoS := make([]int64, 0)
-	blocks := make([]*block.Block, 0, common.MAX_REQ_BLOCK_COUNT)
-	downloadBlkCap := common.MIN_REQ_BLOCK_COUNT
-	totalCount, err := this.taskMgr.GetFileTotalBlockCount(taskId)
-	if err != nil {
-		return err
-	}
-	blockHashes := make([]string, 0, totalCount)
-	blockHashes = append(blockHashes, fileHashStr)
-	for index := 0; index < len(blockHashes); index++ {
-		hash := blockHashes[index]
-		pause, cancel, err = this.taskMgr.IsTaskPauseOrCancel(taskId)
-		if err != nil {
-			return err
-		}
-		if pause || cancel {
-			log.Debugf("fetch task break it pause: %t, cancel: %t", pause, cancel)
-			break
-		}
-		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint64(index)) {
-			log.Debugf("block has downloaded %s %d", hash, index)
-			blk := this.fs.GetBlock(hash)
-			links, err := this.fs.GetBlockLinks(blk)
-			if err != nil {
-				log.Errorf("get block links err %s", err)
-				return err
-			}
-			blockHashes = append(blockHashes, links...)
-			continue
-		}
-		blocks = append(blocks, &block.Block{
-			SessionId: sessionId,
-			Index:     uint64(index),
-			FileHash:  fileHashStr,
-			Hash:      hash,
-			Operation: netcom.BLOCK_OP_GET,
-			Payment: &payment.Payment{
-				Sender: this.chain.WalletAddress(),
-				Asset:  common.ASSET_USDT,
-			},
-		})
-		if index != len(blockHashes)-1 && len(blocks) < downloadBlkCap {
-			continue
-		}
-		var resps []*task.BlockResp
-		startDownload := time.Now().Unix()
-		resps, err = this.downloadBlockFlights(taskId, fileHashStr, peerWalletAddr, blocks,
-			common.MAX_BLOCK_FETCHED_RETRY, common.DOWNLOAD_FILE_TIMEOUT)
-		if time.Now().Unix() <= startDownload {
-			downloadQoS = append(downloadQoS, 0)
-		} else {
-			downloadQoS = append(downloadQoS, time.Now().Unix()-startDownload)
-		}
-		if err != nil {
-			return err
-		}
-		if len(downloadQoS) >= common.MIN_DOWNLOAD_QOS_LEN {
-			// reduce slice
-			downloadQoS = downloadQoS[len(downloadQoS)-common.MIN_DOWNLOAD_QOS_LEN:]
-			downloadBlkCap = adjustDownloadCap(downloadBlkCap, downloadQoS)
-			log.Debugf("adjust new download cap: %d for file %s", downloadBlkCap, fileHashStr)
-		}
-		blocks = blocks[:0]
-
-		for _, value := range resps {
-			blk := this.fs.EncodedToBlockWithCid(value.Block, value.Hash)
-			if blk.Cid().String() != value.Hash {
-				return fmt.Errorf("receive a wrong block: %s, expected: %s", blk.Cid().String(), value.Hash)
-			}
-			err = this.fs.PutBlock(blk)
-			if err != nil {
-				return err
-			}
-			err = this.fs.PutTag(value.Hash, fileHashStr, uint64(value.Index), value.Tag)
-			if err != nil {
-				return err
-			}
-			err = this.taskMgr.SetBlockDownloaded(taskId, value.Hash, value.PeerAddr,
-				value.Index, value.Offset, nil)
-			if err != nil {
-				log.Errorf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d, err: %s",
-					taskId, fileHashStr, value.Hash, value.Index, value.Offset, err)
-				return err
-			}
-			log.Debugf("SetBlockDownloaded taskId:%s, %s-%s-%d-%d",
-				taskId, fileHashStr, value.Hash, value.Index, value.Offset)
-			links, err := this.fs.GetBlockLinks(blk)
-			if err != nil {
-				log.Errorf("get block links err %s", err)
-				return err
-			}
-			blockHashes = append(blockHashes, links...)
-			log.Debugf("blockHashes len: %d", len(blockHashes))
-		}
-	}
-	if !this.taskMgr.IsFileDownloaded(taskId) {
-		return dspErr.New(dspErr.DOWNLOAD_BLOCK_FAILED, "all block has fetched, but file not download completely")
-	}
-
-	err = this.fs.SetFsFileBlockHashes(fileHashStr, blockHashes)
-	if err != nil {
-		log.Errorf("set file blockhashes err %s", err)
-		return err
-	}
-
-	// all block is saved, prove it
-	for i := 0; i < common.MAX_START_PDP_RETRY; i++ {
-		log.Infof("received all block, start pdp verify %s, retry: %d", fileHashStr, i)
-		err = this.fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Duration(common.START_PDP_RETRY_DELAY) * time.Second)
-	}
-	if err != nil {
-		log.Errorf("start pdp verify err %s", err)
-		deleteErr := this.DeleteDownloadedFile(taskId)
-		if deleteErr != nil {
-			log.Errorf("delete download file err of PDP failed file %s", deleteErr)
-			return deleteErr
-		}
-		return err
-	}
-	log.Debugf("push to trackers %v", this.dns.TrackerUrls)
-	this.dns.PushToTrackers(fileHashStr, this.dns.TrackerUrls, client.P2pGetPublicAddr())
-	// TODO: remove unused file info fields after prove pdp success
-	this.taskMgr.EmitResult(taskId, "", nil)
-	this.taskMgr.DeleteTask(taskId)
-	return nil
-}
-
-func (this *Dsp) putBlocks(taskId, fileHashStr, peerAddr string, resps []*task.BlockResp) error {
-	log.Debugf("putBlocks taskId: %s, fileHash: %s", taskId, fileHashStr)
-	if len(fileHashStr) != 0 {
-		defer this.fs.PinRoot(context.TODO(), fileHashStr)
-	}
-	if this.taskMgr.IsFileDownloaded(taskId) {
-		log.Debugf("file has downloaded: %s", fileHashStr)
-		err := this.fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
-		if err != nil {
-			return err
-		}
-		// dispatch downloaded blocks to other primary nodes
-		dispatchTaskId := this.taskMgr.TaskId(fileHashStr, this.WalletAddress(), store.TaskTypeUpload)
-		go this.dispatchBlocks(dispatchTaskId, taskId, fileHashStr)
-		return nil
-	}
-
-	blkInfos := make([]*store.BlockInfo, 0)
-	for _, value := range resps {
-		if len(value.Block) == 0 {
-			log.Errorf("receive empty block %d of file %s", len(value.Block), fileHashStr)
-			return fmt.Errorf("receive empty block %d of file %s", len(value.Block), fileHashStr)
-		}
-		blk := this.fs.EncodedToBlockWithCid(value.Block, value.Hash)
-		if blk.Cid().String() != value.Hash {
-			return fmt.Errorf("receive a wrong block: %s, expected: %s", blk.Cid().String(), value.Hash)
-		}
-		if len(value.Tag) == 0 {
-			log.Errorf("receive empty tag %d of file %s and block %s",
-				len(value.Tag), fileHashStr, blk.Cid().String())
-			return fmt.Errorf("receive empty tag %d of file %s and block %s",
-				len(value.Tag), fileHashStr, blk.Cid().String())
-		}
-		if err := this.fs.PutBlock(blk); err != nil {
-			return err
-		}
-		log.Debugf("put block success %v-%s-%d", fileHashStr, value.Hash, value.Index)
-		if err := this.fs.PutTag(value.Hash, fileHashStr, uint64(value.Index), value.Tag); err != nil {
-			return err
-		}
-		log.Debugf(" put tag or done %s-%s-%d", fileHashStr, value.Hash, value.Index)
-		blkInfos = append(blkInfos, &store.BlockInfo{
-			Hash:       value.Hash,
-			Index:      value.Index,
-			DataOffset: uint64(value.Offset),
-			NodeList:   []string{value.PeerAddr},
-		})
-
-	}
-	if len(blkInfos) > 0 {
-		if err := this.taskMgr.SetBlocksDownloaded(taskId, blkInfos); err != nil {
-			log.Errorf("SetBlocksDownloaded taskId:%s, %s-%s-%d-%d to %s-%d-%d, err: %s",
-				taskId, fileHashStr, blkInfos[0].Hash, blkInfos[0].Index, blkInfos[0].DataOffset,
-				blkInfos[len(blkInfos)-1].Hash, blkInfos[len(blkInfos)-1].Index, blkInfos[len(blkInfos)-1].DataOffset,
-				err)
-			return err
-		}
-		log.Debugf("SetBlocksDownloaded taskId:%s, %s-%s-%d-%d to %s-%d-%d",
-			taskId, fileHashStr, blkInfos[0].Hash, blkInfos[0].Index, blkInfos[0].DataOffset,
-			blkInfos[len(blkInfos)-1].Hash, blkInfos[len(blkInfos)-1].Index, blkInfos[len(blkInfos)-1].DataOffset)
-	}
-
-	if !this.taskMgr.IsFileDownloaded(taskId) {
-		return nil
-	}
-	blockHashes := this.taskMgr.FileBlockHashes(taskId)
-	log.Debugf("file block hashes %d", len(blockHashes))
-	if err := this.fs.SetFsFileBlockHashes(fileHashStr, blockHashes); err != nil {
-		log.Errorf("set file blockhashes err %s", err)
-		return err
-	}
-	// all block is saved, prove it
-	proved := false
-	for i := 0; i < common.MAX_START_PDP_RETRY; i++ {
-		log.Infof("received all block, start pdp verify %s, retry: %d", fileHashStr, i)
-		if err := this.fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY); err == nil {
-			proved = true
-			break
-		} else {
-			log.Errorf("start pdp verify err %s", err)
-		}
-		time.Sleep(time.Duration(common.START_PDP_RETRY_DELAY) * time.Second)
-	}
-	if !proved {
-		if err := this.DeleteDownloadedFile(taskId); err != nil {
-			return err
-		}
-		return nil
-	}
-	log.Debugf("pdp verify %s success, push the file to trackers %v", fileHashStr, this.dns.TrackerUrls)
-	this.dns.PushToTrackers(fileHashStr, this.dns.TrackerUrls, client.P2pGetPublicAddr())
-	// TODO: remove unused file info fields after prove pdp success
-	this.taskMgr.EmitResult(taskId, "", nil)
-	this.taskMgr.DeleteTask(taskId)
-	if err := this.fs.PinRoot(context.TODO(), fileHashStr); err != nil {
-		log.Errorf("pin root file err %s", err)
-		return err
-	}
-	// dispatch downloaded blocks to other primary nodes
-	go this.dispatchBlocks("", taskId, fileHashStr)
-	doneMsg := message.NewFileMsg(fileHashStr, netcom.FILE_OP_FETCH_DONE,
-		message.WithSessionId(taskId),
-		message.WithWalletAddress(this.chain.WalletAddress()),
-		message.WithSign(this.account),
-	)
-	return client.P2pSend(peerAddr, doneMsg.MessageId, doneMsg.ToProtoMsg())
-}
-
-// downloadBlockUnits. download block helper function for client.
-func (this *Dsp) downloadBlockFlights(taskId, fileHashStr, peerWalletAddr string, blockReqs []*block.Block,
-	retry, timeout uint32) ([]*task.BlockResp, error) {
-	sessionId, err := this.taskMgr.GetSessionId(taskId, peerWalletAddr)
-	if err != nil {
-		return nil, err
-	}
-	if len(blockReqs) > 0 {
-		log.Debugf("download block of task: %s %s-%s-%d to %s-%s-%d to %s",
-			taskId, fileHashStr, blockReqs[0].Hash, blockReqs[0].Index, fileHashStr,
-			blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
-	}
-	timeStamp := time.Now().UnixNano()
-	msg := message.NewBlockFlightsReqMsg(blockReqs, timeStamp)
-	blockReqM := make(map[string]struct{}, 0)
-	for _, req := range blockReqs {
-		blockReqM[keyOfBlockHashAndIndex(req.Hash, req.Index)] = struct{}{}
-	}
-	for i := uint32(0); i < retry; i++ {
-		state, _ := this.taskMgr.GetTaskState(taskId)
-		log.Debugf("send download block flights msg sessionId %s of %s retry %d,"+
-			" msgId %s, timeStamp %d, state %d",
-			sessionId, fileHashStr, i, msg.MessageId, timeStamp, state)
-		this.taskMgr.ActiveDownloadTaskPeer(peerWalletAddr)
-		resp, err := client.P2pSendAndWaitReply(peerWalletAddr, msg.MessageId, msg.ToProtoMsg())
-		if err != nil {
-			log.Errorf("send download block flights msg err: %s", err)
-			continue
-		}
-		msg := message.ReadMessage(resp)
-		if msg == nil {
-			return nil, fmt.Errorf("receive invalid msg from peer %s", peerWalletAddr)
-		}
-		if msg.Payload == nil {
-			log.Error("receive empty block flights of task %s", taskId)
-			return nil, fmt.Errorf("receive empty block flights of task %s", taskId)
-		}
-		blockFlightsMsg := msg.Payload.(*block.BlockFlights)
-		if blockFlightsMsg == nil || len(blockFlightsMsg.Blocks) == 0 {
-			log.Errorf("receive empty block flights, err %v", msg.Error)
-			return nil, fmt.Errorf("receive empty block flights of task %s", taskId)
-		}
-		log.Debugf("taskId: %s, sessionId: %s receive %d blocks from peer:%s",
-			taskId, blockFlightsMsg.Blocks[0].SessionId, len(blockFlightsMsg.Blocks), peerWalletAddr)
-		// active worker
-		this.taskMgr.ActiveDownloadTaskPeer(peerWalletAddr)
-		blockResps := make([]*task.BlockResp, 0)
-		for _, blockMsg := range blockFlightsMsg.Blocks {
-			if _, ok := blockReqM[keyOfBlockHashAndIndex(blockMsg.Hash, blockMsg.Index)]; !ok {
-				log.Warnf("block %s-%d is not my request task", blockMsg.Hash, blockMsg.Index)
-				continue
-			}
-			block := this.fs.EncodedToBlockWithCid(blockMsg.Data, blockMsg.Hash)
-			if block.Cid().String() != blockMsg.Hash {
-				log.Warnf("receive wrong block %s-%d", blockMsg.Hash, blockMsg.Index)
-				continue
-			}
-			blockResps = append(blockResps, &task.BlockResp{
-				Hash:      blockMsg.Hash,
-				Index:     blockMsg.Index,
-				PeerAddr:  peerWalletAddr,
-				Block:     blockMsg.Data,
-				Tag:       blockMsg.Tag,
-				Offset:    blockMsg.Offset,
-				PaymentId: blockFlightsMsg.PaymentId,
-			})
-		}
-		if len(blockResps) == 0 {
-			log.Warnf("blockResps is not match request")
-		}
-		return blockResps, nil
-	}
-	if err != nil {
-		log.Errorf("download block flight err %s", err)
-	}
-	return nil, err
-}
-
-// shareUploadedFile. share uploaded file when upload success
-func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []string) error {
-	log.Debugf("shareUploadedFile path: %s filename:%s prefix:%s hashes:%d", filePath, fileName, prefix, len(hashes))
-	if !this.IsClient() {
-		return dspErr.New(dspErr.INTERNAL_ERROR, "fs type is not file store")
-	}
-	if len(hashes) == 0 {
-		return dspErr.New(dspErr.INTERNAL_ERROR, "no block hashes")
-	}
-	fileHashStr := hashes[0]
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	if len(taskId) == 0 {
-		var err error
-		taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
-		if err != nil {
-			return err
-		}
-		if err := this.taskMgr.AddFileBlockHashes(taskId, hashes); err != nil {
-			return err
-		}
-		fullFilePath := utils.GetFileFullPath(this.config.FsFileRoot, fileHashStr, fileName,
-			utils.GetPrefixEncrypted([]byte(prefix)))
-		if err := this.taskMgr.SetTaskInfoWithOptions(taskId, task.Prefix(prefix),
-			task.FileName(fullFilePath)); err != nil {
-			return err
-		}
-	}
-	fullFilePath, err := this.taskMgr.GetFilePath(taskId)
-	if err != nil {
-		return err
-	}
-	input, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	output, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
-		return err
-	}
-	defer output.Close()
-	n, err := io.Copy(output, input)
-	log.Debugf("copy %d bytes", n)
-	if err != nil {
-		return err
-	}
-	// TODO: set nil prefix for encrypted file
-	this.fs.SetFsFilePrefix(fullFilePath, prefix)
-	offsets, err := this.fs.GetAllOffsets(fileHashStr)
-	if err != nil {
-		return err
-	}
-	for index, hash := range hashes {
-		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint64(index)) {
-			log.Debugf("%s-%s-%d is downloaded", fileHashStr, hash, index)
-			continue
-		}
-		block := this.fs.GetBlock(hash)
-		links, err := this.fs.GetBlockLinks(block)
-		if err != nil {
-			return err
-		}
-		offsetKey := fmt.Sprintf("%s-%d", hash, index)
-		offset := offsets[offsetKey]
-		log.Debugf("hash: %s-%s-%d , offset: %d, links count %d", fileHashStr, hash, index, offset, len(links))
-		if err := this.taskMgr.SetBlockDownloaded(taskId, fileHashStr, client.P2pGetPublicAddr(), uint64(index),
-			int64(offset), links); err != nil {
-			return err
-		}
-	}
-	go this.dns.PushToTrackers(fileHashStr, this.dns.TrackerUrls, client.P2pGetPublicAddr())
-	return nil
-}
-
-// backupFileFromPeer. backup a file from peer
-func (this *Dsp) backupFileFromPeer(fileInfo *fs.FileInfo, peer string, luckyNum, bakHeight, bakNum uint64,
-	brokenAddr chainCom.Address) (err error) {
-	fileHashStr := string(fileInfo.FileHash)
-	if fileInfo == nil || len(fileHashStr) == 0 {
-		return dspErr.New(dspErr.DOWNLOAD_FILEHASH_NOT_FOUND, "no filehash for download")
-	}
-	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
-	defer func() {
-		sdkErr, _ := err.(*dspErr.Error)
-		if err != nil {
-			log.Errorf("download file %s err %s", fileHashStr, err)
-		}
-		log.Debugf("emit ret %s %s", taskId, err)
-		if sdkErr != nil {
-			this.taskMgr.EmitResult(taskId, nil, sdkErr)
-		}
-		// delete task from cache in the end
-		if this.taskMgr.IsFileDownloaded(taskId) && sdkErr == nil {
-			this.taskMgr.EmitResult(taskId, "", nil)
-			this.taskMgr.DeleteTask(taskId)
-		}
-	}()
-	if len(taskId) == 0 {
-		taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
-		if err != nil {
-			return err
-		}
-	}
-	taskDone, _ := this.taskMgr.IsTaskDone(taskId)
-	if taskDone {
-		return nil
-	}
-	if this.dns.DNSNode == nil {
-		return dspErr.New(dspErr.NO_CONNECTED_DNS, "no online dns node")
-	}
-	if err = this.taskMgr.SetTaskState(taskId, store.TaskStateDoing); err != nil {
-		return err
-	}
-	log.Debugf("download file dns node %s", this.dns.DNSNode.WalletAddr)
-	if err = this.taskMgr.SetTaskInfoWithOptions(taskId,
-		task.FileHash(fileHashStr),
-		task.Asset(common.ASSET_USDT),
-		task.Inorder(false),
-		task.MaxPeerCnt(common.MAX_DOWNLOAD_PEERS_NUM),
-		task.FileName(string(fileInfo.FileDesc)),
-		task.FileOwner(fileInfo.FileOwner.ToBase58()),
-		task.Walletaddr(this.chain.WalletAddress())); err != nil {
-		return err
-	}
-	if err = this.taskMgr.BindTaskId(taskId); err != nil {
-		return err
-	}
-	// TODO: test back up logic
-	taskInfo, err := this.taskMgr.GetTaskInfoCopy(taskId)
-	if err != nil {
-		return err
-	}
-	if err = this.downloadFileFromPeers(taskInfo, []string{peer}); err != nil {
-		log.Errorf("download file err %s", err)
-		return err
-	}
-	if err = this.fs.PinRoot(context.TODO(), fileHashStr); err != nil {
-		log.Errorf("pin root file err %s", err)
-		return err
-	}
-	if err = this.fs.StartPDPVerify(fileHashStr, luckyNum, bakHeight, bakNum, brokenAddr); err != nil {
-		if err := this.DeleteDownloadedFile(taskId); err != nil {
-			log.Errorf("delete downloaded file of task failed %v, err %s", taskId, err)
-			return err
-		}
-		return err
-	}
-	log.Debugf("backup file:%s success", fileHashStr)
-	return nil
-}
-
-// createDownloadFile. create file handler for write downloading file
-func createDownloadFile(dir, filePath string) (*os.File, error) {
-	err := common.CreateDirIfNeed(dir)
-	if err != nil {
-		return nil, dspErr.NewWithError(dspErr.INTERNAL_ERROR, err)
-	}
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0666)
-	log.Debugf("create download file dir:%s, path: %s, file: %v %s", dir, filePath, file, err)
-	if err != nil {
-		return nil, dspErr.NewWithError(dspErr.INTERNAL_ERROR, err)
-	}
-	return file, nil
-}
-
-func adjustDownloadCap(cap int, qos []int64) int {
-	speedUp := canDownloadSpeedUp(qos)
-	newCap := cap
-	if speedUp {
-		newCap = cap + 2
-		if newCap > common.MAX_REQ_BLOCK_COUNT {
-			return common.MAX_REQ_BLOCK_COUNT
-		} else {
-			return newCap
-		}
-	}
-	newCap = cap - 4
-	if newCap < common.MIN_REQ_BLOCK_COUNT {
-		return common.MIN_REQ_BLOCK_COUNT
-	}
-	return newCap
-}
-
-func canDownloadSpeedUp(qos []int64) bool {
-	if len(qos) < common.MIN_DOWNLOAD_QOS_LEN {
-		return false
-	}
-	if qos[len(qos)-1] >= common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT {
-		return false
-	}
-	qosSum := int64(0)
-	for i := 0; i < common.MIN_DOWNLOAD_QOS_LEN; i++ {
-		qosSum += qos[len(qos)-i-1]
-	}
-	avg := qosSum / common.MIN_DOWNLOAD_QOS_LEN
-	log.Debugf("qosSum :%d, avg : %d", qosSum, avg)
-	return avg < common.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT
-}
+// // shareUploadedFile. share uploaded file when upload success
+// func (this *Dsp) shareUploadedFile(filePath, fileName, prefix string, hashes []string) error {
+// 	log.Debugf("shareUploadedFile path: %s filename:%s prefix:%s hashes:%d", filePath, fileName, prefix, len(hashes))
+// 	if !this.IsClient() {
+// 		return sdkErr.New(sdkErr.INTERNAL_ERROR, "fs type is not file store")
+// 	}
+// 	if len(hashes) == 0 {
+// 		return sdkErr.New(sdkErr.INTERNAL_ERROR, "no block hashes")
+// 	}
+// 	fileHashStr := hashes[0]
+// 	taskId := this.taskMgr.TaskId(fileHashStr, this.chain.WalletAddress(), store.TaskTypeDownload)
+// 	if len(taskId) == 0 {
+// 		var err error
+// 		taskId, err = this.taskMgr.NewTask("", store.TaskTypeDownload)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		if err := this.taskMgr.AddFileBlockHashes(taskId, hashes); err != nil {
+// 			return err
+// 		}
+// 		fullFilePath := utils.GetFileFullPath(this.config.FsFileRoot, fileHashStr, fileName,
+// 			utils.GetPrefixEncrypted([]byte(prefix)))
+// 		if err := this.taskMgr.SetTaskInfoWithOptions(taskId, task.Prefix(prefix),
+// 			task.FileName(fullFilePath)); err != nil {
+// 			return err
+// 		}
+// 	}
+// 	fullFilePath, err := this.taskMgr.GetFilePath(taskId)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	input, err := os.Open(filePath)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	output, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_RDWR, 0666)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer output.Close()
+// 	n, err := io.Copy(output, input)
+// 	log.Debugf("copy %d bytes", n)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	// TODO: set nil prefix for encrypted file
+// 	this.fs.SetFsFilePrefix(fullFilePath, prefix)
+// 	offsets, err := this.fs.GetAllOffsets(fileHashStr)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	for index, hash := range hashes {
+// 		if this.taskMgr.IsBlockDownloaded(taskId, hash, uint64(index)) {
+// 			log.Debugf("%s-%s-%d is downloaded", fileHashStr, hash, index)
+// 			continue
+// 		}
+// 		block := this.fs.GetBlock(hash)
+// 		links, err := this.fs.GetBlockLinks(block)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		offsetKey := fmt.Sprintf("%s-%d", hash, index)
+// 		offset := offsets[offsetKey]
+// 		log.Debugf("hash: %s-%s-%d , offset: %d, links count %d", fileHashStr, hash, index, offset, len(links))
+// 		if err := this.taskMgr.SetBlockDownloaded(taskId, fileHashStr, client.P2pGetPublicAddr(), uint64(index),
+// 			int64(offset), links); err != nil {
+// 			return err
+// 		}
+// 	}
+// 	go this.dns.PushToTrackers(fileHashStr, this.dns.TrackerUrls, client.P2pGetPublicAddr())
+// 	return nil
+// }

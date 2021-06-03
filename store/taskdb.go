@@ -9,9 +9,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/saveio/dsp-go-sdk/utils/crypto"
+	"github.com/saveio/dsp-go-sdk/utils/time"
+
+	"github.com/saveio/dsp-go-sdk/consts"
+
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/saveio/dsp-go-sdk/common"
-	"github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/themis/common/log"
 	"github.com/syndtr/goleveldb/leveldb"
 
@@ -33,6 +36,7 @@ const (
 	TaskTypeDownload
 	TaskTypeShare
 	TaskTypeBackup
+	TaskTypeDispatch
 )
 
 type TaskState int
@@ -76,69 +80,73 @@ type WhiteList struct {
 
 // fileInfo keep all blocks infomation and the prove private key for generating tags
 type TaskInfo struct {
-	Id              string            `json:"id"`                               // task id
-	Index           uint32            `json:"index"`                            // task index
-	FileHash        string            `json:"file_hash"`                        // file hash
-	BlocksRoot      string            `json:"blocks_root"`                      // blocks hash root
-	FileName        string            `json:"file_name"`                        // file name
-	FileDesc        string            `json:"file_desc,omitempty"`              // file desc
-	FilePath        string            `json:"file_path"`                        // file absolute path
-	FileOwner       string            `json:"file_owner"`                       // file owner wallet address
-	SimpleChecksum  string            `json:"simple_checksum,omitempty"`        // hash of first 128 KB and last 128 KB from file content
-	WalletAddress   string            `json:"wallet_address"`                   // task belong to
-	CopyNum         uint32            `json:"copy_num,omitempty"`               // copy num
-	Type            TaskType          `json:"file_info_type"`                   // task type
-	StoreTx         string            `json:"store_tx"`                         // store tx hash
-	StoreTxHeight   uint32            `json:"store_tx_height"`                  // store tx height
-	RegisterDNSTx   string            `json:"register_dns_tx,omitempty"`        // register dns tx
-	BindDNSTx       string            `json:"bind_dns_tx,omitempty"`            // bind dns tx
-	WhitelistTx     string            `json:"whitelist_tx,omitempty"`           // first op whitelist tx
-	TotalBlockCount uint64            `json:"total_block_count"`                // total block count
-	TaskState       TaskState         `json:"task_state"`                       // task state
-	ProveParams     []byte            `json:"prove_params,omitempty"`           // pdp prove params
-	Prefix          []byte            `json:"prefix"`                           // file prefix
-	EncryptHash     string            `json:"encrypt_hash,omitempty"`           // encrypt hash
-	EncryptSalt     string            `json:"encrypt_salt,omitempty"`           // encrypt salt
-	Url             string            `json:"url"`                              // url
-	Link            string            `json:"link"`                             // url <=> link
-	CurrentBlock    string            `json:"current_block_hash,omitempty"`     // current transferred block
-	CurrentIndex    uint64            `json:"current_block_index,omitempty"`    // current transferred block index
-	StoreType       uint32            `json:"store_type"`                       // store type
-	InOrder         bool              `json:"in_order,omitempty"`               // is in order
-	OnlyBlock       bool              `json:"only_block,omitempty"`             // send only raw block data
-	TranferState    uint32            `json:"transfer_state"`                   // transfer state
-	ReferId         string            `json:"refer_id,omitempty"`               // refer task id
-	PrimaryNodes    []string          `json:"primary_nodes,omitempty"`          // primary nodes wallet address
-	CandidateNodes  []string          `json:"candidate_nodes,omitempty"`        // candidate nodes wallet address
-	NodeHostAddrs   map[string]string `json:"node_host_addrs,omitempty"`        //  nodes wallet address <=> host addrs
-	CreatedAt       uint64            `json:"createdAt"`                        // createAt, unit ms
-	CreatedAtHeight uint32            `json:"createdAt_block_height,omitempty"` // created at block height
-	UpdatedAt       uint64            `json:"updatedAt"`                        // updatedAt, unit ms
-	UpdatedAtHeight uint32            `json:"updatedAt_block_height,omitempty"` // updatedAt block height
-	DoneAt          uint64            `json:"doneAt"`                           // task done timestamp
-	ExpiredHeight   uint64            `json:"expired_block_height,omitempty"`   // expiredAt block height
-	Asset           int32             `json:"asset,omitempty"`                  // download task pay asset
-	DecryptPwd      string            `json:"decrypt_pwd,omitempty"`            // download task with decrypt pwd
-	Free            bool              `json:"free,omitempty"`                   // download task with free opts
-	SetFileName     bool              `json:"set_file_name,omitempty"`          // download task with set file name
-	MaxPeerCnt      int               `json:"max_peer_count,omitempty"`         // download task with max peer count to download
-	RealFileSize    uint64            `json:"real_file_size"`                   // real file size in KB
-	FileSize        uint64            `json:"file_size"`                        // real file size in block
-	ProveInterval   uint64            `json:"prove_interval,omitempty"`         // prove interval
-	ProveLevel      uint64            `json:"prove_level,omitempty"`            // prove level
-	Privilege       uint64            `json:"privilege,omitempty"`              // file privilege
-	Encrypt         bool              `json:"encrypt,omitempty"`                // encrypt or not
-	EncryptPassword []byte            `json:"encrypt_pwd,omitempty"`            // encrypted pwd
-	RegisterDNS     bool              `json:"register_dns,omitempty"`           // register dns or not
-	BindDNS         bool              `json:"bind_dns,omitempty"`               // bind dns or not
-	WhiteList       []*WhiteList      `json:"white_list,omitempty"`             // white list
-	Share           bool              `json:"share,omitempty"`                  // share or not
-	Hide            bool              `json:"hide,omitempty"`                   // hide task in transfer list
-	Retry           int               `json:"retry"`                            // retry counter
-	RetryAt         uint64            `json:"retryAt"`                          // retry at timestamp
-	ErrorCode       uint32            `json:"error_code,omitempty"`             // error code
-	ErrorMsg        string            `json:"error_msg,omitempty"`              // error msg
-	Result          interface{}       `json:"result"`                           // task complete result
+	Id               string            `json:"id"`                               // task id
+	Index            uint32            `json:"index"`                            // task index
+	FileHash         string            `json:"file_hash"`                        // file hash
+	BlocksRoot       string            `json:"blocks_root"`                      // blocks hash root
+	FileName         string            `json:"file_name"`                        // file name
+	FileDesc         string            `json:"file_desc,omitempty"`              // file desc
+	FilePath         string            `json:"file_path"`                        // file absolute path
+	FileOwner        string            `json:"file_owner"`                       // file owner wallet address
+	SimpleChecksum   string            `json:"simple_checksum,omitempty"`        // hash of first 128 KB and last 128 KB from file content
+	WalletAddress    string            `json:"wallet_address"`                   // task belong to
+	CopyNum          uint32            `json:"copy_num,omitempty"`               // copy num
+	Type             TaskType          `json:"file_info_type"`                   // task type
+	StoreTx          string            `json:"store_tx"`                         // store tx hash
+	StoreTxHeight    uint32            `json:"store_tx_height"`                  // store tx height
+	RegisterDNSTx    string            `json:"register_dns_tx,omitempty"`        // register dns tx
+	BindDNSTx        string            `json:"bind_dns_tx,omitempty"`            // bind dns tx
+	WhitelistTx      string            `json:"whitelist_tx,omitempty"`           // first op whitelist tx
+	TotalBlockCount  uint64            `json:"total_block_count"`                // total block count
+	TaskState        TaskState         `json:"task_state"`                       // task state
+	ProveParams      []byte            `json:"prove_params,omitempty"`           // pdp prove params
+	Prefix           []byte            `json:"prefix"`                           // file prefix
+	EncryptHash      string            `json:"encrypt_hash,omitempty"`           // encrypt hash
+	EncryptSalt      string            `json:"encrypt_salt,omitempty"`           // encrypt salt
+	Url              string            `json:"url"`                              // url
+	Link             string            `json:"link"`                             // url <=> link
+	CurrentBlock     string            `json:"current_block_hash,omitempty"`     // current transferred block
+	CurrentIndex     uint64            `json:"current_block_index,omitempty"`    // current transferred block index
+	StoreType        uint32            `json:"store_type"`                       // store type
+	InOrder          bool              `json:"in_order,omitempty"`               // send block in order
+	OnlyBlock        bool              `json:"only_block,omitempty"`             // send only raw block data
+	TranferState     uint32            `json:"transfer_state"`                   // transfer state
+	ReferId          string            `json:"refer_id,omitempty"`               // refer task id
+	PrimaryNodes     []string          `json:"primary_nodes,omitempty"`          // primary nodes wallet address
+	CandidateNodes   []string          `json:"candidate_nodes,omitempty"`        // candidate nodes wallet address
+	NodeHostAddrs    map[string]string `json:"node_host_addrs,omitempty"`        //  nodes wallet address <=> host addrs
+	CreatedAt        uint64            `json:"createdAt"`                        // createAt, unit ms
+	CreatedAtHeight  uint32            `json:"createdAt_block_height,omitempty"` // created at block height
+	UpdatedAt        uint64            `json:"updatedAt"`                        // updatedAt, unit ms
+	UpdatedAtHeight  uint32            `json:"updatedAt_block_height,omitempty"` // updatedAt block height
+	DoneAt           uint64            `json:"doneAt"`                           // task done timestamp
+	ExpiredHeight    uint64            `json:"expired_block_height,omitempty"`   // expiredAt block height
+	Asset            int32             `json:"asset,omitempty"`                  // download task pay asset
+	DecryptPwd       string            `json:"decrypt_pwd,omitempty"`            // download task with decrypt pwd
+	Free             bool              `json:"free,omitempty"`                   // download task with free opts
+	SetFileName      bool              `json:"set_file_name,omitempty"`          // download task with set file name
+	MaxPeerCnt       int               `json:"max_peer_count,omitempty"`         // download task with max peer count to download
+	RealFileSize     uint64            `json:"real_file_size"`                   // real file size in KB
+	FileSize         uint64            `json:"file_size"`                        // real file size in block
+	ProveInterval    uint64            `json:"prove_interval,omitempty"`         // prove interval
+	ProveLevel       uint64            `json:"prove_level,omitempty"`            // prove level
+	Privilege        uint64            `json:"privilege,omitempty"`              // file privilege
+	Encrypt          bool              `json:"encrypt,omitempty"`                // encrypt or not
+	EncryptPassword  []byte            `json:"encrypt_pwd,omitempty"`            // encrypted pwd
+	RegisterDNS      bool              `json:"register_dns,omitempty"`           // register dns or not
+	BindDNS          bool              `json:"bind_dns,omitempty"`               // bind dns or not
+	WhiteList        []*WhiteList      `json:"white_list,omitempty"`             // white list
+	Share            bool              `json:"share,omitempty"`                  // share or not
+	Hide             bool              `json:"hide,omitempty"`                   // hide task in transfer list
+	Retry            int               `json:"retry"`                            // retry counter
+	RetryAt          uint64            `json:"retryAt"`                          // retry at timestamp
+	ErrorCode        uint32            `json:"error_code,omitempty"`             // error code
+	ErrorMsg         string            `json:"error_msg,omitempty"`              // error msg
+	Result           interface{}       `json:"result"`                           // task complete result
+	PeerToSessionIds map[string]string `json:"peertosessionids"`                 // request peerAddr <=> session id
+	Transferring     bool              `json:"transferring"`                     // fetch is transferring flag
+	PayOnL1          bool              `json:"payOnL1"`                          // is task pay on l1
+	WorkerNetPhase   map[string]int    `json:"worker_net_phase"`                 // network msg interact phase, used to check msg transaction, wallet addr <=> phase
 }
 
 type FileProgress struct {
@@ -185,6 +193,7 @@ type TaskCount struct {
 	UploadCount   uint32 `json:"upload_count"`
 	DownloadCount uint32 `json:"download_count"`
 	ShareCount    uint32 `json:"share_count"`
+	DispatchCount uint32 `json:"dispatch_count"`
 }
 
 func NewTaskDB(db *LevelDBStore) *TaskDB {
@@ -232,7 +241,7 @@ func (this *TaskDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
 		Id:        id,
 		Index:     taskCount.Index,
 		Type:      ft,
-		CreatedAt: utils.GetMilliSecTimestamp(),
+		CreatedAt: time.GetMilliSecTimestamp(),
 	}
 	batch := this.db.NewBatch()
 	// store to undone task list
@@ -261,6 +270,8 @@ func (this *TaskDB) NewTaskInfo(id string, ft TaskType) (*TaskInfo, error) {
 		taskCount.DownloadCount++
 	case TaskTypeShare:
 		taskCount.ShareCount++
+	case TaskTypeDispatch:
+		taskCount.DispatchCount++
 	}
 	err = this.batchSaveTaskCount(batch, taskCount)
 	if err != nil {
@@ -352,9 +363,9 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd,
 	return ids
 }
 
-func (this *TaskDB) SaveFileInfoId(key, id string) error {
-	return this.db.Put([]byte(TaskInfoIdWithFile(key)), []byte(id))
-}
+// func (this *TaskDB) SaveFileInfoId(key, id string) error {
+// 	return this.db.Put([]byte(TaskInfoIdWithFile(key)), []byte(id))
+// }
 
 func (this *TaskDB) GetFileInfoId(key string) (string, error) {
 	id, err := this.db.Get([]byte(TaskInfoIdWithFile(key)))
@@ -364,12 +375,52 @@ func (this *TaskDB) GetFileInfoId(key string) (string, error) {
 	return string(id), nil
 }
 
-func (this *TaskDB) GetDownloadedTaskId(fileHashStr string) (string, error) {
+func (this *TaskDB) GetUploadTaskByFields(fields map[string]string) *TaskInfo {
+	this.dbLock.RLock()
+	defer this.dbLock.RUnlock()
 	prefix := TaskInfoKey("")
 	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
 		log.Errorf("query task failed %s", err)
-		return "", err
+		return nil
+	}
+	for _, key := range keys {
+		info, _ := this.getTaskInfoByKey(key)
+		if info == nil {
+			continue
+		}
+		if info.Type != TaskTypeUpload {
+			continue
+		}
+
+		walletAddr, _ := fields[TaskInfoFieldWalletAddress]
+		if len(walletAddr) > 0 && info.WalletAddress != walletAddr {
+			continue
+		}
+
+		if fileHash, ok := fields[TaskInfoFieldFileHash]; ok && info.FileHash == fileHash {
+			return info
+		}
+
+		if filePath, ok := fields[TaskInfoFieldFilePath]; ok && info.FilePath == filePath {
+			return info
+		}
+
+		if checkSum, ok := fields[TaskInfoFieldSimpleCheckSum]; ok && info.SimpleChecksum == checkSum {
+			return info
+		}
+	}
+	return nil
+}
+
+func (this *TaskDB) GetDownloadTaskInfoByField(fields map[string]string) *TaskInfo {
+	this.dbLock.RLock()
+	defer this.dbLock.RUnlock()
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		log.Errorf("query task failed %s", err)
+		return nil
 	}
 	for _, key := range keys {
 		info, _ := this.getTaskInfoByKey(key)
@@ -379,33 +430,81 @@ func (this *TaskDB) GetDownloadedTaskId(fileHashStr string) (string, error) {
 		if info.Type != TaskTypeDownload {
 			continue
 		}
-		if info.TaskState != TaskStateDone {
+
+		walletAddr, _ := fields[TaskInfoFieldWalletAddress]
+		if len(walletAddr) > 0 && info.WalletAddress != walletAddr {
 			continue
 		}
-		if info.FileHash != fileHashStr {
-			continue
+
+		if fileHash, ok := fields[TaskInfoFieldFileHash]; ok && info.FileHash == fileHash {
+			return info
 		}
-		return info.Id, nil
+
+		if filePath, ok := fields[TaskInfoFieldFilePath]; ok && info.FilePath == filePath {
+			return info
+		}
+
+		if checkSum, ok := fields[TaskInfoFieldSimpleCheckSum]; ok && info.SimpleChecksum == checkSum {
+			return info
+		}
 	}
-	return "", fmt.Errorf("no downloaded task for file %s", fileHashStr)
+	return nil
 }
 
-func (this *TaskDB) DeleteFileInfoId(key string) error {
-	return this.db.Delete([]byte(key))
-}
-
-func (this *TaskDB) SetFileName(id string, fileName string) error {
-
-	fi, err := this.GetTaskInfo(id)
+func (this *TaskDB) GetShareTaskByFields(fields map[string]string) *TaskInfo {
+	this.dbLock.RLock()
+	defer this.dbLock.RUnlock()
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
 	if err != nil {
-		return err
+		log.Errorf("query task failed %s", err)
+		return nil
 	}
-	if fi == nil {
-		return fmt.Errorf("fileinfo not found of %s", id)
+	for _, key := range keys {
+		info, _ := this.getTaskInfoByKey(key)
+		if info == nil {
+			continue
+		}
+		if info.Type != TaskTypeShare {
+			continue
+		}
+
+		walletAddr, _ := fields[TaskInfoFieldWalletAddress]
+		if len(walletAddr) > 0 && info.WalletAddress != walletAddr {
+			continue
+		}
+
+		if fileHash, ok := fields[TaskInfoFieldFileHash]; ok && info.FileHash == fileHash {
+			return info
+		}
+
+		if filePath, ok := fields[TaskInfoFieldFilePath]; ok && info.FilePath == filePath {
+			return info
+		}
+
+		if checkSum, ok := fields[TaskInfoFieldSimpleCheckSum]; ok && info.SimpleChecksum == checkSum {
+			return info
+		}
 	}
-	fi.FileName = fileName
-	return this.batchSaveTaskInfo(nil, fi)
+	return nil
 }
+
+// func (this *TaskDB) DeleteFileInfoId(key string) error {
+// 	return this.db.Delete([]byte(key))
+// }
+
+// func (this *TaskDB) SetFileName(id string, fileName string) error {
+
+// 	fi, err := this.GetTaskInfo(id)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if fi == nil {
+// 		return fmt.Errorf("fileinfo not found of %s", id)
+// 	}
+// 	fi.FileName = fileName
+// 	return this.batchSaveTaskInfo(nil, fi)
+// }
 
 func (this *TaskDB) HideTaskIds(ids []string) error {
 	batch := this.db.NewBatch()
@@ -484,6 +583,8 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 		switch fi.Type {
 		case TaskTypeUpload:
 			taskCount.UploadCount--
+		case TaskTypeDispatch:
+			taskCount.DispatchCount--
 		case TaskTypeDownload:
 			taskCount.DownloadCount--
 		case TaskTypeShare:
@@ -494,9 +595,9 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 			return err
 		}
 		// delete file info id
-		if fi.Type == TaskTypeUpload {
+		if fi.Type == TaskTypeUpload || fi.Type == TaskTypeDispatch {
 			if len(fi.FilePath) > 0 {
-				hexStr := utils.StringToSha256Hex(fi.FilePath)
+				hexStr := crypto.StringToSha256Hex(fi.FilePath)
 				taskIdWithFilekey := TaskIdWithFile(hexStr, fi.WalletAddress, fi.Type)
 				log.Debugf("will delete taskIdWithFilekey: %s", TaskInfoIdWithFile(taskIdWithFilekey))
 				this.db.BatchDelete(batch, []byte(TaskInfoIdWithFile(taskIdWithFilekey)))
@@ -552,7 +653,7 @@ func (this *TaskDB) SetBlocksUploaded(id, nodeAddr string, blockInfos []*BlockIn
 		progress = &FileProgress{
 			TaskId:       fi.Id,
 			NodeHostAddr: nodeAddr,
-			CreatedAt:    utils.GetMilliSecTimestamp(),
+			CreatedAt:    time.GetMilliSecTimestamp(),
 		}
 	}
 	for _, bi := range blockInfos {
@@ -637,11 +738,11 @@ func (this *TaskDB) UpdateTaskPeerProgress(id, nodeAddr string, count uint64) er
 		progress = &FileProgress{
 			TaskId:       id,
 			NodeHostAddr: nodeAddr,
-			CreatedAt:    utils.GetMilliSecTimestamp(),
+			CreatedAt:    time.GetMilliSecTimestamp(),
 		}
 	}
 	progress.Progress = count
-	progress.UpdatedAt = utils.GetMilliSecTimestamp()
+	progress.UpdatedAt = time.GetMilliSecTimestamp()
 	log.Debugf("%s, nodeAddr %s progress %v", id, nodeAddr, progress)
 	progressBuf, err := json.Marshal(progress)
 	if err != nil {
@@ -664,17 +765,17 @@ func (this *TaskDB) UpdateTaskPeerSpeed(id, nodeAddr string, speed uint64) error
 		progress = &FileProgress{
 			TaskId:       id,
 			NodeHostAddr: nodeAddr,
-			CreatedAt:    utils.GetMilliSecTimestamp(),
+			CreatedAt:    time.GetMilliSecTimestamp(),
 		}
 	}
 	if progress.Speeds == nil {
 		progress.Speeds = make([]uint64, 0)
 	}
 	progress.Speeds = append(progress.Speeds, speed)
-	if len(progress.Speeds) > common.PROGRESS_SPEED_LEN {
-		progress.Speeds = progress.Speeds[len(progress.Speeds)-common.PROGRESS_SPEED_LEN:]
+	if len(progress.Speeds) > consts.PROGRESS_SPEED_LEN {
+		progress.Speeds = progress.Speeds[len(progress.Speeds)-consts.PROGRESS_SPEED_LEN:]
 	}
-	progress.UpdatedAt = utils.GetMilliSecTimestamp()
+	progress.UpdatedAt = time.GetMilliSecTimestamp()
 	log.Debugf("%s, nodeAddr %s progress %v, speed %v", id, nodeAddr, progress, progress.Speeds)
 	progressBuf, err := json.Marshal(progress)
 	if err != nil {
@@ -752,6 +853,9 @@ func (this *TaskDB) IsFileUploaded(id string, isDispatched bool) bool {
 	}
 	log.Debugf("check is file %s uploaded total block %d, progress sum %d, copyNum: %d, is dispatched %t",
 		fi.FileHash, fi.TotalBlockCount, sum, fi.CopyNum, isDispatched)
+	if sum == 0 {
+		return false
+	}
 	if !isDispatched {
 		return fi.TotalBlockCount > 0 && fi.TotalBlockCount == sum
 	}
@@ -767,7 +871,7 @@ func (this *TaskDB) IsBlockUploaded(id, blockHashStr, nodeAddr string, index uin
 	}
 	for _, addr := range block.NodeList {
 		reqTime := block.ReqTimes[nodeAddr]
-		if nodeAddr == addr && reqTime > common.MAX_SAME_UPLOAD_BLOCK_NUM {
+		if nodeAddr == addr && reqTime > consts.MAX_SAME_UPLOAD_BLOCK_NUM {
 			return true
 		}
 	}
@@ -1104,6 +1208,8 @@ func (this *TaskDB) RemoveFromUndoneList(batch *leveldb.Batch, id string, ft Tas
 	switch ft {
 	case TaskTypeUpload:
 		undoneKey = FileUploadUndoneKey()
+	case TaskTypeDispatch:
+		undoneKey = FileDispatchUndoneKey()
 	case TaskTypeDownload:
 		undoneKey = FileDownloadUndoneKey()
 	case TaskTypeShare:
@@ -1145,6 +1251,8 @@ func (this *TaskDB) UndoneList(ft TaskType) ([]string, error) {
 	switch ft {
 	case TaskTypeUpload:
 		undoneKey = FileUploadUndoneKey()
+	case TaskTypeDispatch:
+		undoneKey = FileDispatchUndoneKey()
 	case TaskTypeDownload:
 		undoneKey = FileDownloadUndoneKey()
 	case TaskTypeShare:
@@ -1238,16 +1346,16 @@ func (this *TaskDB) UpdateTaskProgressState(id, nodeAddr string, state TaskState
 		progress = &FileProgress{
 			TaskId:       id,
 			NodeHostAddr: nodeAddr,
-			CreatedAt:    utils.GetMilliSecTimestamp(),
+			CreatedAt:    time.GetMilliSecTimestamp(),
 		}
 	}
 	log.Debugf("save  progress  before: %v %v", progress.Progress)
 	if state == TaskStateDoing {
 		progress.TransferCount++
 	}
-	progress.NextUpdatedAt = utils.GetMilliSecTimestamp() + common.DISPATCH_FILE_DURATION*1000
+	progress.NextUpdatedAt = time.GetMilliSecTimestamp() + consts.DISPATCH_FILE_DURATION*1000
 	progress.State = state
-	progress.UpdatedAt = utils.GetMilliSecTimestamp()
+	progress.UpdatedAt = time.GetMilliSecTimestamp()
 	progressBuf, err := json.Marshal(progress)
 	if err != nil {
 		return err
@@ -1276,8 +1384,8 @@ func (this *TaskDB) IsNodeTaskDoingOrDone(id, nodeAddr string) (bool, error) {
 		progress.State == TaskStateDoing, nil
 }
 
-func (this *TaskDB) SaveFileUploaded(id string) error {
-	return this.RemoveFromUndoneList(nil, id, TaskTypeUpload)
+func (this *TaskDB) SaveFileUploaded(id string, taskType TaskType) error {
+	return this.RemoveFromUndoneList(nil, id, taskType)
 }
 
 func (this *TaskDB) SaveFileDownloaded(id string) error {
@@ -1439,16 +1547,12 @@ func (this *TaskDB) GetFileUploadOptions(fileInfoId string) (*fs.UploadOption, e
 	return opt, nil
 }
 
-func (this *TaskDB) SetFileDownloadOptions(fileInfoId string, options *common.DownloadOption) error {
-	buf, err := json.Marshal(options)
-	if err != nil {
-		return err
-	}
+func (this *TaskDB) SetFileDownloadOptions(fileInfoId string, buf []byte) error {
 	key := FileOptionsKey(fileInfoId)
 	return this.db.Put([]byte(key), buf)
 }
 
-func (this *TaskDB) GetFileDownloadOptions(fileInfoId string) (*common.DownloadOption, error) {
+func (this *TaskDB) GetFileDownloadOptions(fileInfoId string) ([]byte, error) {
 	key := FileOptionsKey(fileInfoId)
 	value, err := this.db.Get([]byte(key))
 	if err != nil && err != leveldb.ErrNotFound {
@@ -1457,12 +1561,7 @@ func (this *TaskDB) GetFileDownloadOptions(fileInfoId string) (*common.DownloadO
 	if len(value) == 0 {
 		return nil, nil
 	}
-	opt := &common.DownloadOption{}
-	err = json.Unmarshal(value, opt)
-	if err != nil {
-		return nil, err
-	}
-	return opt, nil
+	return value, nil
 }
 
 func (this *TaskDB) AddFileSession(fileInfoId, sessionId, walletAddress, hostAddress string, asset uint32, unitPrice uint64) error {
@@ -1639,13 +1738,14 @@ func (this *TaskDB) GetUnDispatchTaskInfos(curWalletAddr string) ([]*TaskInfo, e
 	if err != nil {
 		return nil, err
 	}
+	exist := make(map[string]struct{}, 0)
 	taskInfos := make([]*TaskInfo, 0, len(keys))
 	for _, key := range keys {
 		info, err := this.getTaskInfoByKey(key)
 		if err != nil || info == nil {
 			continue
 		}
-		if info.Type != TaskTypeUpload {
+		if info.Type != TaskTypeUpload && info.Type != TaskTypeDispatch {
 			continue
 		}
 		if info.TaskState == TaskStateDone {
@@ -1654,11 +1754,16 @@ func (this *TaskDB) GetUnDispatchTaskInfos(curWalletAddr string) ([]*TaskInfo, e
 		if info.FileOwner == curWalletAddr {
 			continue
 		}
+		if _, ok := exist[info.Id]; ok {
+			continue
+		}
 		newInfo := this.CopyTask(info)
 		if newInfo == nil {
 			log.Warnf("copy task %s failed", info.Id)
 			continue
 		}
+
+		exist[newInfo.Id] = struct{}{}
 		taskInfos = append(taskInfos, newInfo)
 	}
 	return taskInfos, nil
@@ -1840,10 +1945,10 @@ func appendToStringSlice(data []byte, value string) ([]byte, error) {
 
 func (this *TaskDB) batchSaveTaskInfo(batch *leveldb.Batch, info *TaskInfo) error {
 	if info.DoneAt == 0 {
-		info.UpdatedAt = utils.GetMilliSecTimestamp()
+		info.UpdatedAt = time.GetMilliSecTimestamp()
 	}
 	if info.TaskState == TaskStateDone && info.DoneAt == 0 {
-		info.DoneAt = utils.GetMilliSecTimestamp()
+		info.DoneAt = time.GetMilliSecTimestamp()
 	}
 	key := []byte(TaskInfoKey(info.Id))
 	buf, err := json.Marshal(info)

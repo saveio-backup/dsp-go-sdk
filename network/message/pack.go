@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
 	"github.com/saveio/dsp-go-sdk/network/message/types/progress"
-	dspUtils "github.com/saveio/dsp-go-sdk/utils"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -21,10 +21,17 @@ var msgRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 // https://github.com/golang/go/issues/21835
 var mu = new(sync.Mutex)
 
+func GenIdByTimestamp(r *rand.Rand) string {
+	if r == nil {
+		r = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+	return fmt.Sprintf("%d%d", time.Now().UnixNano(), 100000+r.Int31n(900000))
+}
+
 func GenMessageId() string {
 	mu.Lock()
 	defer mu.Unlock()
-	return dspUtils.GenIdByTimestamp(msgRand)
+	return GenIdByTimestamp(msgRand)
 }
 
 func MessageHeader() *Header {

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/saveio/dsp-go-sdk/config"
 	chain "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis-go-sdk/wallet"
 	cliUtil "github.com/saveio/themis/cmd/utils"
@@ -95,14 +94,14 @@ func TestDepositChannel(t *testing.T) {
 	}
 	chain.SetDefaultAccount(acc2)
 
-	cfg := &config.DspConfig{
-		ChainRpcAddr:         rpcAddr,
-		ChannelClientType:    "rpc",
-		ChannelListenAddr:    channel3Addr,
-		ChannelProtocol:      "tcp",
-		ChannelRevealTimeout: "1000",
-	}
-	c, _ := NewChannelService(cfg, chain)
+	// cfg := &config.DspConfig{
+	// 	ChainRpcAddr:         rpcAddr,
+	// 	ChannelClientType:    "rpc",
+	// 	ChannelListenAddr:    channel3Addr,
+	// 	ChannelProtocol:      "tcp",
+	// 	ChannelRevealTimeout: "1000",
+	// }
+	c, _ := NewChannelService(chain)
 	id, err := c.OpenChannel(acc.Address.ToBase58(), 0)
 	if err != nil {
 		t.Fatal(err)
@@ -137,17 +136,17 @@ func TestGetTargetBalance(t *testing.T) {
 	chain := chain.NewChain()
 	chain.NewRpcClient().SetAddress([]string{rpcAddr})
 	chain.SetDefaultAccount(acc)
-	cfg := &config.DspConfig{
-		ChainRpcAddr:         rpcAddr,
-		ChannelClientType:    "rpc",
-		ChannelListenAddr:    channel3Addr,
-		ChannelProtocol:      "tcp",
-		ChannelRevealTimeout: "1000",
-	}
+	// cfg := &config.DspConfig{
+	// 	ChainRpcAddr:         rpcAddr,
+	// 	ChannelClientType:    "rpc",
+	// 	ChannelListenAddr:    channel3Addr,
+	// 	ChannelProtocol:      "tcp",
+	// 	ChannelRevealTimeout: "1000",
+	// }
 	target := "ANa3f9jm2FkWu4NrVn6L1FGu7zadKdvPjL"
 	if target == "" {
 	}
-	c, _ := NewChannelService(cfg, chain)
+	c, _ := NewChannelService(chain)
 
 	err = c.StartService()
 	if err != nil {

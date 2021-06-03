@@ -1,6 +1,6 @@
 package dsp
 
-import "github.com/saveio/dsp-go-sdk/state"
+import "github.com/saveio/dsp-go-sdk/types/state"
 
 type ModuleStateResp struct {
 	Id    int
@@ -10,22 +10,22 @@ type ModuleStateResp struct {
 
 func (this *Dsp) GetModuleState() []*ModuleStateResp {
 	var stateOfChain, stateOfFs, stateOfDNS, stateOfChannel state.ModuleState
-	if this.chain != nil {
-		stateOfChain = this.chain.State()
+	if this.Chain != nil {
+		stateOfChain = this.Chain.State()
 	}
 	if this.Running() {
-		if this.fs != nil {
-			stateOfFs = this.fs.State()
+		if this.Fs != nil {
+			stateOfFs = this.Fs.State()
 		} else {
 			stateOfFs = state.ModuleStateError
 		}
-		if this.dns != nil {
-			stateOfDNS = this.dns.State()
+		if this.DNS != nil {
+			stateOfDNS = this.DNS.State()
 		} else {
 			stateOfDNS = state.ModuleStateError
 		}
-		if this.channel != nil {
-			stateOfChannel = this.channel.State()
+		if this.Channel != nil {
+			stateOfChannel = this.Channel.State()
 		} else {
 			stateOfChannel = state.ModuleStateError
 		}

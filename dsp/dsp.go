@@ -5,19 +5,17 @@ import (
 	"time"
 
 	"github.com/ontio/ontology-eventbus/actor"
-	"github.com/saveio/dsp-go-sdk/actor/client"
 	dspActorClient "github.com/saveio/dsp-go-sdk/actor/client"
-	"github.com/saveio/dsp-go-sdk/common"
 	"github.com/saveio/dsp-go-sdk/config"
+	"github.com/saveio/dsp-go-sdk/consts"
 	"github.com/saveio/dsp-go-sdk/core/chain"
 	"github.com/saveio/dsp-go-sdk/core/channel"
 	"github.com/saveio/dsp-go-sdk/core/dns"
 	"github.com/saveio/dsp-go-sdk/core/fs"
 	dspErr "github.com/saveio/dsp-go-sdk/error"
-	"github.com/saveio/dsp-go-sdk/state"
 	"github.com/saveio/dsp-go-sdk/store"
-	"github.com/saveio/dsp-go-sdk/task"
-	"github.com/saveio/dsp-go-sdk/utils/ticker"
+	"github.com/saveio/dsp-go-sdk/taskmgr"
+	"github.com/saveio/dsp-go-sdk/types/state"
 	chActorClient "github.com/saveio/pylons/actor/client"
 	"github.com/saveio/themis/account"
 	"github.com/saveio/themis/common/log"
@@ -27,38 +25,31 @@ import (
 var Version string
 
 type Dsp struct {
-	account           *account.Account         // Chain account of current login user
+	Chain             *chain.Chain             // Chain component
+	Fs                *fs.Fs                   // FS component
+	DNS               *dns.DNS                 // DNS component
+	Channel           *channel.Channel         // Channel Component
+	TaskMgr           *taskmgr.TaskMgr         // task mgr
 	config            *config.DspConfig        // Dsp global config
-	chain             *chain.Chain             // Chain component
-	fs                *fs.Fs                   // FS component
-	channel           *channel.Channel         // Channel Component
-	dns               *dns.DNS                 // DNS component
-	taskMgr           *task.TaskMgr            // Task Mgr
 	levelDBStore      *store.LevelDBStore      // Level DB
-	shareRecordDB     *store.ShareRecordDB     // share_record db
 	userspaceRecordDB *store.UserspaceRecordDB // user space db
 	state             *state.SyncState         // dsp state
 	closeCh           chan struct{}            // close signal
-	retryTaskTicker   *ticker.Ticker           // retry task ticker
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
-	d := &Dsp{
-		dns: &dns.DNS{},
-	}
+	d := &Dsp{}
 	d.state = state.NewSyncState()
 	if c == nil {
 		return d
 	}
 	d.config = c
-	if d.IsClient() {
-		d.taskMgr = task.NewTaskMgr(ticker.NewTicker(time.Duration(common.TASK_PROGRESS_TICKER_DURATION)*time.Second, d.RunGetProgressTicker))
-	} else {
-		d.taskMgr = task.NewTaskMgr(nil)
-	}
-	d.retryTaskTicker = ticker.NewTicker(time.Second, d.retryTaskService)
-	d.chain = chain.NewChain(acc, c.ChainRpcAddrs, chain.IsClient(d.IsClient()))
-	d.account = acc
+
+	d.Chain = chain.NewChain(acc, c.ChainRpcAddrs,
+		chain.IsClient(d.IsClient()),
+		chain.BlockConfirm(c.BlockConfirm),
+	)
+	// d.account = acc
 	if len(c.DBPath) > 0 {
 		var err error
 		d.levelDBStore, err = store.NewLevelDBStore(c.DBPath)
@@ -66,24 +57,24 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 			log.Errorf("init db err %s", err)
 			return nil
 		}
-		d.shareRecordDB = store.NewShareRecordDB(d.levelDBStore)
 		d.userspaceRecordDB = store.NewUserspaceRecordDB(d.levelDBStore)
-		d.taskMgr.SetFileDB(d.levelDBStore)
-		err = d.taskMgr.RecoverUndoneTask()
-		if err != nil {
-			log.Errorf("recover undone task err %s", err)
-		}
-		go d.RecoverDBLossTask()
+
 	}
 	if len(c.FsRepoRoot) > 0 {
 		var err error
-		d.fs, err = fs.NewFs(c, d.chain.Themis())
+		d.Fs, err = fs.NewFs(d.Chain.Themis(),
+			fs.RepoRoot(d.config.FsRepoRoot),
+			fs.FsType(d.config.FsType),
+			fs.ChunkSize(consts.CHUNK_SIZE),
+			fs.GcPeriod(d.config.FsGcPeriod),
+			fs.MaxStorage(d.config.FsMaxStorage),
+		)
 		if err != nil {
 			log.Errorf("init fs err %s", err)
 			return nil
 		}
 	}
-	dspActorClient.SetP2pPid(p2pActor)
+	dspActorClient.SetP2PPid(p2pActor)
 	if len(c.ChannelListenAddr) > 0 && acc != nil {
 		if err := d.initChannelService(); err != nil {
 			log.Errorf("init channel err %s", err)
@@ -92,26 +83,35 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 			chActorClient.SetP2pPid(p2pActor)
 		}
 	}
-	d.dns = dns.NewDNS(d.chain, d.channel,
+	log.Infof("start init dns with chain %v, channel %v", d.Chain, d.Channel)
+	d.DNS = dns.NewDNS(d.Chain, d.Channel,
 		dns.MaxDNSNodeNum(d.config.DnsNodeMaxNum),
-		dns.DNSWalletAddrsFromCfg(d.config.DNSWalletAddrs),
+		dns.ReservedDNS(d.config.DNSWalletAddrs),
 		dns.TrackerProtocol(d.config.TrackerProtocol),
-		dns.TrackersFromCfg(d.config.Trackers),
+		dns.ReservedTrackers(d.config.Trackers),
 		dns.ChannelProtocol(d.config.ChannelProtocol),
 		dns.AutoBootstrap(d.config.AutoSetupDNSEnable))
+
+	d.TaskMgr = taskmgr.NewTaskMgr(d.Chain, d.Fs, d.DNS, d.Channel, d.config)
+	d.TaskMgr.SetFileDB(d.levelDBStore)
+
+	if err := d.TaskMgr.RecoverUndoneTask(); err != nil {
+		log.Errorf("recover undone task err %s", err)
+	}
+	go d.RecoverDBLossTask()
 	return d
 }
 
 func (this *Dsp) GetVersion() string {
-	return common.DSP_SDK_VERSION
+	return consts.DSP_SDK_VERSION
 }
 
 func (this *Dsp) IsClient() bool {
-	return this.config.FsType == config.FS_FILESTORE
+	return this.config.FsType == consts.FS_FILESTORE
 }
 
 func (this *Dsp) IsFs() bool {
-	return this.config.FsType == config.FS_BLOCKSTORE
+	return this.config.FsType == consts.FS_BLOCKSTORE
 }
 
 func (this *Dsp) Start() error {
@@ -122,18 +122,18 @@ func (this *Dsp) Start() error {
 	}
 	this.closeCh = make(chan struct{})
 	this.state.Set(state.ModuleStateStarting)
-	if err := this.dns.SetupTrackers(); err != nil {
+	if err := this.DNS.SetupTrackers(); err != nil {
 		this.state.Set(state.ModuleStateError)
 		return err
 	}
 
-	if this.channel != nil {
+	if this.Channel != nil {
 		if err := this.StartChannelService(); err != nil {
 			this.state.Set(state.ModuleStateError)
 			return err
 		}
-		this.dns.Channel = this.channel
-		this.dns.BootstrapDNS()
+		// this.DNS.Channel = this.Channel
+		this.DNS.Discovery()
 	}
 
 	// start seed service
@@ -142,13 +142,8 @@ func (this *Dsp) Start() error {
 	}
 	// start backup service
 	if this.IsFs() {
-		if this.config.EnableBackup {
-			log.Debugf("start backup file service ")
-			go this.StartBackupFileService()
-		}
-		go this.StartCheckRemoveFiles()
-		go this.startDispatchFileService()
-		go this.startDNSHealthCheckService()
+
+		go this.DNS.StartDNSHealthCheckService()
 	}
 	if this.IsClient() {
 		sys.MonitorEnable = false
@@ -156,25 +151,22 @@ func (this *Dsp) Start() error {
 	}
 	if this.IsClient() && this.config.HealthCheckDNS {
 		log.Debugf("startDNSHealthCheckService")
-		go this.startDNSHealthCheckService()
+		go this.DNS.StartDNSHealthCheckService()
 	}
-	unSalve, _ := this.taskMgr.GetUnSlavedTasks()
-	if len(unSalve) > 0 {
-		this.taskMgr.RunGetProgress()
-	}
+
 	this.state.Set(state.ModuleStateStarted)
 	this.state.Set(state.ModuleStateActive)
 	log.Debugf("runing...")
-
+	go this.TaskMgr.StartService()
 	return nil
 }
 
 func (this *Dsp) StartChannelService() error {
-	if this.channel == nil {
+	if this.Channel == nil {
 		return dspErr.New(dspErr.CHANNEL_START_SERVICE_ERROR, "channel is nil")
 	}
-	this.registerReceiveNotification()
-	if err := this.channel.StartService(); err != nil {
+	this.TaskMgr.ReceiveMediaTransferNotify()
+	if err := this.Channel.StartService(); err != nil {
 		return err
 	}
 	time.Sleep(time.Second)
@@ -183,23 +175,22 @@ func (this *Dsp) StartChannelService() error {
 
 func (this *Dsp) Stop() error {
 	this.state.Set(state.ModuleStateStopping)
-	if this.taskMgr.HasRunningTask() {
+	if this.TaskMgr.HasRunningTask() {
 		this.state.Set(state.ModuleStateActive)
 		return fmt.Errorf("exist running task")
 	}
 	close(this.closeCh)
-	err := this.taskMgr.CloseDB()
-	if err != nil {
+	if err := this.TaskMgr.Stop(); err != nil {
 		log.Errorf("close fileDB err %s", err)
 		this.state.Set(state.ModuleStateError)
 		return err
 	}
-	if this.channel != nil {
-		this.channel.StopService()
-		this.channel = nil
+	if this.Channel != nil {
+		this.Channel.StopService()
+		this.Channel = nil
 	}
-	if this.fs != nil {
-		err := this.fs.Close()
+	if this.Fs != nil {
+		err := this.Fs.Close()
 		if err != nil {
 			log.Errorf("close fs err %s", err)
 			this.state.Set(state.ModuleStateError)
@@ -237,11 +228,11 @@ func (this *Dsp) StartSeedService() {
 	tick := time.NewTicker(time.Duration(this.config.SeedInterval) * time.Second)
 	defer tick.Stop()
 	for {
-		_, files, err := this.taskMgr.AllDownloadFiles()
+		_, files, err := this.TaskMgr.AllDownloadFiles()
 		if err != nil {
 			log.Errorf("push seed service err %v", err)
 		} else {
-			this.dns.PushFilesToTrackers(files)
+			this.DNS.PushFilesToTrackers(files)
 		}
 		select {
 		case <-tick.C:
@@ -256,22 +247,23 @@ func (this *Dsp) StartSeedService() {
 	}
 }
 
-func (this *Dsp) startDNSHealthCheckService() {
-	for walletAddr, _ := range this.dns.OnlineDNS {
-		log.Infof("append walletAddr %s to health check", walletAddr)
-		client.P2pAppendAddrForHealthCheck(walletAddr, client.P2pNetTypeChannel)
-	}
-}
-
 func (this *Dsp) initChannelService() error {
-	ch, err := channel.NewChannelService(this.config, this.chain.Themis())
+	ch, err := channel.NewChannelService(
+		this.Chain.Themis(),
+		channel.ClientType(this.config.ChannelClientType),
+		channel.RevealTimeout(this.config.ChannelRevealTimeout),
+		channel.DBPath(this.config.ChannelDBPath),
+		channel.SettleTimeout(this.config.ChannelSettleTimeout),
+		channel.BlockDelay(this.config.BlockDelay),
+		channel.IsClient(this.IsClient()),
+		channel.ChannelDB(store.NewChannelDB(this.levelDBStore)),
+	)
 	if err != nil {
 		log.Errorf("init channel err %s", err)
 		return err
 	}
-	this.channel = ch
-	channelDB := store.NewChannelDB(this.levelDBStore)
-	this.channel.SetChannelDB(channelDB)
+	this.Channel = ch
+	log.Infof("init channel service success ch %v", this.Channel)
 
 	return nil
 }

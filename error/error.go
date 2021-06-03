@@ -41,9 +41,26 @@ func NewWithError(code uint32, err error) *Error {
 	}
 }
 
+// Error. implement error string
 func (serr *Error) Error() string {
 	if serr == nil {
 		return "error is nil"
 	}
 	return fmt.Sprintf("code: %d, message: %v", serr.Code, serr.Message)
 }
+
+func (serr *Error) Unwrap() error {
+	return serr.Cause
+}
+
+// HasErrorCode. check if a error has same error code
+func (serr *Error) HasErrorCode(errCode uint32) bool {
+	if serr == nil {
+		return false
+	}
+	return serr.Code == errCode
+}
+
+// func ConntextTimeoutErr(err error) bool {
+// 	return strings.Contains(err.Error(), "context deadline exceeded")
+// }
