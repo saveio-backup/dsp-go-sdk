@@ -961,7 +961,7 @@ func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext,
 	progressMsg := msg.Payload.(*progress.Progress)
 	nodeInfos := make([]*progress.ProgressInfo, 0)
 	for _, info := range progressMsg.Infos {
-		id := this.TaskMgr.GetUploadTaskId(progressMsg.Hash, this.WalletAddress())
+		id := this.TaskMgr.GetDownloadedTaskId(progressMsg.Hash, this.WalletAddress())
 		var prog *store.FileProgress
 		if len(id) != 0 {
 			prog = this.TaskMgr.GetTaskPeerProgress(id, info.WalletAddr)

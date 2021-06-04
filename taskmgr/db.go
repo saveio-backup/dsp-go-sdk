@@ -15,7 +15,7 @@ func (this *TaskMgr) GetUploadTaskId(fileHashStr, walletAddr string) string {
 	}
 	task := this.db.GetUploadTaskByFields(fields)
 	if task == nil {
-		log.Errorf("get upload task by fields %v ", fields)
+		log.Errorf("get nil upload task by fields %v ", fields)
 		return ""
 	}
 	return task.Id
@@ -27,7 +27,7 @@ func (this *TaskMgr) GetUploadTaskByFileHash(fileHashStr string) *store.TaskInfo
 	fields[store.TaskInfoFieldWalletAddress] = this.chain.WalletAddress()
 	task := this.db.GetUploadTaskByFields(fields)
 	if task == nil {
-		log.Errorf("get upload task by fields %v", fields)
+		log.Errorf("get nil upload task by fields %v", fields)
 		return nil
 	}
 	return task

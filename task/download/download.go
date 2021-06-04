@@ -951,7 +951,6 @@ func (this *DownloadTask) workBackground() {
 					done <- resp
 				}
 			}
-			log.Debugf("workers outside for loop")
 		}()
 	}
 }
