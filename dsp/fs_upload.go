@@ -107,6 +107,11 @@ func (this *Dsp) CancelUpload(taskId string, gasLimit uint64) (*types.DeleteUplo
 		return uploadTask.Cancel("", 0)
 	}
 
+	if uploadTask.IsTaskPaying() {
+		log.Debugf("upload task %s is paying, can't cancel", taskId)
+		return nil, sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, "upload task %s is paying, can't cancel", taskId)
+	}
+
 	txHashStr, txHeight, err := this.DeleteUploadFilesFromChain(fileHashStrs, gasLimit)
 	log.Debugf("delete upload task %s from chain :%s, %d, %v", taskId, txHashStr, txHeight, err)
 	if err != nil {
@@ -115,7 +120,12 @@ func (this *Dsp) CancelUpload(taskId string, gasLimit uint64) (*types.DeleteUplo
 		}
 	}
 
-	return uploadTask.Cancel(txHashStr, txHeight)
+	resp, err := uploadTask.Cancel(txHashStr, txHeight)
+	if err != nil {
+		log.Errorf("cancel task %s err %s", taskId, err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (this *Dsp) RetryUpload(taskId string) error {
