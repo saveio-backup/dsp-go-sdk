@@ -154,18 +154,19 @@ func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (str
 	this.EmitProgress(types.TaskUploadFileRegisterDNS)
 	var dnsRegTx, dnsBindTx string
 	var err error
-	if opt.RegisterDNS && len(opt.DnsURL) > 0 {
-		dnsRegTx, err = this.Mgr.DNS().RegisterFileUrl(string(opt.DnsURL), saveLink)
+	urlString := string(opt.DnsURL)
+	if opt.RegisterDNS && len(urlString) > 0 {
+		dnsRegTx, err = this.Mgr.DNS().RegisterFileUrl(string(urlString), saveLink)
 		if err != nil {
-			log.Errorf("register url err: %s", err)
+			log.Errorf("register url %s err: %s", urlString, err)
 			return "", "", err
 		}
 		log.Debugf("acc %s, reg dns %s for %s", this.Mgr.Chain().WalletAddress(), dnsRegTx, this.GetFileHash())
 	}
-	if opt.BindDNS && len(opt.DnsURL) > 0 {
-		dnsBindTx, err = this.Mgr.DNS().BindFileUrl(string(opt.DnsURL), saveLink)
+	if opt.BindDNS && len(urlString) > 0 {
+		dnsBindTx, err = this.Mgr.DNS().BindFileUrl(string(urlString), saveLink)
 		if err != nil {
-			log.Errorf("bind url err: %s", err)
+			log.Errorf("bind url %s err: %s", urlString, err)
 			return "", "", err
 		}
 		log.Debugf("bind dns %s for file %s", dnsBindTx, this.GetFileHash())
@@ -176,7 +177,7 @@ func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (str
 		_, err := this.Mgr.Chain().WaitForGenerateBlock(time.Duration(consts.TX_CONFIRM_TIMEOUT) * time.Second)
 		this.EmitProgress(types.TaskWaitForBlockConfirmedDone)
 		if err != nil {
-			log.Errorf("[Dsp registerUrls] wait for generate block failed, err %s", err)
+			log.Errorf("register url %s  wait for generate block failed, err %s", urlString, err)
 			return "", "", err
 		}
 	}
@@ -306,8 +307,9 @@ func (this *UploadTask) publishFile(opt *fs.UploadOption) (*types.UploadResult, 
 		if err != nil {
 			return nil, err
 		}
-
 	}
+	log.Debugf("publish file %s with reg tx %s, bind tx %s",
+		fileLink.FileHashStr, dnsRegTx, dnsBindTx)
 
 	if err := this.SetInfoWithOptions(
 		base.Url(string(opt.DnsURL)),

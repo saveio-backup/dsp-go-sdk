@@ -125,7 +125,7 @@ func (this *TaskMgr) UploadTaskExist(filePath string) (bool, error) {
 func (this *TaskMgr) EmitUploadResult(taskId string, result interface{}, sdkErr *sdkErr.Error) {
 	tsk := this.GetUploadTask(taskId)
 	if tsk == nil {
-		log.Errorf("[TaskMgr EmitResult] emit result get no task")
+		log.Errorf("stop emit upload result, task %s not found", taskId)
 		return
 	}
 

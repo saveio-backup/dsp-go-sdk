@@ -489,23 +489,6 @@ func (this *TaskDB) GetShareTaskByFields(fields map[string]string) *TaskInfo {
 	return nil
 }
 
-// func (this *TaskDB) DeleteFileInfoId(key string) error {
-// 	return this.db.Delete([]byte(key))
-// }
-
-// func (this *TaskDB) SetFileName(id string, fileName string) error {
-
-// 	fi, err := this.GetTaskInfo(id)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if fi == nil {
-// 		return fmt.Errorf("fileinfo not found of %s", id)
-// 	}
-// 	fi.FileName = fileName
-// 	return this.batchSaveTaskInfo(nil, fi)
-// }
-
 func (this *TaskDB) HideTaskIds(ids []string) error {
 	batch := this.db.NewBatch()
 	for _, id := range ids {
@@ -1636,6 +1619,17 @@ func (this *TaskDB) GetFileSessions(fileInfoId string) (map[string]*Session, err
 
 // saveFileInfo. helper function, put fileinfo to db
 func (this *TaskDB) SaveTaskInfo(info *TaskInfo) error {
+	// try find info first
+	this.dbLock.Lock()
+	defer this.dbLock.Unlock()
+
+	key := []byte(TaskInfoKey(info.Id))
+	value, _ := this.db.Get(key)
+	if len(value) == 0 {
+		log.Debugf("ignore save task info %s, because it's deleted", info.Id)
+		return nil
+	}
+
 	return this.batchSaveTaskInfo(nil, info)
 }
 
