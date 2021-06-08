@@ -255,13 +255,19 @@ func (this *TaskMgr) TaskExist(taskId string) bool {
 // CleanTask. clean task from memory and DB
 func (this *TaskMgr) CleanTasks(taskId []string) error {
 	for _, id := range taskId {
-		if err := this.CleanUploadTask(id); err != nil {
-			log.Errorf("clean upload task %s failed, err %s", id, err)
+		if task := this.GetUploadTask(id); task != nil {
+			if err := this.CleanUploadTask(id); err != nil {
+				log.Errorf("clean upload task %s failed, err %s", id, err)
+				continue
+			}
 			continue
 		}
-		if err := this.CleanDownloadTask(id); err != nil {
-			log.Errorf("clean download task %s failed, err %s", id, err)
-			continue
+
+		if task := this.GetDownloadTask(id); task != nil {
+			if err := this.CleanDownloadTask(id); err != nil {
+				log.Errorf("clean download task %s failed, err %s", id, err)
+				continue
+			}
 		}
 	}
 	return nil

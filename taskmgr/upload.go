@@ -390,6 +390,7 @@ func (this *TaskMgr) cleanUploadTask(taskId string) error {
 	log.Debugf("clean task %s, %s", taskId, debug.Stack())
 	err := this.db.DeleteTaskInfo(taskId)
 	if err != nil {
+		log.Errorf("delete task info %s err %s", taskId, err)
 		return sdkErr.NewWithError(sdkErr.SET_FILEINFO_DB_ERROR, err)
 	}
 	return nil

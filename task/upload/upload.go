@@ -410,7 +410,7 @@ func (this *UploadTask) Cancel(tx string, txHeight uint32) (*types.DeleteUploadF
 		if err == nil {
 			return nil, nil
 		}
-		log.Errorf("delete task err %s", err)
+		log.Errorf("delete task %s with no fileHash err %s", taskId, err)
 		this.SetTaskState(oldState)
 		return nil, sdkErr.New(sdkErr.DELETE_FILE_FAILED, "delete task failed %s, err: %v", fileHashStr, err)
 	}
@@ -431,7 +431,7 @@ func (this *UploadTask) Cancel(tx string, txHeight uint32) (*types.DeleteUploadF
 		if err == nil {
 			return resp, nil
 		}
-		log.Errorf("delete task err %s", err)
+		log.Errorf("delete task of file %s with no nodes err %s", fileHashStr, err)
 		this.SetTaskState(oldState)
 		return nil, sdkErr.New(sdkErr.DELETE_FILE_FAILED, "delete task failed %s, err: %v", fileHashStr, err)
 
@@ -444,7 +444,7 @@ func (this *UploadTask) Cancel(tx string, txHeight uint32) (*types.DeleteUploadF
 		message.WithSign(this.Mgr.Chain().CurrentAccount()),
 	)
 	ret, err := client.P2PBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId)
-	log.Debugf("broadcast cancel msg ret %v, err: %s", ret, err)
+	log.Debugf("broadcast cancel file %s msg ret %v, err: %s", fileHashStr, ret, err)
 	resp, err := this.sendDeleteMsg(tx, txHeight)
 	if err != nil {
 		this.SetTaskState(oldState)

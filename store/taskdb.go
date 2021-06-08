@@ -526,6 +526,7 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 	defer this.DelTaskLock(id)
 	taskCount, err := this.getTaskCount()
 	if err != nil {
+		log.Errorf("delete task %s get task count err %s", id, err)
 		return err
 	}
 	batch := this.db.NewBatch()
@@ -533,11 +534,13 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 	countKey := []byte(FileSessionCountKey(id))
 	data, err := this.db.Get(countKey)
 	if err != nil && err != leveldb.ErrNotFound {
+		log.Errorf("delete task %s get file session err %s", id, err)
 		return err
 	}
 	if len(data) > 0 {
 		count, err := strconv.ParseInt(string(data), 10, 64)
 		if err != nil {
+			log.Errorf("delete task %s parse data %s err %s", id, string(data), err)
 			return err
 		}
 		for i := 0; i < int(count); i++ {
@@ -554,12 +557,14 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 	// delete blocks
 	err = this.batchDeleteBlocks(batch, fi)
 	if err != nil {
+		log.Errorf("delete task %s batch delete blocks err %s", id, err)
 		return err
 	}
 
 	// delete progress
 	err = this.batchDeleteProgress(batch, id)
 	if err != nil {
+		log.Errorf("delete task %s batch delete progress err %s", id, err)
 		return err
 	}
 
@@ -567,6 +572,7 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 	if fi != nil {
 		err = this.RemoveFromUnSalvedList(batch, id, fi.Type)
 		if err != nil {
+			log.Errorf("delete task %s unsalved err %s", id, err)
 			return err
 		}
 	}
@@ -592,6 +598,7 @@ func (this *TaskDB) DeleteTaskInfo(id string) error {
 		}
 		err = this.batchSaveTaskCount(batch, taskCount)
 		if err != nil {
+			log.Errorf("delete task %s save task count err %s", id, err)
 			return err
 		}
 		// delete file info id
