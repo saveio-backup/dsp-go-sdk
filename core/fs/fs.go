@@ -80,6 +80,7 @@ func (this *Fs) Close() error {
 		return sdkErr.NewWithError(sdkErr.FS_CLOSE_ERROR, err)
 	}
 	this.state.Set(state.ModuleStateStopped)
+	log.Infof("dsp core fs stopped")
 	return nil
 }
 

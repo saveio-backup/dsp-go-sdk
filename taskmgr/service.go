@@ -16,10 +16,6 @@ import (
 	cUtils "github.com/saveio/themis/smartcontract/service/native/utils"
 )
 
-func (this *TaskMgr) Running() bool {
-	return this.running
-}
-
 // ReceiveMediaTransferNotify. register receive payment notification
 func (this *TaskMgr) ReceiveMediaTransferNotify() {
 	log.Debugf("registerReceiveNotification")
@@ -72,6 +68,7 @@ func (this *TaskMgr) ReceiveMediaTransferNotify() {
 				this.InsertShareRecord(taskId, fileHashStr, fileName, fileOwner,
 					addr.ToBase58(), uint64(event.Amount))
 			case <-this.channel.GetCloseCh():
+				log.Debugf("taskmgr stop receive mediatransfer notify service")
 				return
 			}
 		}
@@ -79,7 +76,6 @@ func (this *TaskMgr) ReceiveMediaTransferNotify() {
 }
 
 func (this *TaskMgr) StartService() {
-	this.running = true
 	go this.startShareServices()
 	go this.progressTicker.Run()
 
@@ -98,41 +94,43 @@ func (this *TaskMgr) startDispatchFile() {
 	log.Debugf("start dispatch file service")
 	ticker := time.NewTicker(time.Duration(consts.DISPATCH_FILE_DURATION) * time.Second)
 	for {
-		<-ticker.C
-		if !this.Running() {
-			log.Debugf("stop fetch file service")
+		select {
+		case <-ticker.C:
+			tasks, err := this.db.GetUnDispatchTaskInfos(this.chain.WalletAddress())
+			if err != nil {
+				log.Errorf("get dispatch task failed %s", err)
+				continue
+			}
+			log.Debugf("find %v task need to dispatch", len(tasks))
+			for _, t := range tasks {
+				if len(t.ReferId) == 0 {
+					log.Debugf("skip dispatch task %s because its referId is empty", t.Id)
+					continue
+				}
+				dispatchTask := this.GetDispatchTask(t.Id)
+				if dispatchTask == nil {
+					log.Errorf("dispatch file service get dispatch nil from taskId %s", t.Id)
+					continue
+				}
+				if this.db.IsFileUploaded(t.Id, true) {
+					log.Debugf("find %s task has uploaded, skip dispatch", t.Id)
+					// update task state
+					dispatchTask.SetTaskState(store.TaskStateDone)
+					continue
+				}
+				if prepare, doing := dispatchTask.IsTaskPreparingOrDoing(); prepare || doing {
+					log.Debugf("dispatch task %v is prepare %t or doing %t, skip it", t.Id, prepare, doing)
+					continue
+				}
+				log.Debugf("get task %s to dispatch %s", t.Id, t.FileHash)
+				go dispatchTask.Start()
+			}
+		case <-this.closeCh:
+			log.Debugf("taskmgr stop dispatch file service")
 			ticker.Stop()
 			return
 		}
-		tasks, err := this.db.GetUnDispatchTaskInfos(this.chain.WalletAddress())
-		if err != nil {
-			log.Errorf("get dispatch task failed %s", err)
-			continue
-		}
-		log.Debugf("find %v task need to dispatch", len(tasks))
-		for _, t := range tasks {
-			if len(t.ReferId) == 0 {
-				log.Debugf("skip dispatch task %s because its referId is empty", t.Id)
-				continue
-			}
-			dispatchTask := this.GetDispatchTask(t.Id)
-			if dispatchTask == nil {
-				log.Errorf("dispatch file service get dispatch nil from taskId %s", t.Id)
-				continue
-			}
-			if this.db.IsFileUploaded(t.Id, true) {
-				log.Debugf("find %s task has uploaded, skip dispatch", t.Id)
-				// update task state
-				dispatchTask.SetTaskState(store.TaskStateDone)
-				continue
-			}
-			if prepare, doing := dispatchTask.IsTaskPreparingOrDoing(); prepare || doing {
-				log.Debugf("dispatch task %v is prepare %t or doing %t, skip it", t.Id, prepare, doing)
-				continue
-			}
-			log.Debugf("get task %s to dispatch %s", t.Id, t.FileHash)
-			go dispatchTask.Start()
-		}
+
 	}
 
 }
@@ -152,6 +150,9 @@ func (this *TaskMgr) startShareServices() {
 			shareTask := this.GetShareTaskByFileHash(req[0].FileHash, req[0].WalletAddress)
 
 			go shareTask.ShareBlock(req)
+		case <-this.closeCh:
+			log.Debugf("taskmgr stop share file service")
+			return
 		}
 	}
 }
@@ -293,11 +294,7 @@ func (this *TaskMgr) startCheckRemoveFiles() {
 	for {
 		select {
 		case <-ticker.C:
-			if !this.Running() {
-				log.Debugf("stop check remove files service")
-				ticker.Stop()
-				return
-			}
+
 			files := this.fs.RemovedExpiredFiles()
 			if len(files) == 0 {
 				continue
@@ -312,6 +309,10 @@ func (this *TaskMgr) startCheckRemoveFiles() {
 				log.Debugf("delete removed file %s %s", taskId, hash)
 				this.DeleteDownloadedFile(taskId)
 			}
+		case <-this.closeCh:
+			log.Debugf("taskmgr stop check removed file service")
+			ticker.Stop()
+			return
 		}
 	}
 }

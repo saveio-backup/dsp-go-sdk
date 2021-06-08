@@ -959,7 +959,7 @@ func (this *UploadTask) sendDeleteMsg(deleteTaskTx string, deleteTaskTxHeight ui
 		nodesFromTsk := uAddr.Base58ToWalletAddrs(this.DB.GetUploadedBlockNodeList(taskId, fileHashStr, 0))
 		host, err := this.Mgr.Chain().GetNodeHostAddrListByWallets(nodesFromTsk)
 		if err != nil {
-			log.Errorf("get nodes empty from wallets %v", nodesFromTsk)
+			log.Warnf("get nodes empty from wallets %v", nodesFromTsk)
 		}
 		storingNode = append(storingNode, host...)
 		log.Debugf("storingNode: %v", storingNode)

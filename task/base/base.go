@@ -83,6 +83,10 @@ func (this *Task) SetSessionId(peerWalletAddr, id string) {
 func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg string) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
+	log.Debugf("task %s state %v", this.Info.Id, this.Info.TaskState)
+	if this.Info.TaskState == store.TaskStateCancel {
+		return fmt.Errorf("task %s is canceled", this.Info.Id)
+	}
 	log.Debugf("set task result %v %v", errorCode, errorMsg)
 	if errorCode != 0 {
 		if this.Info.Retry >= consts.MAX_TASK_RETRY {
@@ -420,10 +424,15 @@ func (this *Task) EmitProgress(state types.TaskProgressState) {
 	if this.progress == nil {
 		return
 	}
-	this.Info.TranferState = uint32(state)
-	if err := this.DB.SaveTaskInfo(this.Info); err != nil {
-		log.Errorf("save task into db failed %v", err)
+	if this.Info.TaskState != store.TaskStateCancel {
+		this.Info.TranferState = uint32(state)
+		if err := this.DB.SaveTaskInfo(this.Info); err != nil {
+			log.Errorf("save task into db failed %v", err)
+		}
+	} else {
+		log.Debugf("skip save upload task %v because it's canceled", this.Info.Id)
 	}
+
 	pInfo := this.getProgressInfo()
 	log.Debugf("emit progress taskId: %s, transfer state: %v, progress: %v", this.Info.Id, state, pInfo)
 	go func() {

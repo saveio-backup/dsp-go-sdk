@@ -31,7 +31,7 @@ type TaskMgr struct {
 	channel             *channel.Channel                  // channel module
 	cfg                 *config.DspConfig                 // sdk config
 	db                  *store.TaskDB                     // task db
-	running             bool                              // state of service
+	closeCh             chan bool                         // state of service
 	shareRecordDB       *store.ShareRecordDB              // share_record db
 	uploadTasks         map[string]*upload.UploadTask     // upload tasks map, task id => upload task
 	uploadTaskLock      *sync.RWMutex                     // upload task lock
@@ -58,6 +58,7 @@ func NewTaskMgr(chain *chain.Chain, fs *fs.Fs, dns *dns.DNS, channel *channel.Ch
 		dns:                 dns,
 		channel:             channel,
 		cfg:                 cfg,
+		closeCh:             make(chan bool),
 		uploadTasks:         make(map[string]*upload.UploadTask, 0),
 		downloadTasks:       make(map[string]*download.DownloadTask, 0),
 		dispatchTasks:       make(map[string]*dispatch.DispatchTask, 0),
@@ -107,7 +108,6 @@ func (this *TaskMgr) IsClient() bool {
 }
 
 func (this *TaskMgr) Stop() error {
-	this.running = false
 	if this.db == nil {
 		return nil
 	}
@@ -115,6 +115,7 @@ func (this *TaskMgr) Stop() error {
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.CLOSE_DB_ERROR, err)
 	}
+	close(this.closeCh)
 	return nil
 }
 

@@ -108,7 +108,7 @@ func (this *Dsp) CancelUpload(taskId string, gasLimit uint64) (*types.DeleteUplo
 	}
 
 	txHashStr, txHeight, err := this.DeleteUploadFilesFromChain(fileHashStrs, gasLimit)
-	log.Debugf("delete upload files from chain :%s, %d, %v", txHashStr, txHeight, err)
+	log.Debugf("delete upload task %s from chain :%s, %d, %v", taskId, txHashStr, txHeight, err)
 	if err != nil {
 		if serr, ok := err.(*sdkErr.Error); ok && serr.Code != sdkErr.NO_FILE_NEED_DELETED {
 			return nil, serr

@@ -138,9 +138,9 @@ func (this *Channel) StopService() {
 		return
 	}
 	this.state.Set(state.ModuleStateStopping)
-	log.Debug("[dsp-go-sdk-channel] StopService")
+	log.Debug("dsp core channel StopService")
 	err := ch_actor.StopPylons()
-	log.Debug("[dsp-go-sdk-channel] StopService done")
+	log.Infof("dsp core channel stopped")
 	if err != nil {
 		this.state.Set(state.ModuleStateError)
 		log.Errorf("stop pylons err %s", err)
@@ -238,10 +238,10 @@ func (this *Channel) ChannelReachale(walletAddr string) bool {
 
 // HealthyCheckNodeState. health check node network state with wallet address
 func (this *Channel) HealthyCheckNodeState(walletAddr string) error {
-	log.Debugf("start healthy check node state of wallet %s", walletAddr)
 	if this.State() != state.ModuleStateActive {
 		return sdkErr.New(sdkErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
+	log.Debugf("start healthy check node state of wallet %s", walletAddr)
 	target, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.INVALID_ADDRESS, err)
