@@ -158,7 +158,7 @@ func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (str
 	if opt.RegisterDNS && len(urlString) > 0 {
 		dnsRegTx, err = this.Mgr.DNS().RegisterFileUrl(string(urlString), saveLink)
 		if err != nil {
-			log.Errorf("register url %s err: %s", urlString, err)
+			log.Errorf("register url %s %s err: %s", urlString, saveLink, err)
 			return "", "", err
 		}
 		log.Debugf("acc %s, reg dns %s for %s", this.Mgr.Chain().WalletAddress(), dnsRegTx, this.GetFileHash())
@@ -166,7 +166,7 @@ func (this *UploadTask) registerUrls(saveLink string, opt *fs.UploadOption) (str
 	if opt.BindDNS && len(urlString) > 0 {
 		dnsBindTx, err = this.Mgr.DNS().BindFileUrl(string(urlString), saveLink)
 		if err != nil {
-			log.Errorf("bind url %s err: %s", urlString, err)
+			log.Errorf("bind url %s, saveLink %s err: %s", urlString, saveLink, err)
 			return "", "", err
 		}
 		log.Debugf("bind dns %s for file %s", dnsBindTx, this.GetFileHash())
