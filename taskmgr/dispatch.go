@@ -29,8 +29,8 @@ func (this *TaskMgr) NewDispatchTask(taskId string) (*dispatch.DispatchTask, err
 }
 
 func (this *TaskMgr) GetDispatchTask(taskId string) *dispatch.DispatchTask {
-	this.dispatchTaskLock.RLock()
-	defer this.dispatchTaskLock.RUnlock()
+	this.dispatchTaskLock.Lock()
+	defer this.dispatchTaskLock.Unlock()
 	tsk, ok := this.dispatchTasks[taskId]
 	if ok {
 		return tsk
