@@ -34,26 +34,26 @@ func (this *Dsp) CleanTasks(taskIds []string) error {
 	return this.TaskMgr.CleanTasks(taskIds)
 }
 
-func (this *Dsp) Progress() {
-	this.RegProgressChannel()
-	go func() {
-		stop := false
-		for {
-			v := <-this.ProgressChannel()
-			for node, pro := range v.Progress {
-				log.Infof("file progress:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f, speed: %d",
-					v.FileName, v.FileHash, v.Total, node, pro.Progress, float64(pro.Progress)/float64(v.Total),
-					pro.AvgSpeed())
-				stop = (pro.Progress == v.Total)
-			}
-			if stop {
-				break
-			}
-		}
-		// TODO: why need close
-		this.CloseProgressChannel()
-	}()
-}
+// func (this *Dsp) Progress() {
+// 	this.RegProgressChannel()
+// 	go func() {
+// 		stop := false
+// 		for {
+// 			v := <-this.ProgressChannel()
+// 			for node, pro := range v.Progress {
+// 				log.Infof("file progress:%s, hash:%s, total:%d, peer:%s, uploaded:%d, progress:%f, speed: %d",
+// 					v.FileName, v.FileHash, v.Total, node, pro.Progress, float64(pro.Progress)/float64(v.Total),
+// 					pro.AvgSpeed())
+// 				stop = (pro.Progress == v.Total)
+// 			}
+// 			if stop {
+// 				break
+// 			}
+// 		}
+// 		// TODO: why need close
+// 		this.CloseProgressChannel()
+// 	}()
+// }
 
 // RegProgressChannel. register progress channel
 func (this *Dsp) RegProgressChannel() {

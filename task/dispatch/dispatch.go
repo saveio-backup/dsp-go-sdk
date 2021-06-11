@@ -83,7 +83,12 @@ func (this *DispatchTask) Start() error {
 		return sdkErr.New(sdkErr.INTERNAL_ERROR,
 			"dispatch file, get download task with referId %s nil", referId)
 	}
-	refDownloadTask := refDownloadTaskImpl.(*download.DownloadTask)
+	refDownloadTask, _ := refDownloadTaskImpl.(*download.DownloadTask)
+	if refDownloadTask == nil {
+		return sdkErr.New(sdkErr.INTERNAL_ERROR,
+			"dispatch file, get download task with referId %s nil", referId)
+	}
+
 	blockHashes := this.DB.FileBlockHashes(referId)
 	totalCount := len(blockHashes)
 
