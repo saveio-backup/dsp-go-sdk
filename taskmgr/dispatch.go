@@ -198,7 +198,7 @@ func (this *TaskMgr) newDispatchTask(taskId string) (*dispatch.DispatchTask, err
 		return nil, sdkErr.New(sdkErr.NEW_TASK_FAILED, fmt.Sprintf("new task of type %d", taskType))
 	}
 	t.Mgr = this
-	t.SetProgressNotifyCh(this.progress)
+	t.SetProgressNotifyCh(this.progress, this.progressCtx)
 
 	return t, nil
 }
@@ -225,7 +225,7 @@ func (this *TaskMgr) newDispatchTaskFromDB(id string) (*dispatch.DispatchTask, e
 	}
 	t := dispatch.InitDispatchTask(this.db)
 	t.Mgr = this
-	t.SetProgressNotifyCh(this.progress)
+	t.SetProgressNotifyCh(this.progress, this.progressCtx)
 	t.SetInfo(info)
 
 	t.SetInfoWithOptions(

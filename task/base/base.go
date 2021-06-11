@@ -1,6 +1,7 @@
 package base
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -15,13 +16,14 @@ import (
 )
 
 type Task struct {
-	Info     *store.TaskInfo          // task info from local DB
-	Lock     *sync.RWMutex            // lock
-	DB       *store.TaskDB            // db
-	Batch    bool                     // batch save to db
-	Workers  map[string]*Worker       // set remote connection as worker
-	Mgr      ITaskMgr                 // task mgr interface delegate
-	progress chan *types.ProgressInfo // emit progress channel
+	Info        *store.TaskInfo          // task info from local DB
+	Lock        *sync.RWMutex            // lock
+	DB          *store.TaskDB            // db
+	Batch       bool                     // batch save to db
+	Workers     map[string]*Worker       // set remote connection as worker
+	Mgr         ITaskMgr                 // task mgr interface delegate
+	progress    chan *types.ProgressInfo // emit progress channel
+	progressCtx context.Context          // context to close the channel
 }
 
 // NewTask. new task for file, and set the task info to DB.
@@ -413,8 +415,9 @@ func (this *Task) IsTaskFailed() bool {
 	return this.Info.TaskState == store.TaskStateFailed
 }
 
-func (this *Task) SetProgressNotifyCh(ch chan *types.ProgressInfo) {
+func (this *Task) SetProgressNotifyCh(ch chan *types.ProgressInfo, ctx context.Context) {
 	this.progress = ch
+	this.progressCtx = ctx
 }
 
 // EmitProgress. emit progress to channel with taskId
@@ -436,7 +439,13 @@ func (this *Task) EmitProgress(state types.TaskProgressState) {
 	pInfo := this.getProgressInfo()
 	log.Debugf("emit progress taskId: %s, transfer state: %v, progress: %v", this.Info.Id, state, pInfo)
 	go func() {
-		this.progress <- pInfo
+		select {
+		case <-this.progressCtx.Done():
+			log.Debugf("progress channel has closed")
+			this.progress = nil
+		default:
+			this.progress <- pInfo
+		}
 	}()
 }
 

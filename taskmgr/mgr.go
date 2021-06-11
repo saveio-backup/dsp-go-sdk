@@ -1,6 +1,7 @@
 package taskmgr
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -45,6 +46,8 @@ type TaskMgr struct {
 	retryDownloadTaskTs map[string]uint64                 // retry task taskId <==> retry at timestamp
 	retryDispatchTaskTs map[string]uint64                 // retry task taskId <==> retry at timestamp
 	progress            chan *types.ProgressInfo          // progress channel
+	progressCtx         context.Context                   // progress channel context
+	progressCancelFunc  context.CancelFunc                // progress channel context cancel func
 	blockReqCh          chan []*types.GetBlockReq         // used for share blocks
 	progressTicker      *ticker.Ticker                    // get upload progress ticker
 	retryTaskTicker     *ticker.Ticker                    // retry task ticker
@@ -276,6 +279,7 @@ func (this *TaskMgr) CleanTasks(taskId []string) error {
 func (this *TaskMgr) RegProgressCh() {
 	if this.progress == nil {
 		this.progress = make(chan *types.ProgressInfo, consts.MAX_PROGRESS_CHANNEL_SIZE)
+		this.progressCtx, this.progressCancelFunc = context.WithCancel(context.TODO())
 	}
 }
 
@@ -284,6 +288,7 @@ func (this *TaskMgr) ProgressCh() chan *types.ProgressInfo {
 }
 
 func (this *TaskMgr) CloseProgressCh() {
+	this.progressCancelFunc()
 	close(this.progress)
 	this.progress = nil
 }

@@ -261,7 +261,7 @@ func (this *TaskMgr) newDownloadTask(taskId string) (*download.DownloadTask, err
 		return nil, sdkErr.New(sdkErr.NEW_TASK_FAILED, fmt.Sprintf("new task of type %d", taskType))
 	}
 	t.Mgr = this
-	t.SetProgressNotifyCh(this.progress)
+	t.SetProgressNotifyCh(this.progress, this.progressCtx)
 	log.Debugf("new download task %v", taskId)
 	return t, nil
 }
@@ -298,7 +298,7 @@ func (this *TaskMgr) newDownloadTaskFromDB(id string) (*download.DownloadTask, e
 
 	t := download.InitDownloadTask(this.db)
 	t.Mgr = this
-	t.SetProgressNotifyCh(this.progress)
+	t.SetProgressNotifyCh(this.progress, this.progressCtx)
 	sessionIds := make(map[string]string)
 	for _, session := range sessions {
 		sessionIds[session.WalletAddr] = session.SessionId
