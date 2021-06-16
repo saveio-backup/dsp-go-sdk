@@ -187,7 +187,6 @@ func (this *Dsp) Stop() error {
 	}
 	if this.Channel != nil {
 		this.Channel.StopService()
-		this.Channel = nil
 	}
 	if this.Fs != nil {
 		err := this.Fs.Close()
