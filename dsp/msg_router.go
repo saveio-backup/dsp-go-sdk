@@ -874,22 +874,23 @@ func (this *Dsp) handleBlockFlightsMsg(ctx *network.ComponentContext,
 		blockMsg := blockFlightsMsg.Blocks[0]
 		sessionId := blockMsg.SessionId
 		var taskType store.TaskType
-		for _, blk := range blockFlightsMsg.Blocks {
-			log.Debugf("session: %s handle get block %s-%s-%d from %s",
-				sessionId, blk.FileHash, blk.Hash, blk.Index, peerWalletAddr)
-			if len(sessionId) == 0 {
-				return
-			}
-			origTaskInfo := this.TaskMgr.GetTaskInfoCopy(sessionId)
-			if origTaskInfo == nil {
-				log.Debugf("task %s, file %s not exist", sessionId, blockMsg.FileHash)
-				return
-			}
-			taskType = origTaskInfo.Type
+
+		if len(sessionId) == 0 {
+			return
 		}
+
+		// now the blockFlights get is only processed for file sharing
+		shareTask := this.TaskMgr.GetShareTask(sessionId)
+		if shareTask == nil {
+			log.Errorf("no share task found with session Id%s", sessionId)
+			return
+		}
+
+		taskType = shareTask.GetTaskType()
+
 		log.Debugf("task key: %s type %d", sessionId, taskType)
 		switch taskType {
-		case store.TaskTypeDownload, store.TaskTypeShare:
+		case store.TaskTypeShare:
 			reqCh := this.TaskMgr.BlockReqCh()
 			req := make([]*types.GetBlockReq, 0)
 			for _, v := range blockFlightsMsg.Blocks {
