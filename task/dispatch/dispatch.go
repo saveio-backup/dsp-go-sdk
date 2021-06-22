@@ -7,7 +7,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/store"
-	"github.com/saveio/dsp-go-sdk/task/base"
 	"github.com/saveio/dsp-go-sdk/task/download"
 	"github.com/saveio/dsp-go-sdk/task/types"
 	"github.com/saveio/themis/common/log"
@@ -92,19 +91,6 @@ func (this *DispatchTask) Start() error {
 	blockHashes := this.DB.FileBlockHashes(referId)
 	totalCount := len(blockHashes)
 
-	if err := this.SetInfoWithOptions(
-		base.FileHash(fileHashStr),
-		base.BlocksRoot(refDownloadTask.GetBlocksRoot()),
-		base.Walletaddr(this.GetCurrentWalletAddr()),
-		base.Prefix(string(refDownloadTask.GetPrefix())),
-		base.StoreTx(refDownloadTask.GetStoreTx()),
-		base.StoreTxHeight(refDownloadTask.GetStoreTxHeight()),
-		base.ReferId(referId),
-		base.CopyNum(uint32(fileInfo.CopyNum)),
-		base.FileOwner(fileInfo.FileOwner.ToBase58()),
-		base.TotalBlockCnt(uint64(totalCount))); err != nil {
-		return err
-	}
 	if err := this.SetTaskState(store.TaskStateDoing); err != nil {
 		log.Errorf("set dispatch task  %s doing err %v", taskId, err)
 		return sdkErr.New(sdkErr.INTERNAL_ERROR,

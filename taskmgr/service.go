@@ -116,6 +116,7 @@ func (this *TaskMgr) startDispatchFile() {
 					log.Debugf("find %s task has uploaded, skip dispatch", t.Id)
 					// update task state
 					dispatchTask.SetTaskState(store.TaskStateDone)
+					this.DeleteDispatchTask(t.Id)
 					continue
 				}
 				if prepare, doing := dispatchTask.IsTaskPreparingOrDoing(); prepare || doing {
@@ -308,6 +309,13 @@ func (this *TaskMgr) startCheckRemoveFiles() {
 				taskId := this.GetDownloadedTaskId(hash, this.chain.WalletAddress())
 				log.Debugf("delete removed file %s %s", taskId, hash)
 				this.DeleteDownloadedFile(taskId)
+
+				dispatchTask := this.GetDispatchTaskByReferId(taskId)
+				if dispatchTask != nil {
+					dispatchTask.SetTaskState(store.TaskStateCancel)
+					this.DeleteDispatchTask(dispatchTask.GetId())
+				}
+
 			}
 		case <-this.closeCh:
 			log.Debugf("taskmgr stop check removed file service")

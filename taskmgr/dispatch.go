@@ -47,6 +47,19 @@ func (this *TaskMgr) GetDispatchTask(taskId string) *dispatch.DispatchTask {
 	return t
 }
 
+func (this *TaskMgr) GetDispatchTaskByReferId(referId string) *dispatch.DispatchTask {
+	this.dispatchTaskLock.Lock()
+	defer this.dispatchTaskLock.Unlock()
+
+	for _, t := range this.dispatchTasks {
+		if t.GetReferId() == referId {
+			return t
+		}
+	}
+
+	return nil
+}
+
 func (this *TaskMgr) DispatchTask(origTaskId, fileHashStr string) {
 	refDownloadTask := this.GetDownloadTask(origTaskId)
 	log.Debugf("dispatchTask original download task id %v, file %s, original task %v",
@@ -61,6 +74,11 @@ func (this *TaskMgr) DispatchTask(origTaskId, fileHashStr string) {
 		if t.GetWalletAddr() != this.chain.WalletAddress() {
 			continue
 		}
+
+		if _, doing := t.IsTaskPreparingOrDoing(); doing {
+			return
+		}
+
 		go t.Start()
 		return
 	}
@@ -97,6 +115,8 @@ func (this *TaskMgr) DispatchTask(origTaskId, fileHashStr string) {
 			t.GetId(), origTaskId, fileHashStr)
 		return
 	}
+
+	this.dispatchTasks[t.GetId()] = t
 
 	// sleep for pdp verify
 	time.Sleep(time.Duration(consts.MAX_PDP_PROVE_TIME) * time.Second)
@@ -138,6 +158,15 @@ func (this *TaskMgr) CleanDispatchTask(taskId string) error {
 		return sdkErr.NewWithError(sdkErr.SET_FILEINFO_DB_ERROR, err)
 	}
 	return nil
+}
+
+// DeleteDispatchTask. delete task with task id from memory. runtime delete action.
+func (this *TaskMgr) DeleteDispatchTask(taskId string) {
+	this.dispatchTaskLock.Lock()
+	defer this.dispatchTaskLock.Unlock()
+	log.Debugf("delete task %s, %s", taskId, debug.Stack())
+	delete(this.dispatchTasks, taskId)
+	delete(this.retryDispatchTaskTs, taskId)
 }
 
 // EmitDispatchResult. emit result or error async
