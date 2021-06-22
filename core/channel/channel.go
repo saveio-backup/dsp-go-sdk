@@ -415,8 +415,8 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to string) error {
 	log.Debugf("media transfer to %s payment id %s amount %d with media %v",
 		to, paymentId, amount, to)
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	// this.lock.Lock()
+	// defer this.lock.Unlock()
 	if this.State() != state.ModuleStateActive {
 		return sdkErr.New(sdkErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
