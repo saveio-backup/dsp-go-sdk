@@ -34,14 +34,6 @@ func (this *Chain) GetFileInfos(fileHashStr []string) (*fs.FileInfoList, error) 
 	return list, nil
 }
 
-func (this *Chain) GetExpiredProveList() (*fs.BakTasks, error) {
-	tasks, err := this.themis.Native.Fs.GetExpiredProveList()
-	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
-	}
-	return tasks, nil
-}
-
 func (this *Chain) GetUploadStorageFee(opt *fs.UploadOption) (*fs.StorageFee, error) {
 	if opt.ProveInterval == 0 {
 		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "prove interval too small")
