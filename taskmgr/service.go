@@ -276,7 +276,7 @@ func (this *TaskMgr) retryTaskService() bool {
 		}
 		go uploadTask.Resume()
 	}
-	downloadIds := this.GetUploadTasksToRetry()
+	downloadIds := this.GetDownloadTasksToRetry()
 	for _, taskId := range downloadIds {
 		downloadTask := this.GetDownloadTask(taskId)
 		log.Debugf("retry download task service running, retry %s, is nil %t", taskId, downloadTask == nil)
@@ -285,7 +285,7 @@ func (this *TaskMgr) retryTaskService() bool {
 		}
 		go downloadTask.Resume()
 	}
-	return true
+	return false
 }
 
 // startCheckRemoveFiles. check to remove files after prove PDP done
