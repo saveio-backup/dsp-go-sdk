@@ -96,6 +96,10 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 		return nil, this.sendPauseMsg()
 	}
 
+	if this.IsTaskCancel() {
+		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "task is cancel")
+	}
+
 	tx = this.GetStoreTx()
 	var hashes []string
 	// sharing file or get hashes from DB
@@ -209,6 +213,9 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	if this.IsTaskPaused() {
 		return nil, this.sendPauseMsg()
 	}
+	if this.IsTaskCancel() {
+		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "task is cancel")
+	}
 	this.EmitProgress(types.TaskUploadFilePayingDone)
 	if _, err = this.addWhitelist(taskId, fileHashStr, opt); err != nil {
 		return nil, err
@@ -228,6 +235,9 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	if this.IsTaskPaused() {
 		return nil, this.sendPauseMsg()
 	}
+	if this.IsTaskCancel() {
+		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "task is cancel")
+	}
 	this.EmitProgress(types.TaskUploadFileFindReceiversDone)
 	if err = this.sendBlocks(hashes); err != nil {
 		log.Errorf("send blocks err %s", err)
@@ -236,6 +246,9 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	log.Debugf("wait for fetch blocks finish id: %s ", taskId)
 	if this.IsTaskPaused() {
 		return nil, this.sendPauseMsg()
+	}
+	if this.IsTaskCancel() {
+		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "task is cancel")
 	}
 
 	uploadRet, err := this.publishFile(opt)
