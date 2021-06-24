@@ -19,7 +19,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/store"
-	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -387,7 +386,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 			fileHashDone := this.TaskMgr.IsFileDownloaded(taskId)
 			if fileHashDone && this.IsFs() && !this.Chain.CheckHasProveFile(fileMsg.Hash, this.Address()) {
 				// file has downloaded but not proved
-				if err := this.Fs.StartPDPVerify(fileMsg.Hash, 0, 0, 0, chainCom.ADDRESS_EMPTY); err != nil {
+				if err := this.TaskMgr.StartPDPVerify(fileMsg.Hash); err != nil {
 					replyErr(fileMsg.Hash, msg.MessageId, serr.SET_FILEINFO_DB_ERROR, err.Error())
 					return
 				}

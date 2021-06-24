@@ -349,6 +349,10 @@ func (this *Fs) RemovedExpiredFiles() []interface{} {
 	return this.removeFileList.PopAll()
 }
 
+func (this *Fs) RegChainEventNotificationChannel() chan map[string]interface{} {
+	return this.fs.RegChainEventNotificationChannel("DSP-FS")
+}
+
 // registerRemoveNotify. register fs notify for a removed file
 func (this *Fs) registerRemoveNotify() {
 	for {

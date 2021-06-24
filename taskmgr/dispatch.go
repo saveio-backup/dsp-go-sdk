@@ -3,9 +3,7 @@ package taskmgr
 import (
 	"fmt"
 	"runtime/debug"
-	"time"
 
-	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task/base"
@@ -61,25 +59,7 @@ func (this *TaskMgr) GetDispatchTaskByReferId(referId string) *dispatch.Dispatch
 }
 
 func (this *TaskMgr) DispatchTask(origTaskId, fileHashStr string) {
-	refDownloadTask := this.GetDownloadTask(origTaskId)
-	log.Debugf("dispatchTask original download task id %v, file %s, original task %v",
-		origTaskId, fileHashStr, refDownloadTask)
-	this.dispatchTaskLock.Lock()
-	defer this.dispatchTaskLock.Unlock()
-
-	for _, t := range this.dispatchTasks {
-		if t.GetFileHash() != fileHashStr {
-			continue
-		}
-		if t.GetWalletAddr() != this.chain.WalletAddress() {
-			continue
-		}
-
-		if _, doing := t.IsTaskPreparingOrDoing(); doing {
-			return
-		}
-
-		go t.Start()
+	if ok := this.dispatchExistTask(fileHashStr); ok {
 		return
 	}
 
@@ -89,6 +69,13 @@ func (this *TaskMgr) DispatchTask(origTaskId, fileHashStr string) {
 		log.Errorf("dispatch task err new dispatch failed origin task %s, fileHash %s", origTaskId, fileHashStr)
 		return
 	}
+	refDownloadTask := this.GetDownloadTask(origTaskId)
+	if refDownloadTask == nil {
+		log.Errorf("dispatch file %s, origin download task %s is nil", fileHashStr, origTaskId)
+		return
+	}
+	log.Debugf("dispatchTask original download task id %v, file %s, original task %v",
+		origTaskId, fileHashStr, refDownloadTask)
 	log.Debugf("BlocksRoot : %v, Prefix : %v, StoreTx : %v, "+
 		"StoreTxHeight : %v, CopyNum : %v, FileOwner : %v, TotalBlockCnt : %v ",
 		refDownloadTask.GetBlocksRoot(),
@@ -116,10 +103,18 @@ func (this *TaskMgr) DispatchTask(origTaskId, fileHashStr string) {
 		return
 	}
 
+	this.dispatchTaskLock.Lock()
 	this.dispatchTasks[t.GetId()] = t
+	this.dispatchTaskLock.Unlock()
 
-	// sleep for pdp verify
-	time.Sleep(time.Duration(consts.MAX_PDP_PROVE_TIME) * time.Second)
+	provedCh, _ := this.fileProvedCh.Load(fileHashStr)
+	if provedCh != nil {
+		ch := provedCh.(chan uint32)
+		log.Debugf("dispatch task %s wait for file %s pdp", t.GetId(), fileHashStr)
+		provedHeight := <-ch
+		this.fileProvedCh.Delete(fileHashStr)
+		log.Debugf("dispatch task %s of file %s has proved at %v", t.GetId(), fileHashStr, provedHeight)
+	}
 
 	go func() {
 		err := t.Start()
@@ -264,4 +259,28 @@ func (this *TaskMgr) newDispatchTaskFromDB(id string) (*dispatch.DispatchTask, e
 	log.Debugf("get dispatch task from db task id %s, file name %s, task type %d, state %d",
 		info.Id, info.FileName, info.Type, info.TaskState)
 	return t, nil
+}
+
+// dispatchExistTask. Find exist dispatch task. If exists, dispatch it.
+func (this *TaskMgr) dispatchExistTask(fileHashStr string) bool {
+	this.dispatchTaskLock.RLock()
+	defer this.dispatchTaskLock.RUnlock()
+
+	for _, t := range this.dispatchTasks {
+		if t.GetFileHash() != fileHashStr {
+			continue
+		}
+		if t.GetWalletAddr() != this.chain.WalletAddress() {
+			continue
+		}
+
+		if _, doing := t.IsTaskPreparingOrDoing(); doing {
+			return true
+		}
+		log.Debugf("get exist dispatch task %s for file %s", t.GetId(), fileHashStr)
+
+		go t.Start()
+		return true
+	}
+	return false
 }

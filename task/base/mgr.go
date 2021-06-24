@@ -29,4 +29,5 @@ type ITaskMgr interface {
 	EmitDownloadResult(taskId string, ret interface{}, sdkErr *sdkErr.Error)
 	DispatchTask(origTaskId, fileHashStr string)
 	CleanDispatchTask(taskId string) error
+	StartPDPVerify(fileHashStr string) error
 }

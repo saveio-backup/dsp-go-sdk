@@ -20,6 +20,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/task/types"
 	"github.com/saveio/dsp-go-sdk/task/upload"
 	"github.com/saveio/dsp-go-sdk/types/ticker"
+	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -52,6 +53,7 @@ type TaskMgr struct {
 	progressTicker      *ticker.Ticker                    // get upload progress ticker
 	retryTaskTicker     *ticker.Ticker                    // retry task ticker
 	shareNoticeCh       chan *types.ShareNotification     // share notification channel
+	fileProvedCh        *sync.Map                         // proved file hash => block height channel
 }
 
 func NewTaskMgr(chain *chain.Chain, fs *fs.Fs, dns *dns.DNS, channel *channel.Channel, cfg *config.DspConfig) *TaskMgr {
@@ -74,6 +76,7 @@ func NewTaskMgr(chain *chain.Chain, fs *fs.Fs, dns *dns.DNS, channel *channel.Ch
 		retryDownloadTaskTs: make(map[string]uint64),
 		retryDispatchTaskTs: make(map[string]uint64),
 		blockReqCh:          make(chan []*types.GetBlockReq, consts.MAX_GOROUTINES_FOR_WORK_TASK),
+		fileProvedCh:        new(sync.Map),
 	}
 	tmgr.progressTicker = ticker.NewTicker(time.Duration(consts.TASK_PROGRESS_TICKER_DURATION)*time.Second,
 		tmgr.runGetProgressTicker)
@@ -314,4 +317,10 @@ func (this *TaskMgr) GetDoingTaskNum(tskType store.TaskType) uint32 {
 
 func (this *TaskMgr) BlockReqCh() chan []*types.GetBlockReq {
 	return this.blockReqCh
+}
+
+func (this *TaskMgr) StartPDPVerify(fileHashStr string) error {
+	ch := make(chan uint32)
+	this.fileProvedCh.Store(fileHashStr, ch)
+	return this.fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
 }

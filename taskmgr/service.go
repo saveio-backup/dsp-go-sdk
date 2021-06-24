@@ -16,6 +16,13 @@ import (
 	cUtils "github.com/saveio/themis/smartcontract/service/native/utils"
 )
 
+var (
+	eventFilterName        = "eventName"
+	eventFilterFileHash    = "fileHash"
+	eventFilterBlockHeight = "blockHeight"
+	fileProvedEventName    = "filePdpSuccess"
+)
+
 // ReceiveMediaTransferNotify. register receive payment notification
 func (this *TaskMgr) ReceiveMediaTransferNotify() {
 	log.Debugf("registerReceiveNotification")
@@ -76,21 +83,22 @@ func (this *TaskMgr) ReceiveMediaTransferNotify() {
 }
 
 func (this *TaskMgr) StartService() {
-	go this.startShareServices()
+	go this.shareService()
 	go this.progressTicker.Run()
+	go this.fileProvedService()
 
 	if this.cfg.FsType == consts.FS_FILESTORE {
 		return
 	}
-	go this.startDispatchFile()
-	go this.startCheckRemoveFiles()
+	go this.dispatchFileService()
+	go this.removeFileService()
 	if this.cfg.EnableBackup {
 		log.Debugf("start backup file service ")
-		go this.startBackupFileService()
+		go this.backupFileService()
 	}
 }
 
-func (this *TaskMgr) startDispatchFile() {
+func (this *TaskMgr) dispatchFileService() {
 	log.Debugf("start dispatch file service")
 	ticker := time.NewTicker(time.Duration(consts.DISPATCH_FILE_DURATION) * time.Second)
 	for {
@@ -136,7 +144,7 @@ func (this *TaskMgr) startDispatchFile() {
 
 }
 
-func (this *TaskMgr) startShareServices() {
+func (this *TaskMgr) shareService() {
 	for {
 		select {
 		case req, ok := <-this.blockReqCh:
@@ -289,7 +297,7 @@ func (this *TaskMgr) retryTaskService() bool {
 }
 
 // startCheckRemoveFiles. check to remove files after prove PDP done
-func (this *TaskMgr) startCheckRemoveFiles() {
+func (this *TaskMgr) removeFileService() {
 	log.Debugf("StartCheckRemoveFiles ")
 	ticker := time.NewTicker(time.Duration(consts.REMOVE_FILES_DURATION) * time.Second)
 	for {
@@ -325,8 +333,48 @@ func (this *TaskMgr) startCheckRemoveFiles() {
 	}
 }
 
-// StartBackupFileService. start a backup file service to find backup jobs.
-func (this *TaskMgr) startBackupFileService() {
+// startCheckFileProved. check file has proved service
+func (this *TaskMgr) fileProvedService() {
+	notify := this.fs.RegChainEventNotificationChannel()
+	for {
+		select {
+		case event, _ := <-notify:
+			if event == nil {
+				continue
+			}
+			eventName, _ := event[eventFilterName].(string)
+			if len(eventName) == 0 {
+				continue
+			}
+			if eventName != fileProvedEventName {
+				continue
+			}
+			fileHash, _ := event[eventFilterFileHash].(string)
+			if len(fileHash) == 0 {
+				continue
+			}
+
+			val, ok := this.fileProvedCh.Load(fileHash)
+			if !ok {
+				log.Debugf("file %s has proved, but notify channel is not found", fileHash)
+				continue
+			}
+			ch, ok := val.(chan uint32)
+			if !ok {
+				log.Debugf("file %s has proved, but notify channel wrong type", fileHash)
+				continue
+			}
+			ch <- event[eventFilterBlockHeight].(uint32)
+
+		case <-this.closeCh:
+			log.Debugf("taskmgr stop check file proved service")
+			return
+		}
+	}
+}
+
+// backupFileService. start a backup file service to find backup jobs.
+func (this *TaskMgr) backupFileService() {
 	// backupingCnt := 0
 	// ticker := time.NewTicker(time.Duration(consts.BACKUP_FILE_DURATION) * time.Second)
 	// backupFailedMap := make(map[string]int)

@@ -11,7 +11,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task/types"
-	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -26,7 +25,7 @@ func (this *DownloadTask) PutBlocks(peerAddr string, resps []*types.BlockResp) e
 	}
 	if this.DB.IsFileDownloaded(taskId) {
 		log.Debugf("file has downloaded: %s", fileHashStr)
-		err := this.Mgr.Fs().StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
+		err := this.Mgr.StartPDPVerify(fileHashStr)
 		if err != nil {
 			return err
 		}
@@ -93,7 +92,7 @@ func (this *DownloadTask) PutBlocks(peerAddr string, resps []*types.BlockResp) e
 	proved := false
 	for i := 0; i < consts.MAX_START_PDP_RETRY; i++ {
 		log.Infof("received all block, start pdp verify %s, retry: %d", fileHashStr, i)
-		if err := this.Mgr.Fs().StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY); err == nil {
+		if err := this.Mgr.StartPDPVerify(fileHashStr); err == nil {
 			proved = true
 			break
 		} else {
