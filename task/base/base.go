@@ -305,7 +305,8 @@ func (this *Task) Resume() error {
 	defer this.Lock.Unlock()
 
 	state := this.Info.TaskState
-	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
+	if state != store.TaskStatePrepare && state != store.TaskStatePause &&
+		state != store.TaskStateDoing && state != store.TaskStateIdle {
 		return fmt.Errorf("task %s can't resume with state %v", this.Info.Id, state)
 	}
 	if state == store.TaskStatePause {

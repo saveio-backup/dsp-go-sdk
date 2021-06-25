@@ -274,6 +274,7 @@ func (this *UploadTask) Resume() error {
 
 	// call super.resume()
 	if err := this.Task.Resume(); err != nil {
+		log.Errorf("resume task %s err %s", taskId, err)
 		return err
 	}
 	this.EmitProgress(types.TaskDoing)
