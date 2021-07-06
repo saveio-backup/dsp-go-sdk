@@ -325,6 +325,9 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd,
 		if !includeFailed && info.TaskState == TaskStateFailed {
 			continue
 		}
+		if info.TaskState == TaskStateCancel {
+			continue
+		}
 		if createdAt != 0 && createdAtEnd != 0 && (info.CreatedAt <= createdAt || info.CreatedAt > createdAtEnd) {
 			// log.Debugf("created at %d, end %d, %d", createdAt, createdAtEnd, info.CreatedAt)
 			// os.Exit(1)

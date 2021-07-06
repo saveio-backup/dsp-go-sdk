@@ -2,6 +2,7 @@ package chain
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,10 @@ import (
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
 	"github.com/saveio/themis/smartcontract/service/native/usdt"
+)
+
+var (
+	errFileInfoNotFound = errors.New("[FS Profit] getFsFileInfo not found")
 )
 
 func (this *Chain) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
@@ -389,7 +394,8 @@ func (this *Chain) GetSectorInfosForNode(walletAddr string) (*fs.SectorInfos, er
 }
 
 func (this *Chain) IsFileInfoDeleted(err error) bool {
-	if err != nil && strings.Contains(err.Error(), "[FS Profit] FsGetFileInfo not found") {
+	if err != nil && strings.Contains(
+		strings.ToLower(err.Error()), strings.ToLower(errFileInfoNotFound.Error())) {
 		return true
 	}
 	return false
