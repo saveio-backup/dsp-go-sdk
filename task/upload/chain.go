@@ -27,7 +27,8 @@ func (this *UploadTask) payFile(fileID pdp.FileID, tagsRoot []byte, walletAddrs 
 
 	this.EmitProgress(types.TaskUploadFilePaying)
 
-	log.Info("upload task %s pay the upload file %s on chain", this.GetId(), this.GetFileHash())
+	log.Info("upload task %s pay the upload file %s on chain with wallet %s", this.GetId(), this.GetFileHash(),
+		this.GetWalletAddr())
 	blockSizeInKB := uint64(math.Ceil(float64(consts.CHUNK_SIZE) / 1024.0))
 	paramsBuf, err := this.Mgr.Chain().ProveParamSer(tagsRoot, fileID)
 	if err != nil {
