@@ -21,6 +21,7 @@ var (
 	eventFilterFileHash    = "fileHash"
 	eventFilterBlockHeight = "blockHeight"
 	fileProvedEventName    = "filePdpSuccess"
+	eventFilterWalletAddr  = "walletAddr"
 )
 
 // ReceiveMediaTransferNotify. register receive payment notification
@@ -338,19 +339,29 @@ func (this *TaskMgr) fileProvedService() {
 	notify := this.fs.RegChainEventNotificationChannel()
 	for {
 		select {
-		case event, _ := <-notify:
+		case event := <-notify:
 			if event == nil {
+				log.Errorf("receive empty event")
 				continue
 			}
 			eventName, _ := event[eventFilterName].(string)
 			if len(eventName) == 0 {
+				log.Errorf("wrong event name type %v, type %T", event, event[eventFilterName])
 				continue
 			}
 			if eventName != fileProvedEventName {
+				log.Errorf("wrong event name %v, expect %v", eventName, fileProvedEventName)
 				continue
 			}
 			fileHash, _ := event[eventFilterFileHash].(string)
 			if len(fileHash) == 0 {
+				log.Errorf("wrong event name type %v, type %T", event, event[eventFilterFileHash])
+				continue
+			}
+			walletAddr, _ := event[eventFilterWalletAddr].(string)
+			if walletAddr != this.chain.WalletAddress() {
+				log.Errorf("wrong event name type %v, type %T, walletAddr %s, expect %v",
+					event, event[eventFilterWalletAddr], walletAddr, this.chain.WalletAddress())
 				continue
 			}
 
@@ -364,6 +375,7 @@ func (this *TaskMgr) fileProvedService() {
 				log.Debugf("file %s has proved, but notify channel wrong type", fileHash)
 				continue
 			}
+			log.Debugf("file %s proved success notify height %v", fileHash, event[eventFilterBlockHeight])
 			ch <- event[eventFilterBlockHeight].(uint32)
 
 		case <-this.closeCh:

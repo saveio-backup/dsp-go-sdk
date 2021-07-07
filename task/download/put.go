@@ -107,7 +107,7 @@ func (this *DownloadTask) PutBlocks(peerAddr string, resps []*types.BlockResp) e
 		}
 		return this.Mgr.CleanDownloadTask(taskId)
 	}
-	log.Debugf("pdp verify %s success, push the file to trackers %v", fileHashStr, this.Mgr.DNS().GetTrackerList())
+	log.Debugf("push the file %s to trackers %v", fileHashStr, this.Mgr.DNS().GetTrackerList())
 	this.Mgr.DNS().PushToTrackers(fileHashStr, client.P2PGetPublicAddr())
 	// TODO: remove unused file info fields after prove pdp success
 	this.Mgr.EmitDownloadResult(taskId, "", nil)
