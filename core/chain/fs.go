@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	errFileInfoNotFound = errors.New("[FS Profit] getFsFileInfo not found")
+	errFileInfoNotFound = errors.New("FsGetFileInfo getFsFileInfo error")
 )
 
 func (this *Chain) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
