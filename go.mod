@@ -1,6 +1,6 @@
 module github.com/saveio/dsp-go-sdk
 
-go 1.14
+go 1.16
 
 replace (
 	github.com/saveio/themis => ../themis

@@ -27,7 +27,7 @@ func (this *ShareTask) ShareBlock(req []*types.GetBlockReq) {
 	var shareErr *sdkErr.Error
 
 	for _, blockmsg := range req {
-		taskId = this.Info.Id
+		taskId = this.Id
 		log.Debugf("share block task id %v, file hash %v, peer wallet address %v, syn %s",
 			taskId, blockmsg.FileHash, blockmsg.WalletAddress, blockmsg.Syn)
 		reqWalletAddr = blockmsg.WalletAddress
@@ -47,7 +47,7 @@ func (this *ShareTask) ShareBlock(req []*types.GetBlockReq) {
 				"get block %s failed, its data is empty ", blockmsg.Hash)
 			break
 		}
-		downloadTaskId := this.Info.ReferId
+		downloadTaskId := this.GetReferId()
 		if len(downloadTaskId) == 0 {
 			shareErr = sdkErr.New(sdkErr.REFER_ID_NOT_FOUND,
 				"get download task id of task %s not found", taskId)
@@ -144,7 +144,7 @@ func (this *ShareTask) ShareBlock(req []*types.GetBlockReq) {
 }
 
 func (this *ShareTask) CanShareTo(walletAddress string, asset int32) bool {
-	taskId := this.Info.Id
+	taskId := this.Id
 	unpaidAmount, err := this.DB.GetUnpaidAmount(taskId, walletAddress, asset)
 	maxUnpaidAmount := uint64(consts.CHUNK_SIZE * consts.MAX_REQ_BLOCK_COUNT * this.Mgr.Config().MaxUnpaidPayment)
 	if err != nil || unpaidAmount >= maxUnpaidAmount {

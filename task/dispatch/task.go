@@ -30,7 +30,8 @@ func InitDispatchTask(db *store.TaskDB) *DispatchTask {
 func (this *DispatchTask) GetReferId() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.ReferId
+	info := this.GetTaskInfo()
+	return info.ReferId
 }
 
 func (this *DispatchTask) isNodeTaskDoingOrDone(nodeAddr string) (bool, error) {

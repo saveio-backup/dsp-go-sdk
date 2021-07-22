@@ -74,21 +74,23 @@ func (this *UploadTask) WorkerIdleDuration(addr string) uint64 {
 func (this *UploadTask) SetRegUrlTx(regUrlTx string) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	this.Info.RegisterDNSTx = regUrlTx
+	info := this.GetTaskInfo()
+	info.RegisterDNSTx = regUrlTx
 	if this.Batch {
 		return nil
 	}
-	return this.DB.SaveTaskInfo(this.Info)
+	return this.DB.SaveTaskInfo(info)
 }
 
 func (this *UploadTask) SetBindUrlTx(bindUrlTx string) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	this.Info.BindDNSTx = bindUrlTx
+	info := this.GetTaskInfo()
+	info.BindDNSTx = bindUrlTx
 	if this.Batch {
 		return nil
 	}
-	return this.DB.SaveTaskInfo(this.Info)
+	return this.DB.SaveTaskInfo(info)
 }
 
 func (this *UploadTask) SetBlocksUploaded(id, nodeAddr string, blockInfos []*store.BlockInfo) error {
@@ -98,11 +100,7 @@ func (this *UploadTask) SetBlocksUploaded(id, nodeAddr string, blockInfos []*sto
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.DB.GetTaskInfo(id)
-	if err != nil {
-		return err
-	}
-	this.Info = newInfo
+
 	return nil
 }
 
@@ -113,144 +111,161 @@ func (this *UploadTask) SetUploadProgressDone(id, nodeAddr string) error {
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.DB.GetTaskInfo(id)
-	if err != nil {
-		return err
-	}
-	this.Info = newInfo
+
 	return nil
 }
 
 func (this *UploadTask) SetInOrder(inOrder bool) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	this.Info.InOrder = inOrder
+	info := this.GetTaskInfo()
+	info.InOrder = inOrder
 	if this.Batch {
 		return nil
 	}
-	return this.DB.SaveTaskInfo(this.Info)
+	return this.DB.SaveTaskInfo(info)
 }
 
 func (this *UploadTask) SetWhiteListTx(whiteListTx string) error {
-	this.Info.WhitelistTx = whiteListTx
+	info := this.GetTaskInfo()
+	info.WhitelistTx = whiteListTx
 	if this.Batch {
 		return nil
 	}
-	return this.DB.SaveTaskInfo(this.Info)
+	return this.DB.SaveTaskInfo(info)
 }
 
 func (this *UploadTask) GetRegUrlTx() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.RegisterDNSTx
+	info := this.GetTaskInfo()
+	return info.RegisterDNSTx
 }
 
 func (this *UploadTask) GetBindUrlTx() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.BindDNSTx
+	info := this.GetTaskInfo()
+	return info.BindDNSTx
 }
 
 func (this *UploadTask) GetWhitelistTx() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.WhitelistTx
+	info := this.GetTaskInfo()
+	return info.WhitelistTx
 }
 
 func (this *UploadTask) GetSimpleChecksum() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.SimpleChecksum
+	info := this.GetTaskInfo()
+	return info.SimpleChecksum
 }
 
 func (this *UploadTask) GetProveLevel() uint64 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.ProveLevel
+	info := this.GetTaskInfo()
+	return info.ProveLevel
 }
 
 func (this *UploadTask) GetBlocksRoot() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.BlocksRoot
+	info := this.GetTaskInfo()
+	return info.BlocksRoot
 }
 
 func (this *UploadTask) GetExpiredHeight() uint64 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.ExpiredHeight
+	info := this.GetTaskInfo()
+	return info.ExpiredHeight
 }
 
 func (this *UploadTask) GetRealFileSize() uint64 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.RealFileSize
+	info := this.GetTaskInfo()
+	return info.RealFileSize
 }
 
 func (this *UploadTask) GetStoreType() uint32 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.StoreType
+	info := this.GetTaskInfo()
+	return info.StoreType
 }
 
 func (this *UploadTask) GetPrivilege() uint64 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.Privilege
+	info := this.GetTaskInfo()
+	return info.Privilege
 }
 
 func (this *UploadTask) GetProveInterval() uint64 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.ProveInterval
+	info := this.GetTaskInfo()
+	return info.ProveInterval
 }
 
 func (this *UploadTask) GetEncrypt() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.Encrypt
+	info := this.GetTaskInfo()
+	return info.Encrypt
 }
 
 func (this *UploadTask) GetEncryptPassword() []byte {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.EncryptPassword
+	info := this.GetTaskInfo()
+	return info.EncryptPassword
 }
 
 func (this *UploadTask) GetRegisterDNS() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.RegisterDNS
+	info := this.GetTaskInfo()
+	return info.RegisterDNS
 }
 
 func (this *UploadTask) GetBindDNS() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.BindDNS
+	info := this.GetTaskInfo()
+	return info.BindDNS
 }
 
 func (this *UploadTask) GetWhiteList() []*store.WhiteList {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.WhiteList
+	info := this.GetTaskInfo()
+	return info.WhiteList
 }
 
 func (this *UploadTask) GetShare() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.Share
+	info := this.GetTaskInfo()
+	return info.Share
 }
 
 func (this *UploadTask) GetPrimaryNodes() []string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.PrimaryNodes
+	info := this.GetTaskInfo()
+	return info.PrimaryNodes
 }
 
 func (this *UploadTask) GetProveParams() []byte {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.ProveParams
+	info := this.GetTaskInfo()
+	return info.ProveParams
 }
 
 func (this *UploadTask) UpdateTaskProgress(taskId, nodeAddr string, progress uint64) error {

@@ -373,7 +373,7 @@ func (this *TaskMgr) newUploadTaskFromDB(id string) (*upload.UploadTask, error) 
 	t := upload.InitUploadTask(this.db)
 	t.Mgr = this
 	t.SetProgressNotifyCh(this.progress, this.progressCtx)
-	t.SetInfo(info)
+	// t.SetInfo(info)
 	t.SetInfoWithOptions(
 		base.TaskState(state),
 		base.TransferState(uint32(types.TaskPause)),

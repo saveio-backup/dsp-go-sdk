@@ -250,7 +250,7 @@ func (this *TaskMgr) newDispatchTaskFromDB(id string) (*dispatch.DispatchTask, e
 	t := dispatch.InitDispatchTask(this.db)
 	t.Mgr = this
 	t.SetProgressNotifyCh(this.progress, this.progressCtx)
-	t.SetInfo(info)
+	// t.SetInfo(info)
 
 	t.SetInfoWithOptions(
 		base.TaskState(state),

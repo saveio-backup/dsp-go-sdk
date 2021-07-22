@@ -57,7 +57,8 @@ func (this *DownloadTask) SetTaskState(newState store.TaskState) error {
 	}
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	if this.Info.TaskState == store.TaskStatePause {
+	info := this.GetTaskInfo()
+	if info.TaskState == store.TaskStatePause {
 		this.cleanBlockReqPool()
 	}
 	return nil
@@ -70,11 +71,7 @@ func (this *DownloadTask) SetBlockDownloaded(id, blockHashStr, nodeAddr string, 
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.DB.GetTaskInfo(id)
-	if err != nil {
-		return err
-	}
-	this.Info = newInfo
+
 	return nil
 }
 
@@ -85,73 +82,77 @@ func (this *DownloadTask) SetBlocksDownloaded(id string, blkInfos []*store.Block
 	if err != nil {
 		return err
 	}
-	newInfo, err := this.DB.GetTaskInfo(id)
-	if err != nil {
-		return err
-	}
-	this.Info = newInfo
+
 	return nil
 }
 
 func (this *DownloadTask) IsInOrder() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.InOrder
+	info := this.GetTaskInfo()
+	return info.InOrder
 }
 
 func (this *DownloadTask) GetAsset() int32 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.Asset
+	info := this.GetTaskInfo()
+	return info.Asset
 }
 
 func (this *DownloadTask) GetMaxPeerCnt() int {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.MaxPeerCnt
+	info := this.GetTaskInfo()
+	return info.MaxPeerCnt
 }
 
 func (this *DownloadTask) GetDecryptPwd() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.DecryptPwd
+	info := this.GetTaskInfo()
+	return info.DecryptPwd
 }
 
 func (this *DownloadTask) IsFree() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.Free
+	info := this.GetTaskInfo()
+	return info.Free
 }
 
 func (this *DownloadTask) IsSetFileName() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.SetFileName
+	info := this.GetTaskInfo()
+	return info.SetFileName
 }
 
 func (this *DownloadTask) PayOnLayer1() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.PayOnL1
+	info := this.GetTaskInfo()
+	return info.PayOnL1
 }
 
 func (this *DownloadTask) SetPayOnLayer1(payOnL1 bool) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	this.Info.PayOnL1 = payOnL1
+	info := this.GetTaskInfo()
+	info.PayOnL1 = payOnL1
 	if this.Batch {
 		return nil
 	}
-	return this.DB.SaveTaskInfo(this.Info)
+	return this.DB.SaveTaskInfo(info)
 }
 
 func (this *DownloadTask) setWorkerUnPaid(walletAddr string, unpaid bool) {
 	w, ok := this.Workers[walletAddr]
 	if !ok {
-		log.Warnf("task %s, set remote peer %s unpaid failed, peer not found", this.Info.Id, walletAddr)
+		log.Warnf("task %s, set remote peer %s unpaid failed, peer not found", this.Id, walletAddr)
 		return
 	}
-	log.Debugf("task %s, set peer %s unpaid %v", this.Info.Id, walletAddr, unpaid)
+	log.Debugf("task %s, set peer %s unpaid %v", this.Id, walletAddr, unpaid)
 	w.SetUnpaid(unpaid)
 }
 
@@ -198,7 +199,7 @@ func (this *DownloadTask) GetIdleWorker(addrs []string, fileHash, reqHash string
 		failedTooMuch := w.FailedTooMuch(fileHash)
 		if working || workUnpaid || workFailed || failedTooMuch {
 			log.Debugf("task %s, #%d worker is working: %t, failed: %t, unpaid: %t, file: %s, block: %s",
-				this.Info.Id, i, working, workFailed, workUnpaid, fileHash, reqHash)
+				this.Id, i, working, workFailed, workUnpaid, fileHash, reqHash)
 			if workFailed && !working && !workUnpaid && !failedTooMuch {
 				backupWorkers = append(backupWorkers, w)
 			}
@@ -208,7 +209,7 @@ func (this *DownloadTask) GetIdleWorker(addrs []string, fileHash, reqHash string
 		break
 	}
 	log.Debugf("task %s, getIdleWorker %s, pool-len: %d, worker %v",
-		this.Info.Id, reqHash, len(this.blockReqPool), worker)
+		this.Id, reqHash, len(this.blockReqPool), worker)
 	if worker != nil {
 		return worker
 	}
@@ -227,8 +228,9 @@ func (this *DownloadTask) AddBlockReqToPool(blockReqs []*types.GetBlockReq) {
 	if len(blockReqs) == 0 {
 		return
 	}
+	info := this.GetTaskInfo()
 	log.Debugf("task %s, add block req %s-%s-%d to %s-%d",
-		this.Info.Id, this.Info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
+		this.Id, info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
 		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
 	this.blockReqPool = append(this.blockReqPool, blockReqs...)
 	if len(this.Workers) == 0 {
@@ -246,8 +248,9 @@ func (this *DownloadTask) InsertBlockReqToPool(blockReqs []*types.GetBlockReq) {
 	if len(blockReqs) == 0 {
 		return
 	}
+	info := this.GetTaskInfo()
 	log.Debugf("task %s, insert block req %s-%s-%d to %s-%d",
-		this.Info.Id, this.Info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
+		this.Id, info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
 		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
 	this.blockReqPool = append(blockReqs, this.blockReqPool...)
 	if len(this.Workers) == 0 {
@@ -265,8 +268,9 @@ func (this *DownloadTask) DelBlockReqFromPool(blockReqs []*types.GetBlockReq) {
 	if len(blockReqs) == 0 {
 		return
 	}
+	info := this.GetTaskInfo()
 	log.Debugf("task %s, del block req %s-%s-%d to %s-%d",
-		this.Info.Id, this.Info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
+		this.Id, info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
 		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
 	hashKey := make(map[string]struct{}, 0)
 	for _, r := range blockReqs {
@@ -281,7 +285,7 @@ func (this *DownloadTask) DelBlockReqFromPool(blockReqs []*types.GetBlockReq) {
 	}
 	this.blockReqPool = newBlockReqPool
 	log.Debugf("task %s, block req pool len: %d",
-		this.Info.Id, len(this.blockReqPool))
+		this.Id, len(this.blockReqPool))
 	if len(this.Workers) == 0 {
 		return
 	}
@@ -361,23 +365,26 @@ func (this *DownloadTask) WorkerIdleDuration(addr string) uint64 {
 func (this *DownloadTask) SetWorkerNetPhase(addr string, phase int) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	this.Info.WorkerNetPhase[addr] = phase
+	info := this.GetTaskInfo()
+	info.WorkerNetPhase[addr] = phase
 	if this.Batch {
 		return nil
 	}
-	return this.DB.SaveTaskInfo(this.Info)
+	return this.DB.SaveTaskInfo(info)
 }
 
 func (this *DownloadTask) GetWorkerNetPhase(addr string) int {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.WorkerNetPhase[addr]
+	info := this.GetTaskInfo()
+	return info.WorkerNetPhase[addr]
 }
 
 func (this *DownloadTask) GetBlocksRoot() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	return this.Info.BlocksRoot
+	info := this.GetTaskInfo()
+	return info.BlocksRoot
 }
 
 func (this *DownloadTask) GetMaxFlightLen() int {
@@ -403,7 +410,8 @@ func (this *DownloadTask) NotifyBlock(blk *types.BlockResp) {
 func (this *DownloadTask) NewBlockFlightsRespCh(sessionId string, timeStamp int64) chan []*types.BlockResp {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	key := fmt.Sprintf("%s-%s-%s-%d", this.Info.Id, sessionId, this.Info.FileHash, timeStamp)
+	info := this.GetTaskInfo()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.Id, sessionId, info.FileHash, timeStamp)
 
 	if this.blockFlightRespsMap == nil {
 		this.blockFlightRespsMap = make(map[string]chan []*types.BlockResp)
@@ -420,7 +428,8 @@ func (this *DownloadTask) NewBlockFlightsRespCh(sessionId string, timeStamp int6
 func (this *DownloadTask) DropBlockFlightsRespCh(sessionId string, timeStamp int64) {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	key := fmt.Sprintf("%s-%s-%s-%d", this.Info.Id, sessionId, this.Info.FileHash, timeStamp)
+	info := this.GetTaskInfo()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.Id, sessionId, info.FileHash, timeStamp)
 	log.Debugf("drop block resp channel key: %s", key)
 	delete(this.blockFlightRespsMap, key)
 }
@@ -428,7 +437,8 @@ func (this *DownloadTask) DropBlockFlightsRespCh(sessionId string, timeStamp int
 func (this *DownloadTask) BlockFlightsChannelExists(sessionId string, timeStamp int64) bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	key := fmt.Sprintf("%s-%s-%s-%d", this.Info.Id, sessionId, this.Info.FileHash, timeStamp)
+	info := this.GetTaskInfo()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.Id, sessionId, info.FileHash, timeStamp)
 	_, ok := this.blockFlightRespsMap[key]
 	return ok
 }
@@ -436,7 +446,8 @@ func (this *DownloadTask) BlockFlightsChannelExists(sessionId string, timeStamp 
 func (this *DownloadTask) PushGetBlockFlights(sessionId string, blocks []*types.BlockResp, timeStamp int64) {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
-	key := fmt.Sprintf("%s-%s-%s-%d", this.Info.Id, sessionId, this.Info.FileHash, timeStamp)
+	info := this.GetTaskInfo()
+	key := fmt.Sprintf("%s-%s-%s-%d", this.Id, sessionId, info.FileHash, timeStamp)
 	log.Debugf("push block to resp channel: %s", key)
 	ch, ok := this.blockFlightRespsMap[key]
 	if !ok {
@@ -462,25 +473,26 @@ func (this *DownloadTask) PushGetBlockFlights(sessionId string, blocks []*types.
 func (this *DownloadTask) GetFullFilePath() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
-	filePath := this.Info.FilePath
+	info := this.GetTaskInfo()
+	filePath := info.FilePath
 	if len(filePath) != 0 {
 		return filePath
 	}
 
-	if this.Info.SetFileName {
+	if info.SetFileName {
 		filePath = uTask.GetFileFullPath(
 			this.Mgr.Config().FsFileRoot,
-			this.Info.FileHash,
-			this.Info.FileName,
-			uPrefix.GetPrefixEncrypted(this.Info.Prefix),
+			info.FileHash,
+			info.FileName,
+			uPrefix.GetPrefixEncrypted(info.Prefix),
 		)
 
 	} else {
 		filePath = uTask.GetFileFullPath(
 			this.Mgr.Config().FsFileRoot,
-			this.Info.FileHash,
+			info.FileHash,
 			"",
-			uPrefix.GetPrefixEncrypted(this.Info.Prefix),
+			uPrefix.GetPrefixEncrypted(info.Prefix),
 		)
 	}
 	return filePath
@@ -490,7 +502,8 @@ func (this *DownloadTask) setTaskState(newState store.TaskState) error {
 	if err := this.Task.UnsafeSetTaskState(newState); err != nil {
 		return err
 	}
-	if this.Info.TaskState == store.TaskStatePause {
+	info := this.GetTaskInfo()
+	if info.TaskState == store.TaskStatePause {
 		this.cleanBlockReqPool()
 	}
 	return nil
@@ -498,9 +511,9 @@ func (this *DownloadTask) setTaskState(newState store.TaskState) error {
 
 // notifyBlockReqPoolLen. notify block req pool len
 func (this *DownloadTask) notifyBlockReqPoolLen() {
-	log.Debugf("task %s, notify block req update", this.Info.Id)
+	log.Debugf("task %s, notify block req update", this.Id)
 	this.blockReqPoolNotify <- struct{}{}
-	log.Debugf("task %s, notify block req update done", this.Info.Id)
+	log.Debugf("task %s, notify block req update done", this.Id)
 }
 
 // cleanBlockReqPool. clean all block req pool. non thread-safe
@@ -515,24 +528,26 @@ func (this *DownloadTask) cleanBlockReqPool() {
 }
 
 func (this *DownloadTask) setPayOnLayer1(payOnL1 bool) error {
-	this.Info.PayOnL1 = payOnL1
+	info := this.GetTaskInfo()
+	info.PayOnL1 = payOnL1
 	if this.Batch {
 		return nil
 	}
-	return this.DB.SaveTaskInfo(this.Info)
+	return this.DB.SaveTaskInfo(info)
 }
 
 func (this *DownloadTask) SetFilePath(filePath string) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
+	info := this.GetTaskInfo()
 	// TODO: temp solution for concurrent update path, will fixed by refactor code
-	if len(this.Info.FilePath) != 0 {
-		log.Warnf("task %s has path %s, ignore new path", this.Info.Id, this.Info.FilePath)
+	if len(info.FilePath) != 0 {
+		log.Warnf("task %s has path %s, ignore new path", this.Id, info.FilePath)
 		return nil
 	}
-	this.Info.FilePath = filePath
+	info.FilePath = filePath
 	if this.Batch {
 		return nil
 	}
-	return this.DB.SaveTaskInfo(this.Info)
+	return this.DB.SaveTaskInfo(info)
 }

@@ -34,7 +34,7 @@ func InitShareTask(db *store.TaskDB) *ShareTask {
 }
 
 func (this *ShareTask) DeleteFileUnpaid(walletAddress string, paymentId, asset int32, amount uint64) error {
-	err := this.DB.DeleteFileUnpaid(this.Info.Id, walletAddress, paymentId, asset, amount)
+	err := this.DB.DeleteFileUnpaid(this.Id, walletAddress, paymentId, asset, amount)
 	if err != nil {
 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
 	}
@@ -42,9 +42,16 @@ func (this *ShareTask) DeleteFileUnpaid(walletAddress string, paymentId, asset i
 }
 
 func (this *ShareTask) AddFileUnpaid(walletAddress string, paymentId, asset int32, amount uint64) error {
-	err := this.DB.AddFileUnpaid(this.Info.Id, walletAddress, paymentId, asset, amount)
+	err := this.DB.AddFileUnpaid(this.Id, walletAddress, paymentId, asset, amount)
 	if err != nil {
 		return sdkErr.New(sdkErr.SET_FILEINFO_DB_ERROR, err.Error())
 	}
 	return nil
+}
+
+func (this *ShareTask) GetReferId() string {
+	this.Lock.RLock()
+	defer this.Lock.RUnlock()
+	info := this.GetTaskInfo()
+	return info.ReferId
 }

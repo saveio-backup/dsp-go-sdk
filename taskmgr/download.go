@@ -303,7 +303,7 @@ func (this *TaskMgr) newDownloadTaskFromDB(id string) (*download.DownloadTask, e
 	for _, session := range sessions {
 		sessionIds[session.WalletAddr] = session.SessionId
 	}
-	t.SetInfo(info)
+	// t.SetInfo(info)
 	t.SetInfoWithOptions(
 		base.TaskState(state),
 		base.TransferState(uint32(types.TaskPause)),
