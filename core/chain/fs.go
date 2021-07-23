@@ -355,8 +355,8 @@ func (this *Chain) CheckHasProveFile(fileHashStr string, walletAddr chainCom.Add
 	return false
 }
 
-func (this *Chain) CreateSector(sectorId uint64, proveLevel uint64, size uint64) (string, error) {
-	txHash, err := this.themis.Native.Fs.CreateSector(sectorId, proveLevel, size)
+func (this *Chain) CreateSector(sectorId uint64, proveLevel uint64, size uint64, isPlots bool) (string, error) {
+	txHash, err := this.themis.Native.Fs.CreateSector(sectorId, proveLevel, size, isPlots)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
 	}

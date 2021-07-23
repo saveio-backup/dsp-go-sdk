@@ -303,8 +303,8 @@ func (this *Dsp) QueryPluginsInfo() (*dns.NameInfoList, error) {
 	return this.Chain.QueryPluginsInfo()
 }
 
-func (this *Dsp) CreateSector(sectorId uint64, proveLevel uint64, size uint64) (string, error) {
-	return this.Chain.CreateSector(sectorId, proveLevel, size)
+func (this *Dsp) CreateSector(sectorId uint64, proveLevel uint64, size uint64, isPlots bool) (string, error) {
+	return this.Chain.CreateSector(sectorId, proveLevel, size, isPlots)
 }
 
 func (this *Dsp) DeleteSector(sectorId uint64) (string, error) {
