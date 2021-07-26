@@ -20,7 +20,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/task/types"
 	"github.com/saveio/dsp-go-sdk/task/upload"
 	"github.com/saveio/dsp-go-sdk/types/ticker"
-	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -322,5 +321,5 @@ func (this *TaskMgr) BlockReqCh() chan []*types.GetBlockReq {
 func (this *TaskMgr) StartPDPVerify(fileHashStr string) error {
 	ch := make(chan uint32)
 	this.fileProvedCh.Store(fileHashStr, ch)
-	return this.fs.StartPDPVerify(fileHashStr, 0, 0, 0, chainCom.ADDRESS_EMPTY)
+	return this.fs.StartPDPVerify(fileHashStr)
 }

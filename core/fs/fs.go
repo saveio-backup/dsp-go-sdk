@@ -20,7 +20,6 @@ import (
 	queue "github.com/saveio/dsp-go-sdk/types/queue"
 	osUtil "github.com/saveio/dsp-go-sdk/utils/os"
 	sdk "github.com/saveio/themis-go-sdk"
-	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 
 	"github.com/saveio/max/importer/helpers"
@@ -274,9 +273,8 @@ func (this *Fs) GetTag(blockHash string, fileHash string, index uint64) ([]byte,
 }
 
 // StartPDPVerify. start pdp verify for a file
-func (this *Fs) StartPDPVerify(fileHash string, luckyNum uint64, bakHeight uint64, bakNum uint64,
-	borkenWalletAddr chainCom.Address) error {
-	err := this.fs.StartPDPVerify(fileHash, luckyNum, bakHeight, bakNum, borkenWalletAddr)
+func (this *Fs) StartPDPVerify(fileHash string) error {
+	err := this.fs.StartPDPVerify(fileHash)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.FS_INTERNAL_ERROR, err)
 	}
