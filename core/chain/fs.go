@@ -116,10 +116,10 @@ func (this *Chain) StoreFile(
 	blockNum, blockSizeInKB, proveLevel, expiredHeight, copyNum uint64,
 	fileDesc []byte, privilege uint64, proveParam []byte,
 	storageType, realFileSize uint64,
-	primaryNodes, candidateNodes []chainCom.Address,
+	primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo,
 ) (string, uint32, error) {
 	txHash, err := this.themis.Native.Fs.StoreFile(fileHashStr, blocksRoot, blockNum, blockSizeInKB, proveLevel,
-		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes)
+		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes, plotInfo)
 	if err != nil {
 		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
 	}

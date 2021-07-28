@@ -60,6 +60,7 @@ func (this *UploadTask) payFile(fileID pdp.FileID, tagsRoot []byte, walletAddrs 
 		this.GetRealFileSize(),
 		walletAddrs,
 		candidateNodes,
+		nil,
 	)
 	if err != nil {
 		log.Debugf("store file params fileHash:%v, blockNum:%v, blockSize:%v, "+
