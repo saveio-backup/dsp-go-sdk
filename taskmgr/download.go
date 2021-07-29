@@ -297,6 +297,7 @@ func (this *TaskMgr) newDownloadTaskFromDB(id string) (*download.DownloadTask, e
 	}
 
 	t := download.InitDownloadTask(this.db)
+	t.Id = id
 	t.Mgr = this
 	t.SetProgressNotifyCh(this.progress, this.progressCtx)
 	sessionIds := make(map[string]string)

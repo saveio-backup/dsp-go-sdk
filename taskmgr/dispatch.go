@@ -248,6 +248,7 @@ func (this *TaskMgr) newDispatchTaskFromDB(id string) (*dispatch.DispatchTask, e
 		state = store.TaskStatePause
 	}
 	t := dispatch.InitDispatchTask(this.db)
+	t.Id = id
 	t.Mgr = this
 	t.SetProgressNotifyCh(this.progress, this.progressCtx)
 	// t.SetInfo(info)

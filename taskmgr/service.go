@@ -336,15 +336,18 @@ func (this *TaskMgr) removeFileService() {
 
 // startCheckFileProved. check file has proved service
 func (this *TaskMgr) fileProvedService() {
+	log.Infof("start fileProvedService")
 	notify := this.fs.RegChainEventNotificationChannel()
 	for {
 		select {
 		case event := <-notify:
+			log.Infof("fileProvedService event %v", event)
 			if event == nil {
 				log.Errorf("receive empty event")
 				continue
 			}
 			eventName, _ := event[eventFilterName].(string)
+			log.Infof("fileProvedService eventName %v", eventName)
 			if len(eventName) == 0 {
 				log.Errorf("wrong event name type %v, type %T", event, event[eventFilterName])
 				continue

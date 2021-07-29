@@ -16,6 +16,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/task/base"
 	"github.com/saveio/dsp-go-sdk/task/dispatch"
 	"github.com/saveio/dsp-go-sdk/task/download"
+	"github.com/saveio/dsp-go-sdk/task/poc"
 	"github.com/saveio/dsp-go-sdk/task/share"
 	"github.com/saveio/dsp-go-sdk/task/types"
 	"github.com/saveio/dsp-go-sdk/task/upload"
@@ -40,8 +41,10 @@ type TaskMgr struct {
 	downloadTaskLock    *sync.RWMutex                     // download task lock
 	dispatchTasks       map[string]*dispatch.DispatchTask // dispatch tasks map, task id => upload task
 	dispatchTaskLock    *sync.RWMutex                     // dispatch task lock
-	shareTasks          map[string]*share.ShareTask       // upload tasks map, task id => upload task
-	shareTaskLock       *sync.RWMutex                     // upload task lock
+	shareTasks          map[string]*share.ShareTask       // share tasks map, task id => share task
+	shareTaskLock       *sync.RWMutex                     // share task lock
+	pocTasks            map[string]*poc.PocTask           // poc tasks map, task id => poc task
+	pocTaskLock         *sync.RWMutex                     // poc task lock
 	retryUploadTaskTs   map[string]uint64                 // retry task taskId <==> retry at timestamp
 	retryDownloadTaskTs map[string]uint64                 // retry task taskId <==> retry at timestamp
 	retryDispatchTaskTs map[string]uint64                 // retry task taskId <==> retry at timestamp
@@ -67,10 +70,12 @@ func NewTaskMgr(chain *chain.Chain, fs *fs.Fs, dns *dns.DNS, channel *channel.Ch
 		downloadTasks:       make(map[string]*download.DownloadTask, 0),
 		dispatchTasks:       make(map[string]*dispatch.DispatchTask, 0),
 		shareTasks:          make(map[string]*share.ShareTask, 0),
+		pocTasks:            make(map[string]*poc.PocTask, 0),
 		uploadTaskLock:      new(sync.RWMutex),
 		downloadTaskLock:    new(sync.RWMutex),
 		dispatchTaskLock:    new(sync.RWMutex),
 		shareTaskLock:       new(sync.RWMutex),
+		pocTaskLock:         new(sync.RWMutex),
 		retryUploadTaskTs:   make(map[string]uint64),
 		retryDownloadTaskTs: make(map[string]uint64),
 		retryDispatchTaskTs: make(map[string]uint64),

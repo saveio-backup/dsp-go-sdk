@@ -190,6 +190,10 @@ func (this *TaskMgr) RecoverLossTaskFromDB() error {
 			log.Debugf("recover loss task for file %s get info is nil : %v", fileHashStr)
 			continue
 		}
+		log.Infof("IsPlotFile %v", info.IsPlotFile)
+		if info.IsPlotFile {
+			continue
+		}
 
 		newUploadTask, err := this.NewUploadTask("")
 		if err != nil {

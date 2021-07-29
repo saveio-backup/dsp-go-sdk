@@ -43,7 +43,7 @@ func NewFs(chain *sdk.Chain, opts ...FsOption) (*Fs, error) {
 	}
 	fsConfig := &max.FSConfig{
 		RepoRoot:   initOpt.RepoRoot,
-		FsType:     max.FSType(initOpt.FsType),
+		FsType:     max.FS_FILESTORE | max.FS_BLOCKSTORE,
 		ChunkSize:  consts.CHUNK_SIZE,
 		GcPeriod:   initOpt.GcPeriod,
 		MaxStorage: initOpt.MaxStorage,

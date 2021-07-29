@@ -283,6 +283,7 @@ func (this *TaskMgr) RecoverUndoneUploadTask() error {
 
 	for _, id := range taskIds {
 		t, err := this.newUploadTaskFromDB(id)
+		log.Infof("new upload task %v from db %v err %v", id, t, err)
 		if err != nil {
 			continue
 		}
@@ -371,9 +372,9 @@ func (this *TaskMgr) newUploadTaskFromDB(id string) (*upload.UploadTask, error) 
 	}
 
 	t := upload.InitUploadTask(this.db)
+	t.Id = id
 	t.Mgr = this
 	t.SetProgressNotifyCh(this.progress, this.progressCtx)
-	// t.SetInfo(info)
 	t.SetInfoWithOptions(
 		base.TaskState(state),
 		base.TransferState(uint32(types.TaskPause)),

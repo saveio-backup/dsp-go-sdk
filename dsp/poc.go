@@ -1,18 +1,15 @@
 package dsp
 
-import "github.com/saveio/dsp-go-sdk/task/poc"
+import (
+	"github.com/saveio/dsp-go-sdk/task/poc"
+	"github.com/saveio/dsp-go-sdk/task/types"
+)
 
 // AddNewPocFile. Add new plot file and generate new poc task.
-func (this *Dsp) AddNewPlotFile(taskId string, plotCfg *poc.PlotConfig) (string, error) {
-
+func (this *Dsp) AddNewPlotFile(taskId string, createSector bool, plotCfg *poc.PlotConfig) (*types.AddPlotFileResp, error) {
 	tsk, err := this.TaskMgr.NewPocTask(taskId)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
-	if err := tsk.AddPlotFile(plotCfg); err != nil {
-		return "", err
-	}
-
-	return tsk.GetId(), nil
+	return this.TaskMgr.AddPlotFile(tsk.GetId(), createSector, plotCfg)
 }

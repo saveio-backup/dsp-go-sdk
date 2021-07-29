@@ -267,6 +267,20 @@ func (this *Chain) WhiteListOp(fileHashStr string, op uint64, whiteList fs.White
 	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
 }
 
+func (this *Chain) GetNodeInfoByWallet(walletAddr chainCom.Address) (*fs.FsNodeInfo, error) {
+	infos, err := this.themis.Native.Fs.GetNodeListByAddrs([]chainCom.Address{walletAddr})
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+	}
+	if infos.NodeNum != 1 {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, fmt.Errorf("wrong node num %v", infos.NodeNum))
+	}
+
+	nodeInfo := infos.NodeInfo[0]
+	p := &nodeInfo
+	return p, nil
+}
+
 func (this *Chain) GetNodeHostAddrListByWallets(nodeWalletAddrs []chainCom.Address) ([]string, error) {
 	info, err := this.themis.Native.Fs.GetNodeListByAddrs(nodeWalletAddrs)
 	if err != nil {

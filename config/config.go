@@ -11,12 +11,14 @@ type DspConfig struct {
 	MaxDownloadTask uint32 // max download task num
 	MaxShareTask    uint32 // max share task num
 
-	FsRepoRoot   string // fs block store repo root path
-	FsFileRoot   string // fs file store root path
-	FsType       int    // fs type
-	FsGcPeriod   string // fs gc period
-	FsMaxStorage string // fs max storage
-	EnableBackup bool   // enable backup file
+	FsRepoRoot    string // fs block store repo root path
+	FsFileRoot    string // fs file store root path
+	FsType        int    // fs type
+	FsGcPeriod    string // fs gc period
+	FsMaxStorage  string // fs max storage
+	EnableBackup  bool   // enable backup file
+	DspListenAddr string // dsp listen address. e.g: "127.0.0.1:3001"
+	DspProtocol   string // dsp network protocol. e.g: "tcp"
 
 	ChannelClientType    string // channel client type. e.g: "rpc"
 	ChannelListenAddr    string // channel listen address. e.g: "127.0.0.1:3001"

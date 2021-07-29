@@ -229,3 +229,9 @@ type BlockMsgData struct {
 	Offset    uint64
 	RefCnt    int
 }
+
+type AddPlotFileResp struct {
+	TaskId             string
+	UpdateNodeTxHash   string
+	CreateSectorTxHash string
+}

@@ -124,16 +124,17 @@ func (this *Dsp) Start() error {
 	this.state.Set(state.ModuleStateStarting)
 	if err := this.DNS.SetupTrackers(); err != nil {
 		this.state.Set(state.ModuleStateError)
-		return err
+		log.Errorf("set up dns err %v", err)
 	}
 
 	if this.Channel != nil {
 		if err := this.StartChannelService(); err != nil {
 			this.state.Set(state.ModuleStateError)
-			return err
+			log.Errorf("start channel err %s", err)
+		} else {
+
+			this.DNS.Discovery()
 		}
-		// this.DNS.Channel = this.Channel
-		this.DNS.Discovery()
 	}
 
 	// start seed service
@@ -141,22 +142,21 @@ func (this *Dsp) Start() error {
 		go this.StartSeedService()
 	}
 	// start backup service
-	if this.IsFs() {
-
+	if this.IsFs() && this.DNS != nil {
 		go this.DNS.StartDNSHealthCheckService()
 	}
 	if this.IsClient() {
 		sys.MonitorEnable = false
 		log.Debugf("disable monitor")
 	}
-	if this.IsClient() && this.config.HealthCheckDNS {
+	if this.IsClient() && this.config.HealthCheckDNS && this.DNS != nil {
 		log.Debugf("startDNSHealthCheckService")
 		go this.DNS.StartDNSHealthCheckService()
 	}
 
 	this.state.Set(state.ModuleStateStarted)
 	this.state.Set(state.ModuleStateActive)
-	log.Debugf("runing...")
+	log.Debugf("dsp is runing...")
 	go this.TaskMgr.StartService()
 	return nil
 }

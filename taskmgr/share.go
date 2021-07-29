@@ -111,6 +111,7 @@ func (this *TaskMgr) newShareTaskFromDB(id string) (*share.ShareTask, error) {
 	}
 
 	t := share.InitShareTask(this.db)
+	t.Id = id
 	t.Mgr = this
 	t.SetProgressNotifyCh(this.progress, this.progressCtx)
 	// t.SetInfo(info)

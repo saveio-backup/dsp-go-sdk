@@ -15,6 +15,7 @@ const (
 
 const (
 	CHUNK_SIZE                             = 256 * 1024                                 // chunk size
+	CHUNK_SIZE_KB                          = 256                                        // chunk size in kb
 	DOWNLOAD_FILE_TEMP_DIR_PATH            = "./temp"                                   // download temp file path
 	PROTO_NODE_FILE_HASH_LEN               = 46                                         // proto node file hash length
 	RAW_NODE_FILE_HASH_LEN                 = 49                                         // raw node file hash length
@@ -67,6 +68,7 @@ const (
 	TRACKER_SERVICE_TIMEOUT             = 15      // 5s
 	WAIT_FOR_GENERATEBLOCK_TIMEOUT      = 10      // wait for generate timeout
 	MEDIA_TRANSFER_TIMEOUT              = 20      // media transfer timeout
+	POLL_FOR_BLOCK_TIMEOUT              = 120     // poll for block timeout
 
 	NETWORK_STREAM_WRITE_TIMEOUT  = 16                                                                                               // network write stream timeout for 128KB (128KB/16s=8KB/s)
 	DOWNLOAD_STREAM_WRITE_TIMEOUT = 2                                                                                                // download stream timeout 128KB/2s 64KB/s
@@ -84,45 +86,47 @@ const (
 
 // task consts
 const (
-	MAX_TASKS_NUM                  = 50     // max task number
-	MAX_GOROUTINES_FOR_WORK_TASK   = 8      // max goroutines for choose worker to do job
-	BACKUP_FILE_DURATION           = 30     // 30s check
-	DISPATCH_FILE_DURATION         = 300    // 60s check
-	REMOVE_FILES_DURATION          = 10     // 10s for remove files check
-	MAX_EXPIRED_PROVE_TASK_NUM     = 10     // max backup tasks one time
-	MAX_WORKER_BLOCK_FAILED_NUM    = 1      // max failed count from a worker to request block
-	MAX_WORKER_FILE_FAILED_NUM     = 10     // max failed count from a worker to request file
-	MAX_DOWNLOAD_PEERS_NUM         = 50     // max peers for download file
-	MAX_NETWORK_REQUEST_RETRY      = 4      // max network request retry
-	MAX_BACKUP_FILE_FAILED         = 3      // max backup file failed times
-	MAX_BACKUP_FILES_IN_QUEUE      = 10     // max backuping files
-	MAX_TRACKERS_NUM               = 100    // max tracker num
-	MAX_DNS_NUM                    = 15     // max dns num
-	MAX_PUBLICADDR_CACHE_LEN       = 100    // cache len
-	MAX_PROGRESS_CHANNEL_SIZE      = 100    // progress channel size
-	MAX_SEND_BLOCK_RETRY           = 3      // max send block retry
-	MAX_SAME_UPLOAD_BLOCK_NUM      = 3      // max enable upload same block for same node
-	MAX_TRACKER_REQ_TIMEOUT_NUM    = 5      // max tracker request timeout num
-	MAX_PUBLIC_IP_UPDATE_SECOND    = 5 * 60 // max update second to update peer host addr cache
-	MAX_BLOCK_FETCHED_RETRY        = 3      // max uploading block be fetched retry
-	MAX_REQ_BLOCK_COUNT            = 32     // max block count when request for download flights
-	MIN_REQ_BLOCK_COUNT            = 16     // min block count when request for download flights
-	MAX_SEND_BLOCK_COUNT           = 16     // max send block count for send flights
-	MIN_SEND_BLOCK_COUNT           = 16     // min send block count for send flights
-	MAX_START_PDP_RETRY            = 2      // max start pdp retry
-	START_PDP_RETRY_DELAY          = 5      // delay pdp retry
-	MAX_PEERCNT_FOR_DOWNLOAD       = 100    // max peer count (threads) for download file
-	MIN_DOWNLOAD_QOS_LEN           = 3      // min download QoS size
-	MAX_TRACKER_REQUEST_PARALLEL   = 10     // max concurrent tracker request num
-	MAX_PEERS_NUM_GET_FROM_TRACKER = 1000   // max peer count get from tracker
-	FILE_DOWNLOADED_INDEX_OFFSET   = 3      // check file is downloaded start point
-	MAX_BLOCK_HEIGHT_DIFF          = 10     // max block height diff between peers
-	MAX_DNS_NODE_FOR_PAY           = 4      // max dns node used to pay
-	MAX_TASK_RETRY                 = 20     // max task retry times
-	MAX_TASK_SESSION_NUM           = 100    // max task session num
-	MAX_TASK_BLOCK_REQ             = 100    // max task request block
-	MAX_TASK_BLOCK_NOTIFY          = 100    // max task notify
-	MAX_PDP_PROVE_TIME             = 120    // wait 60s for pdp prove
+	MAX_TASKS_NUM                  = 50          // max task number
+	MAX_GOROUTINES_FOR_WORK_TASK   = 8           // max goroutines for choose worker to do job
+	BACKUP_FILE_DURATION           = 30          // 30s check
+	DISPATCH_FILE_DURATION         = 300         // 60s check
+	REMOVE_FILES_DURATION          = 10          // 10s for remove files check
+	MAX_EXPIRED_PROVE_TASK_NUM     = 10          // max backup tasks one time
+	MAX_WORKER_BLOCK_FAILED_NUM    = 1           // max failed count from a worker to request block
+	MAX_WORKER_FILE_FAILED_NUM     = 10          // max failed count from a worker to request file
+	MAX_DOWNLOAD_PEERS_NUM         = 50          // max peers for download file
+	MAX_NETWORK_REQUEST_RETRY      = 4           // max network request retry
+	MAX_BACKUP_FILE_FAILED         = 3           // max backup file failed times
+	MAX_BACKUP_FILES_IN_QUEUE      = 10          // max backuping files
+	MAX_TRACKERS_NUM               = 100         // max tracker num
+	MAX_DNS_NUM                    = 15          // max dns num
+	MAX_PUBLICADDR_CACHE_LEN       = 100         // cache len
+	MAX_PROGRESS_CHANNEL_SIZE      = 100         // progress channel size
+	MAX_SEND_BLOCK_RETRY           = 3           // max send block retry
+	MAX_SAME_UPLOAD_BLOCK_NUM      = 3           // max enable upload same block for same node
+	MAX_TRACKER_REQ_TIMEOUT_NUM    = 5           // max tracker request timeout num
+	MAX_PUBLIC_IP_UPDATE_SECOND    = 5 * 60      // max update second to update peer host addr cache
+	MAX_BLOCK_FETCHED_RETRY        = 3           // max uploading block be fetched retry
+	MAX_REQ_BLOCK_COUNT            = 32          // max block count when request for download flights
+	MIN_REQ_BLOCK_COUNT            = 16          // min block count when request for download flights
+	MAX_SEND_BLOCK_COUNT           = 16          // max send block count for send flights
+	MIN_SEND_BLOCK_COUNT           = 16          // min send block count for send flights
+	MAX_START_PDP_RETRY            = 2           // max start pdp retry
+	START_PDP_RETRY_DELAY          = 5           // delay pdp retry
+	MAX_PEERCNT_FOR_DOWNLOAD       = 100         // max peer count (threads) for download file
+	MIN_DOWNLOAD_QOS_LEN           = 3           // min download QoS size
+	MAX_TRACKER_REQUEST_PARALLEL   = 10          // max concurrent tracker request num
+	MAX_PEERS_NUM_GET_FROM_TRACKER = 1000        // max peer count get from tracker
+	FILE_DOWNLOADED_INDEX_OFFSET   = 3           // check file is downloaded start point
+	MAX_BLOCK_HEIGHT_DIFF          = 10          // max block height diff between peers
+	MAX_DNS_NODE_FOR_PAY           = 4           // max dns node used to pay
+	MAX_TASK_RETRY                 = 20          // max task retry times
+	MAX_TASK_SESSION_NUM           = 100         // max task session num
+	MAX_TASK_BLOCK_REQ             = 100         // max task request block
+	MAX_TASK_BLOCK_NOTIFY          = 100         // max task notify
+	MAX_PDP_PROVE_TIME             = 120         // wait 60s for pdp prove
+	MAX_SERVICE_TIME               = 86400 * 365 // max service time
+	MAX_PLOT_FILE_EXPIRED_BLOCK    = 63072000    // save for 10 years
 )
 
 // go routine

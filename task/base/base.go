@@ -143,6 +143,7 @@ func (this *Task) SetInfoWithOptions(opts ...InfoOption) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
+	log.Infof("set info with options %v id %v", info, this.Id)
 	for _, opt := range opts {
 		opt.apply(info)
 	}
