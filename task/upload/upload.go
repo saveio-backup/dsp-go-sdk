@@ -174,13 +174,13 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	}
 	log.Debugf("upload task %s isn't uploaded", taskId)
 
-	fileID := getFileIDFromFileHash(fileHashStr)
-	tags, err := this.generatePdpTags(hashes, fileID)
+	fileID := GetFileIDFromFileHash(fileHashStr)
+	tags, err := this.GeneratePdpTags(hashes, fileID)
 	if err != nil {
 		return nil, err
 	}
 
-	tagsRoot, err := this.getMerkleRootForTag(fileID, tags)
+	tagsRoot, err := this.GetMerkleRootForTag(fileID, tags)
 	if err != nil {
 		return nil, err
 	}

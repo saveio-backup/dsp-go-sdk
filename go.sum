@@ -212,6 +212,8 @@ github.com/saveio/carrier v0.0.0-20210519082359-9fc4d908c385 h1:PBGK0WSYVQuwR3GN
 github.com/saveio/carrier v0.0.0-20210519082359-9fc4d908c385/go.mod h1:ag5eewrOHMH81jlpqXeSTvYxKO7gGTILVwfjR3nSUu8=
 github.com/saveio/max v0.0.0-20210624072549-139def04befb h1:EzeZ+PuiPFbOCj5apBYcDb8+5xNkLBDObKsGRKEGjjM=
 github.com/saveio/max v0.0.0-20210624072549-139def04befb/go.mod h1:rHfsOHYt9fK7mpJ+ZkhCECEQKAApvy3pOtUu95b7ZEY=
+github.com/saveio/max v0.0.0-20210728025229-47aa8d4cc8f9 h1:WAR4fwFEjFw2692TEo0WuIjopYvpQQsy3WzyOv1fulc=
+github.com/saveio/max v0.0.0-20210728025229-47aa8d4cc8f9/go.mod h1:rHfsOHYt9fK7mpJ+ZkhCECEQKAApvy3pOtUu95b7ZEY=
 github.com/saveio/pylons v0.0.0-20210519083005-78a1ef20d8a0 h1:IdyNAxyBbMGTHenLZ7uJvKuRTjWCX/s+iwZqDVdQ7v4=
 github.com/saveio/pylons v0.0.0-20210519083005-78a1ef20d8a0/go.mod h1:NS705LQAoFq+aE3zgNFc90RIDFMGRbh99RhFLwhFm4M=
 github.com/scylladb/go-set v1.0.2/go.mod h1:DkpGd78rljTxKAnTDPFqXSGxvETQnJyuSOQwsHycqfs=

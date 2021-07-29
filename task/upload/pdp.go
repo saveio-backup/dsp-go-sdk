@@ -7,7 +7,7 @@ import (
 	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
 )
 
-func (this *UploadTask) generatePdpTags(hashes []string, fileID pdp.FileID) ([]pdp.Tag, error) {
+func (this *UploadTask) GeneratePdpTags(hashes []string, fileID pdp.FileID) ([]pdp.Tag, error) {
 	p := pdp.NewPdp(0)
 	tags := make([]pdp.Tag, 0)
 	for index, hash := range hashes {
@@ -26,7 +26,7 @@ func (this *UploadTask) generatePdpTags(hashes []string, fileID pdp.FileID) ([]p
 	return tags, nil
 }
 
-func (this *UploadTask) getMerkleRootForTag(fileID pdp.FileID, tags []pdp.Tag) ([]byte, error) {
+func (this *UploadTask) GetMerkleRootForTag(fileID pdp.FileID, tags []pdp.Tag) ([]byte, error) {
 	p := pdp.NewPdp(0)
 	nodes := make([]*pdp.MerkleNode, 0)
 	for index, tag := range tags {
@@ -40,7 +40,7 @@ func (this *UploadTask) getMerkleRootForTag(fileID pdp.FileID, tags []pdp.Tag) (
 	return p.GetRootHashForFile(fileID)
 }
 
-func getFileIDFromFileHash(fileHash string) pdp.FileID {
+func GetFileIDFromFileHash(fileHash string) pdp.FileID {
 	var fileID pdp.FileID
 	reader := bytes.NewReader(([]byte)(fileHash))
 	reader.Read(fileID[:])

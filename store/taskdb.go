@@ -37,6 +37,7 @@ const (
 	TaskTypeShare
 	TaskTypeBackup
 	TaskTypeDispatch
+	TaskTypePoC
 )
 
 type TaskState int

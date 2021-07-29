@@ -33,7 +33,7 @@ type FilePrefix struct {
 	Version     uint8              // prefix version
 	Encrypt     bool               // is file encrypt
 	EncryptPwd  string             // file encrypt password
-	EncryptSalt [SALT_LEN]byte     // random salt
+	EncryptSalt [4]byte            // random salt
 	EncryptHash [HASH_LEN]byte     // encrypt hash = sha256(pwd+salt)
 	Owner       common.Address     // file owner, 20 Bytes
 	FileSize    uint64             // file size
