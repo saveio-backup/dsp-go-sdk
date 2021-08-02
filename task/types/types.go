@@ -6,6 +6,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/network/message/types/block"
 	"github.com/saveio/dsp-go-sdk/store"
 	chainCom "github.com/saveio/themis/common"
+	"github.com/saveio/themis/smartcontract/service/native/savefs"
 )
 
 type UploadResult struct {
@@ -234,4 +235,19 @@ type AddPlotFileResp struct {
 	TaskId             string
 	UpdateNodeTxHash   string
 	CreateSectorTxHash string
+}
+
+type PlotFileInfo struct {
+	FileName    string
+	FileHash    string
+	FileOwner   string
+	FileSize    uint64
+	BlockHeight uint64
+	PlotInfo    *savefs.PlotInfo
+}
+
+type AllPlotsFileResp struct {
+	TotalCount int
+	TotalSize  uint64
+	FileInfos  []*PlotFileInfo
 }

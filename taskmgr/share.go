@@ -114,7 +114,6 @@ func (this *TaskMgr) newShareTaskFromDB(id string) (*share.ShareTask, error) {
 	t.Id = id
 	t.Mgr = this
 	t.SetProgressNotifyCh(this.progress, this.progressCtx)
-	// t.SetInfo(info)
 	t.SetInfoWithOptions(
 		base.TaskState(state),
 		base.TransferState(uint32(types.TaskPause)),

@@ -92,3 +92,54 @@ func (this *TaskMgr) WaitPlotFileProved(taskId string) error {
 	}
 	return nil
 }
+
+func (this *TaskMgr) GetAllProvedPlotFile() (*types.AllPlotsFileResp, error) {
+
+	taskInfos, err := this.db.GetPocTaskInfos()
+	if err != nil {
+		return nil, err
+	}
+
+	totalNum := 0
+	totalSize := uint64(0)
+	resp := &types.AllPlotsFileResp{
+		FileInfos: make([]*types.PlotFileInfo, 0),
+	}
+	for _, info := range taskInfos {
+		proveDetails, _ := this.chain.GetFileProveDetails(info.FileHash)
+		if proveDetails == nil {
+			continue
+		}
+		proved := false
+		for _, d := range proveDetails.ProveDetails {
+			if d.ProveTimes > 0 {
+				proved = true
+				break
+			}
+		}
+
+		if !proved {
+			continue
+		}
+
+		fileInfo, _ := this.chain.GetFileInfo(info.FileHash)
+		if fileInfo == nil {
+			continue
+		}
+		fileSize := (fileInfo.FileBlockSize * fileInfo.FileBlockNum)
+		resp.FileInfos = append(resp.FileInfos, &types.PlotFileInfo{
+			FileName:    string(fileInfo.FileDesc),
+			FileHash:    string(fileInfo.FileHash),
+			FileOwner:   fileInfo.FileOwner.ToBase58(),
+			FileSize:    fileSize,
+			BlockHeight: fileInfo.BlockHeight,
+			PlotInfo:    fileInfo.PlotInfo,
+		})
+		totalNum++
+		totalSize += fileSize
+	}
+
+	resp.TotalCount = totalNum
+	resp.TotalSize = totalSize
+	return resp, nil
+}

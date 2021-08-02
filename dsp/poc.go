@@ -13,3 +13,7 @@ func (this *Dsp) AddNewPlotFile(taskId string, createSector bool, plotCfg *poc.P
 	}
 	return this.TaskMgr.AddPlotFile(tsk.GetId(), createSector, plotCfg)
 }
+
+func (this *Dsp) GetAllProvedPlotFile() (*types.AllPlotsFileResp, error) {
+	return this.TaskMgr.GetAllProvedPlotFile()
+}

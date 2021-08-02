@@ -1831,6 +1831,28 @@ func (this *TaskDB) GetUploadTaskInfos() ([]*TaskInfo, error) {
 	return infos, nil
 }
 
+// GetPocTaskInfos. get all poc task info, sort by updated at
+func (this *TaskDB) GetPocTaskInfos() ([]*TaskInfo, error) {
+	infos := make(TaskInfos, 0)
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range keys {
+		info, err := this.getTaskInfoByKey(key)
+		if err != nil || info == nil {
+			continue
+		}
+		if info.Type != TaskTypePoC {
+			continue
+		}
+		infos = append(infos, info)
+	}
+	sort.Sort(infos)
+	return infos, nil
+}
+
 // ExistSameUploadTaskInfo. exist same upload task info with specific file hash
 func (this *TaskDB) ExistSameUploadTaskInfo(taskId, fileHashStr string) (bool, error) {
 	prefix := TaskInfoKey("")
