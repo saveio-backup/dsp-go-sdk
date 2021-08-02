@@ -12,7 +12,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/consts"
 	"github.com/saveio/dsp-go-sdk/task/base"
 	"github.com/saveio/dsp-go-sdk/task/upload"
-	"github.com/saveio/dsp-go-sdk/types/prefix"
 	"github.com/saveio/max/max/sector"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/smartcontract/service/native/savefs"
@@ -120,18 +119,9 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 		return fmt.Errorf("poc sectors not enough for file size %v, please create one", fileSizeInKB)
 	}
 
-	filePrefix := &prefix.FilePrefix{
-		Version:    prefix.PREFIX_VERSION,
-		Encrypt:    false,
-		EncryptPwd: "",
-		Owner:      p.Mgr.Chain().Address(),
-		FileSize:   fileSizeInKB,
-		FileName:   fileName,
-	}
-	filePrefix.MakeSalt()
-	prefixStr := filePrefix.String()
+	prefixStr := ""
 
-	blockHashes, err := p.Mgr.Fs().NodesFromFile(fileName, prefixStr, filePrefix.Encrypt, filePrefix.EncryptPwd)
+	blockHashes, err := p.Mgr.Fs().NodesFromFile(fileName, prefixStr, false, "")
 	if err != nil {
 		log.Errorf("nodes from file error %s", err)
 		return err
