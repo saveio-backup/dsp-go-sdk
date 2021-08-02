@@ -284,6 +284,8 @@ github.com/saveio/max v0.0.0-20210802052855-c3324df99ee9 h1:mzFiC2t4opMBzHh9tKCs
 github.com/saveio/max v0.0.0-20210802052855-c3324df99ee9/go.mod h1:1HEI4jFeGTYIF2+od+7ohxvDTrl7Q23HExqsMCmYW1w=
 github.com/saveio/pylons v0.0.0-20210802060048-364cc6d8079d h1:AKpGaUJHPaUAb4Cz7RZGPlmB450DywXV8Tq2f3hF8HM=
 github.com/saveio/pylons v0.0.0-20210802060048-364cc6d8079d/go.mod h1:BP0wKW0/ge8AtwQH8Ceh6Tc03o5EpFG/AYcfsHAlhn8=
+github.com/saveio/pylons v0.0.0-20210802062637-12c41e6d9ba7 h1:nYVW9f7NDLVIeI4KgNG9+INu7gjHAau55N9NlXzZVao=
+github.com/saveio/pylons v0.0.0-20210802062637-12c41e6d9ba7/go.mod h1:BP0wKW0/ge8AtwQH8Ceh6Tc03o5EpFG/AYcfsHAlhn8=
 github.com/saveio/themis v1.0.135-0.20210802052006-7b1a7f1fef1c h1:Km7G7u9We8c9lSrL11j2dU5s1CJCCF3n8/2TufQeUWM=
 github.com/saveio/themis v1.0.135-0.20210802052006-7b1a7f1fef1c/go.mod h1:XLy1mm8cvii9bqd1xd2WzFGuXmI6QRnoFG6IbTyKwFM=
 github.com/saveio/themis-go-sdk v0.0.0-20210802052239-10a9844e20d5 h1:rXP+YSZ/qyGH3YlAGl3BvT7AjMiRNSyY1NsIR4em3ak=
