@@ -1,6 +1,7 @@
 package poc
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -15,6 +16,10 @@ import (
 	"github.com/saveio/max/max/sector"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/smartcontract/service/native/savefs"
+)
+
+var (
+	InsufficientBalanceErr = errors.New("insufficient balance")
 )
 
 func (p *PocTask) CreateSectorForPlot(plotCfg *PlotConfig) (string, string, error) {

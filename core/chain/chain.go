@@ -80,7 +80,7 @@ func (this *Chain) Themis() *themisSDK.Chain {
 func (this *Chain) GetCurrentBlockHeight() (uint32, error) {
 	height, err := this.themis.GetCurrentBlockHeight()
 	if err != nil {
-		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return height, nil
 }
@@ -88,12 +88,12 @@ func (this *Chain) GetCurrentBlockHeight() (uint32, error) {
 func (this *Chain) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
 	reverseTxHash, err := hex.DecodeString(txHashStr)
 	if err != nil {
-		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	txHash := chainCom.ToArrayReverse(reverseTxHash)
 	height, err := this.themis.PollForTxConfirmedHeight(timeout, txHash)
 	if err != nil {
-		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return height, nil
 }
@@ -117,7 +117,7 @@ func (this *Chain) WaitForGenerateBlock(timeout time.Duration, blockCount ...uin
 	}
 	confirmed, err := this.themis.WaitForGenerateBlock(timeout, blockCount...)
 	if err != nil {
-		return false, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return false, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return confirmed, nil
 }
@@ -149,7 +149,7 @@ func (this *Chain) WaitForTxConfirmed(blockHeight uint64) error {
 func (this *Chain) GetBlockHeightByTxHash(txHash string) (uint32, error) {
 	height, err := this.themis.GetBlockHeightByTxHash(txHash)
 	if err != nil {
-		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return height, nil
 }
@@ -157,7 +157,7 @@ func (this *Chain) GetBlockHeightByTxHash(txHash string) (uint32, error) {
 func (this *Chain) BalanceOf(addr chainCom.Address) (uint64, error) {
 	bal, err := this.themis.Native.Usdt.BalanceOf(addr)
 	if err != nil {
-		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return bal, nil
 }
@@ -165,7 +165,7 @@ func (this *Chain) BalanceOf(addr chainCom.Address) (uint64, error) {
 func (this *Chain) GetChainVersion() (string, error) {
 	ver, err := this.themis.GetVersion()
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return ver, nil
 }
@@ -173,7 +173,7 @@ func (this *Chain) GetChainVersion() (string, error) {
 func (this *Chain) GetBlockHash(height uint32) (string, error) {
 	val, err := this.themis.GetBlockHash(height)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
@@ -181,7 +181,7 @@ func (this *Chain) GetBlockHash(height uint32) (string, error) {
 func (this *Chain) GetBlockByHash(blockHash string) (*types.Block, error) {
 	val, err := this.themis.GetBlockByHash(blockHash)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -189,7 +189,7 @@ func (this *Chain) GetBlockByHash(blockHash string) (*types.Block, error) {
 func (this *Chain) GetBlockTxHashesByHeight(height uint32) (*sdkCom.BlockTxHashes, error) {
 	val, err := this.themis.GetBlockTxHashesByHeight(height)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -197,7 +197,7 @@ func (this *Chain) GetBlockTxHashesByHeight(height uint32) (*sdkCom.BlockTxHashe
 func (this *Chain) GetBlockByHeight(height uint32) (*types.Block, error) {
 	val, err := this.themis.GetBlockByHeight(height)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -205,7 +205,7 @@ func (this *Chain) GetBlockByHeight(height uint32) (*types.Block, error) {
 func (this *Chain) GetTransaction(txHash string) (*types.Transaction, error) {
 	val, err := this.themis.GetTransaction(txHash)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -213,7 +213,7 @@ func (this *Chain) GetTransaction(txHash string) (*types.Transaction, error) {
 func (this *Chain) GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEvent, error) {
 	val, err := this.themis.GetSmartContractEvent(txHash)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -221,35 +221,35 @@ func (this *Chain) GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEve
 func (this *Chain) GetSmartContract(contractAddress string) (*sdkCom.SmartContract, error) {
 	val, err := this.themis.GetSmartContract(contractAddress)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
 func (this *Chain) GetStorage(contractAddress string, key []byte) ([]byte, error) {
 	val, err := this.themis.GetStorage(contractAddress, key)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
 func (this *Chain) GetMerkleProof(txHash string) (*sdkCom.MerkleProof, error) {
 	val, err := this.themis.GetMerkleProof(txHash)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
 func (this *Chain) GetGasPrice() (uint64, error) {
 	val, err := this.themis.GetGasPrice()
 	if err != nil {
-		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
 func (this *Chain) GetMemPoolTxCount() (*sdkCom.MemPoolTxCount, error) {
 	val, err := this.themis.GetMemPoolTxCount()
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -257,7 +257,7 @@ func (this *Chain) GetMemPoolTxCount() (*sdkCom.MemPoolTxCount, error) {
 func (this *Chain) GetMemPoolTxState(txHash string) (*sdkCom.MemPoolTxState, error) {
 	val, err := this.themis.GetMemPoolTxState(txHash)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -265,7 +265,7 @@ func (this *Chain) GetMemPoolTxState(txHash string) (*sdkCom.MemPoolTxState, err
 func (this *Chain) GetSmartContractEventByEventId(contractAddress string, address string, eventId uint32) ([]*sdkCom.SmartContactEvent, error) {
 	val, err := this.themis.GetSmartContractEventByEventId(contractAddress, address, eventId)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -275,7 +275,7 @@ func (this *Chain) GetSmartContractEventByEventIdAndHeights(contractAddress stri
 	val, err := this.themis.GetSmartContractEventByEventIdAndHeights(
 		contractAddress, address, eventId, startHeight, endHeight)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -283,7 +283,7 @@ func (this *Chain) GetSmartContractEventByEventIdAndHeights(contractAddress stri
 func (this *Chain) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartContactEvent, error) {
 	val, err := this.themis.GetSmartContractEventByBlock(height)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -291,7 +291,7 @@ func (this *Chain) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartCon
 func (this *Chain) Transfer(gasPrice, gasLimit uint64, from *account.Account, to chainCom.Address, amount uint64) (string, error) {
 	val, err := this.themis.Native.Usdt.Transfer(gasPrice, gasLimit, from, to, amount)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
@@ -299,7 +299,7 @@ func (this *Chain) Transfer(gasPrice, gasLimit uint64, from *account.Account, to
 func (this *Chain) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account.Account, version byte, contractAddress chainCom.Address, method string, params []interface{}) (string, error) {
 	val, err := this.themis.InvokeNativeContract(gasPrice, gasLimit, signer, version, contractAddress, method, params)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
@@ -307,7 +307,7 @@ func (this *Chain) InvokeNativeContract(gasPrice, gasLimit uint64, signer *accou
 func (this *Chain) PreExecInvokeNativeContract(contractAddress chainCom.Address, version byte, method string, params []interface{}) (*sdkCom.PreExecResult, error) {
 	val, err := this.themis.PreExecInvokeNativeContract(contractAddress, version, method, params)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -315,7 +315,7 @@ func (this *Chain) PreExecInvokeNativeContract(contractAddress chainCom.Address,
 func (this *Chain) GetChannelInfo(channelID uint64, participant1, participant2 chainCom.Address) (*micropayment.ChannelInfo, error) {
 	val, err := this.themis.Native.Channel.GetChannelInfo(channelID, participant1, participant2)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return val, nil
 }
@@ -323,7 +323,7 @@ func (this *Chain) GetChannelInfo(channelID uint64, participant1, participant2 c
 func (this *Chain) FastTransfer(paymentId uint64, from, to chainCom.Address, amount uint64) (string, error) {
 	val, err := this.themis.Native.Channel.FastTransfer(paymentId, from, to, amount)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }

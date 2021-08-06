@@ -26,7 +26,7 @@ func (this *Chain) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
 		if this.IsFileInfoDeleted(err) {
 			return nil, sdkErr.NewWithError(sdkErr.FILE_NOT_FOUND_FROM_CHAIN, err)
 		}
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return info, nil
 }
@@ -34,7 +34,7 @@ func (this *Chain) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
 func (this *Chain) GetFileInfos(fileHashStr []string) (*fs.FileInfoList, error) {
 	list, err := this.themis.Native.Fs.GetFileInfos(fileHashStr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return list, nil
 }
@@ -46,7 +46,7 @@ func (this *Chain) GetUploadStorageFee(opt *fs.UploadOption) (*fs.StorageFee, er
 
 	fee, err := this.themis.Native.Fs.GetUploadStorageFee(opt)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return fee, nil
 }
@@ -76,7 +76,7 @@ func (this *Chain) GetDeleteFilesStorageFee(addr chainCom.Address, fileHashStrs 
 
 	fee, err := this.themis.Native.Fs.GetDeleteFilesStorageFee(fileListFound)
 	if err != nil {
-		return fee, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return fee, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	} else if len(fileListNotFound) != 0 {
 		return fee, fmt.Errorf("files not found on chain, hashs: %v", fileListNotFound)
 	}
@@ -87,7 +87,7 @@ func (this *Chain) GetDeleteFilesStorageFee(addr chainCom.Address, fileHashStrs 
 func (this *Chain) GetNodeList() (*fs.FsNodesInfo, error) {
 	list, err := this.themis.Native.Fs.GetNodeList()
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	this.r.Shuffle(len(list.NodeInfo), func(i, j int) {
 		list.NodeInfo[i], list.NodeInfo[j] = list.NodeInfo[j], list.NodeInfo[i]
@@ -98,7 +98,7 @@ func (this *Chain) GetNodeList() (*fs.FsNodesInfo, error) {
 func (this *Chain) ProveParamSer(rootHash []byte, fileId pdp.FileID) ([]byte, error) {
 	paramsBuf, err := this.themis.Native.Fs.ProveParamSer(rootHash, fileId)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return paramsBuf, nil
 }
@@ -106,7 +106,7 @@ func (this *Chain) ProveParamSer(rootHash []byte, fileId pdp.FileID) ([]byte, er
 func (this *Chain) ProveParamDes(buf []byte) (*fs.ProveParam, error) {
 	arg, err := this.themis.Native.Fs.ProveParamDes(buf)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return arg, nil
 }
@@ -121,7 +121,7 @@ func (this *Chain) StoreFile(
 	txHash, err := this.themis.Native.Fs.StoreFile(fileHashStr, blocksRoot, blockNum, blockSizeInKB, proveLevel,
 		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes, plotInfo)
 	if err != nil {
-		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	log.Debugf("store file txhash :%v, tx: %v", txHash, tx)
@@ -146,7 +146,7 @@ func (this *Chain) StoreFile(
 func (this *Chain) DeleteFiles(files []string, gasLimit uint64) (string, error) {
 	txHash, err := this.themis.Native.Fs.DeleteFiles(files, gasLimit)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
@@ -181,7 +181,7 @@ func (this *Chain) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (
 	txHashStr, err := this.DeleteFiles(fileHashStrs, gasLimit)
 	log.Debugf("delete file tx %v, err %v", txHashStr, err)
 	if err != nil {
-		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	log.Debugf("delete file txHash %s", txHashStr)
 	txHeight, err := this.PollForTxConfirmed(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, txHashStr)
@@ -190,7 +190,7 @@ func (this *Chain) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (
 	}
 	log.Debugf("delete file tx height %d, err %v", txHeight, err)
 	if err != nil {
-		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return txHashStr, txHeight, nil
 }
@@ -198,7 +198,7 @@ func (this *Chain) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (
 func (this *Chain) AddWhiteLists(fileHashStr string, whitelists []fs.Rule) (string, error) {
 	txHash, err := this.themis.Native.Fs.AddWhiteLists(fileHashStr, whitelists)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	_, err = this.PollForTxConfirmed(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, tx)
@@ -211,7 +211,7 @@ func (this *Chain) AddWhiteLists(fileHashStr string, whitelists []fs.Rule) (stri
 func (this *Chain) GetFileProveDetails(fileHashStr string) (*fs.FsProveDetails, error) {
 	details, err := this.themis.Native.Fs.GetFileProveDetails(fileHashStr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return details, nil
 }
@@ -219,7 +219,7 @@ func (this *Chain) GetFileProveDetails(fileHashStr string) (*fs.FsProveDetails, 
 func (this *Chain) GetFileProveNodes(fileHashStr string) (map[string]uint64, error) {
 	details, err := this.themis.Native.Fs.GetFileProveDetails(fileHashStr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	if err != nil || details == nil {
 		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "prove detail not exist %s, err %s", fileHashStr, err)
@@ -238,7 +238,7 @@ func (this *Chain) GetFileProveNodes(fileHashStr string) (map[string]uint64, err
 func (this *Chain) GetFileList(addr chainCom.Address) (*fs.FileList, error) {
 	list, err := this.themis.Native.Fs.GetFileList(addr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return list, nil
 }
@@ -246,7 +246,7 @@ func (this *Chain) GetFileList(addr chainCom.Address) (*fs.FileList, error) {
 func (this *Chain) GetFsSetting() (*fs.FsSetting, error) {
 	set, err := this.themis.Native.Fs.GetSetting()
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return set, nil
 }
@@ -254,7 +254,7 @@ func (this *Chain) GetFsSetting() (*fs.FsSetting, error) {
 func (this *Chain) GetWhiteList(fileHashStr string) (*fs.WhiteList, error) {
 	list, err := this.themis.Native.Fs.GetWhiteList(fileHashStr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return list, nil
 }
@@ -262,7 +262,7 @@ func (this *Chain) GetWhiteList(fileHashStr string) (*fs.WhiteList, error) {
 func (this *Chain) WhiteListOp(fileHashStr string, op uint64, whiteList fs.WhiteList) (string, error) {
 	txHash, err := this.themis.Native.Fs.WhiteListOp(fileHashStr, op, whiteList)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
 }
@@ -270,7 +270,7 @@ func (this *Chain) WhiteListOp(fileHashStr string, op uint64, whiteList fs.White
 func (this *Chain) GetNodeInfoByWallet(walletAddr chainCom.Address) (*fs.FsNodeInfo, error) {
 	infos, err := this.themis.Native.Fs.GetNodeListByAddrs([]chainCom.Address{walletAddr})
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	if infos.NodeNum != 1 {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, fmt.Errorf("wrong node num %v", infos.NodeNum))
@@ -284,7 +284,7 @@ func (this *Chain) GetNodeInfoByWallet(walletAddr chainCom.Address) (*fs.FsNodeI
 func (this *Chain) GetNodeHostAddrListByWallets(nodeWalletAddrs []chainCom.Address) ([]string, error) {
 	info, err := this.themis.Native.Fs.GetNodeListByAddrs(nodeWalletAddrs)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	if info.NodeNum != uint64(len(nodeWalletAddrs)) {
 		return nil, sdkErr.New(sdkErr.CHAIN_ERROR, "node num %d is not equal to request wallets length %d", info.NodeNum, len(nodeWalletAddrs))
@@ -299,7 +299,7 @@ func (this *Chain) GetNodeHostAddrListByWallets(nodeWalletAddrs []chainCom.Addre
 func (this *Chain) GetNodeListWithoutAddrs(nodeWalletAddrs []chainCom.Address, num int) ([]chainCom.Address, error) {
 	list, err := this.themis.Native.Fs.GetNodeList()
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	addrs := make([]chainCom.Address, 0, num)
 	nodeWalletMap := make(map[chainCom.Address]struct{}, 0)
@@ -321,7 +321,7 @@ func (this *Chain) GetNodeListWithoutAddrs(nodeWalletAddrs []chainCom.Address, n
 func (this *Chain) GetUnprovePrimaryFileInfos(walletAddr chainCom.Address) ([]fs.FileInfo, error) {
 	list, err := this.themis.Native.Fs.GetUnprovePrimaryFileList(walletAddr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	if list.FileNum == 0 || len(list.List) == 0 {
 		return nil, nil
@@ -332,7 +332,7 @@ func (this *Chain) GetUnprovePrimaryFileInfos(walletAddr chainCom.Address) ([]fs
 	}
 	infoList, err := this.themis.Native.Fs.GetFileInfos(hashes)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return infoList.List, nil
 }
@@ -340,7 +340,7 @@ func (this *Chain) GetUnprovePrimaryFileInfos(walletAddr chainCom.Address) ([]fs
 func (this *Chain) GetUnproveCandidateFileInfos(walletAddr chainCom.Address) ([]fs.FileInfo, error) {
 	list, err := this.themis.Native.Fs.GetUnProveCandidateFileList(walletAddr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	if list.FileNum == 0 || len(list.List) == 0 {
 		return nil, nil
@@ -351,7 +351,7 @@ func (this *Chain) GetUnproveCandidateFileInfos(walletAddr chainCom.Address) ([]
 	}
 	infoList, err := this.themis.Native.Fs.GetFileInfos(hashes)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return infoList.List, nil
 }
@@ -372,7 +372,7 @@ func (this *Chain) CheckHasProveFile(fileHashStr string, walletAddr chainCom.Add
 func (this *Chain) CreateSector(sectorId uint64, proveLevel uint64, size uint64, isPlots bool) (string, error) {
 	txHash, err := this.themis.Native.Fs.CreateSector(sectorId, proveLevel, size, isPlots)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
@@ -381,7 +381,7 @@ func (this *Chain) CreateSector(sectorId uint64, proveLevel uint64, size uint64,
 func (this *Chain) DeleteSector(sectorId uint64) (string, error) {
 	txHash, err := this.themis.Native.Fs.DeleteSector(sectorId)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
@@ -390,7 +390,7 @@ func (this *Chain) DeleteSector(sectorId uint64) (string, error) {
 func (this *Chain) GetSectorInfo(sectorId uint64) (*fs.SectorInfo, error) {
 	sectorInfo, err := this.themis.Native.Fs.GetSectorInfo(sectorId)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return sectorInfo, nil
 }
@@ -398,11 +398,11 @@ func (this *Chain) GetSectorInfo(sectorId uint64) (*fs.SectorInfo, error) {
 func (this *Chain) GetSectorInfosForNode(walletAddr string) (*fs.SectorInfos, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	sectorInfos, err := this.themis.Native.Fs.GetSectorInfosForNode(address)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return sectorInfos, nil
 }
@@ -450,11 +450,11 @@ func (this *Chain) CheckFilePrivilege(info *fs.FileInfo, fileHashStr, walletAddr
 func (this *Chain) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	us, err := this.themis.Native.Fs.GetUserSpace(address)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return us, nil
 }
@@ -462,7 +462,7 @@ func (this *Chain) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
 func (this *Chain) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	if size == 0 {
 		sizeOpType = uint64(fs.UserSpaceNone)
@@ -478,7 +478,7 @@ func (this *Chain) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCou
 		Value: blockCount,
 	})
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
@@ -487,7 +487,7 @@ func (this *Chain) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCou
 func (this *Chain) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	if size == 0 {
 		sizeOpType = uint64(fs.UserSpaceNone)
@@ -503,7 +503,7 @@ func (this *Chain) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, b
 		Value: blockCount,
 	})
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return state, nil
 }

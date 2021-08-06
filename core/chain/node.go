@@ -14,7 +14,7 @@ var ErrNoFileInfo = "[FS Profit] FsGetFileInfo not found!"
 func (this *Chain) RegisterNode(addr string, volume, serviceTime uint64) (string, error) {
 	txHash, err := this.themis.Native.Fs.NodeRegister(volume, serviceTime, addr)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
@@ -24,7 +24,7 @@ func (this *Chain) RegisterNode(addr string, volume, serviceTime uint64) (string
 func (this *Chain) NodeExit() (string, error) {
 	txHash, err := this.themis.Native.Fs.NodeCancel()
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
@@ -34,11 +34,11 @@ func (this *Chain) NodeExit() (string, error) {
 func (this *Chain) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	info, err := this.themis.Native.Fs.NodeQuery(address)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	return info, nil
 }
@@ -47,7 +47,7 @@ func (this *Chain) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
 func (this *Chain) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
 	nodeInfo, err := this.QueryNode(this.themis.Native.Fs.DefAcc.Address.ToBase58())
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	if volume == 0 {
 		volume = nodeInfo.Volume
@@ -63,7 +63,7 @@ func (this *Chain) UpdateNode(addr string, volume, serviceTime uint64) (string, 
 	}
 	txHash, err := this.themis.Native.Fs.NodeUpdate(volume, serviceTime, addr)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
@@ -73,7 +73,7 @@ func (this *Chain) UpdateNode(addr string, volume, serviceTime uint64) (string, 
 func (this *Chain) NodeWithdrawProfit() (string, error) {
 	txHash, err := this.themis.Native.Fs.NodeWithDrawProfit()
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, err)
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
