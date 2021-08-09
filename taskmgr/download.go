@@ -270,11 +270,11 @@ func (this *TaskMgr) newDownloadTask(taskId string) (*download.DownloadTask, err
 func (this *TaskMgr) newDownloadTaskFromDB(id string) (*download.DownloadTask, error) {
 	info, err := this.db.GetTaskInfo(id)
 	if err != nil {
-		log.Errorf("get task from db, get file info failed, id: %s", id)
+		log.Errorf("new download task get task from db, get file info failed, id: %s", id)
 		return nil, err
 	}
 	if info == nil {
-		log.Warnf("get task from db, recover task get file info is nil, id: %v", id)
+		log.Warnf("new download task get task from db, recover task get file info is nil, id: %v", id)
 		return nil, nil
 	}
 	if info.Type != store.TaskTypeDownload {
@@ -287,7 +287,7 @@ func (this *TaskMgr) newDownloadTaskFromDB(id string) (*download.DownloadTask, e
 	}
 	sessions, err := this.db.GetFileSessions(id)
 	if err != nil {
-		log.Errorf("get task from db, set task session: %s", err)
+		log.Errorf("new download task get task from db, set task session: %s", err)
 		return nil, err
 	}
 	state := store.TaskState(info.TaskState)

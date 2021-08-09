@@ -179,12 +179,22 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	if err != nil {
 		return nil, err
 	}
-
+	if this.IsTaskPaused() {
+		return nil, this.sendPauseMsg()
+	}
+	if this.IsTaskCancel() {
+		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "task is cancel")
+	}
 	tagsRoot, err := this.GetMerkleRootForTag(fileID, tags)
 	if err != nil {
 		return nil, err
 	}
-
+	if this.IsTaskPaused() {
+		return nil, this.sendPauseMsg()
+	}
+	if this.IsTaskCancel() {
+		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "task is cancel")
+	}
 	// pay file
 	if fileInfo != nil {
 		// file has paid

@@ -405,6 +405,9 @@ func (this *Task) IsTaskCancel() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return true
+	}
 	return info.TaskState == store.TaskStateCancel
 }
 

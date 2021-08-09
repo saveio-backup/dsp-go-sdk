@@ -88,11 +88,11 @@ func (this *TaskMgr) newShareTask(taskId string) (*share.ShareTask, error) {
 func (this *TaskMgr) newShareTaskFromDB(id string) (*share.ShareTask, error) {
 	info, err := this.db.GetTaskInfo(id)
 	if err != nil {
-		log.Errorf("get task from db, get file info failed, id: %s", id)
+		log.Errorf("new share task get task from db, get file info failed, id: %s", id)
 		return nil, err
 	}
 	if info == nil {
-		log.Warnf("get task from db, recover task get file info is nil, id: %v", id)
+		log.Warnf("new share task get task from db, recover task get file info is nil, id: %v", id)
 		return nil, nil
 	}
 	if info.Type != store.TaskTypeShare {
