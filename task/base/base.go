@@ -75,6 +75,9 @@ func (this *Task) SetSessionId(peerWalletAddr, id string) {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return
+	}
 	if info.PeerToSessionIds == nil {
 		info.PeerToSessionIds = make(map[string]string)
 	}
@@ -89,6 +92,9 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return fmt.Errorf("info not found when set result")
+	}
 	log.Debugf("task %s state %v", this.Id, info.TaskState)
 	if info.TaskState == store.TaskStateCancel {
 		return fmt.Errorf("task %s is canceled", info.Id)
@@ -143,6 +149,9 @@ func (this *Task) SetInfoWithOptions(opts ...InfoOption) error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return fmt.Errorf("set info with opts when info is nil")
+	}
 	log.Infof("set info with options %v id %v", info, this.Id)
 	for _, opt := range opts {
 		opt.apply(info)
@@ -174,6 +183,9 @@ func (this *Task) GetTaskType() store.TaskType {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return store.TaskTypeNone
+	}
 	return info.Type
 }
 
@@ -181,6 +193,9 @@ func (this *Task) GetUrl() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.Url
 }
 
@@ -188,6 +203,9 @@ func (this *Task) GetSessionId(peerWalletAddr string) string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.PeerToSessionIds[peerWalletAddr]
 }
 
@@ -197,6 +215,9 @@ func (this *Task) GetTaskInfoCopy() *store.TaskInfo {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return nil
+	}
 	return this.DB.CopyTask(info)
 }
 
@@ -204,6 +225,9 @@ func (this *Task) GetFileHash() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.FileHash
 }
 
@@ -211,6 +235,9 @@ func (this *Task) GetFileName() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.FileName
 }
 
@@ -218,6 +245,9 @@ func (this *Task) GetFileOwner() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.FileOwner
 }
 
@@ -225,6 +255,9 @@ func (this *Task) GetId() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.Id
 }
 
@@ -232,6 +265,9 @@ func (this *Task) GetTotalBlockCnt() uint64 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return 0
+	}
 	return info.TotalBlockCount
 }
 
@@ -239,6 +275,9 @@ func (this *Task) GetPrefix() []byte {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return nil
+	}
 	return info.Prefix
 }
 
@@ -246,6 +285,9 @@ func (this *Task) GetCreatedAt() uint64 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return 0
+	}
 	return info.CreatedAt
 }
 
@@ -253,6 +295,9 @@ func (this *Task) GetCopyNum() uint32 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return 0
+	}
 	return info.CopyNum
 }
 
@@ -260,6 +305,9 @@ func (this *Task) GetRetryAt() uint64 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return 0
+	}
 	return info.RetryAt
 }
 
@@ -267,6 +315,9 @@ func (this *Task) GetWalletAddr() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.WalletAddress
 }
 
@@ -274,6 +325,9 @@ func (this *Task) GetFilePath() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.FilePath
 }
 
@@ -281,6 +335,9 @@ func (this *Task) GetStoreTx() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.StoreTx
 }
 
@@ -288,6 +345,9 @@ func (this *Task) GetStoreTxHeight() uint32 {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return 0
+	}
 	return info.StoreTxHeight
 }
 
@@ -295,6 +355,9 @@ func (this *Task) TransferingState() types.TaskProgressState {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return 0
+	}
 	return types.TaskProgressState(info.TranferState)
 }
 
@@ -308,6 +371,9 @@ func (this *Task) State() store.TaskState {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return store.TaskStateNone
+	}
 	return store.TaskState(info.TaskState)
 }
 
@@ -315,6 +381,9 @@ func (this *Task) Pause() error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return fmt.Errorf("pause error task not found")
+	}
 	state := info.TaskState
 	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
 		return fmt.Errorf("task %s can't pause with state %v", info.Id, state)
@@ -329,6 +398,9 @@ func (this *Task) Resume() error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return fmt.Errorf("resume error task not found")
+	}
 	state := info.TaskState
 	if state != store.TaskStatePrepare && state != store.TaskStatePause &&
 		state != store.TaskStateDoing && state != store.TaskStateIdle {
@@ -344,6 +416,9 @@ func (this *Task) Cancel() error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return nil
+	}
 	if info.TaskState == store.TaskStateCancel {
 		return nil
 	}
@@ -362,6 +437,9 @@ func (this *Task) Retry() error {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return fmt.Errorf("retry when info is nil")
+	}
 	state := info.TaskState
 	if state != store.TaskStateFailed {
 		return fmt.Errorf("state is %d, can't retry", state)
@@ -386,6 +464,9 @@ func (this *Task) NeedRetry() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return false
+	}
 	if info.TaskState != store.TaskStateIdle {
 		return false
 	}
@@ -485,7 +566,7 @@ func (this *Task) EmitProgress(state types.TaskProgressState) {
 	this.Lock.Lock()
 	defer this.Lock.Unlock()
 	info := this.getTaskInfo()
-	if this.progress == nil {
+	if this.progress == nil || info == nil {
 		return
 	}
 	if info.TaskState != store.TaskStateCancel {
@@ -570,6 +651,9 @@ func (this *Task) getTaskInfo() *store.TaskInfo {
 
 func (this *Task) setTaskState(newState store.TaskState) error {
 	info := this.getTaskInfo()
+	if info == nil {
+		return fmt.Errorf("task not found when set task state")
+	}
 	oldState := store.TaskState(info.TaskState)
 	log.Debugf("set task %s state %v, original state %v", info.Id, newState, oldState)
 	if oldState == newState {
