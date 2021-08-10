@@ -376,6 +376,9 @@ func (this *Task) IsTaskPaused() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return false
+	}
 	return info.TaskState == store.TaskStatePause
 }
 
@@ -397,6 +400,9 @@ func (this *Task) IsTaskDone() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return false
+	}
 	return info.TaskState == store.TaskStateDone
 }
 
@@ -415,6 +421,9 @@ func (this *Task) IsTaskPaying() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return false
+	}
 	return types.TaskProgressState(info.TranferState) == types.TaskUploadFilePaying ||
 		types.TaskProgressState(info.TranferState) == types.TaskWaitForBlockConfirmed ||
 		types.TaskProgressState(info.TranferState) == types.TaskDownloadPayForBlocks
@@ -424,6 +433,9 @@ func (this *Task) IsTaskPauseOrCancel() (bool, bool) {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return false, true
+	}
 	state := info.TaskState
 	return state == store.TaskStatePause, state == store.TaskStateCancel
 }
@@ -432,6 +444,9 @@ func (this *Task) IsTaskStop() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return true
+	}
 	state := info.TaskState
 	if state != store.TaskStatePause && state != store.TaskStateCancel {
 		return false
@@ -443,6 +458,9 @@ func (this *Task) IsTaskPreparingOrDoing() (bool, bool) {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return false, false
+	}
 	state := info.TaskState
 	return state == store.TaskStatePrepare, state == store.TaskStateDoing
 }
@@ -451,6 +469,9 @@ func (this *Task) IsTaskFailed() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.getTaskInfo()
+	if info == nil {
+		return false
+	}
 	return info.TaskState == store.TaskStateFailed
 }
 
