@@ -245,7 +245,7 @@ func (p *PocTask) isPocSectorEnough(fileSize uint64) (bool, error) {
 		if !sec.IsPlots {
 			continue
 		}
-		if sec.Size > sec.Used+fileSize {
+		if sec.Size >= sec.Used+fileSize {
 			return true, nil
 		}
 	}

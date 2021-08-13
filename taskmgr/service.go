@@ -349,21 +349,21 @@ func (this *TaskMgr) fileProvedService() {
 			eventName, _ := event[eventFilterName].(string)
 			log.Infof("fileProvedService eventName %v", eventName)
 			if len(eventName) == 0 {
-				log.Errorf("wrong event name type %v, type %T", event, event[eventFilterName])
+				log.Debugf("wrong event name type %v, type %T", event, event[eventFilterName])
 				continue
 			}
 			if eventName != fileProvedEventName {
-				log.Errorf("wrong event name %v, expect %v", eventName, fileProvedEventName)
+				log.Debugf("wrong event name %v, expect %v", eventName, fileProvedEventName)
 				continue
 			}
 			fileHash, _ := event[eventFilterFileHash].(string)
 			if len(fileHash) == 0 {
-				log.Errorf("wrong event name type %v, type %T", event, event[eventFilterFileHash])
+				log.Debugf("wrong event name type %v, type %T", event, event[eventFilterFileHash])
 				continue
 			}
 			walletAddr, _ := event[eventFilterWalletAddr].(string)
 			if walletAddr != this.chain.WalletAddress() {
-				log.Errorf("wrong event name type %v, type %T, walletAddr %s, expect %v",
+				log.Debugf("wrong event name type %v, type %T, walletAddr %s, expect %v",
 					event, event[eventFilterWalletAddr], walletAddr, this.chain.WalletAddress())
 				continue
 			}
