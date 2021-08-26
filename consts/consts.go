@@ -3,7 +3,9 @@ package consts
 import "github.com/saveio/carrier/network"
 
 const (
-	DSP_SDK_VERSION = "1.0.0" // dsp go sdk version
+	DSP_SDK_VERSION     = "1.0.0" // dsp go sdk version
+	DSP_HASH_PREFIX     = "Save"
+	DSP_HASH_PREFIX_LEN = 4
 )
 
 type FSType int
@@ -17,8 +19,8 @@ const (
 	CHUNK_SIZE                             = 256 * 1024                                 // chunk size
 	CHUNK_SIZE_KB                          = 256                                        // chunk size in kb
 	DOWNLOAD_FILE_TEMP_DIR_PATH            = "./temp"                                   // download temp file path
-	PROTO_NODE_FILE_HASH_LEN               = 46                                         // proto node file hash length
-	RAW_NODE_FILE_HASH_LEN                 = 49                                         // raw node file hash length
+	PROTO_NODE_FILE_HASH_LEN               = 46 + DSP_HASH_PREFIX_LEN                   // proto node file hash length
+	RAW_NODE_FILE_HASH_LEN                 = 49 + DSP_HASH_PREFIX_LEN                   // raw node file hash length
 	FILE_URL_CUSTOM_HEADER_PROTOCOL        = "oni://"                                   // file custom header protocol
 	FILE_URL_CUSTOM_HEADER                 = FILE_URL_CUSTOM_HEADER_PROTOCOL + "share/" // file url custom header
 	FILE_URL_CUSTOM_PLUGIN_HEADER_PROTOCOL = "dsp-plugin://"                            // plugin file header protocol
@@ -80,8 +82,8 @@ const (
 )
 
 const (
-	PROTO_NODE_PREFIX = "Qm"
-	RAW_NODE_PREFIX   = "zb"
+	PROTO_NODE_PREFIX = DSP_HASH_PREFIX + "Qm"
+	RAW_NODE_PREFIX   = DSP_HASH_PREFIX + "zb"
 )
 
 // task consts

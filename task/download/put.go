@@ -41,6 +41,9 @@ func (this *DownloadTask) PutBlocks(peerAddr string, resps []*types.BlockResp) e
 			return fmt.Errorf("receive empty block %d of file %s", len(value.Block), fileHashStr)
 		}
 		blk := this.Mgr.Fs().EncodedToBlockWithCid(value.Block, value.Hash)
+		if blk.Cid() == nil {
+			// return fmt.Errorf("receive a wrong block cid is nil, expected: %s", value.Hash)
+		}
 		if blk.Cid().String() != value.Hash {
 			return fmt.Errorf("receive a wrong block: %s, expected: %s", blk.Cid().String(), value.Hash)
 		}
