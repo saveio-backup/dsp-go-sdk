@@ -129,7 +129,7 @@ func (this *TaskMgr) CleanShareTask(taskId string) error {
 	this.shareTaskLock.Lock()
 	defer this.shareTaskLock.Unlock()
 	delete(this.shareTasks, taskId)
-	log.Debugf("clean task %s, %s", taskId, debug.Stack())
+	log.Debugf("clean share task %s", taskId)
 	err := this.db.DeleteTaskInfo(taskId)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.SET_FILEINFO_DB_ERROR, err)

@@ -130,6 +130,7 @@ const (
 	DELETE_FILE_FAILED                                // 70037
 	DELETE_FILE_TX_UNCONFIRMED                        // 70038
 	DELETE_FILE_FILEINFO_EXISTS                       // 70039
+	POC_TASK_ERROR                                    // 70040
 )
 
 // Upload task error code

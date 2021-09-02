@@ -7,12 +7,19 @@ import (
 	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
 )
 
-func (this *UploadTask) GeneratePdpTags(hashes []string, fileID pdp.FileID) ([]pdp.Tag, error) {
+type GenearatePdpProgress struct {
+	Total     int
+	Generated int
+}
+
+func (this *UploadTask) GeneratePdpTags(hashes []string, fileID pdp.FileID, notify chan GenearatePdpProgress) ([]pdp.Tag, error) {
 	p := pdp.NewPdp(0)
 	tags := make([]pdp.Tag, 0)
+	fs := this.Mgr.Fs()
+	total := len(hashes)
 	for index, hash := range hashes {
-		block := this.Mgr.Fs().GetBlock(hash)
-		blockData := this.Mgr.Fs().BlockDataOfAny(block)
+		block := fs.GetBlock(hash)
+		blockData := fs.BlockDataOfAny(block)
 		if len(blockData) == 0 {
 			log.Warnf("get empty block of %s %d", hash, index)
 		}
@@ -21,6 +28,15 @@ func (this *UploadTask) GeneratePdpTags(hashes []string, fileID pdp.FileID) ([]p
 		if err != nil {
 			return nil, err
 		}
+		if notify != nil {
+			go func(generated int) {
+				notify <- GenearatePdpProgress{
+					Generated: generated,
+					Total:     total,
+				}
+			}(index + 1)
+		}
+
 		tags = append(tags, tag...)
 	}
 	return tags, nil

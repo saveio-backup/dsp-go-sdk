@@ -314,6 +314,9 @@ func (this *TaskDB) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd,
 			log.Warnf("get file info of id %s failed", k)
 			continue
 		}
+		if info.Type == TaskTypePoC {
+			continue
+		}
 		if ignoreHide && info.Hide {
 			continue
 		}

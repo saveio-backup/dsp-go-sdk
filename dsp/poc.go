@@ -6,6 +6,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/task/poc"
 	"github.com/saveio/dsp-go-sdk/task/types"
 	tskUtils "github.com/saveio/dsp-go-sdk/utils/task"
+	"github.com/saveio/themis/common/log"
 )
 
 func (this *Dsp) NewPocTask(taskId string) (string, error) {
@@ -14,6 +15,10 @@ func (this *Dsp) NewPocTask(taskId string) (string, error) {
 		return "", err
 	}
 	return tsk.GetId(), nil
+}
+
+func (this *Dsp) GetPocTaskIdByFileName(fileName string) (string, error) {
+	return this.TaskMgr.GetPocTaskIdByFileName(fileName)
 }
 
 // GenPocData. Genearate tags for pdp
@@ -33,9 +38,14 @@ func (this *Dsp) AddNewPlotFile(taskId string, createSector bool, plotCfg *poc.P
 		taskId = tId
 	}
 
+	log.Debugf("add plot for task %v", taskId)
 	return this.TaskMgr.AddPlotFile(taskId, createSector, plotCfg)
 }
 
 func (this *Dsp) GetAllProvedPlotFile() (*types.AllPlotsFileResp, error) {
 	return this.TaskMgr.GetAllProvedPlotFile()
+}
+
+func (this *Dsp) GetAllPocTasks() (*types.AllPocTaskResp, error) {
+	return this.TaskMgr.GetAllPocTasks()
 }

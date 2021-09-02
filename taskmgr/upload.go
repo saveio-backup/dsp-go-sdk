@@ -388,7 +388,7 @@ func (this *TaskMgr) newUploadTaskFromDB(id string) (*upload.UploadTask, error) 
 func (this *TaskMgr) cleanUploadTask(taskId string) error {
 	delete(this.uploadTasks, taskId)
 	delete(this.retryUploadTaskTs, taskId)
-	log.Debugf("clean task %s, %s", taskId, debug.Stack())
+	log.Debugf("clean upload task %s", taskId)
 	err := this.db.DeleteTaskInfo(taskId)
 	if err != nil {
 		log.Errorf("delete task info %s err %s", taskId, err)

@@ -175,7 +175,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	log.Debugf("upload task %s isn't uploaded", taskId)
 
 	fileID := GetFileIDFromFileHash(fileHashStr)
-	tags, err := this.GeneratePdpTags(hashes, fileID)
+	tags, err := this.GeneratePdpTags(hashes, fileID, nil)
 	if err != nil {
 		return nil, err
 	}

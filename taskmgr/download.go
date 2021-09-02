@@ -142,7 +142,7 @@ func (this *TaskMgr) CleanDownloadTask(taskId string) error {
 	defer this.downloadTaskLock.Unlock()
 	delete(this.downloadTasks, taskId)
 	delete(this.retryDownloadTaskTs, taskId)
-	log.Debugf("clean task %s, %s", taskId, debug.Stack())
+	log.Debugf("clean download task %s", taskId)
 	err := this.db.DeleteTaskInfo(taskId)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.SET_FILEINFO_DB_ERROR, err)

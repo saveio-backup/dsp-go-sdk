@@ -147,7 +147,7 @@ func (this *TaskMgr) CleanDispatchTask(taskId string) error {
 	defer this.dispatchTaskLock.Unlock()
 	delete(this.dispatchTasks, taskId)
 	delete(this.retryDispatchTaskTs, taskId)
-	log.Debugf("clean task %s, %s", taskId, debug.Stack())
+	log.Debugf("clean dispatch task %s", taskId)
 	err := this.db.DeleteTaskInfo(taskId)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.SET_FILEINFO_DB_ERROR, err)

@@ -251,3 +251,34 @@ type AllPlotsFileResp struct {
 	TotalSize  uint64
 	FileInfos  []*PlotFileInfo
 }
+
+type PocTaskPDPState int
+
+const (
+	PocTaskPDPStateNonce = iota
+	PocTaskPDPStateGeneratingPdp
+	PocTaskPDPStatePdpSaved
+	PocTaskPDPStateSubmitted
+)
+
+type PocTaskInfo struct {
+	TaskId       string
+	FileName     string
+	FileHash     string
+	FileOwner    string
+	FileSize     uint64
+	RealFileSize uint64
+	BlockHeight  uint64
+	Progress     float64
+	PDPState     PocTaskPDPState
+	TaskState    store.TaskState
+	PlotInfo     *savefs.PlotInfo
+	ProveTimes   uint64
+}
+
+type AllPocTaskResp struct {
+	TotalCount      int
+	TotalSize       uint64
+	TotalProvedSize uint64
+	PocTaskInfos    []*PocTaskInfo
+}

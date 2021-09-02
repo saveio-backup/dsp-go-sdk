@@ -117,6 +117,15 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 	}
 
 	prefixStr := ""
+	if err := p.SetInfoWithOptions(
+		base.TotalBlockCnt(plotCfg.Nonces),
+		base.ProveLevel(savefs.PROVE_LEVEL_HIGH),
+		base.FileName(fileName),
+		base.Privilege(savefs.PRIVATE),
+		base.RealFileSize(consts.CHUNK_SIZE_KB*plotCfg.Nonces),
+	); err != nil {
+		return err
+	}
 
 	blockHashes, err := p.Mgr.Fs().NodesFromFile(fileName, prefixStr, false, "")
 	if err != nil {
@@ -126,13 +135,37 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 
 	fileHash := blockHashes[0]
 
+	fileInfo, _ := p.Mgr.Chain().GetFileInfo(fileHash)
+	if fileInfo != nil {
+		log.Errorf("file %s hash %s already exists on chain", fileName, fileHash)
+		return fmt.Errorf("file %s hash %s already exists on chain", fileName, fileHash)
+	}
+
+	if err := p.SetInfoWithOptions(
+		base.FileHash(fileHash),
+	); err != nil {
+		return err
+	}
+
 	err = p.Mgr.Fs().SetFsFilePrefix(fileName, prefixStr)
 	if err != nil {
 		return err
 	}
 
 	fileID := upload.GetFileIDFromFileHash(fileHash)
-	tags, err := p.GeneratePdpTags(blockHashes, fileID)
+	generateProgressCh := make(chan upload.GenearatePdpProgress)
+	go func() {
+		for {
+			progress := <-generateProgressCh
+			log.Debugf("generate progress %v", progress)
+			p.SetGenerateProgress(progress)
+			if p.AllTagGenerated() {
+				log.Debugf("progress return")
+				return
+			}
+		}
+	}()
+	tags, err := p.GeneratePdpTags(blockHashes, fileID, generateProgressCh)
 	if err != nil {
 		return err
 	}
@@ -154,13 +187,7 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 	}
 
 	return p.SetInfoWithOptions(
-		base.FileHash(fileHash),
-		base.TotalBlockCnt(plotCfg.Nonces),
-		base.ProveLevel(savefs.PROVE_LEVEL_HIGH),
-		base.FileName(fileName),
-		base.Privilege(savefs.PRIVATE),
 		base.ProveParams(proveParam),
-		base.RealFileSize(consts.CHUNK_SIZE_KB*plotCfg.Nonces),
 	)
 
 }
@@ -169,7 +196,7 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 
 	fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
 	fileName = path.Join(plotCfg.Path, fileName)
-	log.Infof("AddPlotFile add plot file %s", fileName, p.GetFileName())
+	log.Infof("AddPlotFile add plot file %s %s", fileName, p.GetFileName())
 	if fileName != p.GetFileName() {
 		return fmt.Errorf("poc task %v has different fileName %s expect %v", p.GetId(), fileName, p.GetFileName())
 	}
@@ -178,7 +205,6 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 	if err != nil {
 		return err
 	}
-
 	fileSizeInKB := uint64(math.Ceil(float64(fileStat.Size() / 1024)))
 	enough, err := p.isPocSectorEnough(fileSizeInKB)
 	if err != nil {
@@ -217,7 +243,7 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 		},
 	}
 
-	_, _, err = p.Mgr.Chain().StoreFile(sp.fileHash,
+	tx, height, err := p.Mgr.Chain().StoreFile(sp.fileHash,
 		sp.blocksRoot,
 		sp.blockNum,
 		sp.blockSize,
@@ -245,7 +271,11 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 
 	log.Infof("get fileInfo success for file %s, %+v", fileHash, fileInfo)
 
-	if err := p.SetInfoWithOptions(base.FileHash(fileHash)); err != nil {
+	if err := p.SetInfoWithOptions(
+		base.FileHash(fileHash),
+		base.StoreTx(tx),
+		base.StoreTxHeight(height),
+	); err != nil {
 		return err
 	}
 

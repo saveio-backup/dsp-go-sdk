@@ -3,11 +3,13 @@ package taskmgr
 import (
 	"fmt"
 
+	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
 	"github.com/saveio/dsp-go-sdk/task/base"
 	"github.com/saveio/dsp-go-sdk/task/poc"
 	"github.com/saveio/dsp-go-sdk/task/types"
+	"github.com/saveio/dsp-go-sdk/task/upload"
 	"github.com/saveio/themis/common/log"
 )
 
@@ -35,9 +37,11 @@ func (this *TaskMgr) GetPocTask(taskId string) *poc.PocTask {
 	if ok {
 		return tsk
 	}
+	tsk, _ = this.newPoCTaskFromDB(taskId)
 	if tsk == nil {
 		return nil
 	}
+	log.Debugf("new task from db %v", tsk.GetFileName())
 	if tsk.State() != store.TaskStateDone {
 		// only cache unfinished task
 		this.pocTasks[taskId] = tsk
@@ -47,7 +51,13 @@ func (this *TaskMgr) GetPocTask(taskId string) *poc.PocTask {
 
 func (this *TaskMgr) GenPlotPDPData(taskId string, plotCfg *poc.PlotConfig) error {
 	tsk := this.GetPocTask(taskId)
-	return tsk.GenPlotPDPData(plotCfg)
+	err := tsk.GenPlotPDPData(plotCfg)
+	if err != nil {
+		tsk.SetResult("", sdkErr.POC_TASK_ERROR, err.Error())
+		return err
+	}
+	tsk.SetResult(tsk.GetId(), sdkErr.SUCCESS, "")
+	return err
 }
 
 func (this *TaskMgr) GetPocTaskIdByFileName(fileName string) (string, error) {
@@ -74,7 +84,7 @@ func (this *TaskMgr) AddPlotFile(taskId string, createSector bool, plotCfg *poc.
 		createSectorTxHash = sectorTx
 		updateNodeTxHash = updateTx
 	}
-	log.Infof("CreateSectorForPlot %v %v", updateNodeTxHash, createSectorTxHash)
+	log.Infof("CreateSectorForPlot %v  createSectorTxHash %v, tsk %v", updateNodeTxHash, createSectorTxHash, tsk)
 
 	if err := tsk.AddPlotFile(plotCfg); err != nil {
 		return nil, err
@@ -157,4 +167,140 @@ func (this *TaskMgr) GetAllProvedPlotFile() (*types.AllPlotsFileResp, error) {
 	resp.TotalCount = totalNum
 	resp.TotalSize = totalSize
 	return resp, nil
+}
+
+func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
+
+	taskInfos, err := this.db.GetPocTaskInfos()
+	if err != nil {
+		return nil, err
+	}
+
+	totalNum := 0
+	resp := &types.AllPocTaskResp{
+		PocTaskInfos: make([]*types.PocTaskInfo, 0),
+	}
+	for _, info := range taskInfos {
+
+		// 0 undone, 1: generating pdp, 2: generated pdp success, 3. submit to chain
+		var progress upload.GenearatePdpProgress
+		var state types.PocTaskPDPState
+		progressF := 0.0
+		if len(info.ProveParams) > 0 {
+			state = types.PocTaskPDPStatePdpSaved
+			progressF = 1
+		} else {
+			tsk := this.GetPocTask(info.Id)
+			if tsk != nil {
+				progress = tsk.GetGenerateProgress()
+				if progress.Total != 0 {
+					state = types.PocTaskPDPStateGeneratingPdp
+					progressF = float64(progress.Generated) / float64(progress.Total)
+				}
+				// set to 0.99 because prove params haven't saved to db yet
+				if progressF == 1 {
+					progressF = 0.99
+				}
+			}
+
+		}
+
+		fileSize := info.TotalBlockCount * consts.CHUNK_SIZE_KB
+		pocTaskInfo := &types.PocTaskInfo{
+			TaskId:       info.Id,
+			FileSize:     fileSize,
+			RealFileSize: info.RealFileSize,
+			FileName:     info.FileName,
+			FileHash:     string(info.FileHash),
+			BlockHeight:  uint64(info.StoreTxHeight),
+			Progress:     progressF,
+			PDPState:     state,
+			TaskState:    info.TaskState,
+		}
+		resp.TotalSize += fileSize
+		if len(info.StoreTx) == 0 {
+			resp.PocTaskInfos = append(resp.PocTaskInfos, pocTaskInfo)
+			totalNum++
+			continue
+		}
+
+		state = types.PocTaskPDPStateSubmitted
+		progressF = 1
+		proveDetails, _ := this.chain.GetFileProveDetails(info.FileHash)
+		if proveDetails == nil {
+			resp.PocTaskInfos = append(resp.PocTaskInfos, pocTaskInfo)
+			totalNum++
+			continue
+		}
+
+		proveTimes := 0
+		proved := false
+		for _, d := range proveDetails.ProveDetails {
+			if d.ProveTimes > 0 {
+				proved = true
+				proveTimes = int(d.ProveTimes)
+				break
+			}
+		}
+
+		if !proved {
+			resp.PocTaskInfos = append(resp.PocTaskInfos, pocTaskInfo)
+			totalNum++
+			continue
+		}
+
+		fileInfo, _ := this.chain.GetFileInfo(info.FileHash)
+		if fileInfo == nil {
+			resp.PocTaskInfos = append(resp.PocTaskInfos, pocTaskInfo)
+			totalNum++
+			continue
+		}
+
+		pocTaskInfo.FileOwner = fileInfo.FileOwner.ToBase58()
+		pocTaskInfo.PlotInfo = fileInfo.PlotInfo
+
+		pocTaskInfo.ProveTimes = uint64(proveTimes)
+		resp.TotalProvedSize += fileSize
+		resp.PocTaskInfos = append(resp.PocTaskInfos, pocTaskInfo)
+		totalNum++
+
+	}
+
+	resp.TotalCount = totalNum
+	return resp, nil
+}
+
+// newPoCTaskFromDB. Read file info from DB and recover a task by the file info.
+func (this *TaskMgr) newPoCTaskFromDB(id string) (*poc.PocTask, error) {
+	info, err := this.db.GetTaskInfo(id)
+	if err != nil {
+		log.Errorf("new poc task get task from db, get file info failed, id: %s", id)
+		return nil, err
+	}
+	if info == nil {
+		log.Warnf("new poc task  get task from db, recover task get file info is nil, id: %v", id)
+		return nil, nil
+	}
+	if info.Type != store.TaskTypePoC {
+		return nil, nil
+	}
+	log.Debugf("new poc task info name %v", info)
+
+	state := store.TaskState(info.TaskState)
+	if state == store.TaskStatePrepare || state == store.TaskStateDoing ||
+		state == store.TaskStateCancel || state == store.TaskStateIdle {
+		state = store.TaskStatePause
+	}
+	t := poc.InitPoCTask(id, this.db)
+	t.Id = id
+	t.Mgr = this
+
+	t.SetInfoWithOptions(
+		base.TaskType(store.TaskTypePoC),
+		base.TaskState(state),
+		base.TransferState(uint32(types.TaskPause)),
+	)
+	log.Debugf("get poc task from db task id %s, file name %s, task type %d, state %d",
+		info.Id, info.FileName, info.Type, info.TaskState)
+	return t, nil
 }
