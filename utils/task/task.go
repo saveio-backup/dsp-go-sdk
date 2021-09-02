@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/saveio/dsp-go-sdk/consts"
@@ -104,4 +105,10 @@ func GetDecryptedFilePath(filePath, fileName string) string {
 func GetJitterDelay(attempt, initSec int) uint64 {
 	jitter := (float64(attempt) + rand.Float64()) * float64(initSec)
 	return uint64(jitter)
+}
+
+func GetPlotFileName(nonces, startNonce uint64, numericID string) string {
+	startStr := strconv.Itoa(int(startNonce))
+	noncesStr := strconv.Itoa(int(nonces))
+	return strings.Join([]string{numericID, startStr, noncesStr}, "_")
 }

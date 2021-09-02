@@ -45,6 +45,21 @@ func (this *TaskMgr) GetPocTask(taskId string) *poc.PocTask {
 	return tsk
 }
 
+func (this *TaskMgr) GenPlotPDPData(taskId string, plotCfg *poc.PlotConfig) error {
+	tsk := this.GetPocTask(taskId)
+	return tsk.GenPlotPDPData(plotCfg)
+}
+
+func (this *TaskMgr) GetPocTaskIdByFileName(fileName string) (string, error) {
+	info := this.db.GetPoCTaskByFields(map[string]string{
+		store.TaskInfoFieldFileName: fileName,
+	})
+	if info == nil {
+		return "", fmt.Errorf("poc task of %s not found", fileName)
+	}
+	return info.Id, nil
+}
+
 func (this *TaskMgr) AddPlotFile(taskId string, createSector bool, plotCfg *poc.PlotConfig) (*types.AddPlotFileResp, error) {
 
 	tsk := this.GetPocTask(taskId)

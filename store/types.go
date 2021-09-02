@@ -5,4 +5,5 @@ const (
 	TaskInfoFieldWalletAddress  = "TaskInfoWalletAddress"
 	TaskInfoFieldFilePath       = "TaskInfoFilePath"
 	TaskInfoFieldSimpleCheckSum = "TaskInfoSimpleCheckSum"
+	TaskInfoFieldFileName       = "TaskInfoFileName"
 )

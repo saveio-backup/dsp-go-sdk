@@ -7,12 +7,12 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/saveio/dsp-go-sdk/consts"
 	"github.com/saveio/dsp-go-sdk/task/base"
 	"github.com/saveio/dsp-go-sdk/task/upload"
+	tskUtils "github.com/saveio/dsp-go-sdk/utils/task"
 	"github.com/saveio/max/max/sector"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/smartcontract/service/native/savefs"
@@ -23,7 +23,7 @@ var (
 )
 
 func (p *PocTask) CreateSectorForPlot(plotCfg *PlotConfig) (string, string, error) {
-	fileName := GetPlotFileName(plotCfg)
+	fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
 	fileName = path.Join(plotCfg.Path, fileName)
 	log.Infof("add plot file %s", fileName)
 
@@ -104,24 +104,16 @@ func (p *PocTask) CreateSectorForPlot(plotCfg *PlotConfig) (string, string, erro
 	return registerTx, sectorTx, nil
 }
 
-func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
+// GenPlotData. Sharding file and get all blocks. Generate PDP tags and save to local storage.
+func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 
-	fileName := GetPlotFileName(plotCfg)
+	fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
 	fileName = path.Join(plotCfg.Path, fileName)
-	log.Infof("AddPlotFile add plot file %s", fileName)
+	log.Infof("GenPlotData add plot file %s", fileName)
 
-	fileStat, err := os.Stat(fileName)
+	_, err := os.Stat(fileName)
 	if err != nil {
 		return err
-	}
-
-	fileSizeInKB := uint64(math.Ceil(float64(fileStat.Size() / 1024)))
-	enough, err := p.isPocSectorEnough(fileSizeInKB)
-	if err != nil {
-		return err
-	}
-	if !enough {
-		return fmt.Errorf("poc sectors not enough for file size %v, please create one", fileSizeInKB)
 	}
 
 	prefixStr := ""
@@ -161,6 +153,41 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 		return err
 	}
 
+	return p.SetInfoWithOptions(
+		base.FileHash(fileHash),
+		base.TotalBlockCnt(plotCfg.Nonces),
+		base.ProveLevel(savefs.PROVE_LEVEL_HIGH),
+		base.FileName(fileName),
+		base.Privilege(savefs.PRIVATE),
+		base.ProveParams(proveParam),
+		base.RealFileSize(consts.CHUNK_SIZE_KB*plotCfg.Nonces),
+	)
+
+}
+
+func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
+
+	fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
+	fileName = path.Join(plotCfg.Path, fileName)
+	log.Infof("AddPlotFile add plot file %s", fileName, p.GetFileName())
+	if fileName != p.GetFileName() {
+		return fmt.Errorf("poc task %v has different fileName %s expect %v", p.GetId(), fileName, p.GetFileName())
+	}
+
+	fileStat, err := os.Stat(fileName)
+	if err != nil {
+		return err
+	}
+
+	fileSizeInKB := uint64(math.Ceil(float64(fileStat.Size() / 1024)))
+	enough, err := p.isPocSectorEnough(fileSizeInKB)
+	if err != nil {
+		return err
+	}
+	if !enough {
+		return fmt.Errorf("poc sectors not enough for file size %v, please create one", fileSizeInKB)
+	}
+
 	currentHeight, err := p.Mgr.Chain().GetCurrentBlockHeight()
 	if err != nil {
 		return err
@@ -169,18 +196,18 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 	numericId, _ := strconv.Atoi(plotCfg.NumericID)
 
 	sp := &StoreFileParam{
-		fileHash:       fileHash,
+		fileHash:       p.GetFileHash(),
 		blocksRoot:     "",
-		blockNum:       plotCfg.Nonces,
+		blockNum:       p.GetTotalBlockCnt(),
 		blockSize:      consts.CHUNK_SIZE_KB,
-		proveLevel:     savefs.PROVE_LEVEL_HIGH,
+		proveLevel:     p.GetProveLevel(),
 		expiredHeight:  uint64(currentHeight + consts.MAX_PLOT_FILE_EXPIRED_BLOCK),
 		copyNum:        0,
-		fileDesc:       []byte(fileName),
-		privilege:      savefs.PRIVATE,
-		proveParam:     proveParam,
+		fileDesc:       []byte(p.GetFileName()),
+		privilege:      p.GetPrivilege(),
+		proveParam:     p.GetProveParams(),
 		storageType:    savefs.FileStorageTypeCustom,
-		realFileSize:   consts.CHUNK_SIZE_KB * plotCfg.Nonces,
+		realFileSize:   p.GetRealFileSize(),
 		primaryNodes:   nil,
 		candidateNodes: nil,
 		plotInfo: &savefs.PlotInfo{
@@ -210,6 +237,7 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 		return err
 	}
 
+	fileHash := sp.fileHash
 	fileInfo, err := p.Mgr.Chain().GetFileInfo(fileHash)
 	if err != nil {
 		return err
@@ -250,10 +278,4 @@ func (p *PocTask) isPocSectorEnough(fileSize uint64) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-func GetPlotFileName(cfg *PlotConfig) string {
-	startStr := strconv.Itoa(int(cfg.StartNonce))
-	noncesStr := strconv.Itoa(int(cfg.Nonces))
-	return strings.Join([]string{cfg.NumericID, startStr, noncesStr}, "_")
 }

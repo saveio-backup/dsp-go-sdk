@@ -493,6 +493,32 @@ func (this *TaskDB) GetShareTaskByFields(fields map[string]string) *TaskInfo {
 	return nil
 }
 
+func (this *TaskDB) GetPoCTaskByFields(fields map[string]string) *TaskInfo {
+	this.dbLock.RLock()
+	defer this.dbLock.RUnlock()
+	prefix := TaskInfoKey("")
+	keys, err := this.db.QueryStringKeysByPrefix([]byte(prefix))
+	if err != nil {
+		log.Errorf("query task failed %s", err)
+		return nil
+	}
+	for _, key := range keys {
+		info, _ := this.getTaskInfoByKey(key)
+		if info == nil {
+			continue
+		}
+		if info.Type != TaskTypePoC {
+			continue
+		}
+
+		if fileName, ok := fields[TaskInfoFieldFileName]; ok && info.FileName == fileName {
+			return info
+		}
+
+	}
+	return nil
+}
+
 func (this *TaskDB) HideTaskIds(ids []string) error {
 	batch := this.db.NewBatch()
 	for _, id := range ids {
