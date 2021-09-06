@@ -382,9 +382,9 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 		return sdkErr.NewWithError(sdkErr.INVALID_ADDRESS, err)
 	}
 
-	success, err := ch_actor.DirectTransferAsync(pylonsCom.Address(target), pylonsCom.TokenAmount(amount),
+	success, dta_err := ch_actor.DirectTransferAsync(pylonsCom.Address(target), pylonsCom.TokenAmount(amount),
 		pylonsCom.PaymentID(paymentId))
-	if success && err == nil {
+	if success && dta_err == nil {
 		log.Debugf("payment id %d, direct transfer success", paymentId)
 		return nil
 	}
@@ -403,9 +403,9 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 		return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_TIMEOUT,
 			"direct transfer timeout, get payment result and err is both nil")
 	}
-	if !success {
+	if !success && dta_err != nil {
 		return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_ERROR,
-			"PaymentId aleady exist! And last transcation with same paymentId result is: %t", resp.Result)
+			"%s And last transcation with same paymentId result is: %t", dta_err.Error(), resp.Result)
 	}
 	if resp.Result {
 		log.Debugf("direct transfer timeout, but success")
