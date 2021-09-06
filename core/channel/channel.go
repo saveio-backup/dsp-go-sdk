@@ -403,6 +403,10 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 		return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_TIMEOUT,
 			"direct transfer timeout, get payment result and err is both nil")
 	}
+	if !success {
+		return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_ERROR,
+			"PaymentId aleady exist! And last transcation with same paymentId result is: %t", resp.Result)
+	}
 	if resp.Result {
 		log.Debugf("direct transfer timeout, but success")
 		return nil

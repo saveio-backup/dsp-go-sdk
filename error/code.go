@@ -76,6 +76,7 @@ const (
 	CHANNEL_GET_CURRENT_BALANCE_ERROR                  // 50020
 	CHANNEL_WITHDRAW_FAILED                            // 50021
 	CHANNEL_COOPERATIVE_SETTLE_ERROR                   // 50022
+	CHANNEL_DIRECT_TRANSFER_ERROR                      // 50023
 )
 
 const (
