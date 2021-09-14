@@ -9,7 +9,6 @@ import (
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/consts"
 	"github.com/saveio/dsp-go-sdk/store"
-	"github.com/saveio/dsp-go-sdk/utils/format"
 
 	"github.com/ontio/ontology-eventbus/actor"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
@@ -381,46 +380,30 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.INVALID_ADDRESS, err)
 	}
-
-	success, dta_err := ch_actor.DirectTransferAsync(pylonsCom.Address(target), pylonsCom.TokenAmount(amount),
+	success, tErr := ch_actor.DirectTransferAsync(pylonsCom.Address(target), pylonsCom.TokenAmount(amount),
 		pylonsCom.PaymentID(paymentId))
-	if success && dta_err == nil {
-		log.Debugf("payment id %d, direct transfer success", paymentId)
+	if success {
+		log.Debugf("Payment id %d, direct transfer success", paymentId)
 		return nil
-	}
-	log.Errorf("payment id %d, direct transfer %s, err %s", paymentId, format.BoolToStr(success), err)
-	resp, err := ch_actor.GetPaymentResult(pylonsCom.Address(target), pylonsCom.PaymentID(paymentId))
-	if err != nil {
-		if resp != nil {
+	} else {
+		log.Errorf("Payment id %d, direct transfer err: %s", paymentId, err)
+		resp, err := ch_actor.GetPaymentResult(pylonsCom.Address(target), pylonsCom.PaymentID(paymentId))
+		if err != nil {
 			return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_TIMEOUT,
-				"direct transfer timeout, reason %s, transfer %s, err %s",
-				resp.Reason, format.BoolToStr(resp.Result), err)
+				"Direct transfer timeout and get payment result timeout: %s", err)
 		}
-		return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_TIMEOUT,
-			"direct transfer timeout err: %s", err)
-	}
-	if resp == nil {
-		return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_TIMEOUT,
-			"direct transfer timeout, get payment result and err is both nil")
-	}
-	if !success && dta_err != nil {
+		if resp == nil {
+			return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_ERROR,
+				"Direct transfer error: %s, and get payment id %d empty result", tErr.Error(), paymentId)
+		}
 		return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_ERROR,
-			"%s And last transcation with same paymentId result is: %t", dta_err.Error(), resp.Result)
+			"Direct transfer error: %s, and get payment id %d result: %t, reson: %s",tErr.Error(), paymentId, resp.Result, resp.Reason)
 	}
-	if resp.Result {
-		log.Debugf("direct transfer timeout, but success")
-		return nil
-	}
-	return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_TIMEOUT,
-		"direct transfer timeout reason %s transfer %s",
-		resp.Reason, format.BoolToStr(resp.Result))
+	return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_ERROR, "Unknown error, payment id: %d", paymentId)
 }
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to string) error {
-	log.Debugf("media transfer to %s payment id %s amount %d with media %v",
-		to, paymentId, amount, to)
-	// this.lock.Lock()
-	// defer this.lock.Unlock()
+	log.Debugf("media transfer to %s payment id %s amount %d with media %v", to, paymentId, amount, to)
 	if this.State() != state.ModuleStateActive {
 		return sdkErr.New(sdkErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
 	}
@@ -434,34 +417,25 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to str
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.INVALID_ADDRESS, err)
 	}
-	success, err := ch_actor.MediaTransfer(registryAddress, tokenAddress, pylonsCom.Address(mediaAddr),
+	success, tErr := ch_actor.MediaTransfer(registryAddress, tokenAddress, pylonsCom.Address(mediaAddr),
 		pylonsCom.Address(target), pylonsCom.TokenAmount(amount), pylonsCom.PaymentID(paymentId))
-	if success && err == nil {
-		log.Debugf("payment %d transfer success", paymentId)
+	if success {
+		log.Debugf("Payment %d media transfer success", paymentId)
 		return nil
-	}
-	resp, err := ch_actor.GetPaymentResult(pylonsCom.Address(target), pylonsCom.PaymentID(paymentId))
-	if err != nil {
-		if resp != nil {
-			return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_TIMEOUT,
-				"media transfer timeout, reason %s, transfer %s, err %s",
-				resp.Reason, format.BoolToStr(resp.Result), err)
+	} else {
+		resp, err := ch_actor.GetPaymentResult(pylonsCom.Address(target), pylonsCom.PaymentID(paymentId))
+		if err != nil {
+			return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_TIMEOUT,
+				"Media transfer timeout and get payment result timeout: %s", err)
 		}
-		return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_TIMEOUT,
-			"media transfer timeout err: %s", err)
+		if resp == nil {
+			return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_ERROR,
+				"Media transfer error: %s, and get payment id %d empty result", tErr.Error(), paymentId)
+		}
+		return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_ERROR,
+			"Media transfer error: %s, and get payment id %d result: %t, reson: %s",tErr.Error(), paymentId, resp.Result, resp.Reason)
 	}
-	if resp == nil {
-		return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_TIMEOUT,
-			"media transfer timeout, get payment result and err is both nil")
-	}
-	if resp.Result {
-		log.Debugf("media transfer timeout, but success")
-		return nil
-	}
-	return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_TIMEOUT,
-		"media transfer timeout reason %s transfer %s",
-		resp.Reason, format.BoolToStr(resp.Result))
-
+	return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_ERROR, "Unknown error, payment id: %d", paymentId)
 }
 
 // GetTargetBalance. check total deposit balance
