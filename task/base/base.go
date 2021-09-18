@@ -16,8 +16,7 @@ import (
 )
 
 type Task struct {
-	Id string // task id
-	// Info        *store.TaskInfo          // task info from local DB
+	Id          string                   // task id
 	Lock        *sync.RWMutex            // lock
 	DB          *store.TaskDB            // db
 	Batch       bool                     // batch save to db
@@ -39,7 +38,6 @@ func NewTask(taskId string, taskType store.TaskType, db *store.TaskDB) *Task {
 		return nil
 	}
 	t := newTask(taskId, info, db)
-	// t.payOnL1 = true
 	info.Id = taskId
 	log.Debugf("set task %s state %v, original state %v", taskId, store.TaskStatePrepare, info.TaskState)
 	info.TaskState = store.TaskStatePrepare
@@ -51,15 +49,6 @@ func NewTask(taskId string, taskType store.TaskType, db *store.TaskDB) *Task {
 	}
 	return t
 }
-
-// func (this *Task) NewBatchSet() {
-// 	this.Lock.Lock()
-// 	defer this.Lock.Unlock()
-// 	if this.Batch {
-// 		log.Warnf("batch set flag is active")
-// 	}
-// 	this.Batch = true
-// }
 
 func (this *Task) SetTaskState(newState store.TaskState) error {
 	this.Lock.Lock()

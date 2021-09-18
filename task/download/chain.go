@@ -102,7 +102,7 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 		}
 	}
 
-	if this.PayOnLayer1() {
+	if this.PayOnLayer1() && !this.Mgr.Config().EnableLayer2 {
 		return this.fastTransfer(taskId, payInfo, paymentId, amount)
 	}
 

@@ -28,6 +28,7 @@ type DspConfig struct {
 	ChannelDBPath        string // channel DB path
 	BlockDelay           string // block delay for confirmation
 	MaxUnpaidPayment     int32  // max unpaid payments for sharing a file
+	EnableLayer2         bool   // enable pay for block by using layer2
 
 	AutoSetupDNSEnable bool     // enable auto setup DNS node or not
 	DnsNodeMaxNum      int      // dns node max count
