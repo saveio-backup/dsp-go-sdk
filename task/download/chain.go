@@ -81,6 +81,10 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 	if this.Mgr.DNS() == nil || !this.Mgr.DNS().HasDNS() {
 		return sdkErr.New(sdkErr.NO_CONNECTED_DNS, "no dns")
 	}
+	if blockSize < consts.CHUNK_SIZE {
+		blockSize = consts.CHUNK_SIZE
+		log.Debugf("block size %v less than 256KB, pay for 256KB", blockSize)
+	}
 	amount := blockSize * payInfo.UnitPrice
 	if amount/blockSize != payInfo.UnitPrice {
 		return sdkErr.New(sdkErr.INTERNAL_ERROR, "total price overflow")
@@ -185,8 +189,8 @@ func (this *DownloadTask) fastTransfer(taskId string, payInfo *file.Payment, pay
 		return err
 	}
 
-	log.Debugf("task %s sending payment msg %v to %s, txHash: %s txHeight: %v",
-		taskId, paymentId, payInfo.WalletAddress, txHash, txHeight)
+	log.Debugf("task %s sending payment msg %v to %s, amount %v, txHash: %s txHeight: %v",
+		taskId, paymentId, payInfo.WalletAddress, amount, txHash, txHeight)
 	msg := message.NewPaymentMsg(
 		this.GetCurrentWalletAddr(),
 		payInfo.WalletAddress,
