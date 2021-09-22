@@ -158,6 +158,9 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 		break
 	}
 	if !paySuccess {
+		if this.Mgr.Config().EnableLayer2 {
+			return fmt.Errorf("mediaTransfer failed paymentId %v, payto %v", paymentId, payInfo.WalletAddress)
+		}
 		err := this.fastTransfer(taskId, payInfo, paymentId, amount)
 		if err != nil {
 			return fmt.Errorf("pay %d failed", paymentId)

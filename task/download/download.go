@@ -41,7 +41,7 @@ func (this *DownloadTask) Start(opt *types.DownloadOption) error {
 	if !this.Mgr.DNS().HasDNS() {
 		return sdkErr.New(sdkErr.NO_CONNECTED_DNS, "no online dns node")
 	}
-	log.Debugf("download file dns node %s, url %s", this.Mgr.DNS().CurrentDNSWallet(), opt.Url)
+	log.Debugf("download file dns node %s, url %s, total block %v", this.Mgr.DNS().CurrentDNSWallet(), opt.Url, opt.BlockNum)
 
 	if opt.MaxPeerCnt > consts.MAX_DOWNLOAD_PEERS_NUM {
 		opt.MaxPeerCnt = consts.MAX_DOWNLOAD_PEERS_NUM
