@@ -86,6 +86,9 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 		log.Debugf("block size %v less than 256KB, pay for 256KB", blockSize)
 	}
 	amount := blockSize * payInfo.UnitPrice
+	if blockSize%consts.CHUNK_SIZE != 0 {
+		amount = (blockSize/consts.CHUNK_SIZE + 1) * consts.CHUNK_SIZE
+	}
 	if amount/blockSize != payInfo.UnitPrice {
 		return sdkErr.New(sdkErr.INTERNAL_ERROR, "total price overflow")
 	}
