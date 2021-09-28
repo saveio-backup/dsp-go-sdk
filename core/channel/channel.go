@@ -397,7 +397,7 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 				"Direct transfer error: %s, and get payment id %d empty result", tErr.Error(), paymentId)
 		}
 		return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_ERROR,
-			"Direct transfer error: %s, and get payment id %d result: %t, reson: %s",tErr.Error(), paymentId, resp.Result, resp.Reason)
+			"Direct transfer error: %s, and get payment id %d result: %t, reson: %s", tErr.Error(), paymentId, resp.Result, resp.Reason)
 	}
 	return sdkErr.New(sdkErr.CHANNEL_DIRECT_TRANSFER_ERROR, "Unknown error, payment id: %d", paymentId)
 }
@@ -433,7 +433,7 @@ func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to str
 				"Media transfer error: %s, and get payment id %d empty result", tErr.Error(), paymentId)
 		}
 		return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_ERROR,
-			"Media transfer error: %s, and get payment id %d result: %t, reson: %s",tErr.Error(), paymentId, resp.Result, resp.Reason)
+			"Media transfer error: %s, and get payment id %d result: %t, reson: %s", tErr.Error(), paymentId, resp.Result, resp.Reason)
 	}
 	return sdkErr.New(sdkErr.CHANNEL_MEDIA_TRANSFER_ERROR, "Unknown error, payment id: %d", paymentId)
 }

@@ -113,8 +113,9 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 	fileHashStr := this.GetFileHash()
 	// use default dns to pay
 	if err := this.checkDNSState(this.Mgr.DNS().CurrentDNSWallet()); err == nil {
-		log.Debugf("paying for file %s, to %s, id %v, use dns: %s",
-			fileHashStr, payInfo.WalletAddress, paymentId, this.Mgr.DNS().CurrentDNSWallet())
+		log.Debugf("paying for file %s, to %s, id %v, use dns: %s, amount %v, balance %v",
+			fileHashStr, payInfo.WalletAddress, paymentId, this.Mgr.DNS().CurrentDNSWallet(), amount,
+			this.GetChannelBalance(this.Mgr.DNS().CurrentDNSWallet()))
 		if err := this.Mgr.Channel().MediaTransfer(paymentId, amount, this.Mgr.DNS().CurrentDNSWallet(),
 			payInfo.WalletAddress); err == nil {
 			// clean unpaid order
@@ -122,7 +123,9 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 				payInfo.Asset, amount); err != nil {
 				return err
 			}
-			log.Debugf("delete unpaid %d", amount)
+			log.Debugf("paying for file %s, to %s, id %v, success amount %v, balance %v",
+				fileHashStr, payInfo.WalletAddress, paymentId, amount,
+				this.GetChannelBalance(this.Mgr.DNS().CurrentDNSWallet()))
 			// active peer to prevent pay too long
 			this.ActiveWorker(payInfo.WalletAddress)
 			return nil
@@ -146,7 +149,8 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 		if err := this.checkDNSState(ch.Address); err == nil {
 			continue
 		}
-		log.Debugf("paying for file %s, to %s, id %v, use dns: %s", fileHashStr, payInfo.WalletAddress, paymentId, ch.Address)
+
+		log.Debugf("paying for file %s, to %s, id %v, use dns: %s, amount %v balance %v", fileHashStr, payInfo.WalletAddress, paymentId, ch.Address, amount, this.GetChannelBalance(ch.Address))
 		if err := this.Mgr.Channel().MediaTransfer(paymentId, amount, ch.Address, payInfo.WalletAddress); err != nil {
 			log.Debugf("mediaTransfer failed paymentId %d, payTo: %s, err %s", paymentId, payInfo.WalletAddress, err)
 			this.ActiveWorker(payInfo.WalletAddress)
@@ -154,7 +158,7 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 		}
 		this.ActiveWorker(payInfo.WalletAddress)
 		paySuccess = true
-		log.Debugf("paying for file %s ,to %s, id %v success", fileHashStr, payInfo.WalletAddress, paymentId)
+		log.Debugf("paying for file %s ,to %s, id %v success, balance %v", fileHashStr, payInfo.WalletAddress, paymentId, this.GetChannelBalance(ch.Address))
 		break
 	}
 	if !paySuccess {
@@ -175,6 +179,14 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 	}
 	log.Debugf("delete unpaid %d", amount)
 	return nil
+}
+
+func (this *DownloadTask) GetChannelBalance(walletAddr string) uint64 {
+	info, err := this.Mgr.Channel().GetChannelInfo(walletAddr)
+	if err != nil {
+		log.Errorf("get channel info err %s for wallet %s", err, walletAddr)
+	}
+	return info.Balance
 }
 
 // fastTransfer. transfer asset on layer-1 contract, store payment id in contract state
