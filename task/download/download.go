@@ -180,6 +180,16 @@ func (this *DownloadTask) Cancel() error {
 		}(walletAddr, session)
 	}
 	wg.Wait()
+
+	// Delete downloaded file if it's cancel
+	filePath := this.GetFilePath()
+	if len(filePath) == 0 {
+		log.Warnf("can't delete file %s because its' path is empty", fileHashStr)
+		return nil
+	}
+	if err := this.Mgr.Fs().DeleteFile(fileHashStr, filePath); err != nil {
+		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHashStr, filePath, err)
+	}
 	return nil
 }
 
