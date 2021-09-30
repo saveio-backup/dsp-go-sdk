@@ -249,9 +249,12 @@ func (this *DownloadTask) InsertBlockReqToPool(blockReqs []*types.GetBlockReq) {
 		return
 	}
 	info := this.GetTaskInfo()
-	log.Debugf("task %s, insert block req %s-%s-%d to %s-%d",
-		this.Id, info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
-		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
+	if info != nil {
+		log.Debugf("task %s, insert block req %s-%s-%d to %s-%d",
+			this.Id, info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
+			blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
+	}
+
 	this.blockReqPool = append(blockReqs, this.blockReqPool...)
 	if len(this.Workers) == 0 {
 		return
@@ -268,10 +271,14 @@ func (this *DownloadTask) DelBlockReqFromPool(blockReqs []*types.GetBlockReq) {
 	if len(blockReqs) == 0 {
 		return
 	}
+
 	info := this.GetTaskInfo()
-	log.Debugf("task %s, del block req %s-%s-%d to %s-%d",
-		this.Id, info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
-		blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
+	if info != nil {
+		log.Debugf("task %s, del block req %s-%s-%d to %s-%d",
+			this.Id, info.FileHash, blockReqs[0].Hash, blockReqs[0].Index,
+			blockReqs[len(blockReqs)-1].Hash, blockReqs[len(blockReqs)-1].Index)
+	}
+
 	hashKey := make(map[string]struct{}, 0)
 	for _, r := range blockReqs {
 		hashKey[fmt.Sprintf("%s-%d", r.Hash, r.Index)] = struct{}{}
