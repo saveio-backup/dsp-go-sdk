@@ -129,6 +129,8 @@ func (d *DNS) Discovery() {
 	if channels == nil || len(channels.Channels) == 0 {
 		return
 	}
+	addr, _ := d.channel.GetLastUsedDNSWalletAddr()
+	LastUsedDNS(addr).apply(d)
 	log.Debugf("last used dns %s", d.lastUsedDNS)
 	for _, channel := range channels.Channels {
 		url, ok := d.onlineDNS[channel.Address]
