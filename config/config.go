@@ -38,6 +38,7 @@ type DspConfig struct {
 	Trackers           []string // tracker address list
 	DNSWalletAddrs     []string // DNS wallet ADDRESS
 	HealthCheckDNS     bool     // health check dns
+	AllowLocalNode     bool     // allow local nodes
 }
 
 func DefaultDspConfig() *DspConfig {

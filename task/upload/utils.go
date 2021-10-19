@@ -2,6 +2,7 @@ package upload
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
@@ -60,4 +61,20 @@ func getFileSizeWithBlockCount(cnt uint64) uint64 {
 		return 1
 	}
 	return size
+}
+
+func removeLocalIPNodes(list []string) []string {
+	newList := make([]string, 0)
+	for _, item := range list {
+		isLocalIP := strings.Contains(item, "127.0.0.1") ||
+			strings.Contains(item, "localhost") ||
+			strings.Contains(item, "192.168.") ||
+			strings.Contains(item, "172.23..") ||
+			strings.Contains(item, "10.0.")
+		if isLocalIP {
+			continue
+		}
+		newList = append(newList, item)
+	}
+	return newList
 }

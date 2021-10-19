@@ -362,7 +362,7 @@ func (this *TaskMgr) newUploadTaskFromDB(id string) (*upload.UploadTask, error) 
 	if (store.TaskState(info.TaskState) == store.TaskStatePause ||
 		store.TaskState(info.TaskState) == store.TaskStateDoing) &&
 		info.UpdatedAt+consts.DOWNLOAD_FILE_TIMEOUT*1000 < uTime.GetMilliSecTimestamp() {
-		log.Warnf("get upload task from db, task: %s is expired, type: %d, updatedAt: %d", id, info.Type, info.UpdatedAt)
+		log.Warnf("get upload task from db, task: %s is expired, type: %d, task state %v updatedAt: %d", id, info.Type, info.TaskState, info.UpdatedAt)
 	}
 
 	state := store.TaskState(info.TaskState)

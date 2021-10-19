@@ -554,6 +554,9 @@ func (this *UploadTask) findReceivers(primaryNodes []chainCom.Address) ([]chainC
 		if err != nil {
 			return nil, err
 		}
+		if !this.Mgr.Config().AllowLocalNode {
+			nodeList = removeLocalIPNodes(nodeList)
+		}
 	}
 	msg := message.NewFileMsg(this.GetFileHash(), netCom.FILE_OP_FETCH_ASK,
 		message.WithSessionId(this.GetId()), // use task id as session id to remote peers
