@@ -311,10 +311,10 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 // DeleteFile. delete file, unpin root block if needed
 // If a block is referenced to other file, ignore it.
 func (this *Fs) DeleteFile(fileHashStr, filePath string) error {
-	if this.fs.IsFileStore() && this.fsType == consts.FS_FILESTORE && len(filePath) > 0 {
+	if len(filePath) > 0 {
 		err := os.Remove(filePath)
 		if err != nil {
-			return err
+			log.Errorf("delete local file %s err %s", filePath, err)
 		}
 	}
 	err := this.fs.DeleteFile(fileHashStr)

@@ -164,6 +164,7 @@ func (this *DownloadTask) Cancel() error {
 	}
 
 	fileHashStr := this.GetFileHash()
+	log.Debugf("cancel download task %v", fileHashStr)
 	// TODO: broadcast download cancel msg, need optimize
 	wg := sync.WaitGroup{}
 	for walletAddr, session := range sessions {
