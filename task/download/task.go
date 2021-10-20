@@ -132,6 +132,9 @@ func (this *DownloadTask) PayOnLayer1() bool {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.GetTaskInfo()
+	if info == nil {
+		return false
+	}
 	return info.PayOnL1
 }
 
