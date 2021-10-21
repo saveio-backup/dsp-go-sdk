@@ -111,6 +111,7 @@ func (this *TaskMgr) Config() *config.DspConfig {
 
 func (this *TaskMgr) SetFileDB(d *store.LevelDBStore) {
 	this.db = store.NewTaskDB(d)
+	this.shareRecordDB = store.NewShareRecordDB(d)
 }
 
 func (this *TaskMgr) IsClient() bool {
