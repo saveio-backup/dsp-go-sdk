@@ -90,15 +90,16 @@ func (this *DownloadTask) Pause() error {
 
 func (this *DownloadTask) Resume() error {
 	if err := this.Task.Resume(); err != nil {
+		log.Errorf("resume download task err %s", err)
 		return err
 	}
 	this.EmitProgress(types.TaskDoing)
 
 	if len(this.GetFileHash()) == 0 {
 		sdkErr := sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, "filehash not found %s", this.GetId())
+		log.Errorf("resume download task err empty file hash")
 		return sdkErr
 	}
-	log.Debugf("resume download file %s", this.GetId())
 	opt := &types.DownloadOption{
 		FileName:    this.GetFileName(),
 		FileOwner:   this.GetFileOwner(),

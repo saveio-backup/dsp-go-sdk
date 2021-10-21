@@ -374,6 +374,9 @@ func (this *Task) Pause() error {
 		return fmt.Errorf("pause error task not found")
 	}
 	state := info.TaskState
+	if state == store.TaskStateDone {
+		return fmt.Errorf("task %s can't pause, it's done", info.Id)
+	}
 	if state != store.TaskStatePrepare && state != store.TaskStatePause && state != store.TaskStateDoing {
 		return fmt.Errorf("task %s can't pause with state %v", info.Id, state)
 	}
