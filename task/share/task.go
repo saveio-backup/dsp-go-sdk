@@ -53,5 +53,8 @@ func (this *ShareTask) GetReferId() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.GetTaskInfo()
+	if info == nil {
+		return ""
+	}
 	return info.ReferId
 }

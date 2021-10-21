@@ -107,7 +107,7 @@ func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *typ
 			fileHashStr, taskId, err)
 	}
 
-	log.Debugf("task %s is new task %t", taskId, newTask)
+	log.Debugf("downloadFile %s, url %s task %s is new task %t", fileHashStr, opt.Url, taskId, newTask)
 
 	if len(fileHashStr) == 0 {
 		log.Errorf("taskId %s no filehash for download", taskId)
