@@ -1,11 +1,11 @@
 package channel
 
 import (
+	"errors"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
-	"errors"
 
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/consts"
@@ -624,4 +624,13 @@ func (this *Channel) healthCheck(targetAddress string) error {
 	}
 	client.P2PAppendAddrForHealthCheck(targetAddress, client.P2PNetTypeChannel)
 	return nil
+}
+
+func (c *Channel) GetFee(cid pylonsCom.ChannelID) (uint64, error) {
+	fee, err := ch_actor.GetFee(cid)
+	if err != nil {
+		log.Errorf("GetFee err %v", err)
+		return 0, err
+	}
+	return fee, nil
 }
