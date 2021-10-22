@@ -493,6 +493,9 @@ func (this *DownloadTask) GetFullFilePath() string {
 	this.Lock.RLock()
 	defer this.Lock.RUnlock()
 	info := this.GetTaskInfo()
+	if info == nil {
+		return ""
+	}
 	filePath := info.FilePath
 	if len(filePath) != 0 {
 		return filePath
