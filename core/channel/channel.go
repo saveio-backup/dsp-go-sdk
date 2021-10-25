@@ -634,3 +634,13 @@ func (c *Channel) GetFee(cid pylonsCom.ChannelID) (uint64, error) {
 	}
 	return fee, nil
 }
+
+
+func (c *Channel) SetFee(cid pylonsCom.ChannelID, wa chainCom.Address, flat common.FeeAmount) error {
+	err := ch_actor.SetFee(cid, pylonsCom.Address(wa), flat)
+	if err != nil {
+		log.Errorf("SetFee err %v", err)
+		return err
+	}
+	return nil
+}
