@@ -110,6 +110,27 @@ func (this *Channel) StartService() error {
 	log.Debugf("starting pylons service")
 	err = ch_actor.StartPylons()
 	log.Debugf("start pylons done")
+	go func() {
+		log.Debugf("starting get fee schedule")
+		channels, err2 := ch_actor.GetAllChannels()
+		if err2 != nil {
+			log.Errorf("get fee schedule error because get all channel error: %s", err2)
+			return
+		}
+		for _, v := range channels.Channels {
+			cid := pylonsCom.ChannelID(v.ChannelId)
+			fee, err2 := ch_actor.GetFee(cid, true)
+			if err2 != nil {
+				log.Errorf("get fee schedule error: %s", err2)
+				continue
+			}
+			err2 = ch_actor.SetFee(cid, pylonsCom.FeeAmount(fee), false)
+			if err2 != nil {
+				log.Errorf("set fee schedule error: %s", err2)
+			}
+		}
+		log.Debugf("get fee schedule done")
+	}()
 	this.state.Set(state.ModuleStateStarted)
 	if err != nil {
 		this.state.Set(state.ModuleStateError)
@@ -627,7 +648,7 @@ func (this *Channel) healthCheck(targetAddress string) error {
 }
 
 func (c *Channel) GetFee(cid pylonsCom.ChannelID) (uint64, error) {
-	fee, err := ch_actor.GetFee(cid)
+	fee, err := ch_actor.GetFee(cid, false)
 	if err != nil {
 		log.Errorf("GetFee err %v", err)
 		return 0, err
@@ -637,7 +658,7 @@ func (c *Channel) GetFee(cid pylonsCom.ChannelID) (uint64, error) {
 
 
 func (c *Channel) SetFee(cid pylonsCom.ChannelID, flat common.FeeAmount) error {
-	err := ch_actor.SetFee(cid, flat)
+	err := ch_actor.SetFee(cid, flat, true)
 	if err != nil {
 		log.Errorf("SetFee err %v", err)
 		return err
