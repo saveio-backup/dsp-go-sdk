@@ -274,6 +274,7 @@ type PocTaskInfo struct {
 	TaskState    store.TaskState
 	PlotInfo     *savefs.PlotInfo
 	ProveTimes   uint64
+	EstimateTime uint64
 }
 
 type AllPocTaskResp struct {

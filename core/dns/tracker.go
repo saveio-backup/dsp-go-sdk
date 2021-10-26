@@ -59,6 +59,7 @@ func (d *DNS) GetTrackerList() []string {
 // return: ["tcp://127.0.0.1:1234"]
 func (d *DNS) GetPeerFromTracker(hash string) []string {
 	selfAddr := client.P2PGetPublicAddr()
+	log.Infof("selfAddr %v, hash %v", selfAddr, hash)
 	protocol := selfAddr[:strings.Index(selfAddr, "://")]
 
 	request := func(trackerUrl string, resp chan *trackerResp) {

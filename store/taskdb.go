@@ -1281,6 +1281,9 @@ func (this *TaskDB) UndoneList(ft TaskType) ([]string, error) {
 	case TaskTypeShare:
 		return nil, nil
 	}
+	if this.db == nil {
+		return nil, nil
+	}
 	data, err := this.db.Get([]byte(undoneKey))
 	if err != nil && err != leveldb.ErrNotFound {
 		return nil, err

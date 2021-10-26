@@ -8,8 +8,9 @@ import (
 )
 
 type GenearatePdpProgress struct {
-	Total     int
-	Generated int
+	Total        int
+	Generated    int
+	EstimateTime int
 }
 
 func (this *UploadTask) GeneratePdpTags(hashes []string, fileID pdp.FileID, notify chan GenearatePdpProgress) ([]pdp.Tag, error) {

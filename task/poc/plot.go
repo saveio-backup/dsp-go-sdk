@@ -155,9 +155,18 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 	fileID := upload.GetFileIDFromFileHash(fileHash)
 	generateProgressCh := make(chan upload.GenearatePdpProgress)
 	go func() {
+		lastProgress := 0
+		lastDate := time.Now()
 		for {
 			progress := <-generateProgressCh
-			log.Debugf("generate progress %v", progress)
+			sec := time.Now().Unix() - lastDate.Unix()
+			if sec > 0 {
+				progress.EstimateTime = int(sec) * progress.Total / progress.Generated
+			} else {
+				progress.EstimateTime = 0
+			}
+			lastDate = time.Now()
+			log.Debugf("generate progress %v, lastProgress %v, lasteDate %v", progress, lastProgress, lastDate)
 			p.SetGenerateProgress(progress)
 			if p.AllTagGenerated() {
 				log.Debugf("progress return")

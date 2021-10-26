@@ -218,6 +218,9 @@ func (this *TaskMgr) HasRunningDownloadTask() bool {
 func (this *TaskMgr) RecoverUndoneDownloadTask() error {
 	this.downloadTaskLock.Lock()
 	defer this.downloadTaskLock.Unlock()
+	if this.db == nil {
+		return nil
+	}
 	downloadTaskIds, err := this.db.UndoneList(store.TaskTypeDownload)
 	if err != nil {
 		return err

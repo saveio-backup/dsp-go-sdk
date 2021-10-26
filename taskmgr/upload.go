@@ -276,6 +276,9 @@ func (this *TaskMgr) GetUploadTasksToRetry() []string {
 func (this *TaskMgr) RecoverUndoneUploadTask() error {
 	this.uploadTaskLock.Lock()
 	defer this.uploadTaskLock.Unlock()
+	if this.db == nil {
+		return nil
+	}
 	taskIds, err := this.db.UndoneList(store.TaskTypeUpload)
 	if err != nil {
 		return err
