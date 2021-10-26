@@ -273,6 +273,9 @@ func (this *UploadTask) Pause() error {
 	if err := this.Task.Pause(); err != nil {
 		return err
 	}
+	// wait for all routine exit
+
+	// emit new progress state
 	this.EmitProgress(types.TaskPause)
 	return nil
 }

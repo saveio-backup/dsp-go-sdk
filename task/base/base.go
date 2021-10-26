@@ -398,7 +398,7 @@ func (this *Task) Resume() error {
 		state != store.TaskStateDoing && state != store.TaskStateIdle {
 		return fmt.Errorf("task %s can't resume with state %v", info.Id, state)
 	}
-	if state == store.TaskStatePause {
+	if state == store.TaskStatePause || state == store.TaskStateIdle {
 		return this.setTaskState(store.TaskStateDoing)
 	}
 	return fmt.Errorf("task %s can't resume with unknown state %v", info.Id, state)

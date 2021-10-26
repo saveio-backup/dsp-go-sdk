@@ -61,6 +61,10 @@ func (this *Dsp) PauseUpload(taskId string) error {
 	if uploadTask == nil {
 		return sdkErr.New(sdkErr.GET_FILEINFO_FROM_DB_ERROR, "task %s not found", taskId)
 	}
+	if uploadTask.IsTaskPaused() {
+		log.Debugf("upload task %s already paused", taskId)
+		return nil
+	}
 	if err := uploadTask.Pause(); err != nil {
 		return sdkErr.NewWithError(sdkErr.TASK_PAUSE_ERROR, err)
 	}
