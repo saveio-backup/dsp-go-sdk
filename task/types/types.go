@@ -41,7 +41,7 @@ type DeleteFileStatus struct {
 type DeleteUploadFileResp struct {
 	Tx       string
 	FileHash string
-	FileName string
+	FileName string `json:"FileName,omitempty"`
 }
 
 type DownloadOption struct {

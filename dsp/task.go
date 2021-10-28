@@ -81,6 +81,10 @@ func (this *Dsp) GetUploadTaskInfoByHash(fileHashStr string) *store.TaskInfo {
 	return this.TaskMgr.GetUploadTaskByFileHash(fileHashStr)
 }
 
+func (this *Dsp) GetPlotTaskByFileHash(fileHashStr string) *store.TaskInfo {
+	return this.TaskMgr.GetPlotTaskByFileHash(fileHashStr)
+}
+
 func (this *Dsp) GetTaskFileName(id string) string {
 	return this.TaskMgr.GetTaskFileName(id)
 }
@@ -108,6 +112,14 @@ func (this *Dsp) GetUrlOfUploadedfile(fileHashStr string) string {
 		return ""
 	}
 	return tsk.Url
+}
+
+func (this *Dsp) GetPlotTaskId(fileHashStr string) string {
+	tsk := this.GetPlotTaskByFileHash(fileHashStr)
+	if tsk == nil {
+		return ""
+	}
+	return tsk.Id
 }
 
 func (this *Dsp) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,

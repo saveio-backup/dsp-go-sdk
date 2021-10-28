@@ -49,3 +49,7 @@ func (this *Dsp) GetAllProvedPlotFile() (*types.AllPlotsFileResp, error) {
 func (this *Dsp) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 	return this.TaskMgr.GetAllPocTasks()
 }
+
+func (this *Dsp) DeletePocTask(taskId string) error {
+	return this.TaskMgr.CleanPocTask(taskId)
+}

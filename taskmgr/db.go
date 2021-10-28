@@ -87,6 +87,17 @@ func (this *TaskMgr) GetShareTaskInfoByFileHash(fileHash string) *store.TaskInfo
 	return task
 }
 
+func (this *TaskMgr) GetPlotTaskByFileHash(fileHashStr string) *store.TaskInfo {
+	fields := make(map[string]string)
+	fields[store.TaskInfoFieldFileHash] = fileHashStr
+	task := this.db.GetPoCTaskByFields(fields)
+	if task == nil {
+		log.Errorf("get nil poc task by fields %v", fields)
+		return nil
+	}
+	return task
+}
+
 func (this *TaskMgr) GetTaskFileName(id string) string {
 	info, _ := this.db.GetTaskInfo(id)
 	if info == nil {

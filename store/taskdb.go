@@ -518,6 +518,10 @@ func (this *TaskDB) GetPoCTaskByFields(fields map[string]string) *TaskInfo {
 			return info
 		}
 
+		if fileHash, ok := fields[TaskInfoFieldFileHash]; ok && info.FileHash == fileHash {
+			return info
+		}
+
 	}
 	return nil
 }

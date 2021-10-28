@@ -164,6 +164,19 @@ func (this *TaskMgr) DeleteDispatchTask(taskId string) {
 	delete(this.retryDispatchTaskTs, taskId)
 }
 
+// CleanPocTask. clean task from memory and DB
+func (this *TaskMgr) CleanPocTask(taskId string) error {
+	this.pocTaskLock.Lock()
+	defer this.pocTaskLock.Unlock()
+	delete(this.pocTasks, taskId)
+	log.Debugf("clean poc task %s", taskId)
+	err := this.db.DeleteTaskInfo(taskId)
+	if err != nil {
+		return sdkErr.NewWithError(sdkErr.SET_FILEINFO_DB_ERROR, err)
+	}
+	return nil
+}
+
 // EmitDispatchResult. emit result or error async
 func (this *TaskMgr) EmitDispatchResult(taskId string, result interface{}, sdkErr *sdkErr.Error) {
 	tsk := this.GetDispatchTask(taskId)

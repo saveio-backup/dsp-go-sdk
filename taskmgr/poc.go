@@ -259,6 +259,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 
 		pocTaskInfo.FileOwner = fileInfo.FileOwner.ToBase58()
 		pocTaskInfo.PlotInfo = fileInfo.PlotInfo
+		pocTaskInfo.PDPState = state
 
 		pocTaskInfo.ProveTimes = uint64(proveTimes)
 		resp.TotalProvedSize += fileSize
