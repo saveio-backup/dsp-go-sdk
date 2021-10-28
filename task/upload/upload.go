@@ -403,6 +403,7 @@ func (this *UploadTask) Resume() error {
 	log.Debugf("resume upload task %s file %s", taskId, fileHashStr)
 	go func() {
 		uploadResult, err := this.Start(false, taskId, this.GetFilePath(), opt)
+		log.Debugf("resume upload task %s file %s, result %s, err %v", taskId, fileHashStr, uploadResult, err)
 		var serr *sdkErr.Error
 		if err != nil {
 			serr, _ = err.(*sdkErr.Error)
@@ -413,6 +414,8 @@ func (this *UploadTask) Resume() error {
 			if serr == nil {
 				this.Mgr.DeleteUploadTask(taskId)
 			}
+		} else {
+			this.Mgr.EmitUploadResult(taskId, uploadResult, serr)
 		}
 	}()
 	return nil

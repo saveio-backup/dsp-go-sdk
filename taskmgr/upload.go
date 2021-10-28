@@ -265,6 +265,7 @@ func (this *TaskMgr) GetUploadTasksToRetry() []string {
 			continue
 		}
 		if !tsk.NeedRetry() {
+			log.Debugf("task %s not need to retry", tsk.GetId())
 			continue
 		}
 		taskIds = append(taskIds, l.Key)
