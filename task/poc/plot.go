@@ -155,17 +155,23 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 	fileID := upload.GetFileIDFromFileHash(fileHash)
 	generateProgressCh := make(chan upload.GenearatePdpProgress)
 	go func() {
-		lastDate := time.Now()
+		lastDate := GetMilliSecTimestamp()
 		for {
 			progress := <-generateProgressCh
-			sec := time.Now().Unix() - lastDate.Unix()
+			nowTs := GetMilliSecTimestamp()
+			sec := nowTs - lastDate
 			if sec > 0 {
-				progress.EstimateTime = int(sec) * progress.Total / progress.Generated
+				estimateTimeNow := (int(sec) * progress.Total / progress.Generated) / 1000
+				if estimateTimeNow != 0 {
+					progress.EstimateTime = estimateTimeNow
+				} else {
+					progress.EstimateTime = progress.EstimateTime * 99 / 100
+				}
 			} else {
 				progress.EstimateTime = 0
 			}
 			log.Debugf("generate progress total %v, generated %v, second %v, EstimateTime %v", progress.Total, progress.Generated, sec, progress.EstimateTime)
-			lastDate = time.Now()
+			lastDate = nowTs
 
 			p.SetGenerateProgress(progress)
 			if p.AllTagGenerated() {
@@ -317,4 +323,8 @@ func (p *PocTask) isPocSectorEnough(fileSize uint64) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func GetMilliSecTimestamp() uint64 {
+	return uint64(time.Now().UnixNano() / int64(time.Millisecond))
 }
