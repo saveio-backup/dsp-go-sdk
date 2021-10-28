@@ -282,6 +282,8 @@ github.com/saveio/carrier v0.0.0-20210802055929-7567cc29dfc9 h1:bT5OUZMuUUMjdASe
 github.com/saveio/carrier v0.0.0-20210802055929-7567cc29dfc9/go.mod h1:WYJwrtHg7IVSdcxa/TZfWWw23Pi4WOJltq9LfMGqbdY=
 github.com/saveio/max v0.0.0-20210825101853-a279f7982519 h1:XKmcNmzn2W/R2B/apX7CTh1LHkbTX0XngMARTeWNMCk=
 github.com/saveio/max v0.0.0-20210825101853-a279f7982519/go.mod h1:1HEI4jFeGTYIF2+od+7ohxvDTrl7Q23HExqsMCmYW1w=
+github.com/saveio/max v0.0.0-20211028065147-9634b553b277 h1:LUQSVWR50LGt3SFp1DduE1MNRO2oImVhCyau3dIURRc=
+github.com/saveio/max v0.0.0-20211028065147-9634b553b277/go.mod h1:1HEI4jFeGTYIF2+od+7ohxvDTrl7Q23HExqsMCmYW1w=
 github.com/saveio/pylons v0.0.0-20210802062637-12c41e6d9ba7 h1:nYVW9f7NDLVIeI4KgNG9+INu7gjHAau55N9NlXzZVao=
 github.com/saveio/pylons v0.0.0-20210802062637-12c41e6d9ba7/go.mod h1:BP0wKW0/ge8AtwQH8Ceh6Tc03o5EpFG/AYcfsHAlhn8=
 github.com/saveio/themis-go-sdk v0.0.0-20210802052239-10a9844e20d5 h1:rXP+YSZ/qyGH3YlAGl3BvT7AjMiRNSyY1NsIR4em3ak=

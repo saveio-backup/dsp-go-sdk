@@ -225,10 +225,11 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 			continue
 		}
 
-		state = types.PocTaskPDPStateSubmitted
 		progressF = 1
+		state = types.PocTaskPDPStatePdpProving
 		proveDetails, _ := this.chain.GetFileProveDetails(info.FileHash)
 		if proveDetails == nil {
+			pocTaskInfo.PDPState = state
 			resp.PocTaskInfos = append(resp.PocTaskInfos, pocTaskInfo)
 			totalNum++
 			continue
@@ -249,7 +250,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 			totalNum++
 			continue
 		}
-
+		state = types.PocTaskPDPStateSubmitted
 		fileInfo, _ := this.chain.GetFileInfo(info.FileHash)
 		if fileInfo == nil {
 			resp.PocTaskInfos = append(resp.PocTaskInfos, pocTaskInfo)

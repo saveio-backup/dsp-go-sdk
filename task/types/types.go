@@ -258,6 +258,7 @@ const (
 	PocTaskPDPStateNonce = iota
 	PocTaskPDPStateGeneratingPdp
 	PocTaskPDPStatePdpSaved
+	PocTaskPDPStatePdpProving
 	PocTaskPDPStateSubmitted
 )
 
