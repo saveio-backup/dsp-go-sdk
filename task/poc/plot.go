@@ -165,8 +165,9 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 			} else {
 				progress.EstimateTime = 0
 			}
+			log.Debugf("generate progress total %v, generated %v, second %v, EstimateTime %v", progress.Total, progress.Generated, sec, progress.EstimateTime)
 			lastDate = time.Now()
-			log.Debugf("generate progress %v, lastProgress %v, lasteDate %v", progress, lastProgress, lastDate)
+
 			p.SetGenerateProgress(progress)
 			if p.AllTagGenerated() {
 				log.Debugf("progress return")
