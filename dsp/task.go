@@ -122,6 +122,14 @@ func (this *Dsp) GetPlotTaskId(fileHashStr string) string {
 	return tsk.Id
 }
 
+func (this *Dsp) GetPlotTaskFileName(fileHashStr string) string {
+	tsk := this.GetPlotTaskByFileHash(fileHashStr)
+	if tsk == nil {
+		return ""
+	}
+	return tsk.FileName
+}
+
 func (this *Dsp) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,
 	ft store.TaskType, complete, reverse, includeFailed, ignoreHide bool) []string {
 	if this == nil || this.TaskMgr == nil {
