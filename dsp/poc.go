@@ -1,7 +1,7 @@
 package dsp
 
 import (
-	"path"
+	"path/filepath"
 
 	"github.com/saveio/dsp-go-sdk/task/poc"
 	"github.com/saveio/dsp-go-sdk/task/types"
@@ -30,7 +30,7 @@ func (this *Dsp) GenPlotPDPData(taskId string, plotCfg *poc.PlotConfig) error {
 func (this *Dsp) AddNewPlotFile(taskId string, createSector bool, plotCfg *poc.PlotConfig) (*types.AddPlotFileResp, error) {
 	if len(taskId) == 0 {
 		fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
-		fileName = path.Join(plotCfg.Path, fileName)
+		fileName = filepath.Join(plotCfg.Path, fileName)
 		tId, err := this.TaskMgr.GetPocTaskIdByFileName(fileName)
 		if err != nil {
 			return nil, err

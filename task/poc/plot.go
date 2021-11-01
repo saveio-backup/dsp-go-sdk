@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -24,7 +24,7 @@ var (
 
 func (p *PocTask) CreateSectorForPlot(plotCfg *PlotConfig) (string, string, error) {
 	fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
-	fileName = path.Join(plotCfg.Path, fileName)
+	fileName = filepath.Join(plotCfg.Path, fileName)
 	log.Infof("add plot file %s", fileName)
 
 	fileStat, err := os.Stat(fileName)
@@ -108,7 +108,7 @@ func (p *PocTask) CreateSectorForPlot(plotCfg *PlotConfig) (string, string, erro
 func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 
 	fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
-	fileName = path.Join(plotCfg.Path, fileName)
+	fileName = filepath.Join(plotCfg.Path, fileName)
 	log.Infof("GenPlotData add plot file %s", fileName)
 
 	_, err := os.Stat(fileName)
@@ -210,7 +210,7 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 
 	fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
-	fileName = path.Join(plotCfg.Path, fileName)
+	fileName = filepath.Join(plotCfg.Path, fileName)
 	log.Infof("AddPlotFile add plot file %s %s", fileName, p.GetFileName())
 	if fileName != p.GetFileName() {
 		return fmt.Errorf("poc task %v has different fileName %s expect %v", p.GetId(), fileName, p.GetFileName())
