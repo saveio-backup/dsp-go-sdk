@@ -698,8 +698,8 @@ func (this *DownloadTask) workBackground() {
 				close(doneNotify)
 				break
 			}
-			if this.State() == store.TaskStatePause || this.State() == store.TaskStateFailed || this.State() == store.TaskStateCancel {
-				log.Debugf("task job break because task is pause, failed or cancel")
+			if this.State() == store.TaskStatePause || this.State() == store.TaskStateFailed || this.State() == store.TaskStateNone {
+				log.Debugf("task job break because task is pause, failed or none")
 				close(jobCh)
 				break
 			}
