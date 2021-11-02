@@ -159,20 +159,19 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 		for {
 			progress := <-generateProgressCh
 			nowTs := GetMilliSecTimestamp()
-			sec := nowTs - lastDate
-			if sec > 0 {
-				estimateTimeNow := (int(sec) * progress.Total / progress.Generated) / 1000
-				if estimateTimeNow != 0 {
-					progress.EstimateTime = estimateTimeNow
-				} else {
-					progress.EstimateTime = progress.EstimateTime * 99 / 100
+			spent := nowTs - lastDate
+			if spent > 0 {
+				estimateSpent := int(spent) * progress.Total / progress.Generated
+				if estimateSpent > spent && (estimateSpent-spent > 1000) {
+					progress.EstimateTime = (estimateSpent - spent) / 1000
 				}
 			} else {
 				progress.EstimateTime = 0
 			}
-			log.Debugf("generate progress total %v, generated %v, second %v, EstimateTime %v", progress.Total, progress.Generated, sec, progress.EstimateTime)
-			lastDate = nowTs
-
+			if progress.Total == progress.Generated {
+				progress.EstimateTime = 0
+			}
+			log.Debugf("generate progress total %v, generated %v, second %v, EstimateTime %v", progress.Total, progress.Generated, spent, progress.EstimateTime)
 			p.SetGenerateProgress(progress)
 			if p.AllTagGenerated() {
 				log.Debugf("progress return")
