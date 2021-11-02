@@ -161,9 +161,9 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 			nowTs := GetMilliSecTimestamp()
 			spent := nowTs - lastDate
 			if spent > 0 {
-				estimateSpent := int(spent) * progress.Total / progress.Generated
+				estimateSpent := uint64(int(spent) * progress.Total / progress.Generated)
 				if estimateSpent > spent && (estimateSpent-spent > 1000) {
-					progress.EstimateTime = (estimateSpent - spent) / 1000
+					progress.EstimateTime = int((estimateSpent - spent) / 1000)
 				}
 			} else {
 				progress.EstimateTime = 0
