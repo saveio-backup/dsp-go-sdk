@@ -112,22 +112,13 @@ func (this *Channel) StartService() error {
 	log.Debugf("start pylons done")
 	go func() {
 		log.Debugf("starting get fee schedule")
-		channels, err2 := ch_actor.GetAllChannels()
+		fee, err2 := ch_actor.GetFee(true)
 		if err2 != nil {
-			log.Errorf("get fee schedule error because get all channel error: %s", err2)
-			return
+			log.Errorf("get fee schedule error: %s", err2)
 		}
-		for _, v := range channels.Channels {
-			cid := pylonsCom.ChannelID(v.ChannelId)
-			fee, err2 := ch_actor.GetFee(cid, true)
-			if err2 != nil {
-				log.Errorf("get fee schedule error: %s", err2)
-				continue
-			}
-			err2 = ch_actor.SetFee(cid, pylonsCom.FeeAmount(fee), false)
-			if err2 != nil {
-				log.Errorf("set fee schedule error: %s", err2)
-			}
+		err2 = ch_actor.SetFee(pylonsCom.FeeAmount(fee), false)
+		if err2 != nil {
+			log.Errorf("set fee schedule error: %s", err2)
 		}
 		log.Debugf("get fee schedule done")
 	}()
@@ -647,8 +638,8 @@ func (this *Channel) healthCheck(targetAddress string) error {
 	return nil
 }
 
-func (c *Channel) GetFee(cid pylonsCom.ChannelID) (uint64, error) {
-	fee, err := ch_actor.GetFee(cid, false)
+func (c *Channel) GetFee() (uint64, error) {
+	fee, err := ch_actor.GetFee(false)
 	if err != nil {
 		log.Errorf("GetFee err %v", err)
 		return 0, err
@@ -657,8 +648,8 @@ func (c *Channel) GetFee(cid pylonsCom.ChannelID) (uint64, error) {
 }
 
 
-func (c *Channel) SetFee(cid pylonsCom.ChannelID, flat common.FeeAmount) error {
-	err := ch_actor.SetFee(cid, flat, true)
+func (c *Channel) SetFee(flat common.FeeAmount) error {
+	err := ch_actor.SetFee(flat, true)
 	if err != nil {
 		log.Errorf("SetFee err %v", err)
 		return err
