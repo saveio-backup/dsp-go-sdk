@@ -3,6 +3,7 @@ package poc
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -104,15 +105,27 @@ func (p *PocTask) CreateSectorForPlot(plotCfg *PlotConfig) (string, string, erro
 	return registerTx, sectorTx, nil
 }
 
+func (p *PocTask) mockPlotFile(fileName string) error {
+	baseName := filepath.Base(fileName)
+	readPath := filepath.Join("./plots/", baseName)
+	data, err := ioutil.ReadFile(readPath)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(fileName, data, 0666)
+}
+
 // GenPlotData. Sharding file and get all blocks. Generate PDP tags and save to local storage.
 func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 
 	fileName := tskUtils.GetPlotFileName(plotCfg.Nonces, plotCfg.StartNonce, plotCfg.NumericID)
 	fileName = filepath.Join(plotCfg.Path, fileName)
 	log.Infof("GenPlotData add plot file %s", fileName)
+	// p.mockPlotFile(fileName)
 
 	_, err := os.Stat(fileName)
 	if err != nil {
+		log.Errorf("GenPlotData file %s, err %s", fileName, err)
 		return err
 	}
 

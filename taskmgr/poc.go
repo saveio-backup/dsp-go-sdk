@@ -56,7 +56,6 @@ func (this *TaskMgr) GenPlotPDPData(taskId string, plotCfg *poc.PlotConfig) erro
 		tsk.SetResult("", sdkErr.POC_TASK_ERROR, err.Error())
 		return err
 	}
-	tsk.SetResult(tsk.GetId(), sdkErr.SUCCESS, "")
 	return err
 }
 
@@ -73,6 +72,7 @@ func (this *TaskMgr) GetPocTaskIdByFileName(fileName string) (string, error) {
 func (this *TaskMgr) AddPlotFile(taskId string, createSector bool, plotCfg *poc.PlotConfig) (*types.AddPlotFileResp, error) {
 
 	tsk := this.GetPocTask(taskId)
+	tsk.SetTaskState(store.TaskStateDoing)
 
 	updateNodeTxHash := ""
 	createSectorTxHash := ""
