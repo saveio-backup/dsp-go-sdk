@@ -45,17 +45,18 @@ type DeleteUploadFileResp struct {
 }
 
 type DownloadOption struct {
-	FileName    string
-	FileOwner   string
-	BlocksRoot  string
-	Asset       int32
-	InOrder     bool
-	DecryptPwd  string
-	Free        bool
-	SetFileName bool
-	MaxPeerCnt  int
-	Url         string
-	BlockNum    uint64
+	FileName     string
+	FileOwner    string
+	BlocksRoot   string
+	Asset        int32
+	InOrder      bool
+	DecryptPwd   string
+	Free         bool
+	SetFileName  bool
+	MaxPeerCnt   int
+	Url          string
+	BlockNum     uint64
+	RealFileSize uint64
 }
 
 type WorkerNetMsgPhase int

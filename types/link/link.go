@@ -43,14 +43,14 @@ func (u *URLVERSION) String() string {
 }
 
 type URLLink struct {
-	Version     string
-	FileHashStr string
-	FileName    string
-	FileOwner   string
-	FileSize    uint64
-	BlockNum    uint64
-	Trackers    []string
-	BlocksRoot  string
+	Version     string   // url link version
+	FileHashStr string   // file hash string
+	FileName    string   // file name
+	FileOwner   string   // file owner base58 address
+	FileSize    uint64   // real file size (KiB)
+	BlockNum    uint64   // file sharding block count
+	Trackers    []string // trackers' url array
+	BlocksRoot  string   // block hash merkle root
 }
 
 // String. JSON string format. e.g: {"Version":"","FileHashStr":"123","FileName":"456",

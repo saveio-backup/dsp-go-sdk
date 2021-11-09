@@ -102,6 +102,7 @@ func (this *Dsp) DownloadFile(newTask bool, taskId, fileHashStr string, opt *typ
 	}
 	if err := downloadTask.SetInfoWithOptions(
 		base.FileHash(fileHashStr),
+		base.RealFileSize(opt.RealFileSize),
 	); err != nil {
 		return sdkErr.New(sdkErr.INTERNAL_ERROR, "set file hash %s for task %s err %s",
 			fileHashStr, taskId, err)
@@ -185,16 +186,17 @@ func (this *Dsp) DownloadFileByLink(id, linkStr string, asset int32, inOrder boo
 		maxPeerCnt = consts.MAX_PEERCNT_FOR_DOWNLOAD
 	}
 	opt := &types.DownloadOption{
-		FileName:    link.FileName,
-		FileOwner:   link.FileOwner,
-		BlocksRoot:  link.BlocksRoot,
-		Asset:       asset,
-		InOrder:     inOrder,
-		DecryptPwd:  decryptPwd,
-		Free:        free,
-		SetFileName: setFileName,
-		MaxPeerCnt:  maxPeerCnt,
-		BlockNum:    link.BlockNum,
+		FileName:     link.FileName,
+		FileOwner:    link.FileOwner,
+		BlocksRoot:   link.BlocksRoot,
+		Asset:        asset,
+		InOrder:      inOrder,
+		DecryptPwd:   decryptPwd,
+		Free:         free,
+		SetFileName:  setFileName,
+		MaxPeerCnt:   maxPeerCnt,
+		BlockNum:     link.BlockNum,
+		RealFileSize: link.FileSize,
 	}
 	return this.downloadFileWithOpt(id, link.FileHashStr, opt)
 }
@@ -212,17 +214,18 @@ func (this *Dsp) DownloadFileByUrl(id, url string, asset int32, inOrder bool, de
 	}
 
 	opt := &types.DownloadOption{
-		FileName:    link.FileName,
-		BlocksRoot:  link.BlocksRoot,
-		Asset:       asset,
-		InOrder:     inOrder,
-		DecryptPwd:  decryptPwd,
-		Free:        free,
-		SetFileName: setFileName,
-		FileOwner:   link.FileOwner,
-		MaxPeerCnt:  maxPeerCnt,
-		Url:         url,
-		BlockNum:    link.BlockNum,
+		FileName:     link.FileName,
+		BlocksRoot:   link.BlocksRoot,
+		Asset:        asset,
+		InOrder:      inOrder,
+		DecryptPwd:   decryptPwd,
+		Free:         free,
+		SetFileName:  setFileName,
+		FileOwner:    link.FileOwner,
+		MaxPeerCnt:   maxPeerCnt,
+		Url:          url,
+		BlockNum:     link.BlockNum,
+		RealFileSize: link.FileSize,
 	}
 	return this.downloadFileWithOpt(id, fileHashStr, opt)
 }
@@ -233,27 +236,29 @@ func (this *Dsp) DownloadFileByHash(id, fileHashStr string, asset int32, inOrder
 	// TODO: get file name, fix url
 	info, _ := this.Chain.GetFileInfo(fileHashStr)
 	var fileName, fileOwner, blocksRoot string
-	var blockNum uint64
+	var blockNum, realFileSize uint64
 	if info != nil {
 		fileName = string(info.FileDesc)
 		fileOwner = info.FileOwner.ToBase58()
 		blocksRoot = string(info.BlocksRoot)
 		blockNum = info.FileBlockNum
+		realFileSize = info.RealFileSize
 	}
 	if maxPeerCnt > consts.MAX_PEERCNT_FOR_DOWNLOAD {
 		maxPeerCnt = consts.MAX_PEERCNT_FOR_DOWNLOAD
 	}
 	opt := &types.DownloadOption{
-		FileName:    fileName,
-		Asset:       asset,
-		InOrder:     inOrder,
-		BlocksRoot:  blocksRoot,
-		DecryptPwd:  decryptPwd,
-		Free:        free,
-		SetFileName: setFileName,
-		FileOwner:   fileOwner,
-		MaxPeerCnt:  maxPeerCnt,
-		BlockNum:    blockNum,
+		FileName:     fileName,
+		Asset:        asset,
+		InOrder:      inOrder,
+		BlocksRoot:   blocksRoot,
+		DecryptPwd:   decryptPwd,
+		Free:         free,
+		SetFileName:  setFileName,
+		FileOwner:    fileOwner,
+		MaxPeerCnt:   maxPeerCnt,
+		BlockNum:     blockNum,
+		RealFileSize: realFileSize,
 	}
 	return this.downloadFileWithOpt(id, fileHashStr, opt)
 }
