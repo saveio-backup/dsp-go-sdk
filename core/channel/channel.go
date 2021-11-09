@@ -647,7 +647,6 @@ func (c *Channel) GetFee() (uint64, error) {
 	return fee, nil
 }
 
-
 func (c *Channel) SetFee(flat common.FeeAmount) error {
 	err := ch_actor.SetFee(flat, true)
 	if err != nil {

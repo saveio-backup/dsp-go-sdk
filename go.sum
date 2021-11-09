@@ -302,10 +302,14 @@ github.com/saveio/pylons v0.0.0-20210802062637-12c41e6d9ba7 h1:nYVW9f7NDLVIeI4Kg
 github.com/saveio/pylons v0.0.0-20210802062637-12c41e6d9ba7/go.mod h1:BP0wKW0/ge8AtwQH8Ceh6Tc03o5EpFG/AYcfsHAlhn8=
 github.com/saveio/pylons v0.0.0-20211101063731-21f49b2a554f h1:s8alITPu3f6rBqf29/tOk9duErCzno3uIVZuyCWDBQU=
 github.com/saveio/pylons v0.0.0-20211101063731-21f49b2a554f/go.mod h1:BP0wKW0/ge8AtwQH8Ceh6Tc03o5EpFG/AYcfsHAlhn8=
+github.com/saveio/pylons v0.0.0-20211109032939-13c30c056ead h1:P9RJhjeXl+N3IGomaAqy1QloeO+cpNl4RFl261l36UE=
+github.com/saveio/pylons v0.0.0-20211109032939-13c30c056ead/go.mod h1:BP0wKW0/ge8AtwQH8Ceh6Tc03o5EpFG/AYcfsHAlhn8=
 github.com/saveio/themis-go-sdk v0.0.0-20210802052239-10a9844e20d5 h1:rXP+YSZ/qyGH3YlAGl3BvT7AjMiRNSyY1NsIR4em3ak=
 github.com/saveio/themis-go-sdk v0.0.0-20210802052239-10a9844e20d5/go.mod h1:NVIcg/hrgwL+lHnyK58Yb74Q3Nu6WNtYQJ80vxHlaW0=
 github.com/saveio/themis-go-sdk v0.0.0-20211028090828-c8f7c2674776 h1:QetYVyzyw8SGdf2Kp6cqmxGemy2pqJC8bERqx9QJ5mk=
 github.com/saveio/themis-go-sdk v0.0.0-20211028090828-c8f7c2674776/go.mod h1:NVIcg/hrgwL+lHnyK58Yb74Q3Nu6WNtYQJ80vxHlaW0=
+github.com/saveio/themis-go-sdk v0.0.0-20211105080535-6ccfe8eedbe9 h1:i8+Ce2BLUMgmh4Yat0rUAEW1nuDDadVMYbg/fWcFxPc=
+github.com/saveio/themis-go-sdk v0.0.0-20211105080535-6ccfe8eedbe9/go.mod h1:NVIcg/hrgwL+lHnyK58Yb74Q3Nu6WNtYQJ80vxHlaW0=
 github.com/scylladb/go-set v1.0.2 h1:SkvlMCKhP0wyyct6j+0IHJkBkSZL+TDzZ4E7f7BCcRE=
 github.com/scylladb/go-set v1.0.2/go.mod h1:DkpGd78rljTxKAnTDPFqXSGxvETQnJyuSOQwsHycqfs=
 github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=

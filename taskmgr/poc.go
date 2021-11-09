@@ -2,6 +2,7 @@ package taskmgr
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
@@ -178,7 +179,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 
 	totalNum := 0
 	resp := &types.AllPocTaskResp{
-		PocTaskInfos: make([]*types.PocTaskInfo, 0),
+		PocTaskInfos: make(types.PocTaskInfos, 0),
 	}
 	for _, info := range taskInfos {
 
@@ -217,6 +218,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 			PDPState:     state,
 			TaskState:    info.TaskState,
 			EstimateTime: uint64(progress.EstimateTime),
+			CreatedAt:    info.CreatedAt,
 		}
 		resp.TotalSize += fileSize
 		if len(info.StoreTx) == 0 {
@@ -269,6 +271,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 
 	}
 
+	sort.Sort(sort.Reverse(resp.PocTaskInfos))
 	resp.TotalCount = totalNum
 	return resp, nil
 }

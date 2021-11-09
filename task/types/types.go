@@ -276,11 +276,26 @@ type PocTaskInfo struct {
 	PlotInfo     *savefs.PlotInfo
 	ProveTimes   uint64
 	EstimateTime uint64
+	CreatedAt    uint64
 }
 
 type AllPocTaskResp struct {
 	TotalCount      int
 	TotalSize       uint64
 	TotalProvedSize uint64
-	PocTaskInfos    []*PocTaskInfo
+	PocTaskInfos    PocTaskInfos
+}
+
+type PocTaskInfos []*PocTaskInfo
+
+func (s PocTaskInfos) Len() int {
+	return len(s)
+}
+
+func (s PocTaskInfos) Less(i, j int) bool {
+	return s[i].CreatedAt < s[j].CreatedAt
+}
+
+func (s PocTaskInfos) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
