@@ -137,6 +137,12 @@ func StoreTxHeight(storeTxHeight uint32) InfoOption {
 	})
 }
 
+func StoreTxTime(storeTxTime uint64) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.StoreTxTime = storeTxTime
+	})
+}
+
 func WhiteListTx(whiteListTx string) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.WhitelistTx = whiteListTx

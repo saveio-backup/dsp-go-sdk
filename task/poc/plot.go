@@ -14,6 +14,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/task/base"
 	"github.com/saveio/dsp-go-sdk/task/upload"
 	tskUtils "github.com/saveio/dsp-go-sdk/utils/task"
+	uTime "github.com/saveio/dsp-go-sdk/utils/time"
 	"github.com/saveio/max/max/sector"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/smartcontract/service/native/savefs"
@@ -302,6 +303,7 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 		base.FileHash(fileHash),
 		base.StoreTx(tx),
 		base.StoreTxHeight(height),
+		base.StoreTxTime(uTime.GetMilliSecTimestamp()),
 	); err != nil {
 		return err
 	}

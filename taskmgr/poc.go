@@ -219,6 +219,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 			TaskState:    info.TaskState,
 			EstimateTime: uint64(progress.EstimateTime),
 			CreatedAt:    info.CreatedAt,
+			StoredAt:     info.StoreTxTime,
 		}
 		resp.TotalSize += fileSize
 		if len(info.StoreTx) == 0 {

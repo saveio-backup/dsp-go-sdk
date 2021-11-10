@@ -10,6 +10,7 @@ type PocTask struct {
 	plotCfg            *PlotConfig
 	createSector       bool
 	generateProgress   upload.GenearatePdpProgress
+	storeTimestamp     uint64
 }
 
 func NewPocTask(taskId string, taskType store.TaskType, db *store.TaskDB) *PocTask {

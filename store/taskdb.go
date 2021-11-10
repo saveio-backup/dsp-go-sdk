@@ -95,6 +95,7 @@ type TaskInfo struct {
 	Type             TaskType          `json:"file_info_type"`                   // task type
 	StoreTx          string            `json:"store_tx"`                         // store tx hash
 	StoreTxHeight    uint32            `json:"store_tx_height"`                  // store tx height
+	StoreTxTime      uint64            `json:"store_tx_time,omitempty"`          // store tx timestamp
 	RegisterDNSTx    string            `json:"register_dns_tx,omitempty"`        // register dns tx
 	BindDNSTx        string            `json:"bind_dns_tx,omitempty"`            // bind dns tx
 	WhitelistTx      string            `json:"whitelist_tx,omitempty"`           // first op whitelist tx

@@ -278,6 +278,7 @@ type PocTaskInfo struct {
 	ProveTimes   uint64
 	EstimateTime uint64
 	CreatedAt    uint64
+	StoredAt     uint64
 }
 
 type AllPocTaskResp struct {
