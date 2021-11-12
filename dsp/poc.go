@@ -3,6 +3,7 @@ package dsp
 import (
 	"path/filepath"
 
+	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/task/poc"
 	"github.com/saveio/dsp-go-sdk/task/types"
 	tskUtils "github.com/saveio/dsp-go-sdk/utils/task"
@@ -52,4 +53,12 @@ func (this *Dsp) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 
 func (this *Dsp) DeletePocTask(taskId string) error {
 	return this.TaskMgr.CleanPocTask(taskId)
+}
+
+func (this *Dsp) SetPocTaskFailed(taskId, errorMsg string) {
+	tsk := this.TaskMgr.GetPocTask(taskId)
+	if tsk == nil {
+		return
+	}
+	tsk.SetResult(nil, sdkErr.POC_TASK_ERROR, errorMsg)
 }

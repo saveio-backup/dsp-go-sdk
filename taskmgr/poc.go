@@ -220,6 +220,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 			EstimateTime: uint64(progress.EstimateTime),
 			CreatedAt:    info.CreatedAt,
 			StoredAt:     info.StoreTxTime,
+			ErrorMsg:     info.ErrorMsg,
 		}
 		resp.TotalSize += fileSize
 		if len(info.StoreTx) == 0 {

@@ -88,9 +88,10 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 	if info.TaskState == store.TaskStateCancel {
 		return fmt.Errorf("task %s is canceled", info.Id)
 	}
-	log.Debugf("set task result %v %v", errorCode, errorMsg)
+	log.Debugf("set task result %v %v, info.StoreType %v", errorCode, errorMsg, info.Type)
 	if errorCode != 0 {
-		if info.Retry >= consts.MAX_TASK_RETRY {
+		if info.Retry >= consts.MAX_TASK_RETRY ||
+			info.Type == store.TaskTypePoC {
 			// task hasn't pay on chain, make it failed
 			info.TaskState = store.TaskStateFailed
 			info.ErrorCode = errorCode
@@ -100,7 +101,7 @@ func (this *Task) SetResult(result interface{}, errorCode uint32, errorMsg strin
 			info.TaskState = store.TaskStateIdle
 			info.Retry++
 			info.RetryAt = uTime.GetMilliSecTimestamp() + task.GetJitterDelay(info.Retry, 30)*1000
-			log.Errorf("task %s, file %s  is failed, error code %d, error msg %v, retry %d times, retry at %d",
+			log.Errorf("task %s, file %s is failed, error code %d, error msg %v, retry %d times, retry at %d",
 				info.Id, info.FileHash, errorCode, errorMsg, info.Retry, info.RetryAt)
 		}
 	} else if result != nil {
