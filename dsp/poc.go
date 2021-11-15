@@ -40,7 +40,12 @@ func (this *Dsp) AddNewPlotFile(taskId string, createSector bool, plotCfg *poc.P
 	}
 
 	log.Debugf("add plot for task %v", taskId)
-	return this.TaskMgr.AddPlotFile(taskId, createSector, plotCfg)
+	resp, err := this.TaskMgr.AddPlotFile(taskId, createSector, plotCfg)
+	if err != nil {
+		this.SetPocTaskFailed(taskId, err.Error())
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (this *Dsp) GetAllProvedPlotFile() (*types.AllPlotsFileResp, error) {
