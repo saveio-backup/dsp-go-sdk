@@ -112,13 +112,15 @@ func (this *Channel) StartService() error {
 	log.Debugf("start pylons done")
 	go func() {
 		log.Debugf("starting get fee schedule")
-		fee, err2 := ch_actor.GetFee(true)
-		if err2 != nil {
-			log.Errorf("get fee schedule error: %s", err2)
+		fee, err := ch_actor.GetFee(true)
+		if err != nil {
+			log.Errorf("get fee schedule error: %s", err)
+			return
 		}
-		err2 = ch_actor.SetFee(pylonsCom.FeeAmount(fee), false)
-		if err2 != nil {
-			log.Errorf("set fee schedule error: %s", err2)
+		err = ch_actor.SetFee(fee, false)
+		if err != nil {
+			log.Errorf("set fee schedule error: %s", err)
+			return
 		}
 		log.Debugf("get fee schedule done")
 	}()
@@ -638,17 +640,17 @@ func (this *Channel) healthCheck(targetAddress string) error {
 	return nil
 }
 
-func (c *Channel) GetFee() (uint64, error) {
+func (c *Channel) GetFee() (*transfer.FeeScheduleState, error) {
 	fee, err := ch_actor.GetFee(false)
 	if err != nil {
 		log.Errorf("GetFee err %v", err)
-		return 0, err
+		return nil, err
 	}
 	return fee, nil
 }
 
-func (c *Channel) SetFee(flat common.FeeAmount) error {
-	err := ch_actor.SetFee(flat, true)
+func (c *Channel) SetFee(fee *transfer.FeeScheduleState) error {
+	err := ch_actor.SetFee(fee, true)
 	if err != nil {
 		log.Errorf("SetFee err %v", err)
 		return err
