@@ -209,6 +209,7 @@ func (this *TaskMgr) HasRunningDownloadTask() bool {
 	for _, tsk := range this.downloadTasks {
 
 		if prepare, doing := tsk.IsTaskPreparingOrDoing(); prepare || doing {
+			log.Debugf("download task %s is preparing %t or doing %t", tsk.GetId(), prepare, doing)
 			return true
 		}
 	}

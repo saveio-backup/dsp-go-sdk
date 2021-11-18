@@ -307,6 +307,7 @@ func (this *TaskMgr) HasRunningUploadTask() bool {
 	defer this.uploadTaskLock.RUnlock()
 	for _, tsk := range this.uploadTasks {
 		if prepare, doing := tsk.IsTaskPreparingOrDoing(); prepare || doing {
+			log.Debugf("upload task %s is preparing %t or doing %t", tsk.GetId(), prepare, doing)
 			return true
 		}
 	}

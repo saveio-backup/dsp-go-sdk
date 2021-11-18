@@ -219,6 +219,7 @@ func (this *TaskMgr) HasRunningDispatchTask() bool {
 	defer this.dispatchTaskLock.RUnlock()
 	for _, tsk := range this.dispatchTasks {
 		if prepare, doing := tsk.IsTaskPreparingOrDoing(); prepare || doing {
+			log.Debugf("dispatch task %s is preparing %t or doing %t", tsk.GetId(), prepare, doing)
 			return true
 		}
 	}
