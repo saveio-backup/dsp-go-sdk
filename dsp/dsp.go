@@ -177,24 +177,31 @@ func (this *Dsp) Stop() error {
 	this.state.Set(state.ModuleStateStopping)
 	if this.TaskMgr.HasRunningTask() {
 		this.state.Set(state.ModuleStateActive)
+		log.Debugf("cant stop dsp module with running task")
 		return fmt.Errorf("exist running task")
 	}
+	log.Debugf("closing dsp close channel")
 	close(this.closeCh)
 	if err := this.TaskMgr.Stop(); err != nil {
 		log.Errorf("close fileDB err %s", err)
 		this.state.Set(state.ModuleStateError)
 		return err
 	}
+	log.Debugf("close dsp task mgr success")
 	if this.Channel != nil {
+		log.Debugf("stop channel service")
 		this.Channel.StopService()
+		log.Debugf("stop channel service success")
 	}
 	if this.Fs != nil {
+		log.Debugf("closing dsp fs module")
 		err := this.Fs.Close()
 		if err != nil {
 			log.Errorf("close fs err %s", err)
 			this.state.Set(state.ModuleStateError)
 			return err
 		}
+		log.Debugf("closing dsp fs module succes")
 	}
 	log.Debugf("stop dsp success")
 	this.state.Set(state.ModuleStateStopped)
