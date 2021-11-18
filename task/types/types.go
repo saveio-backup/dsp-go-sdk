@@ -39,6 +39,7 @@ type DeleteFileStatus struct {
 }
 
 type DeleteUploadFileResp struct {
+	TaskId   string `json:"TaskId,omitempty"`
 	Tx       string
 	FileHash string
 	FileName string `json:"FileName,omitempty"`
