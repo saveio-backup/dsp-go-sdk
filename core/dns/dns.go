@@ -137,9 +137,9 @@ func (d *DNS) Discovery() {
 		if !ok {
 			continue
 		}
-		_, err := d.channel.OpenChannel(channel.Address, 0)
+		err = d.channel.CanTransfer(channel.Address, 0)
 		if err != nil {
-			log.Errorf("open channel failed, err %s", err)
+			log.Errorf("can't transfer by channel, err %s", err)
 			continue
 		}
 		_, ok = d.onlineDNS[d.lastUsedDNS]

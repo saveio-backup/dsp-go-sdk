@@ -116,21 +116,6 @@ func (this *Dsp) GetOnlineDNSHostAddr(walletAddr string) string {
 
 func (this *Dsp) UpdateDNS(walletAddr, hostAddr string, use bool) {
 	this.DNS.UpdateDNS(walletAddr, hostAddr, use)
-
-	// log.Debugf("reachable %t host %s", this.channel.ChannelReachale(walletAddr), hostAddr)
-	// if this.channel.ChannelReachale(walletAddr) && len(hostAddr) > 0 {
-	// 	this.DNS.OnlineDNS[walletAddr] = hostAddr
-	// }
-	// if !use && (this.DNS != nil && this.DNS.DNSNode != nil) {
-	// 	return
-	// }
-	// this.DNS.DNSNode = &dns.DNSNodeInfo{
-	// 	WalletAddr: walletAddr,
-	// 	HostAddr:   hostAddr,
-	// }
-	// if err := this.channel.SelectDNSChannel(walletAddr); err != nil {
-	// 	log.Errorf("update selecting new dns channel err %s", err)
-	// }
 }
 
 func (this *Dsp) ResetDNSNode() {
