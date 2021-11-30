@@ -174,6 +174,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 
 	taskInfos, err := this.db.GetPocTaskInfos()
 	if err != nil {
+		log.Errorf("get all poc task err %s", err)
 		return nil, err
 	}
 
@@ -181,6 +182,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 	resp := &types.AllPocTaskResp{
 		PocTaskInfos: make(types.PocTaskInfos, 0),
 	}
+	log.Infof("all task count %v", len(taskInfos))
 	for _, info := range taskInfos {
 
 		// 0 undone, 1: generating pdp, 2: generated pdp success, 3. submit to chain
@@ -272,6 +274,7 @@ func (this *TaskMgr) GetAllPocTasks() (*types.AllPocTaskResp, error) {
 		totalNum++
 
 	}
+	log.Debugf("resp.PocTaskInfos %v", resp.PocTaskInfos)
 
 	sort.Sort(sort.Reverse(resp.PocTaskInfos))
 	resp.TotalCount = totalNum
