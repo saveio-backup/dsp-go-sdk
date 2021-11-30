@@ -640,7 +640,7 @@ func (this *Channel) healthCheck(targetAddress string) error {
 	return nil
 }
 
-func (c *Channel) GetFee(channelID uint64) (*transfer.FeeScheduleState, error) {
+func (this *Channel) GetFee(channelID uint64) (*transfer.FeeScheduleState, error) {
 	fee, err := ch_actor.GetFee(pylonsCom.ChannelID(channelID), false)
 	if err != nil {
 		log.Errorf("GetFee err %v", err)
@@ -649,10 +649,28 @@ func (c *Channel) GetFee(channelID uint64) (*transfer.FeeScheduleState, error) {
 	return fee, nil
 }
 
-func (c *Channel) SetFee(fee *transfer.FeeScheduleState) error {
+func (this *Channel) SetFee(fee *transfer.FeeScheduleState) error {
 	err := ch_actor.SetFee(fee, true)
 	if err != nil {
 		log.Errorf("SetFee err %v", err)
+		return err
+	}
+	return nil
+}
+
+func (this *Channel) GetPenalty() (*pylonsCom.RoutePenaltyConfig, error) {
+	penalty, err := ch_actor.GetPenalty()
+	if err != nil {
+		log.Errorf("GetPenalty err %v", err)
+		return nil, err
+	}
+	return penalty, nil
+}
+
+func (this *Channel) SetPenalty(penalty *pylonsCom.RoutePenaltyConfig) error {
+	err := ch_actor.SetPenalty(penalty)
+	if err != nil {
+		log.Errorf("SetPenalty err %v", err)
 		return err
 	}
 	return nil
