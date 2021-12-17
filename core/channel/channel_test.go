@@ -158,3 +158,21 @@ func TestGetTargetBalance(t *testing.T) {
 	}
 	fmt.Printf("balance %v\n", bal)
 }
+
+func TestChannel_NewPaymentId(t *testing.T) {
+	type fields struct {}
+	tests := []struct {
+		name   string
+		fields fields
+		want   int32
+	}{
+		{},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			this := &Channel{}
+			got := this.NewPaymentId()
+			t.Log(got)
+		})
+	}
+}

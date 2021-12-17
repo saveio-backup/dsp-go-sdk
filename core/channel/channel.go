@@ -383,6 +383,9 @@ func (this *Channel) NewPaymentId() int32 {
 
 // DirectTransfer. direct transfer to with payment id, and amount
 func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) error {
+	if paymentId == 0 {
+		paymentId = this.NewPaymentId()
+	}
 	log.Debugf("direct transfer to %s payment id %d amount %d", to, paymentId, amount)
 	if this.State() != state.ModuleStateActive {
 		return sdkErr.New(sdkErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
@@ -422,6 +425,9 @@ func (this *Channel) DirectTransfer(paymentId int32, amount uint64, to string) e
 }
 
 func (this *Channel) MediaTransfer(paymentId int32, amount uint64, media, to string) error {
+	if paymentId == 0 {
+		paymentId = this.NewPaymentId()
+	}
 	log.Debugf("media transfer to %s payment id %s amount %d with media %v", to, paymentId, amount, to)
 	if this.State() != state.ModuleStateActive {
 		return sdkErr.New(sdkErr.CHANNEL_SERVICE_NOT_START, "channel service is not start")
