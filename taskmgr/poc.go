@@ -52,6 +52,9 @@ func (this *TaskMgr) GetPocTask(taskId string) *poc.PocTask {
 
 func (this *TaskMgr) GenPlotPDPData(taskId string, plotCfg *poc.PlotConfig) error {
 	tsk := this.GetPocTask(taskId)
+	if tsk == nil {
+		return fmt.Errorf("task %s not found", taskId)
+	}
 	err := tsk.GenPlotPDPData(plotCfg)
 	if err != nil {
 		tsk.SetResult("", sdkErr.POC_TASK_ERROR, err.Error())
