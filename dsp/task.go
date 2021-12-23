@@ -130,6 +130,14 @@ func (this *Dsp) GetPlotTaskFileName(fileHashStr string) string {
 	return tsk.FileName
 }
 
+func (this *Dsp) GetPlotTaskFileNameById(taskId string) string {
+	tsk := this.TaskMgr.GetPocTask(taskId)
+	if tsk == nil {
+		return ""
+	}
+	return tsk.GetFileName()
+}
+
 func (this *Dsp) GetTaskIdList(offset, limit uint32, createdAt, createdAtEnd, updatedAt, updatedAtEnd uint64,
 	ft store.TaskType, complete, reverse, includeFailed, ignoreHide bool) []string {
 	if this == nil || this.TaskMgr == nil {
