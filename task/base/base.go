@@ -696,7 +696,6 @@ func (this *Task) getProgressInfo() *types.ProgressInfo {
 		FileSize:      info.FileSize,
 		RealFileSize:  info.RealFileSize,
 		Encrypt:       info.Encrypt,
-		Progress:      this.DB.FileProgress(info.Id),
 		NodeHostAddrs: info.NodeHostAddrs,
 		TaskState:     store.TaskState(info.TaskState),
 		ProgressState: types.TaskProgressState(info.TranferState),
@@ -705,6 +704,9 @@ func (this *Task) getProgressInfo() *types.ProgressInfo {
 		Result:        info.Result,
 		ErrorCode:     info.ErrorCode,
 		ErrorMsg:      info.ErrorMsg,
+	}
+	if this.DB != nil {
+		pInfo.Progress = this.DB.FileProgress(info.Id)
 	}
 	if info.Type != store.TaskTypeUpload {
 		return pInfo
