@@ -59,7 +59,7 @@ const (
 	CHECK_CHANNEL_STATE_INTERVAL        = 3       // check channel state interval
 	CHECK_CHANNEL_CAN_TRANSFER_INTERVAL = 1       // check channel can transfer interval
 	CHECK_CHANNEL_CAN_TRANSFER_TIMEOUT  = 30      // check channel can transfer interval
-	WAIT_CHANNEL_CONNECT_TIMEOUT        = 15      // wait for channel connected
+	WAIT_CHANNEL_CONNECT_TIMEOUT        = 60      // wait for channel connected
 	FILE_DNS_TTL                        = 10 * 60 // 10m
 	CHANNEL_TRANSFER_TIMEOUT            = 20      // 60s
 	CHANNEL_WITHDRAW_TIMEOUT            = 60      // 60s
