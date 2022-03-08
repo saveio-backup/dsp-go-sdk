@@ -45,7 +45,7 @@ func (this *Chain) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
 
 // UpdateNode. update node information
 func (this *Chain) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
-	nodeInfo, err := this.QueryNode(this.themis.Native.Fs.DefAcc.Address.ToBase58())
+	nodeInfo, err := this.QueryNode(this.themis.Native.Fs.Client.GetDefaultAccount().Address.ToBase58())
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, this.FormatError(err))
 	}
