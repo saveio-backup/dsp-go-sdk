@@ -3,11 +3,11 @@ package download
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
-	"path/filepath"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/actor/client"
@@ -478,8 +478,9 @@ func (this *DownloadTask) internalDownload() error {
 				}
 			}
 			log.Debugf("checking file hash %s", checkFileList[0])
-			if len(checkFileList) == 0 || checkFileList[0] != this.GetFileHash() {
+			if (len(checkFileList) == 0 || checkFileList[0] != this.GetFileHash()) && !stat.IsDir() {
 				this.EmitProgress(types.TaskDownloadCheckingFileFailed)
+				// TODO wangyu dir hash not match
 				err = sdkErr.New(sdkErr.CHECK_FILE_FAILED, "file hash not match")
 				return err
 			}
@@ -1051,15 +1052,13 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				this.SetFilePath(dirPath)
 			}
 			if len(links) == 0 && this.Mgr.IsClient() {
-				// TODO wangyu debug
+				// TODO wangyu reduce create file times
 				var file *os.File
 				if this.Mgr.IsClient() {
 					var createFileErr error
 					if hasDir {
-						if file == nil {
-							filePath := filepath.Join(this.GetFilePath(), block.Cid().String())
-							file, createFileErr = createDownloadFile(this.GetFilePath(), filePath)
-						}
+						filePath := filepath.Join(this.GetFilePath(), block.Cid().String())
+						file, createFileErr = createDownloadFile(this.GetFilePath(), filePath)
 					} else {
 						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
 					}
