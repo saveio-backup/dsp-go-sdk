@@ -2,6 +2,7 @@ package taskmgr
 
 import (
 	"fmt"
+	"os"
 	"runtime/debug"
 	"sort"
 
@@ -62,16 +63,26 @@ func (this *TaskMgr) UploadTaskExist(filePath string) (bool, error) {
 		}
 	}
 
-	// check uploading task simple checksum, if matched, task is exist
-	checksum, err := crypto.GetSimpleChecksumOfFile(filePath)
+	checksum := ""
+	stat, err := os.Stat(filePath)
 	if err != nil {
-		return true, sdkErr.NewWithError(sdkErr.GET_SIMPLE_CHECKSUM_ERROR, err)
+		return false, err
 	}
-	for _, tsk := range this.uploadTasks {
-		if tsk.GetSimpleChecksum() == checksum {
-			log.Debugf("upload task %s, exist checksum: %s, filepath: %s",
-				tsk.GetId(), checksum, filePath)
-			return true, nil
+	if stat.IsDir() {
+		// TODO: check uploading task dir checksum, if matched, task is exist
+		checksum = stat.Name()
+	} else {
+		// check uploading task simple checksum, if matched, task is exist
+		checksum, err = crypto.GetSimpleChecksumOfFile(filePath)
+		if err != nil {
+			return true, sdkErr.NewWithError(sdkErr.GET_SIMPLE_CHECKSUM_ERROR, err)
+		}
+		for _, tsk := range this.uploadTasks {
+			if tsk.GetSimpleChecksum() == checksum {
+				log.Debugf("upload task %s, exist checksum: %s, filepath: %s",
+					tsk.GetId(), checksum, filePath)
+				return true, nil
+			}
 		}
 	}
 
@@ -106,7 +117,9 @@ func (this *TaskMgr) UploadTaskExist(filePath string) (bool, error) {
 		log.Errorf("get current block height err %s", err)
 		return true, err
 	}
+
 	if taskInfo.ExpiredHeight > uint64(now) {
+		log.Errorf("ExpiredHeight: %d, current block height: %d", taskInfo.ExpiredHeight, now)
 		return true, nil
 	}
 	if len(taskInfo.FileHash) == 0 {

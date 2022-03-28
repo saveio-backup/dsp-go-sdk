@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"path/filepath"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/actor/client"
@@ -460,9 +461,21 @@ func (this *DownloadTask) internalDownload() error {
 		if this.Mgr.IsClient() &&
 			this.DB.IsFileDownloaded(this.GetId()) && !uPrefix.GetPrefixEncrypted(this.GetPrefix()) {
 			this.EmitProgress(types.TaskDownloadCheckingFile)
-			checkFileList, err := this.Mgr.Fs().NodesFromFile(fullFilePath, string(this.GetPrefix()), false, "")
+			stat, err := os.Stat(fullFilePath)
 			if err != nil {
 				return err
+			}
+			checkFileList := make([]string, 0)
+			if stat.IsDir() {
+				checkFileList, err = this.Mgr.Fs().NodesFromDir(fullFilePath, string(this.GetPrefix()), false, "")
+				if err != nil {
+					return err
+				}
+			} else {
+				checkFileList, err = this.Mgr.Fs().NodesFromFile(fullFilePath, string(this.GetPrefix()), false, "")
+				if err != nil {
+					return err
+				}
 			}
 			log.Debugf("checking file hash %s", checkFileList[0])
 			if len(checkFileList) == 0 || checkFileList[0] != this.GetFileHash() {
@@ -983,24 +996,25 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 		log.Warnf("task %s file prefix is empty", this.GetId())
 	}
 	isFileEncrypted := uPrefix.GetPrefixEncrypted(this.GetPrefix())
-	var file *os.File
-	if this.Mgr.IsClient() {
-		var createFileErr error
-		file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
-		if createFileErr != nil {
-			return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
-		}
-		defer func() {
-			if err := file.Close(); err != nil {
-				log.Errorf("close file err %s", err)
-			}
-		}()
-	}
-	if file == nil {
-		return sdkErr.New(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, "create file failed")
-	}
+	//var file *os.File
+	//if this.Mgr.IsClient() {
+	//	var createFileErr error
+	//	file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
+	//	if createFileErr != nil {
+	//		return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
+	//	}
+	//	defer func() {
+	//		if err := file.Close(); err != nil {
+	//			log.Errorf("close file err %s", err)
+	//		}
+	//	}()
+	//}
+	//if file == nil {
+	//	return sdkErr.New(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, "create file failed")
+	//}
 	stateCheckTicker := time.NewTicker(time.Duration(consts.TASK_STATE_CHECK_DURATION) * time.Second)
 	defer stateCheckTicker.Stop()
+	hasDir := false
 	for {
 		select {
 		case value, ok := <-this.GetTaskNotify():
@@ -1031,7 +1045,34 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					this.Mgr.Fs().SetFsFilePrefix(this.GetFilePath(), "")
 				}
 			}
+			if len(links) > 0 && this.Mgr.IsClient() {
+				hasDir = true
+				dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, block.Cid().String())
+				this.SetFilePath(dirPath)
+			}
 			if len(links) == 0 && this.Mgr.IsClient() {
+				// TODO wangyu debug
+				var file *os.File
+				if this.Mgr.IsClient() {
+					var createFileErr error
+					if hasDir {
+						if file == nil {
+							filePath := filepath.Join(this.GetFilePath(), block.Cid().String())
+							file, createFileErr = createDownloadFile(this.GetFilePath(), filePath)
+						}
+					} else {
+						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
+					}
+					if createFileErr != nil {
+						return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
+					}
+					defer func() {
+						if err := file.Close(); err != nil {
+							log.Errorf("close file err %s", err)
+						}
+					}()
+				}
+
 				data := this.Mgr.Fs().BlockData(block)
 				// cut prefix
 				// TEST: why not use filesize == 0

@@ -98,6 +98,14 @@ func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, 
 	return hashes, nil
 }
 
+func (this *Fs) NodesFromDir(path string, filePrefix string, encrypt bool, password string) ([]string, error) {
+	hashes, err := this.fs.NodesFromDir(path, filePrefix, encrypt, password, true)
+	if err != nil {
+		return nil, sdkErr.New(sdkErr.SHARDING_FAIELD, err.Error())
+	}
+	return hashes, nil
+}
+
 // GetAllOffsets. get all block offsets of a file with root hash
 func (this *Fs) GetAllOffsets(rootHash string) (map[string]uint64, error) {
 	rootCid, err := cid.Decode(rootHash)

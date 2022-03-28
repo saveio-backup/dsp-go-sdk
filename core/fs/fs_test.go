@@ -43,11 +43,11 @@ func TestNodeFromFile(t *testing.T) {
 	// 	FsRepoRoot: repoPath,
 	// 	FsFileRoot: downloadPath,
 	// }
-	fs, err := NewFs(nil)
+	fs, err := NewFs(nil, RepoRoot(repoPath))
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, err := fs.NodesFromFile("./go-ipfs_v0.4.21_windows-amd64.zip.xltd", "AAAAcQ==AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD0OzBvczzxxsK/ge/TQXnCnxvVDgAAAAAAAEPzJmdvLWlwZnNfdjAuNC4yMV93aW5kb3dzLWFtZDY0LnppcC54bHRkAAAAAE+aQ9E=", false, "")
+	list, err := fs.NodesFromFile("./aaa", "AAAAcQ==AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD0OzBvczzxxsK/ge/TQXnCnxvVDgAAAAAAAEPzJmdvLWlwZnNfdjAuNC4yMV93aW5kb3dzLWFtZDY0LnppcC54bHRkAAAAAE+aQ9E=", false, "")
 	if err != nil {
 		return
 	}

@@ -36,16 +36,10 @@ import (
 // Phase7: continuesly request dispatch progress to master node
 func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.UploadOption) (
 	*types.UploadResult, error) {
-	file, err := os.Open(filePath)
+	file, err := os.Stat(filePath)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.INTERNAL_ERROR, err)
 	}
-	defer func() {
-		// emit result finally
-		if err := file.Close(); err != nil {
-			log.Errorf("close file err %s", err)
-		}
-	}()
 	if newTask {
 		if err := this.SetTaskState(store.TaskStateDoing); err != nil {
 			return nil, err
@@ -57,10 +51,15 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	if err = uploadOptValid(filePath, opt); err != nil {
 		return nil, err
 	}
-	// calculate check sum for setting to DB
-	checksum, err := crypto.GetSimpleChecksumOfFile(filePath)
-	if err != nil {
-		return nil, sdkErr.New(sdkErr.INVALID_PARAMS, err.Error())
+	checksum := ""
+	if !file.IsDir() {
+		// calculate check sum for setting to DB
+		checksum, err = crypto.GetSimpleChecksumOfFile(filePath)
+		if err != nil {
+			return nil, sdkErr.New(sdkErr.INVALID_PARAMS, err.Error())
+		}
+	} else {
+		// TODO: check dir
 	}
 	if err = this.SetInfoWithOptions(
 		base.FilePath(filePath),
@@ -116,12 +115,21 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 		filePrefix.MakeSalt()
 		prefixStr = filePrefix.String()
 		log.Debugf("node from file prefix: %v, len: %d", prefixStr, len(prefixStr))
-		if hashes, err = this.Mgr.Fs().NodesFromFile(filePath, prefixStr,
-			opt.Encrypt, string(opt.EncryptPassword)); err != nil {
-			return nil, err
+		if !file.IsDir() {
+			if hashes, err = this.Mgr.Fs().NodesFromFile(filePath, prefixStr,
+				opt.Encrypt, string(opt.EncryptPassword)); err != nil {
+				return nil, err
+			}
+			blocksRoot = crypto.ComputeStringHashRoot(hashes)
+			fileHashStr = hashes[0]
+		} else {
+			if hashes, err = this.Mgr.Fs().NodesFromDir(filePath, prefixStr,
+				opt.Encrypt, string(opt.EncryptPassword)); err != nil {
+				return nil, err
+			}
+			blocksRoot = crypto.ComputeStringHashRoot(hashes)
+			fileHashStr = hashes[0]
 		}
-		blocksRoot = crypto.ComputeStringHashRoot(hashes)
-		fileHashStr = hashes[0]
 	} else {
 		// file has paid, get prefix, fileHash etc.
 		prefixStr = string(this.GetPrefix())
@@ -656,6 +664,11 @@ func (this *UploadTask) broadcastAskMsg(msg *message.Message, nodeList []string,
 		log.Debugf("continue....")
 		return false
 	}
+	fmt.Println("===============123===============")
+	for k, v := range nodeList {
+		fmt.Println(k, v)
+	}
+	fmt.Println("===============123===============")
 	ret, err := client.P2PBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, action)
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err %s", err)
