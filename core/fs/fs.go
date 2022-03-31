@@ -99,7 +99,7 @@ func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, 
 }
 
 func (this *Fs) NodesFromDir(path string, filePrefix string, encrypt bool, password string) ([]string, error) {
-	hashes, err := this.fs.NodesFromDir(path, filePrefix, encrypt, password, true)
+	hashes, err := this.fs.NodesFromDir(path, filePrefix, encrypt, password)
 	if err != nil {
 		return nil, sdkErr.New(sdkErr.SHARDING_FAIELD, err.Error())
 	}
@@ -161,6 +161,18 @@ func (this *Fs) GetBlockLinks(block blocks.Block) ([]string, error) {
 		links = append(links, link.Cid.String())
 	}
 	return links, nil
+}
+
+// GetBlockLinks. decode a block and get its links
+func (this *Fs) GetBlockLinksByDAG(block blocks.Block) ([]*ipld.Link, error) {
+	if block.Cid().Type() != cid.DagProtobuf {
+		return nil, nil
+	}
+	dagNode, err := merkledag.DecodeProtobufBlock(block)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.FS_DECODE_BLOCK_ERROR, err)
+	}
+	return dagNode.Links(), nil
 }
 
 // BlockData. get block data from blocks.BlockData

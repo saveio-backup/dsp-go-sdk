@@ -2,6 +2,7 @@ package download
 
 import (
 	"fmt"
+	uOS "github.com/saveio/dsp-go-sdk/utils/os"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -997,25 +998,10 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 		log.Warnf("task %s file prefix is empty", this.GetId())
 	}
 	isFileEncrypted := uPrefix.GetPrefixEncrypted(this.GetPrefix())
-	//var file *os.File
-	//if this.Mgr.IsClient() {
-	//	var createFileErr error
-	//	file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
-	//	if createFileErr != nil {
-	//		return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
-	//	}
-	//	defer func() {
-	//		if err := file.Close(); err != nil {
-	//			log.Errorf("close file err %s", err)
-	//		}
-	//	}()
-	//}
-	//if file == nil {
-	//	return sdkErr.New(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, "create file failed")
-	//}
 	stateCheckTicker := time.NewTicker(time.Duration(consts.TASK_STATE_CHECK_DURATION) * time.Second)
 	defer stateCheckTicker.Stop()
 	hasDir := false
+	dirMap := make(map[string]string)
 	for {
 		select {
 		case value, ok := <-this.GetTaskNotify():
@@ -1036,6 +1022,14 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			if err != nil {
 				return err
 			}
+			// build a map to contract dir file
+			dagLinks, err := this.Mgr.Fs().GetBlockLinksByDAG(block)
+			if err != nil {
+				return err
+			}
+			for _, v := range dagLinks {
+				dirMap[v.Cid.String()] = v.Name
+			}
 			if block.Cid().String() != value.Hash {
 				log.Warnf("receive a unmatched hash block %s %s", block.Cid().String(), value.Hash)
 			}
@@ -1046,18 +1040,24 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					this.Mgr.Fs().SetFsFilePrefix(this.GetFilePath(), "")
 				}
 			}
-			if len(links) > 0 && this.Mgr.IsClient() {
+			if len(links) > 0 && this.Mgr.IsClient() && hasDir == false {
 				hasDir = true
 				dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, block.Cid().String())
 				this.SetFilePath(dirPath)
 			}
 			if len(links) == 0 && this.Mgr.IsClient() {
-				// TODO wangyu reduce create file times
 				var file *os.File
 				if this.Mgr.IsClient() {
 					var createFileErr error
 					if hasDir {
-						filePath := filepath.Join(this.GetFilePath(), block.Cid().String())
+						p := dirMap[block.Cid().String()]
+						dirPath := filepath.Join(this.GetFilePath(), p)
+						err := uOS.CreateDirIfNeed(dirPath)
+						if err != nil {
+							log.Warnf("create dir %s error: %s", dirPath, err)
+							continue
+						}
+						filePath := filepath.Join(dirPath, block.Cid().String())
 						file, createFileErr = createDownloadFile(this.GetFilePath(), filePath)
 					} else {
 						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
@@ -1116,8 +1116,8 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			}
 			this.EmitProgress(types.TaskDownloadFileDownloading)
 			log.Debugf("%s-%s-%d set downloaded", this.GetFileHash(), value.Hash, value.Index)
-			poolLen := this.GetBlockReqPoolLen()
 
+			poolLen := this.GetBlockReqPoolLen()
 			if poolLen != 0 {
 				continue
 			}

@@ -664,11 +664,6 @@ func (this *UploadTask) broadcastAskMsg(msg *message.Message, nodeList []string,
 		log.Debugf("continue....")
 		return false
 	}
-	fmt.Println("===============123===============")
-	for k, v := range nodeList {
-		fmt.Println(k, v)
-	}
-	fmt.Println("===============123===============")
 	ret, err := client.P2PBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId, action)
 	if err != nil {
 		log.Errorf("wait file receivers broadcast err %s", err)
