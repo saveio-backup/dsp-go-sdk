@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1051,13 +1052,15 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					var createFileErr error
 					if hasDir {
 						p := dirMap[block.Cid().String()]
-						dirPath := filepath.Join(this.GetFilePath(), p)
-						err := uOS.CreateDirIfNeed(dirPath)
+						fullPath := filepath.Join(this.GetFilePath(), p)
+						err := uOS.CreateDirIfNeed(fullPath)
 						if err != nil {
-							log.Warnf("create dir %s error: %s", dirPath, err)
+							log.Warnf("create dir %s error: %s", fullPath, err)
 							continue
 						}
-						filePath := filepath.Join(dirPath, block.Cid().String())
+						// always is file because links eq 0
+						dirPath, fileName, _ := SplitFileNameFromPath(fullPath)
+						filePath := filepath.Join(dirPath, fileName)
 						file, createFileErr = createDownloadFile(this.GetFilePath(), filePath)
 					} else {
 						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
@@ -1181,6 +1184,16 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 		}(walletAddr, sessionId)
 	}
 	return nil
+}
+
+func SplitFileNameFromPath(s string) (path string, fileName string, isFile bool) {
+	if strings.HasSuffix(s, "/") {
+		return s, "", false
+	}
+	a := strings.Split(s, "/")
+	s = strings.Join(a[0:len(a)-1], "/")
+	s += "/"
+	return s, a[len(a)-1], true
 }
 
 func (this *DownloadTask) addDownloadBlockReq() error {
