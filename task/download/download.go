@@ -2,7 +2,6 @@ package download
 
 import (
 	"fmt"
-	uOS "github.com/saveio/dsp-go-sdk/utils/os"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -10,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	uOS "github.com/saveio/dsp-go-sdk/utils/os"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/actor/client"
@@ -1053,15 +1054,15 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					if hasDir {
 						p := dirMap[block.Cid().String()]
 						fullPath := filepath.Join(this.GetFilePath(), p)
-						err := uOS.CreateDirIfNeed(fullPath)
+						// always is file because links eq 0
+						dirPath, fileName, _ := SplitFileNameFromPath(fullPath)
+						err := uOS.CreateDirIfNeed(dirPath)
 						if err != nil {
 							log.Warnf("create dir %s error: %s", fullPath, err)
 							continue
 						}
-						// always is file because links eq 0
-						dirPath, fileName, _ := SplitFileNameFromPath(fullPath)
 						filePath := filepath.Join(dirPath, fileName)
-						file, createFileErr = createDownloadFile(this.GetFilePath(), filePath)
+						file, createFileErr = createDownloadFile(dirPath, filePath)
 					} else {
 						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
 					}
