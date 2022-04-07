@@ -1003,7 +1003,8 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 	stateCheckTicker := time.NewTicker(time.Duration(consts.TASK_STATE_CHECK_DURATION) * time.Second)
 	defer stateCheckTicker.Stop()
 	hasDir := false
-	dirMap := make(map[string]string)
+	dirMap := make(map[string]string) // cid => fileName
+	filePos := make(map[string]int64) // cid => pos
 	for {
 		select {
 		case value, ok := <-this.GetTaskNotify():
@@ -1042,7 +1043,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					this.Mgr.Fs().SetFsFilePrefix(this.GetFilePath(), "")
 				}
 			}
-			if len(links) > 0 && this.Mgr.IsClient() && hasDir == false {
+			if len(links) > 0 && this.Mgr.IsClient() && !hasDir {
 				hasDir = true
 				dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, block.Cid().String())
 				this.SetFilePath(dirPath)
@@ -1062,8 +1063,10 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 							continue
 						}
 						filePath := filepath.Join(dirPath, fileName)
+						log.Debugf("precess file not in dir: %s, %s", dirPath, filePath)
 						file, createFileErr = createDownloadFile(dirPath, filePath)
 					} else {
+						log.Debugf("precess file in dir: %s, %s", this.Mgr.Config().FsFileRoot, this.GetFilePath())
 						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
 					}
 					if createFileErr != nil {
@@ -1090,6 +1093,17 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				writeAtPos := value.Offset
 				if value.Offset > 0 && !isFileEncrypted {
 					writeAtPos = value.Offset - int64(len(prefix))
+				}
+				// each file has pos
+				if hasDir {
+					pos, ok := filePos[block.Cid().String()]
+					if !ok {
+						writeAtPos = 0
+						filePos[block.Cid().String()] = int64(len(block.RawData()))
+					} else {
+						writeAtPos = pos
+						filePos[block.Cid().String()] = writeAtPos
+					}
 				}
 				log.Debugf("file %s append block %s index %d, the block data length %d, offset %v, pos %d",
 					this.GetFileHash(), value.Index,
