@@ -986,7 +986,6 @@ func (this *DownloadTask) workBackground() {
 
 // receiveBlockNoOrder. receive blocks in order
 func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
-
 	if this.DB.IsFileDownloaded(this.GetId()) {
 		log.Debugf("task %s, file %s has downloaded", this.GetId(), this.GetFileHash())
 		return nil
@@ -1002,7 +1001,6 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 	isFileEncrypted := uPrefix.GetPrefixEncrypted(this.GetPrefix())
 	stateCheckTicker := time.NewTicker(time.Duration(consts.TASK_STATE_CHECK_DURATION) * time.Second)
 	defer stateCheckTicker.Stop()
-	hasDir := false
 	dirMap := make(map[string]string) // cid => fileName
 	filePos := make(map[string]int64) // cid => pos
 	for {
@@ -1025,14 +1023,6 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			if err != nil {
 				return err
 			}
-			// build a map to contract dir file
-			dagLinks, err := this.Mgr.Fs().GetBlockLinksByDAG(block)
-			if err != nil {
-				return err
-			}
-			for _, v := range dagLinks {
-				dirMap[v.Cid.String()] = v.Name
-			}
 			if block.Cid().String() != value.Hash {
 				log.Warnf("receive a unmatched hash block %s %s", block.Cid().String(), value.Hash)
 			}
@@ -1043,16 +1033,44 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					this.Mgr.Fs().SetFsFilePrefix(this.GetFilePath(), "")
 				}
 			}
-			if len(links) > 0 && this.Mgr.IsClient() && !hasDir {
-				hasDir = true
-				dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, block.Cid().String())
-				this.SetFilePath(dirPath)
+			// build a map to contract dir file
+			dagLinks, err := this.Mgr.Fs().GetBlockLinksByDAG(block)
+			if err != nil {
+				return err
 			}
+			taskInfo, err := this.DB.GetTaskInfo(this.GetId())
+			if err != nil {
+				log.Errorf("get task info err: %s, id: %s", err, this.GetId())
+				return err
+			}
+			for _, v := range dagLinks {
+				// set task info
+				if v.Name != "" && !taskInfo.IsDir {
+					taskInfo.IsDir = true
+					err := this.DB.SaveTaskInfo(taskInfo)
+					if err != nil {
+						log.Errorf("save task info err: %s", err)
+						return err
+					}
+					dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, block.Cid().String())
+					err = this.SetFilePath(dirPath)
+					if err != nil {
+						log.Errorf("set file path err: %s", err)
+						return err
+					}
+				}
+				_, ok := dirMap[v.Cid.String()]
+				if !ok {
+					dirMap[v.Cid.String()] = v.Name
+				}
+				this.travelDagLinks(dirMap, v.Cid.String(), v.Name)
+			}
+			// write file with block data
 			if len(links) == 0 && this.Mgr.IsClient() {
 				var file *os.File
 				if this.Mgr.IsClient() {
 					var createFileErr error
-					if hasDir {
+					if taskInfo.IsDir {
 						p := dirMap[block.Cid().String()]
 						fullPath := filepath.Join(this.GetFilePath(), p)
 						// always is file because links eq 0
@@ -1063,13 +1081,14 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 							continue
 						}
 						filePath := filepath.Join(dirPath, fileName)
-						log.Debugf("precess file not in dir: %s, %s", dirPath, filePath)
 						file, createFileErr = createDownloadFile(dirPath, filePath)
+						log.Debugf("create file in dir: %s", filePath)
 					} else {
-						log.Debugf("precess file in dir: %s, %s", this.Mgr.Config().FsFileRoot, this.GetFilePath())
 						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
+						log.Debugf("create file not in dir: %s", this.GetFilePath())
 					}
 					if createFileErr != nil {
+						log.Errorf("createFileErr: %s, isDir: %v", createFileErr, taskInfo.IsDir)
 						return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
 					}
 					defer func() {
@@ -1095,19 +1114,19 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					writeAtPos = value.Offset - int64(len(prefix))
 				}
 				// each file has pos
-				if hasDir {
-					pos, ok := filePos[block.Cid().String()]
+				if taskInfo.IsDir {
+					fileName := dirMap[block.Cid().String()]
+					pos, ok := filePos[fileName]
 					if !ok {
 						writeAtPos = 0
-						filePos[block.Cid().String()] = int64(len(block.RawData()))
+						filePos[fileName] = int64(len(block.RawData()))
 					} else {
 						writeAtPos = pos
-						filePos[block.Cid().String()] = writeAtPos
+						filePos[fileName] = writeAtPos + int64(len(block.RawData()))
 					}
 				}
 				log.Debugf("file %s append block %s index %d, the block data length %d, offset %v, pos %d",
-					this.GetFileHash(), value.Index,
-					block.Cid().String(), len(data), value.Offset, writeAtPos)
+					this.GetFileHash(), block.Cid().String(), value.Index, len(data), value.Offset, writeAtPos)
 				if _, err := file.WriteAt(data, writeAtPos); err != nil {
 					return sdkErr.NewWithError(sdkErr.WRITE_FILE_DATA_FAILED, err)
 				}
@@ -1199,6 +1218,27 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 		}(walletAddr, sessionId)
 	}
 	return nil
+}
+
+// travelDagLinks because file no have link name
+func (this *DownloadTask) travelDagLinks(m map[string]string, c string, name string) {
+	getBlock := this.Mgr.Fs().GetBlock(c)
+	links, err := this.Mgr.Fs().GetBlockLinksByDAG(getBlock)
+	if err != nil {
+		return
+	}
+	for _, v := range links {
+		// file if link's name is empty
+		if v.Name == "" {
+			_, ok := m[v.Cid.String()]
+			if !ok {
+				m[v.Cid.String()] = name
+			}
+			// if file have more deep links
+			this.travelDagLinks(m, v.Cid.String(), name)
+		}
+	}
+	return
 }
 
 func SplitFileNameFromPath(s string) (path string, fileName string, isFile bool) {

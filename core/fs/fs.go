@@ -163,7 +163,7 @@ func (this *Fs) GetBlockLinks(block blocks.Block) ([]string, error) {
 	return links, nil
 }
 
-// GetBlockLinks. decode a block and get its links
+// GetBlockLinksByDAG. decode a block and get its links
 func (this *Fs) GetBlockLinksByDAG(block blocks.Block) ([]*ipld.Link, error) {
 	if block.Cid().Type() != cid.DagProtobuf {
 		return nil, nil

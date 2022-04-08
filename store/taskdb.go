@@ -149,6 +149,7 @@ type TaskInfo struct {
 	Transferring     bool              `json:"transferring"`                     // fetch is transferring flag
 	PayOnL1          bool              `json:"payOnL1"`                          // is task pay on l1
 	WorkerNetPhase   map[string]int    `json:"worker_net_phase"`                 // network msg interact phase, used to check msg transaction, wallet addr <=> phase
+	IsDir            bool              `json:"isDir"`                            // task is dir or not
 }
 
 type FileProgress struct {
