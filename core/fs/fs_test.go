@@ -32,23 +32,21 @@ var testFileTemp = "./setup-temp.exe"
 var encryptPassword = "123456"
 
 func TestNodeFromFile(t *testing.T) {
-	log.InitLog(1, log.Stdout, "./Log/")
+	log.InitLog(2, log.Stdout, "./Log/")
 	repoPath := "./Repo"
 	downloadPath := "./Downloads"
 
 	defer os.RemoveAll(repoPath)
 	defer os.RemoveAll(downloadPath)
 	defer os.RemoveAll("./Log")
-	// cfg := &config.DspConfig{
-	// 	FsRepoRoot: repoPath,
-	// 	FsFileRoot: downloadPath,
-	// }
+
 	fs, err := NewFs(nil, RepoRoot(repoPath))
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, err := fs.NodesFromFile("./aaa", "AAAAcQ==AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD0OzBvczzxxsK/ge/TQXnCnxvVDgAAAAAAAEPzJmdvLWlwZnNfdjAuNC4yMV93aW5kb3dzLWFtZDY0LnppcC54bHRkAAAAAE+aQ9E=", false, "")
+	list, err := fs.NodesFromFile("./test.txt", "AAAAcQ==AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD0OzBvczzxxsK/ge/TQXnCnxvVDgAAAAAAAEPzJmdvLWlwZnNfdjAuNC4yMV93aW5kb3dzLWFtZDY0LnppcC54bHRkAAAAAE+aQ9E=", false, "")
 	if err != nil {
+		t.Fatal(err)
 		return
 	}
 	hashMap := make(map[string]struct{})
@@ -59,6 +57,9 @@ func TestNodeFromFile(t *testing.T) {
 			fmt.Printf("duplicated %s\n", l)
 		}
 		hashMap[l] = struct{}{}
+		blk := fs.GetBlock(l)
+
+		fmt.Printf("block data %x\n", fs.BlockDataOfAny(blk))
 	}
 }
 
