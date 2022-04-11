@@ -3,6 +3,8 @@ package download
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
@@ -68,4 +70,15 @@ func canDownloadSpeedUp(qos []int64) bool {
 	avg := qosSum / consts.MIN_DOWNLOAD_QOS_LEN
 	log.Debugf("qosSum :%d, avg : %d", qosSum, avg)
 	return avg < consts.DOWNLOAD_BLOCKFLIGHTS_TIMEOUT
+}
+
+func SplitFileNameFromPath(s string) (dirPath string, fileName string, isFile bool) {
+	if strings.HasSuffix(s, "/") {
+		return s, "", false
+	}
+	a := strings.Split(s, "/")
+	s = strings.Join(a[0:len(a)-1], "/")
+	s += "/"
+	// adapt cross-platform
+	return filepath.FromSlash(dirPath), a[len(a)-1], true
 }

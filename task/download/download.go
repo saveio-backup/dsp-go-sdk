@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1071,17 +1070,18 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				if this.Mgr.IsClient() {
 					var createFileErr error
 					if taskInfo.IsDir {
-						p := dirMap[block.Cid().String()]
-						fullPath := filepath.Join(this.GetFilePath(), p)
+						pathByLink := dirMap[block.Cid().String()]
 						// always is file because links eq 0
-						dirPath, fileName, _ := SplitFileNameFromPath(fullPath)
-						err := uOS.CreateDirIfNeed(dirPath)
+						dirPath, fileName, _ := SplitFileNameFromPath(pathByLink)
+						fullDir := filepath.Join(this.GetFilePath(), dirPath)
+						err := uOS.CreateDirIfNeed(fullDir)
 						if err != nil {
-							log.Warnf("create dir %s error: %s", fullPath, err)
+							log.Errorf("create dir error: %s, fullPath: %s, dirPath: %s, fileName: %s",
+								err, dirPath, fullDir, fileName)
 							continue
 						}
-						filePath := filepath.Join(dirPath, fileName)
-						file, createFileErr = createDownloadFile(dirPath, filePath)
+						filePath := filepath.Join(fullDir, fileName)
+						file, createFileErr = createDownloadFile(fullDir, filePath)
 						log.Debugf("create file in dir: %s", filePath)
 					} else {
 						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
@@ -1223,6 +1223,9 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 // travelDagLinks because file no have link name
 func (this *DownloadTask) travelDagLinks(m map[string]string, c string, name string) {
 	getBlock := this.Mgr.Fs().GetBlock(c)
+	if getBlock == nil {
+		return
+	}
 	links, err := this.Mgr.Fs().GetBlockLinksByDAG(getBlock)
 	if err != nil {
 		return
@@ -1239,16 +1242,6 @@ func (this *DownloadTask) travelDagLinks(m map[string]string, c string, name str
 		}
 	}
 	return
-}
-
-func SplitFileNameFromPath(s string) (path string, fileName string, isFile bool) {
-	if strings.HasSuffix(s, "/") {
-		return s, "", false
-	}
-	a := strings.Split(s, "/")
-	s = strings.Join(a[0:len(a)-1], "/")
-	s += "/"
-	return s, a[len(a)-1], true
 }
 
 func (this *DownloadTask) addDownloadBlockReq() error {
