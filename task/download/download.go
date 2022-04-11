@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1046,12 +1047,13 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				// set task info
 				if v.Name != "" && !taskInfo.IsDir {
 					taskInfo.IsDir = true
-					err := this.DB.SaveTaskInfo(taskInfo)
+					err := this.SetIsDirInfo(taskInfo.IsDir)
 					if err != nil {
-						log.Errorf("save task info err: %s", err)
+						log.Errorf("set isDir info err: %s", err)
 						return err
 					}
 					dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, block.Cid().String())
+					log.Debugf("set file path: %s", dirPath)
 					err = this.SetFilePath(dirPath)
 					if err != nil {
 						log.Errorf("set file path err: %s", err)
@@ -1071,6 +1073,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					var createFileErr error
 					if taskInfo.IsDir {
 						pathByLink := dirMap[block.Cid().String()]
+						log.Debugf("get path by link, block cid: %s, path: %s", block.Cid().String(), pathByLink)
 						// always is file because links eq 0
 						dirPath, fileName, _ := SplitFileNameFromPath(pathByLink)
 						fullDir := filepath.Join(this.GetFilePath(), dirPath)
@@ -1080,9 +1083,15 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 								err, dirPath, fullDir, fileName)
 							continue
 						}
-						filePath := filepath.Join(fullDir, fileName)
+						var filePath string
+						if strings.HasPrefix(fullDir, "/") {
+							filePath = fileName
+						} else {
+							filePath = filepath.Join(fullDir, fileName)
+						}
 						file, createFileErr = createDownloadFile(fullDir, filePath)
-						log.Debugf("create file in dir: %s", filePath)
+						log.Debugf("create file in dir, pathConfig: %s, dirPath: %s, fullDir: %s, filePath: %s",
+							this.GetFilePath(), dirPath, fullDir, filePath)
 					} else {
 						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
 						log.Debugf("create file not in dir: %s", this.GetFilePath())
