@@ -2,10 +2,10 @@ package download
 
 import (
 	"fmt"
+	blocks "github.com/saveio/max/Godeps/_workspace/src/gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1003,6 +1003,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 	defer stateCheckTicker.Stop()
 	dirMap := make(map[string]string) // cid => fileName
 	filePos := make(map[string]int64) // cid => pos
+	isDir := false
 	for {
 		select {
 		case value, ok := <-this.GetTaskNotify():
@@ -1013,16 +1014,12 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "download task %s is stop", this.GetId())
 			}
 			log.Debugf("received block %s-%s-%d from %s", this.GetFileHash(), value.Hash, value.Index, value.PeerAddr)
-			if this.DB.IsBlockDownloaded(this.GetId(), value.Hash, uint64(value.Index)) &&
+			if this.DB.IsBlockDownloaded(this.GetId(), value.Hash, value.Index) &&
 				!this.DB.IsFileDownloaded(this.GetId()) {
 				log.Debugf("%s-%s-%d is downloaded", this.GetFileHash(), value.Hash, value.Index)
 				continue
 			}
 			block := this.Mgr.Fs().EncodedToBlockWithCid(value.Block, value.Hash)
-			links, err := this.Mgr.Fs().GetBlockLinks(block)
-			if err != nil {
-				return err
-			}
 			if block.Cid().String() != value.Hash {
 				log.Warnf("receive a unmatched hash block %s %s", block.Cid().String(), value.Hash)
 			}
@@ -1038,16 +1035,14 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			if err != nil {
 				return err
 			}
-			taskInfo, err := this.DB.GetTaskInfo(this.GetId())
-			if err != nil {
-				log.Errorf("get task info err: %s, id: %s", err, this.GetId())
-				return err
+			if !isDir {
+				isDir = this.GetIsDirInfo()
 			}
 			for _, v := range dagLinks {
-				// set task info
-				if v.Name != "" && !taskInfo.IsDir {
-					taskInfo.IsDir = true
-					err := this.SetIsDirInfo(taskInfo.IsDir)
+				// download a dir if links has name
+				if v.Name != "" && !isDir {
+					isDir = true
+					err := this.SetIsDirInfo(isDir)
 					if err != nil {
 						log.Errorf("set isDir info err: %s", err)
 						return err
@@ -1060,84 +1055,19 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 						return err
 					}
 				}
-				_, ok := dirMap[v.Cid.String()]
-				if !ok {
+				_, exist := dirMap[v.Cid.String()]
+				if !exist {
 					dirMap[v.Cid.String()] = v.Name
 				}
 				this.travelDagLinks(dirMap, v.Cid.String(), v.Name)
 			}
 			// write file with block data
-			if len(links) == 0 && this.Mgr.IsClient() {
-				var file *os.File
-				if this.Mgr.IsClient() {
-					var createFileErr error
-					if taskInfo.IsDir {
-						pathByLink := dirMap[block.Cid().String()]
-						log.Debugf("get path by link, block cid: %s, path: %s", block.Cid().String(), pathByLink)
-						// always is file because links eq 0
-						dirPath, fileName, _ := SplitFileNameFromPath(pathByLink)
-						fullDir := filepath.Join(this.GetFilePath(), dirPath)
-						err := uOS.CreateDirIfNeed(fullDir)
-						if err != nil {
-							log.Errorf("create dir error: %s, fullPath: %s, dirPath: %s, fileName: %s",
-								err, dirPath, fullDir, fileName)
-							continue
-						}
-						var filePath string
-						if strings.HasPrefix(fullDir, "/") {
-							filePath = fileName
-						} else {
-							filePath = filepath.Join(fullDir, fileName)
-						}
-						file, createFileErr = createDownloadFile(fullDir, filePath)
-						log.Debugf("create file in dir, pathConfig: %s, dirPath: %s, fullDir: %s, filePath: %s",
-							this.GetFilePath(), dirPath, fullDir, filePath)
-					} else {
-						file, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
-						log.Debugf("create file not in dir: %s", this.GetFilePath())
-					}
-					if createFileErr != nil {
-						log.Errorf("createFileErr: %s, isDir: %v", createFileErr, taskInfo.IsDir)
-						return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
-					}
-					defer func() {
-						if err := file.Close(); err != nil {
-							log.Errorf("close file err %s", err)
-						}
-					}()
-				}
-
-				data := this.Mgr.Fs().BlockData(block)
-				// cut prefix
-				// TEST: why not use filesize == 0
-				if !isFileEncrypted && !hasCutPrefix && len(data) >= len(prefix) &&
-					string(data[:len(prefix)]) == prefix {
-					log.Debugf("cut prefix data-len %d, prefix %s, prefix-len: %d, str %s",
-						len(data), prefix, len(prefix), string(data[:len(prefix)]))
-					data = data[len(prefix):]
-					hasCutPrefix = true
-				}
-				// TEST: offset
-				writeAtPos := value.Offset
-				if value.Offset > 0 && !isFileEncrypted {
-					writeAtPos = value.Offset - int64(len(prefix))
-				}
-				// each file has pos
-				if taskInfo.IsDir {
-					fileName := dirMap[block.Cid().String()]
-					pos, ok := filePos[fileName]
-					if !ok {
-						writeAtPos = 0
-						filePos[fileName] = int64(len(block.RawData()))
-					} else {
-						writeAtPos = pos
-						filePos[fileName] = writeAtPos + int64(len(block.RawData()))
-					}
-				}
-				log.Debugf("file %s append block %s index %d, the block data length %d, offset %v, pos %d",
-					this.GetFileHash(), block.Cid().String(), value.Index, len(data), value.Offset, writeAtPos)
-				if _, err := file.WriteAt(data, writeAtPos); err != nil {
-					return sdkErr.NewWithError(sdkErr.WRITE_FILE_DATA_FAILED, err)
+			if len(dagLinks) == 0 && this.Mgr.IsClient() {
+				err := this.writeBlockToFile(isDir, &hasCutPrefix, prefix, isFileEncrypted,
+					block, value, dirMap, filePos)
+				if err != nil {
+					log.Errorf("write block to file err: %s", err)
+					return err
 				}
 			}
 			if this.Mgr.IsClient() {
@@ -1149,12 +1079,17 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					return err
 				}
 				log.Debugf("block %s value.index %d, value.tag:%d", block.Cid(), value.Index, len(value.Tag))
-				err = this.Mgr.Fs().PutTag(block.Cid().String(), this.GetFileHash(), uint64(value.Index), value.Tag)
+				err = this.Mgr.Fs().PutTag(block.Cid().String(), this.GetFileHash(), value.Index, value.Tag)
 			}
 			log.Debugf("put block for file %s block: %s, offset:%d", this.GetFilePath(), block.Cid(), value.Offset)
 			if err != nil {
 				log.Errorf("put block err %s", err)
 				return err
+			}
+
+			links := make([]string, 0, len(dagLinks))
+			for _, link := range dagLinks {
+				links = append(links, link.Cid.String())
 			}
 			if err := this.SetBlockDownloaded(this.GetId(), value.Hash, value.PeerAddr, value.Index,
 				value.Offset, links); err != nil {
@@ -1225,6 +1160,77 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			}
 			client.P2PBroadcast([]string{hostAddr}, fileDownloadOkMsg.ToProtoMsg(), fileDownloadOkMsg.MessageId)
 		}(walletAddr, sessionId)
+	}
+	return nil
+}
+
+// writeBlockToFile write real file in disk
+func (this *DownloadTask) writeBlockToFile(isDir bool, hasCutPrefix *bool, prefix string, isFileEncrypted bool,
+	block blocks.Block, value *types.BlockResp, dirMap map[string]string, filePos map[string]int64) error {
+	var fileHandler *os.File
+	if this.Mgr.IsClient() {
+		var createFileErr error
+		if isDir {
+			pathByLink := dirMap[block.Cid().String()]
+			log.Debugf("get path by link, block cid: %s, path: %s", block.Cid().String(), pathByLink)
+			// always is file because links eq 0
+			dirPath, fileName, _ := SplitFileNameFromPath(pathByLink)
+			fullDir := filepath.Join(this.GetFilePath(), dirPath)
+			err := uOS.CreateDirIfNeed(fullDir)
+			if err != nil {
+				log.Errorf("create dir error: %s, fullPath: %s, dirPath: %s, fileName: %s",
+					err, dirPath, fullDir, fileName)
+				return err
+			}
+			var filePath string
+			filePath = filepath.Join(fullDir, fileName)
+			fileHandler, createFileErr = createDownloadFile(fullDir, filePath)
+			log.Debugf("create file in dir, pathConfig: %s, dirPath: %s, fullDir: %s, filePath: %s",
+				this.GetFilePath(), dirPath, fullDir, filePath)
+		} else {
+			fileHandler, createFileErr = createDownloadFile(this.Mgr.Config().FsFileRoot, this.GetFilePath())
+			log.Debugf("create file not in dir: %s", this.GetFilePath())
+		}
+		if createFileErr != nil {
+			log.Errorf("createFileErr: %s, isDir: %v", createFileErr, isDir)
+			return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, createFileErr)
+		}
+		defer func() {
+			if err := fileHandler.Close(); err != nil {
+				log.Errorf("close file err %s", err)
+			}
+		}()
+	}
+	data := this.Mgr.Fs().BlockData(block)
+	// cut prefix
+	// TEST: why not use filesize == 0
+	if !isFileEncrypted && !*hasCutPrefix && len(data) >= len(prefix) && string(data[:len(prefix)]) == prefix {
+		log.Debugf("cut prefix data-len %d, prefix %s, prefix-len: %d, str %s",
+			len(data), prefix, len(prefix), string(data[:len(prefix)]))
+		data = data[len(prefix):]
+		*hasCutPrefix = true
+	}
+	// TEST: offset; for single file
+	writeAtPos := value.Offset
+	if value.Offset > 0 && !isFileEncrypted {
+		writeAtPos = value.Offset - int64(len(prefix))
+	}
+	// for dir: each file has pos
+	if isDir {
+		fileName := dirMap[block.Cid().String()]
+		pos, exist := filePos[fileName]
+		if !exist {
+			writeAtPos = 0
+			filePos[fileName] = int64(len(block.RawData()))
+		} else {
+			writeAtPos = pos
+			filePos[fileName] = writeAtPos + int64(len(block.RawData()))
+		}
+	}
+	log.Debugf("file %s append block %s index %d, the block data length %d, offset %v, pos %d",
+		this.GetFileHash(), block.Cid().String(), value.Index, len(data), value.Offset, writeAtPos)
+	if _, err := fileHandler.WriteAt(data, writeAtPos); err != nil {
+		return sdkErr.NewWithError(sdkErr.WRITE_FILE_DATA_FAILED, err)
 	}
 	return nil
 }

@@ -584,3 +584,10 @@ func (this *DownloadTask) SetIsDirInfo(isDir bool) error {
 	}
 	return this.DB.SaveTaskInfo(info)
 }
+
+func (this *DownloadTask) GetIsDirInfo() bool {
+	this.Lock.RLock()
+	defer this.Lock.RUnlock()
+	info := this.GetTaskInfo()
+	return info.IsDir
+}

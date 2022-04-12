@@ -80,5 +80,5 @@ func SplitFileNameFromPath(s string) (dirPath string, fileName string, isFile bo
 	s = strings.Join(a[0:len(a)-1], "/")
 	s += "/"
 	// adapt cross-platform
-	return filepath.FromSlash(dirPath), a[len(a)-1], true
+	return filepath.FromSlash(s), a[len(a)-1], true
 }
