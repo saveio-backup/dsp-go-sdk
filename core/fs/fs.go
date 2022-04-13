@@ -332,7 +332,7 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 // If a block is referenced to other file, ignore it.
 func (this *Fs) DeleteFile(fileHashStr, filePath string) error {
 	if len(filePath) > 0 {
-		err := os.Remove(filePath)
+		err := os.RemoveAll(filePath)
 		if err != nil {
 			log.Errorf("delete local file %s err %s", filePath, err)
 		}

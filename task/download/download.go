@@ -480,10 +480,9 @@ func (this *DownloadTask) internalDownload() error {
 					return err
 				}
 			}
-			log.Debugf("checking file hash %s", checkFileList[0])
-			if (len(checkFileList) == 0 || checkFileList[0] != this.GetFileHash()) && !stat.IsDir() {
+			log.Debugf("checking file hash: %s, want file hash: %s", checkFileList[0], this.GetFileHash())
+			if len(checkFileList) == 0 || checkFileList[0] != this.GetFileHash() {
 				this.EmitProgress(types.TaskDownloadCheckingFileFailed)
-				// TODO wangyu dir hash not match
 				err = sdkErr.New(sdkErr.CHECK_FILE_FAILED, "file hash not match")
 				return err
 			}
@@ -1063,8 +1062,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			}
 			// write file with block data
 			if len(dagLinks) == 0 && this.Mgr.IsClient() {
-				err := this.writeBlockToFile(isDir, &hasCutPrefix, prefix, isFileEncrypted,
-					block, value, dirMap, filePos)
+				err := this.writeBlockToFile(isDir, &hasCutPrefix, prefix, isFileEncrypted, block, value, dirMap, filePos)
 				if err != nil {
 					log.Errorf("write block to file err: %s", err)
 					return err
@@ -1235,9 +1233,9 @@ func (this *DownloadTask) writeBlockToFile(isDir bool, hasCutPrefix *bool, prefi
 	return nil
 }
 
-// travelDagLinks because file no have link name
-func (this *DownloadTask) travelDagLinks(m map[string]string, c string, name string) {
-	getBlock := this.Mgr.Fs().GetBlock(c)
+// travelDagLinks because file have no link name
+func (this *DownloadTask) travelDagLinks(m map[string]string, cid string, name string) {
+	getBlock := this.Mgr.Fs().GetBlock(cid)
 	if getBlock == nil {
 		return
 	}

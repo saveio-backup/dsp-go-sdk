@@ -13,6 +13,7 @@ func TestSplitFileNameFromPath(t *testing.T) {
 		"/aaa/bbb/a160",
 		"/aaa/",
 		"/",
+		"/a/WechatIMG494.png",
 	}
 	for _, v := range arr {
 		path, name, file := SplitFileNameFromPath(v)

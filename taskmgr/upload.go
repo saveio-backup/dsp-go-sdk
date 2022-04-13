@@ -57,32 +57,31 @@ func (this *TaskMgr) UploadTaskExist(filePath string) (bool, error) {
 	// check uploading task, if filePath match, task is exist
 	for _, tsk := range this.uploadTasks {
 		if tsk.GetFilePath() == filePath {
-			log.Debugf("upload task %s,  filepath: %s",
-				tsk.GetId(), filePath)
+			log.Debugf("upload task %s,  filepath: %s", tsk.GetId(), filePath)
 			return true, nil
 		}
 	}
 
+	// check uploading task simple checksum, if matched, task is exist
 	checksum := ""
 	stat, err := os.Stat(filePath)
 	if err != nil {
 		return false, err
 	}
 	if stat.IsDir() {
-		// TODO: check uploading task dir checksum, if matched, task is exist
-		checksum = stat.Name()
+		checksum, err = crypto.GetSimpleChecksumOfDir(filePath)
 	} else {
-		// check uploading task simple checksum, if matched, task is exist
 		checksum, err = crypto.GetSimpleChecksumOfFile(filePath)
-		if err != nil {
-			return true, sdkErr.NewWithError(sdkErr.GET_SIMPLE_CHECKSUM_ERROR, err)
-		}
-		for _, tsk := range this.uploadTasks {
-			if tsk.GetSimpleChecksum() == checksum {
-				log.Debugf("upload task %s, exist checksum: %s, filepath: %s",
-					tsk.GetId(), checksum, filePath)
-				return true, nil
-			}
+	}
+	log.Debugf("upload task checksum: %s, file path: %s", checksum, filePath)
+	if err != nil {
+		return true, sdkErr.NewWithError(sdkErr.GET_SIMPLE_CHECKSUM_ERROR, err)
+	}
+	for _, tsk := range this.uploadTasks {
+		if tsk.GetSimpleChecksum() == checksum {
+			log.Debugf("upload task %s, exist checksum: %s, filepath: %s, isDir: %t",
+				tsk.GetId(), checksum, filePath, stat.IsDir())
+			return true, nil
 		}
 	}
 

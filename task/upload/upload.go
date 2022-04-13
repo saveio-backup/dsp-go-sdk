@@ -59,7 +59,10 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			return nil, sdkErr.New(sdkErr.INVALID_PARAMS, err.Error())
 		}
 	} else {
-		// TODO: check dir
+		checksum, err = crypto.GetSimpleChecksumOfDir(filePath)
+		if err != nil {
+			return nil, sdkErr.New(sdkErr.INVALID_PARAMS, err.Error())
+		}
 	}
 	if err = this.SetInfoWithOptions(
 		base.FilePath(filePath),
