@@ -24,6 +24,7 @@ func TestGenPrefix(t *testing.T) {
 		Owner:      addr,
 		FileSize:   fileSize,
 		FileName:   " 哈哈@@%^#*)!?><|}{}>~!.txt ",
+		FileType:   0,
 	}
 	prefix.MakeSalt()
 	buf := prefix.Serialize()
@@ -32,6 +33,7 @@ func TestGenPrefix(t *testing.T) {
 	prefix2 := &FilePrefix{}
 	prefix2.Deserialize(buf)
 	log.Infof("version: %d", prefix2.Version)
+	log.Infof("file type: %d", prefix2.FileType)
 	log.Infof("encrypt: %t", prefix2.Encrypt)
 	log.Infof("salt: %v", prefix2.EncryptSalt)
 	log.Infof("hash: %v", prefix2.EncryptHash)
@@ -80,6 +82,7 @@ func TestMarshalPrefix(t *testing.T) {
 	fileSize := uint64(4 * 1024 * 1024 * 1024)
 	prefix := &FilePrefix{
 		Version:    1,
+		FileType:   1,
 		Encrypt:    true,
 		EncryptPwd: "1234",
 		Owner:      addr,
@@ -119,6 +122,7 @@ func TestBytesToBytesPrefix(t *testing.T) {
 	fileSize := uint64(4 * 1024 * 1024 * 1024)
 	prefix := &FilePrefix{
 		Version:    1,
+		FileType:   1,
 		Encrypt:    true,
 		EncryptPwd: "1234",
 		Owner:      addr,

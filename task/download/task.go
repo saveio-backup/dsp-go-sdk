@@ -573,21 +573,3 @@ func (this *DownloadTask) SetFilePath(filePath string) error {
 	}
 	return this.DB.SaveTaskInfo(info)
 }
-
-func (this *DownloadTask) SetIsDirInfo(isDir bool) error {
-	this.Lock.Lock()
-	defer this.Lock.Unlock()
-	info := this.GetTaskInfo()
-	info.IsDir = isDir
-	if this.Batch {
-		return nil
-	}
-	return this.DB.SaveTaskInfo(info)
-}
-
-func (this *DownloadTask) GetIsDirInfo() bool {
-	this.Lock.RLock()
-	defer this.Lock.RUnlock()
-	info := this.GetTaskInfo()
-	return info.IsDir
-}

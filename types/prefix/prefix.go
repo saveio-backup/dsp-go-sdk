@@ -25,12 +25,19 @@ const (
 	CHECKSUM_LEN     = 4
 	FILENAME_LEN     = 1
 	PAYLOAD_SIZE_LEN = 4
+	FILETYPE_LEN     = 1
 	MAX_PAYLOAD_SIZE = VERSION_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + OWNER_LEN + FILESIZE_LEN +
-		FILENAME_LEN + 2<<(FILENAME_LEN*8-1) + REVERSED_LEN + CHECKSUM_LEN
+		FILENAME_LEN + 2<<(FILENAME_LEN*8-1) + REVERSED_LEN + CHECKSUM_LEN + FILETYPE_LEN
+)
+
+const (
+	FILETYPE_FILE = iota
+	FILETYPE_DIR
 )
 
 type FilePrefix struct {
 	Version     uint8              // prefix version
+	FileType    uint8              // file type
 	Encrypt     bool               // is file encrypt
 	EncryptPwd  string             // file encrypt password
 	EncryptSalt [4]byte            // random salt
@@ -91,7 +98,7 @@ func (p *FilePrefix) Serialize() []byte {
 	var fileNameBuf [FILENAME_LEN]byte
 	fileNameBuf[0] = byte(len(p.FileName))
 
-	payloadSize := uint32(VERSION_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + len(p.Owner[:]) +
+	payloadSize := uint32(VERSION_LEN + FILETYPE_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + len(p.Owner[:]) +
 		FILESIZE_LEN + FILENAME_LEN + len(p.FileName) + REVERSED_LEN + CHECKSUM_LEN)
 	if payloadSize > MAX_PAYLOAD_SIZE {
 		log.Warnf("payload size too big")
@@ -99,6 +106,9 @@ func (p *FilePrefix) Serialize() []byte {
 	}
 	payloadSizeBuf := make([]byte, PAYLOAD_SIZE_LEN)
 	binary.BigEndian.PutUint32(payloadSizeBuf, payloadSize)
+
+	var typeBuffer [FILETYPE_LEN]byte
+	typeBuffer[0] = byte(p.FileType)
 
 	var result []byte
 	result = append(result, versionBuf[0])
@@ -110,6 +120,7 @@ func (p *FilePrefix) Serialize() []byte {
 	result = append(result, fileNameBuf[0])
 	result = append(result, p.FileName[:]...)
 	result = append(result, p.Reserved[:]...)
+	result = append(result, typeBuffer[0])
 
 	checkSum := crc32.ChecksumIEEE(result)
 	checkSumBuf := make([]byte, CHECKSUM_LEN)
@@ -180,6 +191,8 @@ func (p *FilePrefix) Deserialize(base64Buf []byte) error {
 
 	copy(p.Reserved[:], buf[fileNameEnd:fileNameEnd+REVERSED_LEN])
 
+	p.FileType = buf[fileNameEnd+REVERSED_LEN]
+
 	return nil
 }
 
@@ -199,6 +212,7 @@ func (p *FilePrefix) Print() {
 	log.Debugf("EncryptSalt: %v", p.EncryptSalt)
 	log.Debugf("EncryptHash: %v", p.EncryptHash)
 	log.Debugf("Owner: %s", p.Owner.ToBase58())
+	log.Debugf("FileType: %d", p.FileType)
 }
 
 func VerifyEncryptPassword(password string, salt [4]byte, hash [32]byte) bool {
@@ -213,6 +227,12 @@ func GetPrefixEncrypted(prefix []byte) bool {
 	filePrefix := &FilePrefix{}
 	filePrefix.Deserialize(prefix)
 	return filePrefix.Encrypt
+}
+
+func GetPrefixFileType(prefix []byte) uint8 {
+	filePrefix := &FilePrefix{}
+	filePrefix.Deserialize(prefix)
+	return filePrefix.FileType
 }
 
 func GetPayloadLenFromBuf(prefixLenBuf []byte) uint32 {

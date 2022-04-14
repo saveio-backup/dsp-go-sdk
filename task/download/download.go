@@ -996,7 +996,8 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 	defer stateCheckTicker.Stop()
 	dirMap := make(map[string]string) // cid => fileName
 	filePos := make(map[string]int64) // cid => pos
-	isDir := false
+	fileType := uPrefix.GetPrefixFileType(this.GetPrefix())
+	isDir := fileType == uPrefix.FILETYPE_DIR
 	for {
 		select {
 		case value, ok := <-this.GetTaskNotify():
@@ -1028,24 +1029,22 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			if err != nil {
 				return err
 			}
-			if !isDir {
-				isDir = this.GetIsDirInfo()
+			if isDir {
+				dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, blockCid)
+				_ = this.SetFilePath(dirPath)
 			}
 			for _, v := range dagLinks {
-				// download a dir if links has named
-				if v.Name != "" && !isDir {
-					isDir = true
-					_ = this.SetIsDirInfo(isDir)
-					dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, blockCid)
-					_ = this.SetFilePath(dirPath)
-					log.Debugf("set file path: %s", dirPath)
-				}
 				// record file path
 				_, exist := dirMap[v.Cid.String()]
+				var fileName string
 				if !exist {
-					dirMap[v.Cid.String()] = v.Name
+					fileName = v.Name
+					if isFileEncrypted {
+						fileName += consts.ENCRYPTED_FILE_EXTENSION
+					}
+					dirMap[v.Cid.String()] = fileName
 				}
-				this.travelDagLinks(dirMap, v.Cid.String(), v.Name)
+				this.travelDagLinks(dirMap, v.Cid.String(), fileName)
 			}
 			// write file with block data
 			if len(dagLinks) == 0 && this.Mgr.IsClient() {
@@ -1163,10 +1162,6 @@ func (this *DownloadTask) writeBlockToFile(isDir bool, hasCutPrefix *bool, prefi
 			dirPath, fileName, _ := SplitFileNameFromPath(pathByLink)
 			fullDir := filepath.Join(this.GetFilePath(), dirPath)
 			filePath = filepath.Join(fullDir, fileName)
-			_ = ReplaceFileToDir(fullDir, func() {
-				s := dirMap[block.Cid().String()]
-				filePos[s] = 0
-			})
 			fileHandler, createFileErr = createDownloadFile(fullDir, filePath)
 			log.Debugf("create file in dir, pathConfig: %s, dirPath: %s, fullDir: %s, filePath: %s",
 				this.GetFilePath(), dirPath, fullDir, filePath)

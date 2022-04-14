@@ -52,14 +52,18 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 		return nil, err
 	}
 	checksum := ""
-	if !file.IsDir() {
-		// calculate check sum for setting to DB
-		checksum, err = crypto.GetSimpleChecksumOfFile(filePath)
+	var fileType uint8
+	if file.IsDir() {
+		fileType = prefix.FILETYPE_DIR
+		checksum, err = crypto.GetSimpleChecksumOfDir(filePath)
 		if err != nil {
 			return nil, sdkErr.New(sdkErr.INVALID_PARAMS, err.Error())
 		}
+
 	} else {
-		checksum, err = crypto.GetSimpleChecksumOfDir(filePath)
+		fileType = prefix.FILETYPE_FILE
+		// calculate check sum for setting to DB
+		checksum, err = crypto.GetSimpleChecksumOfFile(filePath)
 		if err != nil {
 			return nil, sdkErr.New(sdkErr.INVALID_PARAMS, err.Error())
 		}
@@ -114,6 +118,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			Owner:      this.Mgr.Chain().Address(),
 			FileSize:   opt.FileSize,
 			FileName:   string(opt.FileDesc),
+			FileType:   fileType,
 		}
 		filePrefix.MakeSalt()
 		prefixStr = filePrefix.String()
