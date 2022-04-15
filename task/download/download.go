@@ -3,6 +3,7 @@ package download
 import (
 	"fmt"
 	blocks "github.com/saveio/max/Godeps/_workspace/src/gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -459,15 +460,16 @@ func (this *DownloadTask) internalDownload() error {
 		}
 		log.Debugf("will check file hash task id %s, file hash %s, downloaded %t",
 			this.GetId(), this.GetFileHash(), this.DB.IsFileDownloaded(this.GetId()))
+		stat, err := os.Stat(fullFilePath)
+		if err != nil {
+			return err
+		}
+		isDir := stat.IsDir()
 		if this.Mgr.IsClient() &&
 			this.DB.IsFileDownloaded(this.GetId()) && !uPrefix.GetPrefixEncrypted(this.GetPrefix()) {
 			this.EmitProgress(types.TaskDownloadCheckingFile)
-			stat, err := os.Stat(fullFilePath)
-			if err != nil {
-				return err
-			}
 			checkFileList := make([]string, 0)
-			if stat.IsDir() {
+			if isDir {
 				checkFileList, err = this.Mgr.Fs().NodesFromDir(fullFilePath, string(this.GetPrefix()), false, "")
 			} else {
 				checkFileList, err = this.Mgr.Fs().NodesFromFile(fullFilePath, string(this.GetPrefix()), false, "")
@@ -485,8 +487,14 @@ func (this *DownloadTask) internalDownload() error {
 		if len(this.GetDecryptPwd()) == 0 {
 			return nil
 		}
-		log.Debugf("decrypt task %s file with pwd %s", this.GetId(), this.GetDecryptPwd())
-		if err := this.decryptDownloadedFile(); err != nil {
+		if isDir {
+			log.Debugf("decrypt task %s file in dir with pwd %s", this.GetId(), this.GetDecryptPwd())
+			err = this.decryptDownloadedFileInDir(fullFilePath)
+		} else {
+			log.Debugf("decrypt task %s file with pwd %s", this.GetId(), this.GetDecryptPwd())
+			err = this.decryptDownloadedFile()
+		}
+		if err != nil {
 			return err
 		}
 		return nil
@@ -1198,13 +1206,15 @@ func (this *DownloadTask) writeBlockToFile(isDir bool, hasCutPrefix *bool, prefi
 		fileName := dirMap[block.Cid().String()]
 		pos, exist := filePos[fileName]
 		if !exist {
+			// set write pos
 			writeAtPos = 0
-			filePos[fileName] = int64(len(block.RawData()))
+			filePos[fileName] = int64(len(data))
 		} else {
 			writeAtPos = pos
-			filePos[fileName] = writeAtPos + int64(len(block.RawData()))
+			filePos[fileName] = writeAtPos + int64(len(data))
 		}
 	}
+
 	log.Debugf("file %s append block %s index %d, the block data length %d, offset %v, pos %d, file path: %s",
 		this.GetFileHash(), block.Cid().String(), value.Index, len(data), value.Offset, writeAtPos, filePath)
 	if _, err := fileHandler.WriteAt(data, writeAtPos); err != nil {
@@ -1291,6 +1301,42 @@ func (this *DownloadTask) decryptDownloadedFile() error {
 	}
 	log.Debugf("decrypt file success %s", newFilePath)
 	// return this.taskMgr.SetTaskInfoWithOptions(taskId, task.FilePath(newFilePath))
+	return nil
+}
+
+func (this *DownloadTask) decryptDownloadedFileInDir(path string) error {
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return sdkErr.New(sdkErr.DECRYPT_FILE_FAILED, err.Error())
+	}
+	for _, v := range files {
+		if v.IsDir() {
+			err := this.decryptDownloadedFileInDir(filepath.Join(path, v.Name()))
+			if err != nil {
+				log.Errorf("decrypt file in dir %s failed %v", path, err)
+				return err
+			}
+		} else {
+			if len(this.GetDecryptPwd()) == 0 {
+				return sdkErr.New(sdkErr.DECRYPT_FILE_FAILED, "no decrypt password")
+			}
+			filePath := filepath.Join(path, v.Name())
+			filePrefix, prefix, err := uPrefix.GetPrefixFromFile(filePath)
+			if err != nil {
+				return sdkErr.New(sdkErr.DECRYPT_FILE_FAILED, err.Error())
+			}
+			if !uPrefix.VerifyEncryptPassword(this.GetDecryptPwd(), filePrefix.EncryptSalt, filePrefix.EncryptHash) {
+				return sdkErr.New(sdkErr.DECRYPT_WRONG_PASSWORD, "wrong password")
+			}
+			newFilePath := filePath[:len(filePath)-4]
+			err = this.Mgr.Fs().AESDecryptFile(filePath, string(prefix), this.GetDecryptPwd(), newFilePath)
+			if err != nil {
+				return sdkErr.New(sdkErr.DECRYPT_FILE_FAILED, err.Error())
+			}
+			_ = os.Remove(filePath)
+			log.Debugf("decrypt file in dir success %s", newFilePath)
+		}
+	}
 	return nil
 }
 

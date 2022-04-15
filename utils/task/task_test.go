@@ -40,6 +40,10 @@ func TestGetDecryptedFilePath(t *testing.T) {
 	fmt.Println(GetDecryptedFilePath(filePath, fileName))
 
 	fmt.Println("file base ", filepath.Base(filePath))
+
+	filePath = "Chain-1/Downloads/AYKnc5VDkvpb5f68XSjTyQzVHU4ZaojGxq/SaveQmTCeB2mf7XsdGeBRZo5S2eoVnEbbgY6hPmDeEHffKH6N5.ept/.DS_Store.ept"
+	fileName = ".DS_Store.ept"
+	fmt.Println(GetDecryptedFilePath(filePath, fileName))
 }
 
 func TestTotalJitterDelay(t *testing.T) {

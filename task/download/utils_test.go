@@ -23,7 +23,7 @@ func TestSplitFileNameFromPath(t *testing.T) {
 
 func TestReplaceFileToDir(t *testing.T) {
 	path := "/Users/smallyu/work/gogs/edge-deploy/node1/Chain-1/Downloads/AYKnc5VDkvpb5f68XSjTyQzVHU4ZaojGxq/SaveQma4vybM23GRVTAYdDseBAU6ynZ4CXJWGL4Q4YzPoorC1R.ept"
-	err := ReplaceFileToDir(path)
+	err := ReplaceFileToDir(path, func() {})
 	if err != nil {
 		fmt.Println(err)
 	}
