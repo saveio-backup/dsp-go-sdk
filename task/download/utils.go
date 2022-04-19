@@ -82,19 +82,3 @@ func SplitFileNameFromPath(s string) (dirPath string, fileName string, isFile bo
 	// adapt cross-platform
 	return filepath.FromSlash(s), a[len(a)-1], true
 }
-
-func ReplaceFileToDir(path string, f func()) error {
-	stat, err := os.Stat(path)
-	if err != nil {
-		// there need not exist file
-		return nil
-	}
-	if !stat.IsDir() {
-		err := os.Remove(path)
-		if err != nil {
-			return err
-		}
-	}
-	f()
-	return nil
-}

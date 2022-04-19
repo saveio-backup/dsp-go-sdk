@@ -49,9 +49,14 @@ type FilePrefix struct {
 	Reserved    [REVERSED_LEN]byte // reserved word field
 }
 
-func NewEncryptPrefix(password string, owner common.Address, fileSize uint64) *FilePrefix {
+func NewEncryptPrefix(password string, owner common.Address, fileSize uint64, isDir bool) *FilePrefix {
+	fileType := FILETYPE_FILE
+	if isDir {
+		fileType = FILETYPE_DIR
+	}
 	p := &FilePrefix{
 		Version:    PREFIX_VERSION,
+		FileType:   uint8(fileType),
 		Encrypt:    true,
 		EncryptPwd: password,
 		Owner:      owner,
