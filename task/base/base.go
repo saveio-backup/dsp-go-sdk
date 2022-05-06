@@ -745,3 +745,21 @@ func newTask(id string, info *store.TaskInfo, db *store.TaskDB) *Task {
 	// t.Info.Id = id
 	return t
 }
+
+func (this *Task) SetDagInfo(dagInfo map[string]map[string]int64) error {
+	this.Lock.RLock()
+	defer this.Lock.RUnlock()
+	info := this.getTaskInfo()
+	info.DagInfo = dagInfo
+	return this.DB.SaveTaskInfo(info)
+}
+
+func (this *Task) GetDagInfo() map[string]map[string]int64 {
+	this.Lock.RLock()
+	defer this.Lock.RUnlock()
+	info := this.getTaskInfo()
+	if info.DagInfo == nil {
+		return make(map[string]map[string]int64)
+	}
+	return info.DagInfo
+}

@@ -1004,7 +1004,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 	isFileEncrypted := uPrefix.GetPrefixEncrypted(this.GetPrefix())
 	stateCheckTicker := time.NewTicker(time.Duration(consts.TASK_STATE_CHECK_DURATION) * time.Second)
 	defer stateCheckTicker.Stop()
-	dirMap := make(map[string]map[string]int64) // fileName => map[cid]any
+	dagInfo := make(map[string]map[string]int64)
 	fileType := uPrefix.GetPrefixFileType(this.GetPrefix())
 	isDir := fileType == uPrefix.FILETYPE_DIR
 	for {
@@ -1042,6 +1042,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, blockCid)
 				_ = this.SetFilePath(dirPath)
 			}
+			dagInfo = this.GetDagInfo()
 			for _, v := range dagLinks {
 				if v.Name == "" {
 					continue
@@ -1051,14 +1052,15 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					fileName += consts.ENCRYPTED_FILE_EXTENSION
 				}
 				// record file path
-				subDirMap, exist := dirMap[fileName]
+				subDirMap, exist := dagInfo[fileName]
 				if !exist {
 					subDirMap = make(map[string]int64)
 				}
 				subDirMap[v.Cid.String()] = value.Offset
-				dirMap[fileName] = subDirMap
-				this.travelDagLinks(dirMap, v.Cid.String(), fileName, value.Offset)
+				dagInfo[fileName] = subDirMap
+				this.travelDagLinks(dagInfo, v.Cid.String(), fileName, value.Offset)
 			}
+			_ = this.SetDagInfo(dagInfo)
 			// write file with block data
 			if len(dagLinks) == 0 && this.Mgr.IsClient() && !isDir {
 				err := this.writeBlockToFile(&hasCutPrefix, prefix, isFileEncrypted, getBlock, value)
@@ -1106,7 +1108,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				this.DB.IsFileDownloaded(this.GetId()), value.Index, isDir)
 			// write to dir after download finish because exist repair file
 			if isDir {
-				err := this.writeBlockToDir(dirMap)
+				err := this.writeBlockToDir(dagInfo)
 				if err != nil {
 					log.Errorf("write block to dir err: %s", err)
 					return err
@@ -1277,7 +1279,7 @@ func (this *DownloadTask) writeBlockToFile(hasCutPrefix *bool, prefix string, is
 }
 
 // travelDagLinks because file have no link name
-func (this *DownloadTask) travelDagLinks(dirMap map[string]map[string]int64, cid string, fileName string, offset int64) {
+func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, cid string, fileName string, offset int64) {
 	getBlock := this.Mgr.Fs().GetBlock(cid)
 	if getBlock == nil {
 		return
@@ -1289,15 +1291,15 @@ func (this *DownloadTask) travelDagLinks(dirMap map[string]map[string]int64, cid
 	for _, v := range links {
 		// is file if link's name is empty
 		if v.Name == "" {
-			subDirMap, exist := dirMap[fileName]
+			subDirMap, exist := dagInfo[fileName]
 			if !exist {
 				subDirMap = make(map[string]int64)
 			}
 			offset += 1
 			subDirMap[v.Cid.String()] = offset
-			dirMap[fileName] = subDirMap
+			dagInfo[fileName] = subDirMap
 			// if file have more deep links
-			this.travelDagLinks(dirMap, v.Cid.String(), fileName, offset)
+			this.travelDagLinks(dagInfo, v.Cid.String(), fileName, offset)
 		}
 	}
 	return
