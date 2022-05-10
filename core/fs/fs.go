@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/saveio/themis/crypto/keypair"
 	"os"
 	"strings"
 
@@ -356,6 +357,22 @@ func (this *Fs) AESDecryptFile(file, prefix, password, outputPath string) error 
 // AESEncryptFile. encrypt a file
 func (this *Fs) AESEncryptFile(file, password, outputPath string) error {
 	err := max.EncryptFile(file, password, outputPath)
+	if err != nil {
+		return sdkErr.NewWithError(sdkErr.FS_ENCRYPT_ERROR, err)
+	}
+	return nil
+}
+
+func (this *Fs) CEIESDecryptFile(file, prefix, password, outputPath string, priKey keypair.PrivateKey) error {
+	err := max.DecryptFileA(file, prefix, password, outputPath, priKey)
+	if err != nil {
+		return sdkErr.NewWithError(sdkErr.FS_DECRYPT_ERROR, err)
+	}
+	return nil
+}
+
+func (this *Fs) CEIESEncryptFile(file, password, outputPath string, pubKey keypair.PublicKey) error {
+	err := max.EncryptFileA(file, password, outputPath, pubKey)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.FS_ENCRYPT_ERROR, err)
 	}
