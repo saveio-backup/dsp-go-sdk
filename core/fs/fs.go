@@ -363,7 +363,7 @@ func (this *Fs) AESEncryptFile(file, password, outputPath string) error {
 	return nil
 }
 
-func (this *Fs) CEIESDecryptFile(file, prefix, password, outputPath string, priKey keypair.PrivateKey) error {
+func (this *Fs) ECIESDecryptFile(file, prefix, password, outputPath string, priKey keypair.PrivateKey) error {
 	err := max.DecryptFileA(file, prefix, password, outputPath, priKey)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.FS_DECRYPT_ERROR, err)
@@ -371,7 +371,7 @@ func (this *Fs) CEIESDecryptFile(file, prefix, password, outputPath string, priK
 	return nil
 }
 
-func (this *Fs) CEIESEncryptFile(file, password, outputPath string, pubKey keypair.PublicKey) error {
+func (this *Fs) ECIESEncryptFile(file, password, outputPath string, pubKey keypair.PublicKey) error {
 	err := max.EncryptFileA(file, password, outputPath, pubKey)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.FS_ENCRYPT_ERROR, err)

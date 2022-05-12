@@ -469,3 +469,17 @@ func (d *DNS) connectDNS(maxDNSNum uint32) (map[string]string, error) {
 	log.Debugf("connected dns result %v", connectedDNS)
 	return connectedDNS, nil
 }
+
+func (d *DNS) GetNodePubKey(walletAddr string) ([]byte, error) {
+	addr, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		log.Errorf("convert wallet addr %s to address failed: %v", walletAddr, err)
+		return nil, err
+	}
+	key, err := d.chain.Themis().Native.Channel.GetNodePubKey(addr)
+	if err != nil {
+		log.Errorf("get node pub key err: %v", err)
+		return nil, err
+	}
+	return key, nil
+}

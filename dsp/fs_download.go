@@ -8,6 +8,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/task/types"
 	"github.com/saveio/dsp-go-sdk/types/prefix"
 	"github.com/saveio/themis/common/log"
+	"github.com/saveio/themis/crypto/keypair"
 )
 
 func (this *Dsp) AESEncryptFile(file, password, outputPath string) error {
@@ -20,6 +21,22 @@ func (this *Dsp) GetFileNameWithPath(filePath string) string {
 
 func (this *Dsp) AESDecryptFile(file, prefix, password, outputPath string) error {
 	return this.Fs.AESDecryptFile(file, prefix, password, outputPath)
+}
+
+func (this *Dsp) ECIESEncryptFile(file, password, outputPath string, pubKey []byte) error {
+	publicKey, err := keypair.DeserializePublicKey(pubKey)
+	if err != nil {
+		return sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error())
+	}
+	return this.Fs.ECIESEncryptFile(file, password, outputPath, publicKey)
+}
+
+func (this *Dsp) ECIESDecryptFile(file, prefix, password, outputPath string, priKey []byte) error {
+	privateKey, err := keypair.DeserializePrivateKey(priKey)
+	if err != nil {
+		return sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error())
+	}
+	return this.Fs.ECIESDecryptFile(file, prefix, password, outputPath, privateKey)
 }
 
 func (this *Dsp) InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr string, profit uint64) error {
