@@ -1,6 +1,8 @@
 package dsp
 
 import (
+	"bytes"
+	"encoding/hex"
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/store"
@@ -9,6 +11,7 @@ import (
 	"github.com/saveio/dsp-go-sdk/types/prefix"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/crypto/keypair"
+	"strings"
 )
 
 func (this *Dsp) AESEncryptFile(file, password, outputPath string) error {
@@ -23,20 +26,25 @@ func (this *Dsp) AESDecryptFile(file, prefix, password, outputPath string) error
 	return this.Fs.AESDecryptFile(file, prefix, password, outputPath)
 }
 
-func (this *Dsp) ECIESEncryptFile(file, password, outputPath string, pubKey []byte) error {
+func (this *Dsp) ECIESEncryptFile(file, password, outputPath string, pubKey []byte) (string, error) {
 	publicKey, err := keypair.DeserializePublicKey(pubKey)
 	if err != nil {
-		return sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error())
+		return "", sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error())
 	}
 	return this.Fs.ECIESEncryptFile(file, password, outputPath, publicKey)
 }
 
-func (this *Dsp) ECIESDecryptFile(file, prefix, password, outputPath string, priKey []byte) error {
-	privateKey, err := keypair.DeserializePrivateKey(priKey)
+func (this *Dsp) ECIESDecryptFile(file, prefix, password, outputPath string, priKey string) error {
+	privateKey, err := hex.DecodeString(strings.TrimPrefix(priKey, "0x"))
 	if err != nil {
 		return sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error())
 	}
-	return this.Fs.ECIESDecryptFile(file, prefix, password, outputPath, privateKey)
+	pri, _, err := keypair.GenerateKeyPairWithSeed(
+		keypair.PK_ECDSA,
+		bytes.NewReader(privateKey),
+		keypair.P256,
+	)
+	return this.Fs.ECIESDecryptFile(file, prefix, password, outputPath, pri)
 }
 
 func (this *Dsp) InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr string, profit uint64) error {
