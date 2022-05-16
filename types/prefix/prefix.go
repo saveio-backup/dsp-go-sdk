@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
+	"io"
 	"os"
 
 	"github.com/saveio/themis/common"
@@ -66,6 +67,10 @@ func NewEncryptPrefix(password string, owner common.Address, fileSize uint64, is
 		return nil
 	}
 	return p
+}
+
+func NewEncryptAPrefix(owner common.Address, fileSize uint64, isDir bool) *FilePrefix {
+	return NewEncryptPrefix("", owner, fileSize, isDir)
 }
 
 // MakeSalt. make a random encrypt salt for prefix
@@ -274,4 +279,40 @@ func GetPrefixFromFile(fullFilePath string) (*FilePrefix, []byte, error) {
 	filePrefix := &FilePrefix{}
 	filePrefix.Deserialize(prefix)
 	return filePrefix, prefix, nil
+}
+
+func AddPrefixToFile(prefix *FilePrefix, path string) error {
+	prefixStr := prefix.Serialize()
+	input := path
+	output := path + ".tmp"
+	outputFile, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		return err
+	}
+	defer func(outputFile *os.File) {
+		err := outputFile.Close()
+		if err != nil {
+			log.Errorf("close file error: %v", err)
+		}
+	}(outputFile)
+	_, err = outputFile.Write(prefixStr)
+	if err != nil {
+		return err
+	}
+	inputFile, err := os.Open(input)
+	if err != nil {
+		return err
+	}
+	_, err = outputFile.Seek(int64(len(prefixStr)), io.SeekStart)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(outputFile, inputFile); err != nil {
+		return err
+	}
+	err = os.Rename(output, input)
+	if err != nil {
+		return err
+	}
+	return nil
 }

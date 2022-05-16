@@ -183,18 +183,30 @@ func Test_ParseFromString(t *testing.T) {
 	log.Infof("file type: %d", prefix.FileType)
 }
 
+func TestAddPrefixToFile(t *testing.T) {
+	prefix := &FilePrefix{
+		Version:    1,
+		Encrypt:    true,
+		EncryptPwd: "1234",
+		Owner:      common.Address{},
+		FileSize:   0,
+		FileType:   1,
+	}
+	path := "/Users/smallyu/work/test/file/aaa"
+	err := AddPrefixToFile(prefix, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGetFilePrefixFromPath(t *testing.T) {
 	log.InitLog(1, os.Stdout)
 	paths := []string{
-		"/Users/zhijie/Desktop/onchain/save-test/node4/Chain-12345/Downloads/AHjjdbVLhfTyiNFEq2X8mFnnirZY1yK8Rq/中文名字.ept",
-		// "/Users/zhijie/Desktop/onchain/save-test/node4/Chain-12345/Downloads/AHjjdbVLhfTyiNFEq2X8mFnnirZY1yK8Rq/2020-02-18_10.57.09_LOG.ept",
-		// "/Users/zhijie/Desktop/onchain/save-test/node4/Chain-12345/Downloads/AHjjdbVLhfTyiNFEq2X8mFnnirZY1yK8Rq/2020-02-17_18.31.20_LOG.ept",
-		// "/Users/zhijie/Desktop/onchain/save-test/node4/Chain-12345/Downloads/AHjjdbVLhfTyiNFEq2X8mFnnirZY1yK8Rq/2020-02-17_18.16.59_LOG.log",
+		"/Users/smallyu/work/test/file/aaa",
 	}
 	for _, path := range paths {
 		prefix, prefixBuf, err := GetPrefixFromFile(path)
 		if err != nil {
-			// t.Fatal(err)
 			log.Error(err)
 			continue
 		}
