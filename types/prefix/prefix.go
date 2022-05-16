@@ -27,7 +27,7 @@ const (
 	PAYLOAD_SIZE_LEN = 4
 	FILETYPE_LEN     = 1
 	MAX_PAYLOAD_SIZE = VERSION_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + OWNER_LEN + FILESIZE_LEN +
-		FILENAME_LEN + 2<<(FILENAME_LEN*8-1) + REVERSED_LEN + CHECKSUM_LEN + FILETYPE_LEN
+		FILENAME_LEN + 2<<(FILENAME_LEN*8-1) + REVERSED_LEN + FILETYPE_LEN + CHECKSUM_LEN
 )
 
 const (
@@ -37,7 +37,6 @@ const (
 
 type FilePrefix struct {
 	Version     uint8              // prefix version
-	FileType    uint8              // file type
 	Encrypt     bool               // is file encrypt
 	EncryptPwd  string             // file encrypt password
 	EncryptSalt [4]byte            // random salt
@@ -47,6 +46,7 @@ type FilePrefix struct {
 	FileNameLen uint8              // file name length
 	FileName    string             // file name string, max length is 2^8, real length = FileNameLen
 	Reserved    [REVERSED_LEN]byte // reserved word field
+	FileType    uint8              // file type
 }
 
 func NewEncryptPrefix(password string, owner common.Address, fileSize uint64, isDir bool) *FilePrefix {
@@ -103,17 +103,17 @@ func (p *FilePrefix) Serialize() []byte {
 	var fileNameBuf [FILENAME_LEN]byte
 	fileNameBuf[0] = byte(len(p.FileName))
 
-	payloadSize := uint32(VERSION_LEN + FILETYPE_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + len(p.Owner[:]) +
-		FILESIZE_LEN + FILENAME_LEN + len(p.FileName) + REVERSED_LEN + CHECKSUM_LEN)
+	var typeBuffer [FILETYPE_LEN]byte
+	typeBuffer[0] = p.FileType
+
+	payloadSize := uint32(VERSION_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + len(p.Owner[:]) +
+		FILESIZE_LEN + FILENAME_LEN + len(p.FileName) + REVERSED_LEN + CHECKSUM_LEN + FILETYPE_LEN)
 	if payloadSize > MAX_PAYLOAD_SIZE {
 		log.Warnf("payload size too big")
 		return nil
 	}
 	payloadSizeBuf := make([]byte, PAYLOAD_SIZE_LEN)
 	binary.BigEndian.PutUint32(payloadSizeBuf, payloadSize)
-
-	var typeBuffer [FILETYPE_LEN]byte
-	typeBuffer[0] = byte(p.FileType)
 
 	var result []byte
 	result = append(result, versionBuf[0])
@@ -195,9 +195,7 @@ func (p *FilePrefix) Deserialize(base64Buf []byte) error {
 	p.FileName = string(fileNameBuf)
 
 	copy(p.Reserved[:], buf[fileNameEnd:fileNameEnd+REVERSED_LEN])
-
 	p.FileType = buf[fileNameEnd+REVERSED_LEN]
-
 	return nil
 }
 
