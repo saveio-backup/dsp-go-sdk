@@ -363,20 +363,20 @@ func (this *Fs) AESEncryptFile(file, password, outputPath string) error {
 	return nil
 }
 
-func (this *Fs) ECIESDecryptFile(file, prefix, password, outputPath string, priKey keypair.PrivateKey) error {
-	err := max.DecryptFileA(file, prefix, password, outputPath, priKey)
+func (this *Fs) ECIESDecryptFile(file, prefix, outputPath string, priKey keypair.PrivateKey) error {
+	err := max.DecryptFileA(file, prefix, outputPath, priKey)
 	if err != nil {
 		return sdkErr.NewWithError(sdkErr.FS_DECRYPT_ERROR, err)
 	}
 	return nil
 }
 
-func (this *Fs) ECIESEncryptFile(file, password, outputPath string, pubKey keypair.PublicKey) (string, error) {
-	eKey, err := max.EncryptFileA(file, password, outputPath, pubKey)
+func (this *Fs) ECIESEncryptFile(file, outputPath string, pubKey keypair.PublicKey) error {
+	err := max.EncryptFileA(file, outputPath, pubKey)
 	if err != nil {
-		return "", sdkErr.NewWithError(sdkErr.FS_ENCRYPT_ERROR, err)
+		return sdkErr.NewWithError(sdkErr.FS_ENCRYPT_ERROR, err)
 	}
-	return eKey, nil
+	return nil
 }
 
 // RemovedExpiredFiles. pop all expired files from the queue

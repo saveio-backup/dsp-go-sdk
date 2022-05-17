@@ -26,15 +26,15 @@ func (this *Dsp) AESDecryptFile(file, prefix, password, outputPath string) error
 	return this.Fs.AESDecryptFile(file, prefix, password, outputPath)
 }
 
-func (this *Dsp) ECIESEncryptFile(file, password, outputPath string, pubKey []byte) (string, error) {
+func (this *Dsp) ECIESEncryptFile(file, outputPath string, pubKey []byte) error {
 	publicKey, err := keypair.DeserializePublicKey(pubKey)
 	if err != nil {
-		return "", sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error())
+		return sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error())
 	}
-	return this.Fs.ECIESEncryptFile(file, password, outputPath, publicKey)
+	return this.Fs.ECIESEncryptFile(file, outputPath, publicKey)
 }
 
-func (this *Dsp) ECIESDecryptFile(file, prefix, password, outputPath string, priKey string) error {
+func (this *Dsp) ECIESDecryptFile(file, prefix, outputPath string, priKey string) error {
 	privateKey, err := hex.DecodeString(strings.TrimPrefix(priKey, "0x"))
 	if err != nil {
 		return sdkErr.New(sdkErr.INTERNAL_ERROR, err.Error())
@@ -44,7 +44,7 @@ func (this *Dsp) ECIESDecryptFile(file, prefix, password, outputPath string, pri
 		bytes.NewReader(privateKey),
 		keypair.P256,
 	)
-	return this.Fs.ECIESDecryptFile(file, prefix, password, outputPath, pri)
+	return this.Fs.ECIESDecryptFile(file, prefix, outputPath, pri)
 }
 
 func (this *Dsp) InsertShareRecord(id, fileHash, fileName, fileOwner, toWalletAddr string, profit uint64) error {
