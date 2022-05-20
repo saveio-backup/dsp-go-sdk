@@ -13,6 +13,19 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
+func PrintPrefix(prefix *FilePrefix) {
+	log.Infof("version: %d", prefix.Version)
+	log.Infof("encrypt: %t", prefix.Encrypt)
+	log.Infof("salt: %v", prefix.EncryptSalt)
+	log.Infof("hash: %v", prefix.EncryptHash)
+	log.Infof("eType: %v", prefix.EncryptType)
+	log.Infof("owner: %s", prefix.Owner.ToBase58())
+	log.Infof("fileSize: %d", prefix.FileSize)
+	log.Infof("fileNameLen: %d", prefix.FileNameLen)
+	log.Infof("fileName: %s", prefix.FileName)
+	log.Infof("file type: %d", prefix.FileType)
+}
+
 func TestGenPrefix(t *testing.T) {
 	log.InitLog(1, os.Stdout)
 	addr, _ := common.AddressFromBase58("AZDn74qWSGQk8cyfD7DXmkRoyeJkZ4RbSx")
@@ -32,15 +45,7 @@ func TestGenPrefix(t *testing.T) {
 
 	prefix2 := &FilePrefix{}
 	prefix2.Deserialize(buf)
-	log.Infof("version: %d", prefix2.Version)
-	log.Infof("encrypt: %t", prefix2.Encrypt)
-	log.Infof("salt: %v", prefix2.EncryptSalt)
-	log.Infof("hash: %v", prefix2.EncryptHash)
-	log.Infof("owner: %s", prefix2.Owner.ToBase58())
-	log.Infof("fileSize: %d", prefix2.FileSize)
-	log.Infof("fileNameLen: %d", prefix2.FileNameLen)
-	log.Infof("fileName: %s", prefix2.FileName)
-	log.Infof("file type: %d", prefix2.FileType)
+	PrintPrefix(prefix2)
 	verify := VerifyEncryptPassword("12345", prefix2.EncryptSalt, prefix2.EncryptHash)
 	log.Infof("verify : %t", verify)
 }
@@ -50,12 +55,13 @@ func TestBase64EncodePrefix(t *testing.T) {
 	addr, _ := common.AddressFromBase58("AZDn74qWSGQk8cyfD7DXmkRoyeJkZ4RbSx")
 	fileSize := uint64(4 * 1024 * 1024 * 1024)
 	prefix := &FilePrefix{
-		Version:    1,
-		Encrypt:    true,
-		EncryptPwd: "1234",
-		Owner:      addr,
-		FileSize:   fileSize,
-		FileType:   FILETYPE_DIR,
+		Version:     1,
+		Encrypt:     true,
+		EncryptPwd:  "1234",
+		EncryptType: ENCRYPTTYPE_AES,
+		Owner:       addr,
+		FileSize:    fileSize,
+		FileType:    FILETYPE_DIR,
 	}
 	buf := prefix.Serialize()
 	encodedLen := base64.StdEncoding.EncodedLen(74)
@@ -67,13 +73,7 @@ func TestBase64EncodePrefix(t *testing.T) {
 
 	prefix2 := &FilePrefix{}
 	prefix2.Deserialize(buf2)
-	log.Infof("version: %d", prefix2.Version)
-	log.Infof("encrypt: %t", prefix2.Encrypt)
-	log.Infof("salt: %v", prefix2.EncryptSalt)
-	log.Infof("hash: %v", prefix2.EncryptHash)
-	log.Infof("owner: %s", prefix2.Owner.ToBase58())
-	log.Infof("fileSize: %d", prefix2.FileSize)
-	log.Infof("file type: %d", prefix2.FileType)
+	PrintPrefix(prefix2)
 	verify := VerifyEncryptPassword("456", prefix2.EncryptSalt, prefix2.EncryptHash)
 	log.Infof("verify : %t", verify)
 }
@@ -83,12 +83,13 @@ func TestMarshalPrefix(t *testing.T) {
 	addr, _ := common.AddressFromBase58("AZDn74qWSGQk8cyfD7DXmkRoyeJkZ4RbSx")
 	fileSize := uint64(4 * 1024 * 1024 * 1024)
 	prefix := &FilePrefix{
-		Version:    1,
-		Encrypt:    true,
-		EncryptPwd: "1234",
-		Owner:      addr,
-		FileSize:   fileSize,
-		FileType:   1,
+		Version:     1,
+		Encrypt:     true,
+		EncryptPwd:  "1234",
+		EncryptType: ENCRYPTTYPE_ECIES,
+		Owner:       addr,
+		FileSize:    fileSize,
+		FileType:    1,
 	}
 	rand.Read(prefix.EncryptSalt[:])
 	toHash := make([]byte, 0)
@@ -107,14 +108,7 @@ func TestMarshalPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// prefix2.Deserialize(buf2)
-	log.Infof("version: %d", prefix2.Version)
-	log.Infof("encrypt: %t", prefix2.Encrypt)
-	log.Infof("salt: %v", prefix2.EncryptSalt)
-	log.Infof("hash: %v", prefix2.EncryptHash)
-	log.Infof("owner: %s", prefix2.Owner.ToBase58())
-	log.Infof("fileSize: %d", prefix2.FileSize)
-	log.Infof("file type: %d", prefix2.FileType)
+	PrintPrefix(prefix2)
 	verify := VerifyEncryptPassword("1234", prefix2.EncryptSalt, prefix2.EncryptHash)
 	log.Infof("verify : %t", verify)
 }
@@ -124,12 +118,13 @@ func TestBytesToBytesPrefix(t *testing.T) {
 	addr, _ := common.AddressFromBase58("AZDn74qWSGQk8cyfD7DXmkRoyeJkZ4RbSx")
 	fileSize := uint64(4 * 1024 * 1024 * 1024)
 	prefix := &FilePrefix{
-		Version:    1,
-		Encrypt:    true,
-		EncryptPwd: "1234",
-		Owner:      addr,
-		FileSize:   fileSize,
-		FileType:   1,
+		Version:     1,
+		Encrypt:     true,
+		EncryptPwd:  "1234",
+		EncryptType: ENCRYPTTYPE_AES,
+		Owner:       addr,
+		FileSize:    fileSize,
+		FileType:    1,
 	}
 	buf := prefix.Serialize()
 	log.Infof("prefix-len: %v, size: %d", len(buf), fileSize)
@@ -140,13 +135,7 @@ func TestBytesToBytesPrefix(t *testing.T) {
 
 	prefix2 := &FilePrefix{}
 	prefix2.Deserialize(buf2)
-	log.Infof("version: %d", prefix2.Version)
-	log.Infof("encrypt: %t", prefix2.Encrypt)
-	log.Infof("salt: %v", prefix2.EncryptSalt)
-	log.Infof("hash: %v", prefix2.EncryptHash)
-	log.Infof("owner: %s", prefix2.Owner.ToBase58())
-	log.Infof("fileSize: %d", prefix2.FileSize)
-	log.Infof("file type: %d", prefix2.FileType)
+	PrintPrefix(prefix2)
 	verify := VerifyEncryptPassword("456", prefix2.EncryptSalt, prefix2.EncryptHash)
 	log.Infof("verify : %t", verify)
 }

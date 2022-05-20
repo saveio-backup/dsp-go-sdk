@@ -27,6 +27,7 @@ const (
 	FILENAME_LEN     = 1
 	PAYLOAD_SIZE_LEN = 4
 	FILETYPE_LEN     = 1
+	ENCRYPTTYPE_LEN  = 1
 	MAX_PAYLOAD_SIZE = VERSION_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + OWNER_LEN + FILESIZE_LEN +
 		FILENAME_LEN + 2<<(FILENAME_LEN*8-1) + REVERSED_LEN + FILETYPE_LEN + CHECKSUM_LEN
 )
@@ -34,6 +35,12 @@ const (
 const (
 	FILETYPE_FILE = iota
 	FILETYPE_DIR
+)
+
+const (
+	ENCRYPTTYPE_NONE = iota
+	ENCRYPTTYPE_AES
+	ENCRYPTTYPE_ECIES
 )
 
 type FilePrefix struct {
@@ -48,20 +55,22 @@ type FilePrefix struct {
 	FileName    string             // file name string, max length is 2^8, real length = FileNameLen
 	Reserved    [REVERSED_LEN]byte // reserved word field
 	FileType    uint8              // file type
+	EncryptType uint8              // encrypt type
 }
 
-func NewEncryptPrefix(password string, owner common.Address, fileSize uint64, isDir bool) *FilePrefix {
+func NewEncryptPrefix(password string, owner common.Address, fileSize uint64, isDir bool, eType uint8) *FilePrefix {
 	fileType := FILETYPE_FILE
 	if isDir {
 		fileType = FILETYPE_DIR
 	}
 	p := &FilePrefix{
-		Version:    PREFIX_VERSION,
-		FileType:   uint8(fileType),
-		Encrypt:    true,
-		EncryptPwd: password,
-		Owner:      owner,
-		FileSize:   fileSize,
+		Version:     PREFIX_VERSION,
+		FileType:    uint8(fileType),
+		Encrypt:     true,
+		EncryptPwd:  password,
+		EncryptType: eType,
+		Owner:       owner,
+		FileSize:    fileSize,
 	}
 	if err := p.MakeSalt(); err != nil {
 		return nil
@@ -69,8 +78,9 @@ func NewEncryptPrefix(password string, owner common.Address, fileSize uint64, is
 	return p
 }
 
-func NewEncryptAPrefix(owner common.Address, fileSize uint64, isDir bool) *FilePrefix {
-	return NewEncryptPrefix("", owner, fileSize, isDir)
+// NewEncryptAPrefix make a encrypt asymmetrically prefix
+func NewEncryptAPrefix(owner common.Address, fileSize uint64, isDir bool, eType uint8) *FilePrefix {
+	return NewEncryptPrefix("", owner, fileSize, isDir, eType)
 }
 
 // MakeSalt. make a random encrypt salt for prefix
@@ -111,8 +121,11 @@ func (p *FilePrefix) Serialize() []byte {
 	var typeBuffer [FILETYPE_LEN]byte
 	typeBuffer[0] = p.FileType
 
+	var eTypeBuffer [ENCRYPTTYPE_LEN]byte
+	eTypeBuffer[0] = p.EncryptType
+
 	payloadSize := uint32(VERSION_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + len(p.Owner[:]) +
-		FILESIZE_LEN + FILENAME_LEN + len(p.FileName) + REVERSED_LEN + CHECKSUM_LEN + FILETYPE_LEN)
+		FILESIZE_LEN + FILENAME_LEN + len(p.FileName) + REVERSED_LEN + FILETYPE_LEN + ENCRYPTTYPE_LEN + CHECKSUM_LEN)
 	if payloadSize > MAX_PAYLOAD_SIZE {
 		log.Warnf("payload size too big")
 		return nil
@@ -131,6 +144,7 @@ func (p *FilePrefix) Serialize() []byte {
 	result = append(result, p.FileName[:]...)
 	result = append(result, p.Reserved[:]...)
 	result = append(result, typeBuffer[0])
+	result = append(result, eTypeBuffer[0])
 
 	checkSum := crc32.ChecksumIEEE(result)
 	checkSumBuf := make([]byte, CHECKSUM_LEN)
@@ -199,8 +213,15 @@ func (p *FilePrefix) Deserialize(base64Buf []byte) error {
 	copy(fileNameBuf[:], buf[fileNameLenEnd:fileNameEnd])
 	p.FileName = string(fileNameBuf)
 
+	reversedEnd := fileNameEnd + REVERSED_LEN
 	copy(p.Reserved[:], buf[fileNameEnd:fileNameEnd+REVERSED_LEN])
-	p.FileType = buf[fileNameEnd+REVERSED_LEN]
+
+	fileTypeEnd := reversedEnd + FILETYPE_LEN
+	p.FileType = buf[reversedEnd:fileTypeEnd][0]
+
+	eTypeEnd := fileTypeEnd + ENCRYPTTYPE_LEN
+	p.EncryptType = buf[fileTypeEnd:eTypeEnd][0]
+
 	return nil
 }
 
@@ -219,6 +240,7 @@ func (p *FilePrefix) Print() {
 	log.Debugf("FileSize: %d", p.FileSize)
 	log.Debugf("EncryptSalt: %v", p.EncryptSalt)
 	log.Debugf("EncryptHash: %v", p.EncryptHash)
+	log.Debugf("EncryptType: %v", p.EncryptType)
 	log.Debugf("Owner: %s", p.Owner.ToBase58())
 	log.Debugf("FileType: %d", p.FileType)
 }
