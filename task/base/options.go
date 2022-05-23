@@ -275,6 +275,12 @@ func EncryptPassword(encryptPassword []byte) InfoOption {
 	})
 }
 
+func EncryptNodeAddr(encryptNodeAddr []byte) InfoOption {
+	return OptionFunc(func(info *store.TaskInfo) {
+		info.EncryptNodeAddr = encryptNodeAddr
+	})
+}
+
 func WhiteList(whiteList []*store.WhiteList) InfoOption {
 	return OptionFunc(func(info *store.TaskInfo) {
 		info.WhiteList = whiteList

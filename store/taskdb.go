@@ -135,6 +135,7 @@ type TaskInfo struct {
 	Privilege        uint64                      `json:"privilege,omitempty"`              // file privilege
 	Encrypt          bool                        `json:"encrypt,omitempty"`                // encrypt or not
 	EncryptPassword  []byte                      `json:"encrypt_pwd,omitempty"`            // encrypted pwd
+	EncryptNodeAddr  []byte                      `json:"encrypt_na,omitempty"`             // encrypted node addr
 	RegisterDNS      bool                        `json:"register_dns,omitempty"`           // register dns or not
 	BindDNS          bool                        `json:"bind_dns,omitempty"`               // bind dns or not
 	WhiteList        []*WhiteList                `json:"white_list,omitempty"`             // white list

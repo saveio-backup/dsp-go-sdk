@@ -80,6 +80,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 		base.CopyNum(uint32(opt.CopyNum)),
 		base.Encrypt(opt.Encrypt),
 		base.EncryptPassword(opt.EncryptPassword),
+		base.EncryptNodeAddr(opt.EncryptNodeAddr),
 		base.RegisterDNS(opt.RegisterDNS),
 		base.BindDNS(opt.BindDNS),
 		base.WhiteList(fsWhiteListToWhiteList(opt.WhiteList)),
@@ -111,14 +112,21 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	// sharing file or get hashes from DB
 	if len(tx) == 0 {
 		// file not paid
+		eType := prefix.ENCRYPTTYPE_NONE
+		if len(opt.EncryptPassword) > 0 {
+			eType = prefix.ENCRYPTTYPE_AES
+		}
+		if len(opt.EncryptNodeAddr) > 0 {
+			eType = prefix.ENCRYPTTYPE_ECIES
+		}
 		filePrefix := &prefix.FilePrefix{
-			Version:    prefix.PREFIX_VERSION,
-			Encrypt:    opt.Encrypt,
-			EncryptPwd: string(opt.EncryptPassword),
-			Owner:      this.Mgr.Chain().Address(),
-			FileSize:   opt.FileSize,
-			FileName:   string(opt.FileDesc),
-			FileType:   fileType,
+			Version:     prefix.PREFIX_VERSION,
+			FileType:    fileType,
+			Encrypt:     opt.Encrypt,
+			EncryptType: uint8(eType),
+			Owner:       this.Mgr.Chain().Address(),
+			FileSize:    opt.FileSize,
+			FileName:    string(opt.FileDesc),
 		}
 		filePrefix.MakeSalt()
 		prefixStr = filePrefix.String()
