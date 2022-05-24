@@ -24,6 +24,7 @@ import (
 	"github.com/saveio/themis/common/log"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
+	"github.com/saveio/themis/crypto/keypair"
 )
 
 // Start. start upload task
@@ -145,7 +146,12 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 				log.Errorf("get node pub key failed, %v", err)
 				return nil, err
 			}
-			hashes, err = this.Mgr.Fs().NodesFromDir(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword), pubKey)
+			publicKey, err := keypair.DeserializePublicKey(pubKey)
+			if err != nil {
+				log.Errorf("deserialize public key failed, %v", err)
+				return nil, err
+			}
+			hashes, err = this.Mgr.Fs().NodesFromDir(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword), publicKey)
 			if err != nil {
 				log.Errorf("get nodes from dir failed, %v", err)
 				return nil, err
@@ -208,6 +214,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	fileID := GetFileIDFromFileHash(fileHashStr)
 	tags, err := this.GeneratePdpTags(hashes, fileID, nil)
 	if err != nil {
+		log.Errorf("generate pdp tags failed, %v", err)
 		return nil, err
 	}
 	if this.IsTaskPaused() {

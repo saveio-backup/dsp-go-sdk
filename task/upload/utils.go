@@ -17,8 +17,10 @@ func uploadOptValid(filePath string, opt *fs.UploadOption) error {
 	if !common.FileExisted(filePath) {
 		return sdkErr.New(sdkErr.INVALID_PARAMS, "file %s not exist", filePath)
 	}
-	if opt.Encrypt && len(opt.EncryptPassword) == 0 {
-		return sdkErr.New(sdkErr.INVALID_PARAMS, "encrypt password is missing")
+	if opt.Encrypt {
+		if len(opt.EncryptPassword) == 0 && len(opt.EncryptNodeAddr) == 0 {
+			return sdkErr.New(sdkErr.INVALID_PARAMS, "encrypt password or encrypt node addr missed")
+		}
 	}
 	return nil
 }
