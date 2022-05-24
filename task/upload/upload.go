@@ -123,6 +123,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			Version:     prefix.PREFIX_VERSION,
 			FileType:    fileType,
 			Encrypt:     opt.Encrypt,
+			EncryptPwd:  string(opt.EncryptPassword),
 			EncryptType: uint8(eType),
 			Owner:       this.Mgr.Chain().Address(),
 			FileSize:    opt.FileSize,
@@ -139,8 +140,14 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			blocksRoot = crypto.ComputeStringHashRoot(hashes)
 			fileHashStr = hashes[0]
 		} else {
-			if hashes, err = this.Mgr.Fs().NodesFromDir(filePath, prefixStr,
-				opt.Encrypt, string(opt.EncryptPassword)); err != nil {
+			pubKey, err := this.Mgr.DNS().GetNodePubKey(string(opt.EncryptNodeAddr))
+			if err != nil {
+				log.Errorf("get node pub key failed, %v", err)
+				return nil, err
+			}
+			hashes, err = this.Mgr.Fs().NodesFromDir(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword), pubKey)
+			if err != nil {
+				log.Errorf("get nodes from dir failed, %v", err)
 				return nil, err
 			}
 			blocksRoot = crypto.ComputeStringHashRoot(hashes)

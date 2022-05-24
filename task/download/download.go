@@ -472,7 +472,7 @@ func (this *DownloadTask) internalDownload() error {
 			this.EmitProgress(types.TaskDownloadCheckingFile)
 			checkFileList := make([]string, 0)
 			if isDir {
-				checkFileList, err = this.Mgr.Fs().NodesFromDir(fullFilePath, string(this.GetPrefix()), false, "")
+				checkFileList, err = this.Mgr.Fs().NodesFromDir(fullFilePath, string(this.GetPrefix()), false, "", nil)
 			} else {
 				checkFileList, err = this.Mgr.Fs().NodesFromFile(fullFilePath, string(this.GetPrefix()), false, "")
 			}

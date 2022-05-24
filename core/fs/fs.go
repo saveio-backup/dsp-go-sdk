@@ -99,8 +99,8 @@ func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, 
 	return hashes, nil
 }
 
-func (this *Fs) NodesFromDir(path string, filePrefix string, encrypt bool, password string) ([]string, error) {
-	hashes, err := this.fs.NodesFromDir(path, filePrefix, encrypt, password)
+func (this *Fs) NodesFromDir(path string, filePrefix string, encrypt bool, password string, pubKey keypair.PublicKey) ([]string, error) {
+	hashes, err := this.fs.NodesFromDir(path, filePrefix, encrypt, password, pubKey)
 	if err != nil {
 		return nil, sdkErr.New(sdkErr.SHARDING_FAIELD, err.Error())
 	}
