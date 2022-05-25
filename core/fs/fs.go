@@ -91,8 +91,8 @@ func (this *Fs) State() state.ModuleState {
 
 // NodesFromFile. sharding file function. sharding a file with custom prefix. encrypt is optional, if true, password
 // need to be designated
-func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string) ([]string, error) {
-	hashes, err := this.fs.NodesFromFile(fileName, filePrefix, encrypt, password)
+func (this *Fs) NodesFromFile(fileName string, filePrefix string, encrypt bool, password string, pubKey keypair.PublicKey) ([]string, error) {
+	hashes, err := this.fs.NodesFromFile(fileName, filePrefix, encrypt, password, pubKey)
 	if err != nil {
 		return nil, sdkErr.New(sdkErr.SHARDING_FAIELD, err.Error())
 	}

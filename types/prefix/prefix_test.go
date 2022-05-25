@@ -158,18 +158,15 @@ func Test_Serialize(t *testing.T) {
 
 func Test_ParseFromString(t *testing.T) {
 	log.InitLog(1, os.Stdout)
-	base64Str := "AAAATA==AQEAAAAA9wCYVQqDvADjGIZo6q/v2SfmXZqqkNa9TcvYu97Ly3S/YFPBVYhkfMH+Bll4ACYYnRKs9gAAAAEAAAAAAAAAAAABW+ww2A=="
+	base64Str := "AAAAgw==AQGzMTQEidQl1OVsoZbzQLDr9luQQvRiLyx82BuJwRxmF9cw6h8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANi9Vc2Vycy9zbWFsbHl1L3dvcmsvZ29ncy9lZGdlLWRlcGxveS9ub2RlMS90ZXN0MTI4L2FhYQAAAAAAAtg9eJo="
 	prefix := &FilePrefix{}
 	prefix.ParseFromString(base64Str)
-	log.Infof("version: %d", prefix.Version)
-	log.Infof("encrypt: %t", prefix.Encrypt)
-	log.Infof("salt: %v", prefix.EncryptSalt)
-	log.Infof("hash: %v", prefix.EncryptHash)
-	log.Infof("owner: %s", prefix.Owner.ToBase58())
-	log.Infof("fileSize: %d", prefix.FileSize)
-	log.Infof("fileNameLen: %d", prefix.FileNameLen)
-	log.Infof("fileName: %s", prefix.FileName)
-	log.Infof("file type: %d", prefix.FileType)
+	PrintPrefix(prefix)
+	pwd := []byte{
+		104, 40, 37, 132, 94, 53, 202, 206,
+	}
+	verify := VerifyEncryptPassword(string(pwd), prefix.EncryptSalt, prefix.EncryptHash)
+	log.Infof("verify : %t", verify)
 }
 
 func TestAddPrefixToFile(t *testing.T) {

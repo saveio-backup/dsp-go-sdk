@@ -22,9 +22,9 @@ import (
 	"github.com/saveio/dsp-go-sdk/utils/crypto"
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
+	"github.com/saveio/themis/crypto/keypair"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
-	"github.com/saveio/themis/crypto/keypair"
 )
 
 // Start. start upload task
@@ -134,8 +134,18 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 		prefixStr = filePrefix.String()
 		log.Debugf("node from file prefix: %v, len: %d", prefixStr, len(prefixStr))
 		if !file.IsDir() {
-			if hashes, err = this.Mgr.Fs().NodesFromFile(filePath, prefixStr,
-				opt.Encrypt, string(opt.EncryptPassword)); err != nil {
+			pubKey, err := this.Mgr.DNS().GetNodePubKey(string(opt.EncryptNodeAddr))
+			if err != nil {
+				log.Errorf("get node pub key failed, %v", err)
+				return nil, err
+			}
+			publicKey, err := keypair.DeserializePublicKey(pubKey)
+			if err != nil {
+				log.Errorf("deserialize public key failed, %v", err)
+				return nil, err
+			}
+			hashes, err = this.Mgr.Fs().NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword), publicKey)
+			if err != nil {
 				return nil, err
 			}
 			blocksRoot = crypto.ComputeStringHashRoot(hashes)

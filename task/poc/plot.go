@@ -141,7 +141,7 @@ func (p *PocTask) GenPlotPDPData(plotCfg *PlotConfig) error {
 		return err
 	}
 
-	blockHashes, err := p.Mgr.Fs().NodesFromFile(fileName, prefixStr, false, "")
+	blockHashes, err := p.Mgr.Fs().NodesFromFile(fileName, prefixStr, false, "", nil)
 	if err != nil {
 		log.Errorf("nodes from file error %s", err)
 		return err

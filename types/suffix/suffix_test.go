@@ -19,7 +19,7 @@ func TestAddCipherTextSuffixToFile(t *testing.T) {
 }
 
 func TestReadCipherTextFromFile(t *testing.T) {
-	path := "/Users/smallyu/work/gogs/edge-deploy/node1/Chain-1/Downloads/AYKnc5VDkvpb5f68XSjTyQzVHU4ZaojGxq/SaveQmfGsjKi9QLaoNo67e8ttz5zW5fWkaEdNTzfJ6wR2e1JFc.ept/aaa.ept"
+	path := "/Users/smallyu/work/gogs/edge-deploy/node1/Chain-1/Downloads/AYKnc5VDkvpb5f68XSjTyQzVHU4ZaojGxq/SaveQmWeAW8UgeSrMY8BnfpBxCS8EA5WHoooTvxpfjvFxK1shs.ept/aaa.ept"
 	file, err := ReadCipherTextFromFile(path)
 	if err != nil {
 		t.Error(err)
@@ -37,7 +37,7 @@ func TestGenerateRandomPassword(t *testing.T) {
 }
 
 func TestCutCipherTextFromFile(t *testing.T) {
-	path := "/Users/smallyu/work/test/file/test1/aaa.epta"
+	path := "/Users/smallyu/work/gogs/edge-deploy/node1/Chain-1/Downloads/AYKnc5VDkvpb5f68XSjTyQzVHU4ZaojGxq/SaveQmQjKfjVEgZdMhNMm2p9bNwqsd3P1zK8VQQrwmY6d9TaZf.ept/t2.ept"
 	err := CutCipherTextFromFile(path)
 	if err != nil {
 		t.Error(err)
