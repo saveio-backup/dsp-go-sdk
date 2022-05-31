@@ -259,6 +259,12 @@ func GetPrefixEncrypted(prefix []byte) bool {
 	return filePrefix.Encrypt
 }
 
+func GetPrefixEncryptType(prefix []byte) byte {
+	filePrefix := &FilePrefix{}
+	filePrefix.Deserialize(prefix)
+	return filePrefix.EncryptType
+}
+
 func GetPrefixFileType(prefix []byte) uint8 {
 	filePrefix := &FilePrefix{}
 	filePrefix.Deserialize(prefix)
