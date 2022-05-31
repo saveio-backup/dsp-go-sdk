@@ -60,7 +60,6 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 		if err != nil {
 			return nil, sdkErr.New(sdkErr.INVALID_PARAMS, err.Error())
 		}
-
 	} else {
 		fileType = prefix.FILETYPE_FILE
 		// calculate check sum for setting to DB
@@ -130,20 +129,23 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			FileSize:    opt.FileSize,
 			FileName:    string(opt.FileDesc),
 		}
-		filePrefix.MakeSalt()
+		_ = filePrefix.MakeSalt()
 		prefixStr = filePrefix.String()
 		log.Debugf("node from file prefix: %v, len: %d", prefixStr, len(prefixStr))
-		if !file.IsDir() {
+		var publicKey keypair.PublicKey
+		if eType == prefix.ENCRYPTTYPE_ECIES {
 			pubKey, err := this.Mgr.DNS().GetNodePubKey(string(opt.EncryptNodeAddr))
 			if err != nil {
 				log.Errorf("get node pub key failed, %v", err)
 				return nil, err
 			}
-			publicKey, err := keypair.DeserializePublicKey(pubKey)
+			publicKey, err = keypair.DeserializePublicKey(pubKey)
 			if err != nil {
 				log.Errorf("deserialize public key failed, %v", err)
 				return nil, err
 			}
+		}
+		if !file.IsDir() {
 			hashes, err = this.Mgr.Fs().NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword), publicKey)
 			if err != nil {
 				return nil, err
@@ -151,16 +153,6 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			blocksRoot = crypto.ComputeStringHashRoot(hashes)
 			fileHashStr = hashes[0]
 		} else {
-			pubKey, err := this.Mgr.DNS().GetNodePubKey(string(opt.EncryptNodeAddr))
-			if err != nil {
-				log.Errorf("get node pub key failed, %v", err)
-				return nil, err
-			}
-			publicKey, err := keypair.DeserializePublicKey(pubKey)
-			if err != nil {
-				log.Errorf("deserialize public key failed, %v", err)
-				return nil, err
-			}
 			hashes, err = this.Mgr.Fs().NodesFromDir(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword), publicKey)
 			if err != nil {
 				log.Errorf("get nodes from dir failed, %v", err)
