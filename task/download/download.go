@@ -486,19 +486,19 @@ func (this *DownloadTask) internalDownload() error {
 			}
 			this.EmitProgress(types.TaskDownloadCheckingFileDone)
 		}
-		if len(this.GetDecryptPwd()) == 0 {
-			return nil
+		if len(this.GetDecryptPwd()) > 0 {
+			if isDir {
+				log.Debugf("decrypt task %s file in dir with pwd %s", this.GetId(), this.GetDecryptPwd())
+				err = this.decryptDownloadedFileInDir(fullFilePath)
+			} else {
+				log.Debugf("decrypt task %s file with pwd %s", this.GetId(), this.GetDecryptPwd())
+				err = this.decryptDownloadedFile()
+			}
+			if err != nil {
+				return err
+			}
 		}
-		if isDir {
-			log.Debugf("decrypt task %s file in dir with pwd %s", this.GetId(), this.GetDecryptPwd())
-			err = this.decryptDownloadedFileInDir(fullFilePath)
-		} else {
-			log.Debugf("decrypt task %s file with pwd %s", this.GetId(), this.GetDecryptPwd())
-			err = this.decryptDownloadedFile()
-		}
-		if err != nil {
-			return err
-		}
+		// TODO wangyu add decrypt node param decode
 		return nil
 	}
 	// TODO: support in-order download
@@ -1051,10 +1051,12 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				fileName := v.Name
 				if isFileEncrypted {
 					if eType == uPrefix.ENCRYPTTYPE_AES {
-						fileName += consts.ENCRYPTED_FILE_EXTENSION
+						path, name, _ := SplitFileNameFromPath(fileName)
+						fileName = uTask.GetFileFullPath(path, "", name, true)
 					}
 					if eType == uPrefix.ENCRYPTTYPE_ECIES {
-						fileName += consts.ENCRYPTED_A_FILE_EXTENSION
+						path, name, _ := SplitFileNameFromPath(fileName)
+						fileName = uTask.GetFileFullPathA(path, "", name, true)
 					}
 				}
 				// record file path
@@ -1378,24 +1380,27 @@ func (this *DownloadTask) decryptDownloadedFileInDir(path string) error {
 			err := this.decryptDownloadedFileInDir(filepath.Join(path, v.Name()))
 			if err != nil {
 				log.Errorf("decrypt file in dir %s failed %v", path, err)
-				return err
 			}
 		} else {
 			if len(this.GetDecryptPwd()) == 0 {
-				return sdkErr.New(sdkErr.DECRYPT_FILE_FAILED, "no decrypt password")
+				log.Errorf("no decrypt password")
+				continue
 			}
 			filePath := filepath.Join(path, v.Name())
 			filePrefix, prefix, err := uPrefix.GetPrefixFromFile(filePath)
 			if err != nil {
-				return sdkErr.New(sdkErr.DECRYPT_FILE_FAILED, err.Error())
+				log.Errorf("get prefix from file %s failed %v", filePath, err)
+				continue
 			}
 			if !uPrefix.VerifyEncryptPassword(this.GetDecryptPwd(), filePrefix.EncryptSalt, filePrefix.EncryptHash) {
-				return sdkErr.New(sdkErr.DECRYPT_WRONG_PASSWORD, "wrong password")
+				log.Errorf("wrong password")
+				continue
 			}
-			newFilePath := filePath[:len(filePath)-4]
+			newFilePath := uTask.GetDecryptedFilePath(filePath, filePrefix.FileName)
 			err = this.Mgr.Fs().AESDecryptFile(filePath, string(prefix), this.GetDecryptPwd(), newFilePath)
 			if err != nil {
-				return sdkErr.New(sdkErr.DECRYPT_FILE_FAILED, err.Error())
+				log.Errorf("decrypt file %s failed %v", filePath, err)
+				continue
 			}
 			_ = os.Remove(filePath)
 			log.Debugf("decrypt file in dir success %s", newFilePath)

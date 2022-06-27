@@ -73,6 +73,44 @@ func GetFileFullPath(dirPath, fileHash, fileName string, encrypted bool) string 
 	return dirPath + fileHash
 }
 
+func GetFileFullPathA(dirPath, fileHash, fileName string, encrypted bool) string {
+	if strings.LastIndex(dirPath, "/") != len(dirPath)-1 {
+		dirPath = dirPath + "/"
+	}
+	if len(fileName) == 0 {
+		if encrypted {
+			return dirPath + fileHash + consts.ENCRYPTED_A_FILE_EXTENSION
+		}
+		return dirPath + fileHash
+	}
+	i := strings.LastIndex(fileName, ".")
+	name := fileName
+	ext := ""
+	if i > 0 {
+		name = fileName[:i]
+		ext = fileName[i:]
+	}
+
+	for count := 0; count < 1000; count++ {
+		fullPath := dirPath + name
+		if count > 0 {
+			fullPath += fmt.Sprintf(" (%d)", count)
+		}
+		if encrypted {
+			fullPath += consts.ENCRYPTED_A_FILE_EXTENSION
+		} else {
+			if len(ext) > 0 {
+				fullPath += ext
+			}
+		}
+		exist := chainCom.FileExisted(fullPath)
+		if !exist {
+			return fullPath
+		}
+	}
+	return dirPath + fileHash
+}
+
 // GetDecryptedFilePath. get file path after dectypted file
 func GetDecryptedFilePath(filePath, fileName string) string {
 	i := strings.LastIndex(filePath, consts.ENCRYPTED_FILE_EXTENSION)
