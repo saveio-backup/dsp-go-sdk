@@ -2,6 +2,7 @@ package upload
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/saveio/dsp-go-sdk/consts"
@@ -79,4 +80,9 @@ func removeLocalIPNodes(list []string) []string {
 		newList = append(newList, item)
 	}
 	return newList
+}
+
+func getDirNameFromPath(path string) string {
+	split := strings.Split(path, string(filepath.Separator))
+	return split[len(split)-1]
 }

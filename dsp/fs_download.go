@@ -11,6 +11,9 @@ import (
 	"github.com/saveio/dsp-go-sdk/types/prefix"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/crypto/keypair"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -91,6 +94,32 @@ func (this *Dsp) IsFileEncrypted(fullFilePath string) bool {
 		return false
 	}
 	return filePrefix.Encrypt
+}
+
+func (this *Dsp) IsDirEncrypted(path string) bool {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	if !stat.IsDir() {
+		return false
+	}
+	dir, err := ioutil.ReadDir(path)
+	if err != nil {
+		return false
+	}
+	for _, fi := range dir {
+		if fi.IsDir() {
+			if this.IsDirEncrypted(filepath.Join(path, fi.Name())) {
+				return true
+			}
+		} else {
+			if this.IsFileEncrypted(filepath.Join(path, fi.Name())) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DownloadFile. download file, piece by piece from addrs.
