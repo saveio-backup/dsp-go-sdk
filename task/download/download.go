@@ -473,6 +473,11 @@ func (this *DownloadTask) internalDownload() error {
 			checkFileList := make([]string, 0)
 			if isDir {
 				checkFileList, err = this.Mgr.Fs().NodesFromDir(fullFilePath, string(this.GetPrefix()), false, "", nil)
+				err := uPrefix.RemovePrefixFileFromDir(fullFilePath, consts.PREFIX_FILE_NAME)
+				if err != nil {
+					this.EmitProgress(types.TaskDownloadCheckingFileFailed)
+					return sdkErr.New(sdkErr.CHECK_FILE_FAILED, "remove prefix file error")
+				}
 			} else {
 				checkFileList, err = this.Mgr.Fs().NodesFromFile(fullFilePath, string(this.GetPrefix()), false, "", nil)
 			}

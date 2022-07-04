@@ -9,6 +9,7 @@ import (
 	"hash/crc32"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
@@ -339,6 +340,29 @@ func AddPrefixToFile(prefix *FilePrefix, path string) error {
 		return err
 	}
 	err = os.Rename(output, input)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func AddPrefixFileToDir(prefix *FilePrefix, dir string, fileName string) error {
+	path := dir + string(filepath.Separator) + fileName
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.Write(prefix.Serialize())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func RemovePrefixFileFromDir(dir string, fileName string) error {
+	path := dir + string(filepath.Separator) + fileName
+	err := os.Remove(path)
 	if err != nil {
 		return err
 	}

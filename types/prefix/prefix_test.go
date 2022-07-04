@@ -253,3 +253,19 @@ func TestGenerateRandomString(t *testing.T) {
 	sum256 := sha256.Sum256(salt[:])
 	t.Log(len(sum256))
 }
+
+func TestAddPrefixFileToDir(t *testing.T) {
+	prefix := &FilePrefix{
+		Version:    1,
+		Encrypt:    true,
+		EncryptPwd: "1234",
+		Owner:      common.Address{},
+		FileSize:   0,
+		FileType:   1,
+	}
+	AddPrefixFileToDir(prefix, "/Users/smallyu/work/test/file/test8", "aaa")
+}
+
+func TestRemovePrefixFileFromDir(t *testing.T) {
+	RemovePrefixFileFromDir("/Users/smallyu/work/test/file/test8", "aaa")
+}
