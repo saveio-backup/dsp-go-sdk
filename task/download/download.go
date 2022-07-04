@@ -1083,7 +1083,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					return err
 				}
 			}
-			if this.Mgr.IsClient() && !isDir {
+			if this.Mgr.IsClient() {
 				err = this.Mgr.Fs().PutBlockForFileStore(this.GetFilePath(), getBlock, uint64(value.Offset))
 				log.Debugf("put block for store err %v", err)
 			} else {
