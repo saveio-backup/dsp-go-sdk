@@ -477,7 +477,8 @@ func (this *DownloadTask) internalDownload() error {
 				checkFileList, err = this.Mgr.Fs().NodesFromFile(fullFilePath, string(this.GetPrefix()), false, "", nil)
 			}
 			if err != nil {
-				return err
+				this.EmitProgress(types.TaskDownloadCheckingFileFailed)
+				return sdkErr.New(sdkErr.CHECK_FILE_FAILED, "get file hash error")
 			}
 			log.Debugf("checking file hash: %s, want file hash: %s", checkFileList[0], this.GetFileHash())
 			if len(checkFileList) == 0 || checkFileList[0] != this.GetFileHash() {
@@ -1077,7 +1078,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					return err
 				}
 			}
-			if this.Mgr.IsClient() {
+			if this.Mgr.IsClient() && !isDir {
 				err = this.Mgr.Fs().PutBlockForFileStore(this.GetFilePath(), getBlock, uint64(value.Offset))
 				log.Debugf("put block for store err %v", err)
 			} else {
@@ -1112,8 +1113,6 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			if !this.DB.IsFileDownloaded(this.GetId()) {
 				continue
 			}
-			log.Debugf("file has downloaded: %t, last block index: %d, isDir: %v",
-				this.DB.IsFileDownloaded(this.GetId()), value.Index, isDir)
 			// write to dir after download finish because exist repair file
 			if isDir {
 				err := this.writeBlockToDir(dagInfo)
@@ -1122,6 +1121,8 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					return err
 				}
 			}
+			log.Debugf("file has downloaded: %t, last block index: %d, isDir: %v",
+				this.DB.IsFileDownloaded(this.GetId()), value.Index, isDir)
 			// last block
 			_ = this.SetTaskState(store.TaskStateDone)
 			break
@@ -1203,13 +1204,16 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 			}()
 			writeAtPos := int64(0)
 			orderCid := rankByValue(cids)
+			log.Debugf("write block to dir, orderCid len: %d", len(orderCid))
 			for _, v := range orderCid {
 				getBlock := this.Mgr.Fs().GetBlock(v.Key)
 				if getBlock == nil {
+					log.Warnf("get block failed, cid: %s", v.Key)
 					continue
 				}
 				rawBlock, err := merkledag.DecodeRawBlock(getBlock)
 				if err != nil {
+					log.Warnf("decode raw block failed, cid: %s, err: %s", v.Key, err)
 					continue
 				}
 				log.Debugf("write block to file in dir, filePath: %s, writeAtPos: %d, dataLen: %d, cid: %s",

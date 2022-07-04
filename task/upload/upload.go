@@ -195,7 +195,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	log.Debugf("get file info of %s is %v", fileHashStr, fileInfo)
 	if newTask && (fileInfo != nil || this.Mgr.PauseDuplicatedUploadTask(taskId, fileHashStr)) {
 		log.Errorf("cancel the task???")
-		return nil, sdkErr.New(sdkErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
+		return nil, sdkErr.New(sdkErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task 1")
 	}
 	log.Debugf("check if file is uploaded %v", taskId)
 
@@ -371,7 +371,7 @@ func (this *UploadTask) Resume() error {
 	}
 	if exist, err := this.DB.ExistSameUploadTaskInfo(taskId, fileHashStr); err != nil || exist {
 		log.Debugf("exist same task err %v, exist %v", err, exist)
-		return sdkErr.New(sdkErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task")
+		return sdkErr.New(sdkErr.UPLOAD_TASK_EXIST, "file has uploading or uploaded, please cancel the task 2")
 	}
 	fileInfo, _ := this.Mgr.Chain().GetFileInfo(fileHashStr)
 	if fileInfo != nil {

@@ -166,9 +166,9 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 		}
 		err := this.fastTransfer(taskId, payInfo, paymentId, amount)
 		if err != nil {
-			return fmt.Errorf("pay %d failed", paymentId)
+			return fmt.Errorf("fast pay failed for %d", paymentId)
 		}
-		this.setPayOnLayer1(true)
+		_ = this.setPayOnLayer1(true)
 		return nil
 	}
 	// clean unpaid order
