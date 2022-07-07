@@ -1092,22 +1092,31 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				}
 			}
 
-			if this.Mgr.IsClient() && !isDir {
-				err = this.Mgr.Fs().PutBlockForFileStore(this.GetFilePath(), getBlock, uint64(value.Offset))
-				log.Debugf("put block for store err %v", err)
-			} else {
+			if isDir {
+				// dir don't put tag temporary TODO @wangyu
 				err = this.Mgr.Fs().PutBlock(getBlock)
 				if err != nil {
 					log.Errorf("put block err: %s", err)
 					return err
 				}
-				log.Debugf("put block only %s value.index %d, value.tag:%d", blockCid, value.Index, len(value.Tag))
-				err = this.Mgr.Fs().PutTag(blockCid, this.GetFileHash(), value.Index, value.Tag)
-			}
-			log.Debugf("put block for file %s block: %s, offset:%d", this.GetFilePath(), blockCid, value.Offset)
-			if err != nil {
-				log.Errorf("put block err %s", err)
-				return err
+			} else {
+				if this.Mgr.IsClient() {
+					err = this.Mgr.Fs().PutBlockForFileStore(this.GetFilePath(), getBlock, uint64(value.Offset))
+					log.Debugf("put block for store err %v", err)
+				} else {
+					err = this.Mgr.Fs().PutBlock(getBlock)
+					if err != nil {
+						log.Errorf("put block err: %s", err)
+						return err
+					}
+					log.Debugf("put block only %s value.index %d, value.tag:%d", blockCid, value.Index, len(value.Tag))
+					err = this.Mgr.Fs().PutTag(blockCid, this.GetFileHash(), value.Index, value.Tag)
+				}
+				log.Debugf("put block for file %s block: %s, offset:%d", this.GetFilePath(), blockCid, value.Offset)
+				if err != nil {
+					log.Errorf("put block err %s", err)
+					return err
+				}
 			}
 
 			links := make([]string, 0, len(dagLinks))
