@@ -271,10 +271,12 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	if this.IsTaskCancel() {
 		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "task is cancel")
 	}
-	err = prefix.RemovePrefixFileFromDir(filePath, consts.PREFIX_FILE_NAME)
-	if err != nil {
-		log.Errorf("remove prefix file failed, %v", err)
-		return nil, err
+	if file.IsDir() {
+		err = prefix.RemovePrefixFileFromDir(filePath, consts.PREFIX_FILE_NAME)
+		if err != nil {
+			log.Errorf("remove prefix file failed, %v", err)
+			return nil, err
+		}
 	}
 	this.EmitProgress(types.TaskUploadFilePayingDone)
 	if _, err = this.addWhitelist(taskId, fileHashStr, opt); err != nil {
