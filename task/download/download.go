@@ -2,8 +2,6 @@ package download
 
 import (
 	"fmt"
-	blocks "github.com/saveio/max/Godeps/_workspace/src/gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
-	"github.com/saveio/max/merkledag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,6 +10,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	blocks "github.com/saveio/max/Godeps/_workspace/src/gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
+	"github.com/saveio/max/merkledag"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/actor/client"
@@ -1045,10 +1046,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			if err != nil {
 				return err
 			}
-			if isDir {
-				dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, blockCid)
-				_ = this.SetFilePath(dirPath)
-			}
+
 			dagInfo = this.GetDagInfo()
 			for _, v := range dagLinks {
 				if v.Name == "" {
@@ -1072,9 +1070,11 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				}
 				subDirMap[v.Cid.String()] = value.Offset
 				dagInfo[fileName] = subDirMap
-				this.travelDagLinks(dagInfo, v.Cid.String(), fileName, value.Offset)
 			}
-			_ = this.SetDagInfo(dagInfo)
+			err = this.SetDagInfo(dagInfo)
+			if err != nil {
+				log.Errorf("task %s, set dag info failed, %s", this.GetId(), err.Error())
+			}
 			// write file with block data
 			if len(dagLinks) == 0 && this.Mgr.IsClient() && !isDir {
 				err := this.writeBlockToFile(&hasCutPrefix, prefix, isFileEncrypted, getBlock, value)
@@ -1083,15 +1083,25 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					return err
 				}
 			}
-			if this.Mgr.IsClient() {
+			if isDir {
+				dirPath := filepath.Join(this.Mgr.Config().FsFileRoot, blockCid)
+				err = this.SetFilePath(dirPath)
+				if err != nil {
+					log.Errorf("task %s, set file path failed, %s", this.GetId(), err.Error())
+					return err
+				}
+			}
+
+			if this.Mgr.IsClient() && !isDir {
 				err = this.Mgr.Fs().PutBlockForFileStore(this.GetFilePath(), getBlock, uint64(value.Offset))
 				log.Debugf("put block for store err %v", err)
 			} else {
 				err = this.Mgr.Fs().PutBlock(getBlock)
 				if err != nil {
+					log.Errorf("put block err: %s", err)
 					return err
 				}
-				log.Debugf("block %s value.index %d, value.tag:%d", blockCid, value.Index, len(value.Tag))
+				log.Debugf("put block only %s value.index %d, value.tag:%d", blockCid, value.Index, len(value.Tag))
 				err = this.Mgr.Fs().PutTag(blockCid, this.GetFileHash(), value.Index, value.Tag)
 			}
 			log.Debugf("put block for file %s block: %s, offset:%d", this.GetFilePath(), blockCid, value.Offset)
@@ -1188,8 +1198,8 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) error {
 	log.Debugf("write block to dir, dirMap: %v", len(dirMap))
 	if this.Mgr.IsClient() {
-		for fileName, cids := range dirMap {
-			dirPath, fileName, isFile := SplitFileNameFromPath(fileName)
+		for fullPath, cids := range dirMap {
+			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
 			if !isFile {
 				continue
 			}
@@ -1207,22 +1217,50 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 					log.Errorf("close file err %s", err)
 				}
 			}()
+
+			rootCid := ""
+			for cid, _ := range cids {
+				rootCid = cid
+				if len(rootCid) > 0 {
+					break
+				}
+			}
+			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
+
 			writeAtPos := int64(0)
 			orderCid := rankByValue(cids)
 			log.Debugf("write block to dir, orderCid len: %d", len(orderCid))
+			if err != nil {
+				log.Errorf("get file all cids err: %s", err)
+				return err
+			}
 			for _, v := range orderCid {
+				hasBlock, err := this.Mgr.Fs().HasBlock(v.Key)
+				if err != nil {
+					log.Errorf("has block err: %s", err)
+					return err
+				}
+				if !hasBlock {
+					log.Errorf("block not exist: %s", v.Key)
+					return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "block %s not exist", v.Key)
+				}
 				getBlock := this.Mgr.Fs().GetBlock(v.Key)
 				if getBlock == nil {
-					log.Warnf("get block failed, cid: %s", v.Key)
-					continue
+					log.Errorf("get block failed, cid: %s, hash block: %t", v.Key, hasBlock)
+					return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "get block failed, cid: %s", v.Key)
 				}
 				rawBlock, err := merkledag.DecodeRawBlock(getBlock)
 				if err != nil {
-					log.Warnf("decode raw block failed, cid: %s, err: %s", v.Key, err)
+					// there are two types of block, raw block and protobuf block
+					// we don't write protobuf block to file
 					continue
 				}
+				if err != nil {
+					log.Errorf("decode block failed, cid: %s, err: %s", v.Key, err)
+					return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "decode block failed, cid: %s, err: %s", v.Key, err)
+				}
 				log.Debugf("write block to file in dir, filePath: %s, writeAtPos: %d, dataLen: %d, cid: %s",
-					filePath, writeAtPos, len(rawBlock.RawData()), v.Key)
+					filePath, writeAtPos, len(rawBlock.RawData()), v)
 				if _, err := fileHandler.WriteAt(rawBlock.RawData(), writeAtPos); err != nil {
 					return sdkErr.NewWithError(sdkErr.WRITE_FILE_DATA_FAILED, err)
 				}
@@ -1296,30 +1334,47 @@ func (this *DownloadTask) writeBlockToFile(hasCutPrefix *bool, prefix string, is
 }
 
 // travelDagLinks because file have no link name
-func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, cid string, fileName string, offset int64) {
+func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, cid string, fullPath string, offset int64) int64 {
+	hasBlock, err := this.Mgr.Fs().HasBlock(cid)
+	if err != nil {
+		log.Debugf("[travelDagLinks] has block err: %s", err)
+		return offset
+	}
+	if !hasBlock {
+		log.Debugf("[travelDagLinks] block not exist: %s", cid)
+		return offset
+	}
 	getBlock := this.Mgr.Fs().GetBlock(cid)
 	if getBlock == nil {
-		return
+		log.Debugf("[travelDagLinks] get block failed, cid: %s", cid)
+		return offset
 	}
 	links, err := this.Mgr.Fs().GetBlockLinksByDAG(getBlock)
 	if err != nil {
-		return
+		log.Debugf("[travelDagLinks] get block links failed, cid: %s", cid)
+		return offset
 	}
 	for _, v := range links {
 		// is file if link's name is empty
 		if v.Name == "" {
-			subDirMap, exist := dagInfo[fileName]
+			subDirMap, exist := dagInfo[fullPath]
 			if !exist {
 				subDirMap = make(map[string]int64)
 			}
 			offset += 1
 			subDirMap[v.Cid.String()] = offset
-			dagInfo[fileName] = subDirMap
-			// if file have more deep links
-			this.travelDagLinks(dagInfo, v.Cid.String(), fileName, offset)
+			dagInfo[fullPath] = subDirMap
 		}
 	}
-	return
+	// the above links must be record first
+	for _, v := range links {
+		if v.Name == "" {
+			// if file have more deep links
+			offset += 1
+			offset = this.travelDagLinks(dagInfo, v.Cid.String(), fullPath, offset)
+		}
+	}
+	return offset
 }
 
 func (this *DownloadTask) addDownloadBlockReq() error {

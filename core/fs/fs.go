@@ -256,6 +256,14 @@ func (this *Fs) PutBlock(block blocks.Block) error {
 	return nil
 }
 
+func (this *Fs) HasBlock(hash string) (bool, error) {
+	cidHash, err := cid.Decode(hash)
+	if err != nil {
+		return false, sdkErr.NewWithError(sdkErr.FS_DECODE_CID_ERROR, err)
+	}
+	return this.fs.HasBlock(cidHash)
+}
+
 // SetFsFilePrefix. set file prefix to fs.
 func (this *Fs) SetFsFilePrefix(fileName, prefix string) error {
 	log.Debugf("set file prefix %s %v", fileName, hex.EncodeToString([]byte(prefix)))
@@ -327,6 +335,18 @@ func (this *Fs) GetBlock(hash string) blocks.Block {
 	}
 
 	return block
+}
+
+func (this *Fs) GetBlockByFileStore(hash string) blocks.Block {
+	cid, err := cid.Decode(hash)
+	if err != nil {
+		return nil
+	}
+	store, err := this.fs.GetBlockByFileStore(cid)
+	if err != nil {
+		return nil
+	}
+	return store
 }
 
 // DeleteFile. delete file, unpin root block if needed

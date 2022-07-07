@@ -82,3 +82,15 @@ func SplitFileNameFromPath(s string) (dirPath string, fileName string, isFile bo
 	// adapt cross-platform
 	return filepath.FromSlash(s), a[len(a)-1], true
 }
+
+func SplitFileNameFromPathWithOS(s string) (dirPath string, fileName string, isFile bool) {
+	flag := string(filepath.Separator)
+	if strings.HasSuffix(s, flag) {
+		return s, "", false
+	}
+	a := strings.Split(s, flag)
+	s = strings.Join(a[0:len(a)-1], flag)
+	s += flag
+	// adapt cross-platform
+	return filepath.FromSlash(s), a[len(a)-1], true
+}
