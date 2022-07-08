@@ -476,8 +476,8 @@ func (this *DownloadTask) internalDownload() error {
 				checkFileList, err = this.Mgr.Fs().NodesFromDir(fullFilePath, string(this.GetPrefix()), false, "", nil)
 				err := uPrefix.RemovePrefixFileFromDir(fullFilePath, consts.PREFIX_FILE_NAME)
 				if err != nil {
-					this.EmitProgress(types.TaskDownloadCheckingFileFailed)
-					return sdkErr.New(sdkErr.CHECK_FILE_FAILED, "remove prefix file error")
+					// don't emit download failed TODO @wangyu
+					log.Errorf("remove prefix file failed %s", err)
 				}
 			} else {
 				checkFileList, err = this.Mgr.Fs().NodesFromFile(fullFilePath, string(this.GetPrefix()), false, "", nil)
@@ -1024,7 +1024,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			if this.IsTaskStop() {
 				return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "download task %s is stop", this.GetId())
 			}
-			log.Debugf("received block %s-%s-%d from %s", this.GetFileHash(), value.Hash, value.Index, value.PeerAddr)
+			log.Debugf("received block %s-%s-%d-%d from %s", this.GetFileHash(), value.Hash, value.Index, len(value.Block), value.PeerAddr)
 			if this.DB.IsBlockDownloaded(this.GetId(), value.Hash, value.Index) &&
 				!this.DB.IsFileDownloaded(this.GetId()) {
 				log.Debugf("%s-%s-%d is downloaded", this.GetFileHash(), value.Hash, value.Index)
@@ -1253,10 +1253,11 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 					log.Errorf("block not exist: %s", v.Key)
 					return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "block %s not exist", v.Key)
 				}
+				var data []byte
 				getBlock := this.Mgr.Fs().GetBlock(v.Key)
 				if getBlock == nil {
 					log.Errorf("get block failed, cid: %s, hash block: %t", v.Key, hasBlock)
-					return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "get block failed, cid: %s", v.Key)
+					return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "get block failed, cid: %s, hash block: %t", v.Key, hasBlock)
 				}
 				rawBlock, err := merkledag.DecodeRawBlock(getBlock)
 				if err != nil {
@@ -1264,16 +1265,13 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 					// we don't write protobuf block to file
 					continue
 				}
-				if err != nil {
-					log.Errorf("decode block failed, cid: %s, err: %s", v.Key, err)
-					return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "decode block failed, cid: %s, err: %s", v.Key, err)
-				}
+				data = rawBlock.RawData()
 				log.Debugf("write block to file in dir, filePath: %s, writeAtPos: %d, dataLen: %d, cid: %s",
-					filePath, writeAtPos, len(rawBlock.RawData()), v)
-				if _, err := fileHandler.WriteAt(rawBlock.RawData(), writeAtPos); err != nil {
+					filePath, writeAtPos, len(data), v)
+				if _, err := fileHandler.WriteAt(data, writeAtPos); err != nil {
 					return sdkErr.NewWithError(sdkErr.WRITE_FILE_DATA_FAILED, err)
 				}
-				writeAtPos += int64(len(rawBlock.RawData()))
+				writeAtPos += int64(len(data))
 			}
 		}
 	}
