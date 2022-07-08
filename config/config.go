@@ -39,6 +39,8 @@ type DspConfig struct {
 	DNSWalletAddrs     []string // DNS wallet ADDRESS
 	HealthCheckDNS     bool     // health check dns
 	AllowLocalNode     bool     // allow local nodes
+
+	Mode string // mode of dsp
 }
 
 func DefaultDspConfig() *DspConfig {
