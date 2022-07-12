@@ -27,15 +27,30 @@ type Chain struct {
 	s            *state.SyncState
 }
 
-func NewChain(acc *account.Account, rpcAddrs []string, opts ...ChainOption) *Chain {
-	themis := themisSDK.NewChain()
-	themis.NewRpcClient().SetAddress(rpcAddrs)
+func NewChain(acc *account.Account, rpcAddrs []string, mode string, opts ...ChainOption) *Chain {
+	var chain *themisSDK.Chain
+	switch mode {
+	case consts.DspModeThemis:
+		chain = themisSDK.NewChainByType(themisSDK.Themis)
+		chain.NewRpcClient().SetAddress(rpcAddrs)
+	case consts.DspModeOp:
+		chain = themisSDK.NewChainByType(themisSDK.EVM)
+		err := chain.NewEthClient(rpcAddrs[0])
+		if err != nil {
+			log.Errorf("new eth client err %s", err)
+			return nil
+		}
+	default:
+		// same with themis
+		chain = themisSDK.NewChain()
+		chain.NewRpcClient().SetAddress(rpcAddrs)
+	}
 	if acc != nil {
-		themis.SetDefaultAccount(acc)
+		chain.SetDefaultAccount(acc)
 	}
 	ch := &Chain{
 		account: acc,
-		themis:  themis,
+		themis:  chain,
 		r:       rand.New(rand.NewSource(time.Now().UnixNano())),
 		s:       state.NewSyncState(),
 	}

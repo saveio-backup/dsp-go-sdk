@@ -156,3 +156,8 @@ const (
 const (
 	DOWNLOAD_BLOCK_PRICE = 1 // 1 per byte
 )
+
+const (
+	DspModeThemis = "themis"
+	DspModeOp     = "op"
+)
