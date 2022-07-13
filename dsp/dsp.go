@@ -37,7 +37,7 @@ type Dsp struct {
 	closeCh           chan struct{}            // close signal
 }
 
-func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID, mode string) *Dsp {
+func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
 	d := &Dsp{}
 	d.state = state.NewSyncState()
 	if c == nil {
@@ -45,7 +45,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID, mode
 	}
 	d.config = c
 
-	d.Chain = chain.NewChain(acc, c.ChainRpcAddrs, mode,
+	d.Chain = chain.NewChain(acc, c.ChainRpcAddrs,
 		chain.IsClient(d.IsClient()),
 		chain.BlockConfirm(c.BlockConfirm),
 	)

@@ -27,20 +27,9 @@ type Chain struct {
 	s            *state.SyncState
 }
 
-func NewChain(acc *account.Account, rpcAddrs []string, mode string, opts ...ChainOption) *Chain {
-	var chain *themisSDK.Chain
-	switch mode {
-	case consts.DspModeThemis:
-		chain = themisSDK.NewChainByType(themisSDK.Themis)
-		chain.NewRpcClient().SetAddress(rpcAddrs)
-	case consts.DspModeOp:
-		chain = themisSDK.NewChainByType(themisSDK.EVM)
-		chain.NewEthClient().SetAddress(rpcAddrs)
-	default:
-		// same as themis
-		chain = themisSDK.NewChain()
-		chain.NewRpcClient().SetAddress(rpcAddrs)
-	}
+func NewChain(acc *account.Account, rpcAddrs []string, opts ...ChainOption) *Chain {
+	chain := themisSDK.NewChain()
+	chain.NewRpcClient().SetAddress(rpcAddrs)
 	if acc != nil {
 		chain.SetDefaultAccount(acc)
 	}
