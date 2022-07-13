@@ -35,7 +35,7 @@ func NewChain(acc *account.Account, rpcAddrs []string, mode string, opts ...Chai
 		chain.NewRpcClient().SetAddress(rpcAddrs)
 	case consts.DspModeOp:
 		chain = themisSDK.NewChainByType(themisSDK.EVM)
-		chain.NewEthClient(rpcAddrs)
+		chain.NewEthClient().SetAddress(rpcAddrs)
 	default:
 		// same as themis
 		chain = themisSDK.NewChain()
