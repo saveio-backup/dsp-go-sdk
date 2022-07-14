@@ -2,6 +2,7 @@ package dns
 
 import (
 	"fmt"
+	"github.com/saveio/dsp-go-sdk/core/chain"
 	"strings"
 	"sync"
 	"time"
@@ -9,7 +10,6 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/consts"
-	"github.com/saveio/dsp-go-sdk/core/chain"
 	"github.com/saveio/dsp-go-sdk/core/channel"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	tAddr "github.com/saveio/dsp-go-sdk/types/address"

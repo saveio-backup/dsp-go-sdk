@@ -1,4 +1,4 @@
-package themis
+package chain
 
 type ChainOption interface {
 	apply(*Chain)

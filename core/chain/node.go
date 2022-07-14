@@ -1,8 +1,7 @@
-package themis
+package chain
 
 import (
 	"encoding/hex"
-
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	chainCom "github.com/saveio/themis/common"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
