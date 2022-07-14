@@ -348,12 +348,7 @@ func AddPrefixToFile(prefix *FilePrefix, path string) error {
 
 func AddPrefixFileToDir(prefix *FilePrefix, dir string, fileName string) error {
 	path := dir + string(filepath.Separator) + fileName
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	_, err = file.Write(prefix.Serialize())
+	err := os.WriteFile(path, prefix.Serialize(), 0666)
 	if err != nil {
 		return err
 	}

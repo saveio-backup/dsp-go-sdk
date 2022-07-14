@@ -1,4 +1,4 @@
-package chain
+package themis
 
 import (
 	"encoding/hex"
