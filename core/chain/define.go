@@ -15,10 +15,13 @@ import (
 	"time"
 )
 
-type Function interface {
+type Client interface {
 	// chain
 	SetAccount(acc *account.Account)
 	CurrentAccount() *account.Account
+	SetIsClient(isClient bool)
+	BlockConfirm() uint32
+	SetBlockConfirm(blockConfirm uint32)
 	State() state.ModuleState
 	WalletAddress() string
 	Address() chainCom.Address
