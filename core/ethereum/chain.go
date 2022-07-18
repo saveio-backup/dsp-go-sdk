@@ -27,7 +27,7 @@ type Ethereum struct {
 
 func NewEthereum(acc *account.Account, rpcAddrs []string) *Ethereum {
 	sdkClient := themisSDK.NewChain()
-	sdkClient.NewRpcClient().SetAddress(rpcAddrs)
+	sdkClient.NewEthClient().SetAddress(rpcAddrs)
 	if acc != nil {
 		sdkClient.SetDefaultAccount(acc)
 	}
@@ -47,13 +47,11 @@ func (e Ethereum) SetAccount(acc *account.Account) {
 }
 
 func (e Ethereum) CurrentAccount() *account.Account {
-	//TODO implement me
-	panic("implement me")
+	return e.account
 }
 
 func (e Ethereum) SetIsClient(isClient bool) {
-	//TODO implement me
-	panic("implement me")
+	e.isClient = isClient
 }
 
 func (e Ethereum) BlockConfirm() uint32 {
@@ -62,8 +60,7 @@ func (e Ethereum) BlockConfirm() uint32 {
 }
 
 func (e Ethereum) SetBlockConfirm(blockConfirm uint32) {
-	//TODO implement me
-	panic("implement me")
+	e.blockConfirm = blockConfirm
 }
 
 func (e Ethereum) State() state.ModuleState {
@@ -82,13 +79,15 @@ func (e Ethereum) Address() chainCom.Address {
 }
 
 func (e Ethereum) SDK() *themisSDK.Chain {
-	//TODO implement me
-	panic("implement me")
+	return e.sdk
 }
 
 func (e Ethereum) GetCurrentBlockHeight() (uint32, error) {
-	//TODO implement me
-	panic("implement me")
+	height, err := e.sdk.GetCurrentBlockHeight()
+	if err != nil {
+		return 0, err
+	}
+	return height, nil
 }
 
 func (e Ethereum) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
@@ -117,8 +116,7 @@ func (e Ethereum) BalanceOf(addr chainCom.Address) (uint64, error) {
 }
 
 func (e Ethereum) GetChainVersion() (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return "1.0.0", nil
 }
 
 func (e Ethereum) GetBlockHash(height uint32) (string, error) {
@@ -222,8 +220,12 @@ func (e Ethereum) FastTransfer(paymentId uint64, from, to chainCom.Address, amou
 }
 
 func (e Ethereum) GetAllDnsNodes() (map[string]dns.DNSNodeInfo, error) {
-	//TODO implement me
-	panic("implement me")
+	nodes, err := e.sdk.EVM.Dns.GetAllDnsNodes()
+	if err != nil {
+		return nil, err
+	}
+	return nodes, nil
+
 }
 
 func (e Ethereum) QueryPluginsInfo() (*dns.NameInfoList, error) {
@@ -367,8 +369,11 @@ func (e Ethereum) GetFileProveNodes(fileHashStr string) (map[string]uint64, erro
 }
 
 func (e Ethereum) GetFileList(addr chainCom.Address) (*fs.FileList, error) {
-	//TODO implement me
-	panic("implement me")
+	list, err := e.sdk.EVM.Fs.GetFileList(addr)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 func (e Ethereum) GetFsSetting() (*fs.FsSetting, error) {
@@ -472,8 +477,15 @@ func (e Ethereum) NodeExit() (string, error) {
 }
 
 func (e Ethereum) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
-	//TODO implement me
-	panic("implement me")
+	address, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return nil, err
+	}
+	query, err := e.sdk.EVM.Fs.NodeQuery(address)
+	if err != nil {
+		return nil, err
+	}
+	return query, nil
 }
 
 func (e Ethereum) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
