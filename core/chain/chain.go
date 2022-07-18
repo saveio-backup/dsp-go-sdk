@@ -1,7 +1,9 @@
 package chain
 
 import (
-	chain "github.com/saveio/dsp-go-sdk/core/themis"
+	"github.com/saveio/dsp-go-sdk/consts"
+	ethereum "github.com/saveio/dsp-go-sdk/core/ethereum"
+	themis "github.com/saveio/dsp-go-sdk/core/themis"
 	"time"
 
 	"github.com/saveio/dsp-go-sdk/types/state"
@@ -17,16 +19,24 @@ type Chain struct {
 	client Client
 }
 
-func NewChain(acc *account.Account, rpcAddrs []string, opts ...ChainOption) *Chain {
-	// TODO wangyu add other type by args
-	themisChain := chain.NewThemis(acc, rpcAddrs)
-	chainInstance := &Chain{
-		client: themisChain,
+func NewChain(acc *account.Account, rpcAddrs []string, mode string, opts ...ChainOption) *Chain {
+	var chain *Chain
+	switch mode {
+	case consts.DspModeOp:
+		themisChain := ethereum.NewEthereum(acc, rpcAddrs)
+		chain = &Chain{
+			client: themisChain,
+		}
+	default:
+		themisChain := themis.NewThemis(acc, rpcAddrs)
+		chain = &Chain{
+			client: themisChain,
+		}
 	}
 	for _, opt := range opts {
-		opt.apply(chainInstance)
+		opt.apply(chain)
 	}
-	return chainInstance
+	return chain
 }
 
 func (c *Chain) SetAccount(acc *account.Account) {
@@ -61,8 +71,8 @@ func (c *Chain) Address() chainCom.Address {
 	return c.client.Address()
 }
 
-func (c *Chain) Themis() *themisSDK.Chain {
-	return c.client.Themis()
+func (c *Chain) SDK() *themisSDK.Chain {
+	return c.client.SDK()
 }
 
 func (c *Chain) GetCurrentBlockHeight() (uint32, error) {

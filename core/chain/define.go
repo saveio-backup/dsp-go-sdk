@@ -25,7 +25,7 @@ type Client interface {
 	State() state.ModuleState
 	WalletAddress() string
 	Address() chainCom.Address
-	Themis() *themisSDK.Chain
+	SDK() *themisSDK.Chain
 	GetCurrentBlockHeight() (uint32, error)
 	PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error)
 	WaitForGenerateBlock(timeout time.Duration, blockCount ...uint32) (bool, error)

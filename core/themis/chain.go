@@ -19,7 +19,7 @@ import (
 
 type Themis struct {
 	account      *account.Account // account for chain
-	themis       *themisSDK.Chain // chain sdk
+	sdk          *themisSDK.Chain // chain sdk
 	isClient     bool             // flag of is client or max node
 	blockConfirm uint32           // wait for n block confirm
 	r            *rand.Rand
@@ -34,7 +34,7 @@ func NewThemis(acc *account.Account, rpcAddrs []string) *Themis {
 	}
 	ch := &Themis{
 		account: acc,
-		themis:  sdkClient,
+		sdk:     sdkClient,
 		r:       rand.New(rand.NewSource(time.Now().UnixNano())),
 		s:       state.NewSyncState(),
 	}
@@ -44,7 +44,7 @@ func NewThemis(acc *account.Account, rpcAddrs []string) *Themis {
 
 func (t *Themis) SetAccount(acc *account.Account) {
 	t.account = acc
-	t.themis.Native.SetDefaultAccount(acc)
+	t.sdk.Native.SetDefaultAccount(acc)
 }
 
 func (t *Themis) CurrentAccount() *account.Account {
@@ -81,12 +81,12 @@ func (t *Themis) Address() chainCom.Address {
 	return t.account.Address
 }
 
-func (t *Themis) Themis() *themisSDK.Chain {
-	return t.themis
+func (t *Themis) SDK() *themisSDK.Chain {
+	return t.sdk
 }
 
 func (t *Themis) GetCurrentBlockHeight() (uint32, error) {
-	height, err := t.themis.GetCurrentBlockHeight()
+	height, err := t.sdk.GetCurrentBlockHeight()
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -99,7 +99,7 @@ func (t *Themis) PollForTxConfirmed(timeout time.Duration, txHashStr string) (ui
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
 	txHash := chainCom.ToArrayReverse(reverseTxHash)
-	height, err := t.themis.PollForTxConfirmedHeight(timeout, txHash)
+	height, err := t.sdk.PollForTxConfirmedHeight(timeout, txHash)
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -123,7 +123,7 @@ func (t *Themis) WaitForGenerateBlock(timeout time.Duration, blockCount ...uint3
 			}
 		}
 	}
-	confirmed, err := t.themis.WaitForGenerateBlock(timeout, blockCount...)
+	confirmed, err := t.sdk.WaitForGenerateBlock(timeout, blockCount...)
 	if err != nil {
 		return false, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -155,7 +155,7 @@ func (t *Themis) WaitForTxConfirmed(blockHeight uint64) error {
 }
 
 func (t *Themis) GetBlockHeightByTxHash(txHash string) (uint32, error) {
-	height, err := t.themis.GetBlockHeightByTxHash(txHash)
+	height, err := t.sdk.GetBlockHeightByTxHash(txHash)
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -163,7 +163,7 @@ func (t *Themis) GetBlockHeightByTxHash(txHash string) (uint32, error) {
 }
 
 func (t *Themis) BalanceOf(addr chainCom.Address) (uint64, error) {
-	bal, err := t.themis.Native.Usdt.BalanceOf(addr)
+	bal, err := t.sdk.Native.Usdt.BalanceOf(addr)
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -171,7 +171,7 @@ func (t *Themis) BalanceOf(addr chainCom.Address) (uint64, error) {
 }
 
 func (t *Themis) GetChainVersion() (string, error) {
-	ver, err := t.themis.GetVersion()
+	ver, err := t.sdk.GetVersion()
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -179,7 +179,7 @@ func (t *Themis) GetChainVersion() (string, error) {
 }
 
 func (t *Themis) GetBlockHash(height uint32) (string, error) {
-	val, err := t.themis.GetBlockHash(height)
+	val, err := t.sdk.GetBlockHash(height)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -187,7 +187,7 @@ func (t *Themis) GetBlockHash(height uint32) (string, error) {
 }
 
 func (t *Themis) GetBlockByHash(blockHash string) (*types.Block, error) {
-	val, err := t.themis.GetBlockByHash(blockHash)
+	val, err := t.sdk.GetBlockByHash(blockHash)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -195,7 +195,7 @@ func (t *Themis) GetBlockByHash(blockHash string) (*types.Block, error) {
 }
 
 func (t *Themis) GetBlockTxHashesByHeight(height uint32) (*sdkCom.BlockTxHashes, error) {
-	val, err := t.themis.GetBlockTxHashesByHeight(height)
+	val, err := t.sdk.GetBlockTxHashesByHeight(height)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -203,7 +203,7 @@ func (t *Themis) GetBlockTxHashesByHeight(height uint32) (*sdkCom.BlockTxHashes,
 }
 
 func (t *Themis) GetBlockByHeight(height uint32) (*types.Block, error) {
-	val, err := t.themis.GetBlockByHeight(height)
+	val, err := t.sdk.GetBlockByHeight(height)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -211,7 +211,7 @@ func (t *Themis) GetBlockByHeight(height uint32) (*types.Block, error) {
 }
 
 func (t *Themis) GetTransaction(txHash string) (*types.Transaction, error) {
-	val, err := t.themis.GetTransaction(txHash)
+	val, err := t.sdk.GetTransaction(txHash)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -219,7 +219,7 @@ func (t *Themis) GetTransaction(txHash string) (*types.Transaction, error) {
 }
 
 func (t *Themis) GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEvent, error) {
-	val, err := t.themis.GetSmartContractEvent(txHash)
+	val, err := t.sdk.GetSmartContractEvent(txHash)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -227,35 +227,35 @@ func (t *Themis) GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEvent
 }
 
 func (t *Themis) GetSmartContract(contractAddress string) (*sdkCom.SmartContract, error) {
-	val, err := t.themis.GetSmartContract(contractAddress)
+	val, err := t.sdk.GetSmartContract(contractAddress)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
 	return val, nil
 }
 func (t *Themis) GetStorage(contractAddress string, key []byte) ([]byte, error) {
-	val, err := t.themis.GetStorage(contractAddress, key)
+	val, err := t.sdk.GetStorage(contractAddress, key)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
 	return val, nil
 }
 func (t *Themis) GetMerkleProof(txHash string) (*sdkCom.MerkleProof, error) {
-	val, err := t.themis.GetMerkleProof(txHash)
+	val, err := t.sdk.GetMerkleProof(txHash)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
 	return val, nil
 }
 func (t *Themis) GetGasPrice() (uint64, error) {
-	val, err := t.themis.GetGasPrice()
+	val, err := t.sdk.GetGasPrice()
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
 	return val, nil
 }
 func (t *Themis) GetMemPoolTxCount() (*sdkCom.MemPoolTxCount, error) {
-	val, err := t.themis.GetMemPoolTxCount()
+	val, err := t.sdk.GetMemPoolTxCount()
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -263,7 +263,7 @@ func (t *Themis) GetMemPoolTxCount() (*sdkCom.MemPoolTxCount, error) {
 }
 
 func (t *Themis) GetMemPoolTxState(txHash string) (*sdkCom.MemPoolTxState, error) {
-	val, err := t.themis.GetMemPoolTxState(txHash)
+	val, err := t.sdk.GetMemPoolTxState(txHash)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -271,7 +271,7 @@ func (t *Themis) GetMemPoolTxState(txHash string) (*sdkCom.MemPoolTxState, error
 }
 
 func (t *Themis) GetSmartContractEventByEventId(contractAddress string, address string, eventId uint32) ([]*sdkCom.SmartContactEvent, error) {
-	val, err := t.themis.GetSmartContractEventByEventId(contractAddress, address, eventId)
+	val, err := t.sdk.GetSmartContractEventByEventId(contractAddress, address, eventId)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -280,7 +280,7 @@ func (t *Themis) GetSmartContractEventByEventId(contractAddress string, address 
 
 func (t *Themis) GetSmartContractEventByEventIdAndHeights(contractAddress string, address string,
 	eventId, startHeight, endHeight uint32) ([]*sdkCom.SmartContactEvent, error) {
-	val, err := t.themis.GetSmartContractEventByEventIdAndHeights(
+	val, err := t.sdk.GetSmartContractEventByEventIdAndHeights(
 		contractAddress, address, eventId, startHeight, endHeight)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
@@ -289,7 +289,7 @@ func (t *Themis) GetSmartContractEventByEventIdAndHeights(contractAddress string
 }
 
 func (t *Themis) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartContactEvent, error) {
-	val, err := t.themis.GetSmartContractEventByBlock(height)
+	val, err := t.sdk.GetSmartContractEventByBlock(height)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -297,7 +297,7 @@ func (t *Themis) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartConta
 }
 
 func (t *Themis) Transfer(gasPrice, gasLimit uint64, from *account.Account, to chainCom.Address, amount uint64) (string, error) {
-	val, err := t.themis.Native.Usdt.Transfer(gasPrice, gasLimit, from, to, amount)
+	val, err := t.sdk.Native.Usdt.Transfer(gasPrice, gasLimit, from, to, amount)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -305,7 +305,7 @@ func (t *Themis) Transfer(gasPrice, gasLimit uint64, from *account.Account, to c
 }
 
 func (t *Themis) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account.Account, version byte, contractAddress chainCom.Address, method string, params []interface{}) (string, error) {
-	val, err := t.themis.InvokeNativeContract(gasPrice, gasLimit, signer, version, contractAddress, method, params)
+	val, err := t.sdk.InvokeNativeContract(gasPrice, gasLimit, signer, version, contractAddress, method, params)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -313,7 +313,7 @@ func (t *Themis) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account
 }
 
 func (t *Themis) PreExecInvokeNativeContract(contractAddress chainCom.Address, version byte, method string, params []interface{}) (*sdkCom.PreExecResult, error) {
-	val, err := t.themis.PreExecInvokeNativeContract(contractAddress, version, method, params)
+	val, err := t.sdk.PreExecInvokeNativeContract(contractAddress, version, method, params)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -321,7 +321,7 @@ func (t *Themis) PreExecInvokeNativeContract(contractAddress chainCom.Address, v
 }
 
 func (t *Themis) GetChannelInfo(channelID uint64, participant1, participant2 chainCom.Address) (*micropayment.ChannelInfo, error) {
-	val, err := t.themis.Native.Channel.GetChannelInfo(channelID, participant1, participant2)
+	val, err := t.sdk.Native.Channel.GetChannelInfo(channelID, participant1, participant2)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -329,7 +329,7 @@ func (t *Themis) GetChannelInfo(channelID uint64, participant1, participant2 cha
 }
 
 func (t *Themis) FastTransfer(paymentId uint64, from, to chainCom.Address, amount uint64) (string, error) {
-	val, err := t.themis.Native.Channel.FastTransfer(paymentId, from, to, amount)
+	val, err := t.sdk.Native.Channel.FastTransfer(paymentId, from, to, amount)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}

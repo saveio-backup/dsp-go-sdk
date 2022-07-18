@@ -37,7 +37,7 @@ type Dsp struct {
 	closeCh           chan struct{}            // close signal
 }
 
-func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp {
+func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID, mode string) *Dsp {
 	d := &Dsp{}
 	d.state = state.NewSyncState()
 	if c == nil {
@@ -45,7 +45,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	}
 	d.config = c
 
-	d.Chain = chain.NewChain(acc, c.ChainRpcAddrs,
+	d.Chain = chain.NewChain(acc, c.ChainRpcAddrs, mode,
 		chain.IsClient(d.IsClient()),
 		chain.BlockConfirm(c.BlockConfirm),
 	)
@@ -62,7 +62,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID) *Dsp
 	}
 	if len(c.FsRepoRoot) > 0 {
 		var err error
-		d.Fs, err = fs.NewFs(d.Chain.Themis(),
+		d.Fs, err = fs.NewFs(d.Chain.SDK(),
 			fs.RepoRoot(d.config.FsRepoRoot),
 			fs.FsType(d.config.FsType),
 			fs.ChunkSize(consts.CHUNK_SIZE),
@@ -255,7 +255,7 @@ func (this *Dsp) StartSeedService() {
 
 func (this *Dsp) initChannelService() error {
 	ch, err := channel.NewChannelService(
-		this.Chain.Themis(),
+		this.Chain.SDK(),
 		channel.ClientType(this.config.ChannelClientType),
 		channel.RevealTimeout(this.config.ChannelRevealTimeout),
 		channel.DBPath(this.config.ChannelDBPath),

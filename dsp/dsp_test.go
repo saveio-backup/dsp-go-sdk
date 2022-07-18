@@ -84,7 +84,7 @@ package dsp
 // 		ChainRpcAddr: rpcAddr,
 // 	}
 // 	d := NewDsp(dspCfg, nil, nil)
-// 	height, err := d.chain.Themis().GetCurrentBlockHeight()
+// 	height, err := d.chain.SDK().GetCurrentBlockHeight()
 // 	if err != nil {
 // 		fmt.Printf("get block height err: %s", err)
 // 		return
@@ -390,7 +390,7 @@ package dsp
 // 		ChainRpcAddr: rpcAddr,
 // 	}
 // 	d := NewDsp(dspCfg, nil, nil)
-// 	list, err := d.chain.Themis().Native.Fs.GetExpiredProveList()
+// 	list, err := d.chain.SDK().Native.Fs.GetExpiredProveList()
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}
@@ -655,7 +655,7 @@ package dsp
 // 	if d == nil {
 // 		t.Fatal("dsp init failed")
 // 	}
-// 	tx, err := d.chain.Themis().Native.Dns.RegisterHeader(common.FILE_URL_CUSTOM_HEADER, common.FILE_URL_CUSTOM_HEADER, 1)
+// 	tx, err := d.chain.SDK().Native.Dns.RegisterHeader(common.FILE_URL_CUSTOM_HEADER, common.FILE_URL_CUSTOM_HEADER, 1)
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}
@@ -679,7 +679,7 @@ package dsp
 // 	if d == nil {
 // 		t.Fatal("dsp init failed")
 // 	}
-// 	hash, err := d.chain.Themis().Native.Dns.RegisterHeader("oni", "oni", 100000)
+// 	hash, err := d.chain.SDK().Native.Dns.RegisterHeader("oni", "oni", 100000)
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}
@@ -705,7 +705,7 @@ package dsp
 // 		t.Fatal("dsp init failed")
 // 	}
 
-// 	event, err := d.chain.Themis().GetSmartContractEventByBlock(1021445)
+// 	event, err := d.chain.SDK().GetSmartContractEventByBlock(1021445)
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}
@@ -858,7 +858,7 @@ package dsp
 // 		ChainRpcAddr: rpcAddr,
 // 	}
 // 	d := NewDsp(dspCfg, nil, nil)
-// 	nodes, err := d.chain.Themis().Native.Dns.GetAllDnsNodes()
+// 	nodes, err := d.chain.SDK().Native.Dns.GetAllDnsNodes()
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}
@@ -1151,7 +1151,7 @@ package dsp
 // 	}
 // 	addr1, _ := chainCom.AddressFromBase58("AVmZet4LgYATPoR5Zhat3GCd5PccKqJVVY")
 // 	addr2, _ := chainCom.AddressFromBase58("AHmUFP3au9odqgfm3FzSXRUyBxMcNTR8uS")
-// 	channelID, err := d.chain.Themis().Native.Channel.GetChannelIdentifier(addr1, addr2)
+// 	channelID, err := d.chain.SDK().Native.Channel.GetChannelIdentifier(addr1, addr2)
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}
@@ -1276,7 +1276,7 @@ package dsp
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}
-// 	pubKey, err := d.chain.Themis().Native.Channel.GetNodePubKey(walletAddr)
+// 	pubKey, err := d.chain.SDK().Native.Channel.GetNodePubKey(walletAddr)
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}

@@ -476,7 +476,7 @@ func (d *DNS) GetNodePubKey(walletAddr string) ([]byte, error) {
 		log.Errorf("convert wallet addr %s to address failed: %v", walletAddr, err)
 		return nil, err
 	}
-	key, err := d.chain.Themis().Native.Channel.GetNodePubKey(addr)
+	key, err := d.chain.SDK().Native.Channel.GetNodePubKey(addr)
 	if err != nil {
 		log.Errorf("get node pub key err: %v", err)
 		return nil, err

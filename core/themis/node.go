@@ -11,7 +11,7 @@ var ErrNoFileInfo = "[FS Profit] FsGetFileInfo not found!"
 
 // RegisterNode. register node to chain
 func (t *Themis) RegisterNode(addr string, volume, serviceTime uint64) (string, error) {
-	txHash, err := t.themis.Native.Fs.NodeRegister(volume, serviceTime, addr)
+	txHash, err := t.sdk.Native.Fs.NodeRegister(volume, serviceTime, addr)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -21,7 +21,7 @@ func (t *Themis) RegisterNode(addr string, volume, serviceTime uint64) (string, 
 
 // NodeExit. exit a fs node submit to chain
 func (t *Themis) NodeExit() (string, error) {
-	txHash, err := t.themis.Native.Fs.NodeCancel()
+	txHash, err := t.sdk.Native.Fs.NodeCancel()
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -35,7 +35,7 @@ func (t *Themis) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	info, err := t.themis.Native.Fs.NodeQuery(address)
+	info, err := t.sdk.Native.Fs.NodeQuery(address)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -44,7 +44,7 @@ func (t *Themis) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
 
 // UpdateNode. update node information
 func (t *Themis) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
-	nodeInfo, err := t.QueryNode(t.themis.Native.Fs.Client.GetDefaultAccount().Address.ToBase58())
+	nodeInfo, err := t.QueryNode(t.sdk.Native.Fs.Client.GetDefaultAccount().Address.ToBase58())
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -60,7 +60,7 @@ func (t *Themis) UpdateNode(addr string, volume, serviceTime uint64) (string, er
 	if len(addr) == 0 {
 		addr = string(nodeInfo.NodeAddr)
 	}
-	txHash, err := t.themis.Native.Fs.NodeUpdate(volume, serviceTime, addr)
+	txHash, err := t.sdk.Native.Fs.NodeUpdate(volume, serviceTime, addr)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
@@ -70,7 +70,7 @@ func (t *Themis) UpdateNode(addr string, volume, serviceTime uint64) (string, er
 
 // RegisterNode. register node to chain
 func (t *Themis) NodeWithdrawProfit() (string, error) {
-	txHash, err := t.themis.Native.Fs.NodeWithDrawProfit()
+	txHash, err := t.sdk.Native.Fs.NodeWithDrawProfit()
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
