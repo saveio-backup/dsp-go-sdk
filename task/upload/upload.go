@@ -153,11 +153,6 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			blocksRoot = crypto.ComputeStringHashRoot(hashes)
 			fileHashStr = hashes[0]
 		} else {
-			err := prefix.AddPrefixFileToDir(filePrefix, filePath, consts.PREFIX_FILE_NAME)
-			if err != nil {
-				log.Errorf("add prefix file to dir failed, %v", err)
-				return nil, err
-			}
 			hashes, err = this.Mgr.Fs().NodesFromDir(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword), publicKey)
 			if err != nil {
 				log.Errorf("get nodes from dir failed, %v", err)
@@ -270,13 +265,6 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	}
 	if this.IsTaskCancel() {
 		return nil, sdkErr.New(sdkErr.INTERNAL_ERROR, "task is cancel")
-	}
-	if file.IsDir() {
-		err = prefix.RemovePrefixFileFromDir(filePath, consts.PREFIX_FILE_NAME)
-		if err != nil {
-			log.Errorf("remove prefix file failed, %v", err)
-			return nil, err
-		}
 	}
 	this.EmitProgress(types.TaskUploadFilePayingDone)
 	if _, err = this.addWhitelist(taskId, fileHashStr, opt); err != nil {

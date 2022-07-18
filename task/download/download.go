@@ -474,11 +474,6 @@ func (this *DownloadTask) internalDownload() error {
 			checkFileList := make([]string, 0)
 			if isDir {
 				checkFileList, err = this.Mgr.Fs().NodesFromDir(fullFilePath, string(this.GetPrefix()), false, "", nil)
-				err := uPrefix.RemovePrefixFileFromDir(fullFilePath, consts.PREFIX_FILE_NAME)
-				if err != nil {
-					// don't emit download failed TODO @wangyu
-					log.Errorf("remove prefix file failed %s", err)
-				}
 			} else {
 				checkFileList, err = this.Mgr.Fs().NodesFromFile(fullFilePath, string(this.GetPrefix()), false, "", nil)
 			}
@@ -1235,6 +1230,9 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 				}
 			}
 			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
+
+			// remove dir prefix
+			delete(dirMap, ".SaveioDirPrefix")
 
 			writeAtPos := int64(0)
 			orderCid := rankByValue(cids)
