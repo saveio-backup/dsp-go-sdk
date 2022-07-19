@@ -64,8 +64,7 @@ func (e Ethereum) SetBlockConfirm(blockConfirm uint32) {
 }
 
 func (e Ethereum) State() state.ModuleState {
-	//TODO implement me
-	panic("implement me")
+	return e.s.Get()
 }
 
 func (e Ethereum) WalletAddress() string {
@@ -111,8 +110,11 @@ func (e Ethereum) GetBlockHeightByTxHash(txHash string) (uint32, error) {
 }
 
 func (e Ethereum) BalanceOf(addr chainCom.Address) (uint64, error) {
-	//TODO implement me
-	panic("implement me")
+	of, err := e.sdk.EVM.Usdt.BalanceOf(addr)
+	if err != nil {
+		return 0, err
+	}
+	return of, nil
 }
 
 func (e Ethereum) GetChainVersion() (string, error) {
@@ -180,13 +182,11 @@ func (e Ethereum) GetMemPoolTxState(txHash string) (*sdkCom.MemPoolTxState, erro
 }
 
 func (e Ethereum) GetSmartContractEventByEventId(contractAddress string, address string, eventId uint32) ([]*sdkCom.SmartContactEvent, error) {
-	//TODO implement me
-	panic("implement me")
+	return e.sdk.GetSmartContractEventByEventId(contractAddress, address, eventId)
 }
 
 func (e Ethereum) GetSmartContractEventByEventIdAndHeights(contractAddress string, address string, eventId, startHeight, endHeight uint32) ([]*sdkCom.SmartContactEvent, error) {
-	//TODO implement me
-	panic("implement me")
+	return e.sdk.GetSmartContractEventByEventIdAndHeights(contractAddress, address, eventId, startHeight, endHeight)
 }
 
 func (e Ethereum) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartContactEvent, error) {
@@ -452,8 +452,15 @@ func (e Ethereum) CheckFilePrivilege(info *fs.FileInfo, fileHashStr, walletAddr 
 }
 
 func (e Ethereum) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
-	//TODO implement me
-	panic("implement me")
+	base58, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return nil, err
+	}
+	space, err := e.sdk.EVM.Fs.GetUserSpace(base58)
+	if err != nil {
+		return nil, err
+	}
+	return space, nil
 }
 
 func (e Ethereum) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error) {
