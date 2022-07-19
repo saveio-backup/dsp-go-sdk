@@ -1203,6 +1203,11 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 	log.Debugf("write block to dir, dirMap: %v", len(dirMap))
 	if this.Mgr.IsClient() {
 		for fullPath, cids := range dirMap {
+			// TODO wangyu magic constance
+			if fullPath == ".SaveioDirPrefix" {
+				continue
+			}
+
 			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
 			if !isFile {
 				continue
@@ -1232,6 +1237,7 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
 
 			// remove dir prefix
+			// TODO wangyu magic constance
 			delete(dirMap, ".SaveioDirPrefix")
 
 			writeAtPos := int64(0)

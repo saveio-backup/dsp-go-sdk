@@ -377,8 +377,11 @@ func (e Ethereum) GetFileList(addr chainCom.Address) (*fs.FileList, error) {
 }
 
 func (e Ethereum) GetFsSetting() (*fs.FsSetting, error) {
-	//TODO implement me
-	panic("implement me")
+	setting, err := e.sdk.EVM.Fs.GetSetting()
+	if err != nil {
+		return nil, err
+	}
+	return setting, nil
 }
 
 func (e Ethereum) GetWhiteList(fileHashStr string) (*fs.WhiteList, error) {
