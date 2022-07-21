@@ -1087,7 +1087,8 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				}
 			}
 
-			if isDir {
+			// encrypt file can generate tage
+			if isDir && !isFileEncrypted {
 				// dir don't put tag temporary TODO @wangyu
 				err = this.Mgr.Fs().PutBlock(getBlock)
 				if err != nil {

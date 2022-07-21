@@ -128,7 +128,7 @@ func (p *FilePrefix) Serialize() []byte {
 	payloadSize := uint32(VERSION_LEN + CRYPTO_LEN + SALT_LEN + HASH_LEN + len(p.Owner[:]) +
 		FILESIZE_LEN + FILENAME_LEN + len(p.FileName) + REVERSED_LEN + FILETYPE_LEN + ENCRYPTTYPE_LEN + CHECKSUM_LEN)
 	if payloadSize > MAX_PAYLOAD_SIZE {
-		log.Warnf("payload size too big")
+		log.Warnf("payload size too big, %d, %d", payloadSize, MAX_PAYLOAD_SIZE)
 		return nil
 	}
 	payloadSizeBuf := make([]byte, PAYLOAD_SIZE_LEN)
