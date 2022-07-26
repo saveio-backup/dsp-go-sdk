@@ -1,6 +1,7 @@
 package dsp
 
 import (
+	"github.com/saveio/dsp-go-sdk/consts"
 	"time"
 
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
@@ -33,6 +34,12 @@ func (this *Dsp) Address() chainCom.Address {
 	acc := this.CurrentAccount()
 	if acc == nil {
 		return chainCom.ADDRESS_EMPTY
+	}
+	switch this.Mode {
+	case consts.DspModeThemis:
+		return acc.Address
+	case consts.DspModeOp:
+		return chainCom.Address(acc.EthAddress)
 	}
 	return acc.Address
 }

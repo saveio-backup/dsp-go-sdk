@@ -1,11 +1,15 @@
 package ethereum
 
 import (
+	ethCom "github.com/ethereum/go-ethereum/common"
+	"github.com/saveio/dsp-go-sdk/consts"
+	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/types/state"
 	themisSDK "github.com/saveio/themis-go-sdk"
 	sdkCom "github.com/saveio/themis-go-sdk/common"
 	"github.com/saveio/themis/account"
 	chainCom "github.com/saveio/themis/common"
+	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/core/types"
 	"github.com/saveio/themis/smartcontract/service/native/dns"
 	"github.com/saveio/themis/smartcontract/service/native/micropayment"
@@ -68,13 +72,11 @@ func (e Ethereum) State() state.ModuleState {
 }
 
 func (e Ethereum) WalletAddress() string {
-	//TODO implement me
-	panic("implement me")
+	return e.account.EthAddress.Hex()
 }
 
 func (e Ethereum) Address() chainCom.Address {
-	//TODO implement me
-	panic("implement me")
+	return chainCom.Address(e.account.EthAddress)
 }
 
 func (e Ethereum) SDK() *themisSDK.Chain {
@@ -91,7 +93,7 @@ func (e Ethereum) GetCurrentBlockHeight() (uint32, error) {
 
 func (e Ethereum) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
 	//TODO implement me
-	panic("implement me")
+	return 1, nil
 }
 
 func (e Ethereum) WaitForGenerateBlock(timeout time.Duration, blockCount ...uint32) (bool, error) {
@@ -110,7 +112,8 @@ func (e Ethereum) GetBlockHeightByTxHash(txHash string) (uint32, error) {
 }
 
 func (e Ethereum) BalanceOf(addr chainCom.Address) (uint64, error) {
-	of, err := e.sdk.EVM.Usdt.BalanceOf(addr)
+	address := ethCom.Address(addr)
+	of, err := e.sdk.EVM.ERC20.BalanceOf(address)
 	if err != nil {
 		return 0, err
 	}
@@ -254,8 +257,11 @@ func (e Ethereum) DeleteUrl(url string) (string, error) {
 }
 
 func (e Ethereum) QueryUrl(url string, ownerAddr chainCom.Address) (*dns.NameInfo, error) {
-	//TODO implement me
-	panic("implement me")
+	info, err := e.sdk.Native.Dns.QueryUrl(url, ownerAddr)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return info, nil
 }
 
 func (e Ethereum) GetDnsNodeByAddr(wallet chainCom.Address) (*dns.DNSNodeInfo, error) {
@@ -299,13 +305,16 @@ func (e Ethereum) GetPeerPoolItem(pubKey string) (*dns.PeerPoolItem, error) {
 }
 
 func (e Ethereum) FormatError(err error) error {
-	//TODO implement me
-	panic("implement me")
+	//TODO do nothing
+	return err
 }
 
 func (e Ethereum) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
-	//TODO implement me
-	panic("implement me")
+	info, err := e.sdk.EVM.Fs.GetFileInfo(fileHashStr)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return info, nil
 }
 
 func (e Ethereum) GetFileInfos(fileHashStr []string) (*fs.FileInfoList, error) {
@@ -319,8 +328,11 @@ func (e Ethereum) GetUploadStorageFee(opt *fs.UploadOption) (*fs.StorageFee, err
 }
 
 func (e Ethereum) GetDeleteFilesStorageFee(addr chainCom.Address, fileHashStrs []string) (uint64, error) {
-	//TODO implement me
-	panic("implement me")
+	fee, err := e.sdk.EVM.Fs.GetDeleteFilesStorageFee(fileHashStrs)
+	if err != nil {
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return fee, nil
 }
 
 func (e Ethereum) GetNodeList() (*fs.FsNodesInfo, error) {
@@ -344,13 +356,54 @@ func (e Ethereum) StoreFile(fileHashStr, blocksRoot string, blockNum, blockSizeI
 }
 
 func (e Ethereum) DeleteFiles(files []string, gasLimit uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	deleteFiles, err := e.sdk.EVM.Fs.DeleteFiles(files, gasLimit)
+	if err != nil {
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return string(deleteFiles), nil
 }
 
 func (e Ethereum) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (string, uint32, error) {
-	//TODO implement me
-	panic("implement me")
+	if len(fileHashStrs) == 0 {
+		return "", 0, nil
+	}
+	needDeleteFile := false
+	for _, fileHashStr := range fileHashStrs {
+		info, err := e.GetFileInfo(fileHashStr)
+		log.Debugf("delete file get fileinfo %v, err %v", info, err)
+		if err != nil {
+			if derr, ok := err.(*sdkErr.Error); ok && derr.Code != sdkErr.FILE_NOT_FOUND_FROM_CHAIN {
+				log.Debugf("info:%v, other err:%s", info, err)
+				return "", 0, sdkErr.New(sdkErr.FILE_NOT_FOUND_FROM_CHAIN,
+					"file info not found, %s has deleted", fileHashStr)
+			}
+		}
+		if info != nil && info.FileOwner.ToBase58() != e.WalletAddress() {
+			return "", 0, sdkErr.New(sdkErr.DELETE_FILE_ACCESS_DENIED,
+				"file %s can't be deleted, you are not the owner", fileHashStr)
+		}
+		if info != nil && err == nil {
+			needDeleteFile = true
+		}
+	}
+	if !needDeleteFile {
+		return "", 0, sdkErr.New(sdkErr.NO_FILE_NEED_DELETED, "no file to delete")
+	}
+	txHashStr, err := e.DeleteFiles(fileHashStrs, gasLimit)
+	log.Debugf("delete file tx %v, err %v", txHashStr, err)
+	if err != nil {
+		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	log.Debugf("delete file txHash %s", txHashStr)
+	txHeight, err := e.PollForTxConfirmed(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, txHashStr)
+	if err != nil || txHeight == 0 {
+		return "", 0, sdkErr.New(sdkErr.CHAIN_ERROR, "wait for tx confirmed failed")
+	}
+	log.Debugf("delete file tx height %d, err %v", txHeight, err)
+	if err != nil {
+		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return txHashStr, txHeight, nil
 }
 
 func (e Ethereum) AddWhiteLists(fileHashStr string, whitelists []fs.Rule) (string, error) {
@@ -499,8 +552,11 @@ func (e Ethereum) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
 }
 
 func (e Ethereum) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	update, err := e.sdk.EVM.Fs.NodeUpdate(volume, serviceTime, addr)
+	if err != nil {
+		return "", err
+	}
+	return string(update), nil
 }
 
 func (e Ethereum) NodeWithdrawProfit() (string, error) {

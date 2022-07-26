@@ -35,6 +35,7 @@ type Dsp struct {
 	userspaceRecordDB *store.UserspaceRecordDB // user space db
 	state             *state.SyncState         // dsp state
 	closeCh           chan struct{}            // close signal
+	Mode              string
 }
 
 func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID, mode string) *Dsp {
@@ -44,6 +45,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID, mode
 		return d
 	}
 	d.config = c
+	d.Mode = mode
 
 	d.Chain = chain.NewChain(acc, c.ChainRpcAddrs, mode,
 		chain.IsClient(d.IsClient()),
