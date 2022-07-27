@@ -1,6 +1,7 @@
 package ethereum
 
 import (
+	"encoding/hex"
 	ethCom "github.com/ethereum/go-ethereum/common"
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
@@ -46,8 +47,8 @@ func NewEthereum(acc *account.Account, rpcAddrs []string) *Ethereum {
 }
 
 func (e Ethereum) SetAccount(acc *account.Account) {
-	//TODO implement me
-	panic("implement me")
+	e.account = acc
+	e.sdk.EVM.SetDefaultAccount(acc)
 }
 
 func (e Ethereum) CurrentAccount() *account.Account {
@@ -552,11 +553,29 @@ func (e Ethereum) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
 }
 
 func (e Ethereum) UpdateNode(addr string, volume, serviceTime uint64) (string, error) {
-	update, err := e.sdk.EVM.Fs.NodeUpdate(volume, serviceTime, addr)
+	base58 := ETHAddressToBase58(e.sdk.EVM.Fs.Client.GetDefaultAccount().EthAddress.Bytes())
+	nodeInfo, err := e.QueryNode(base58)
 	if err != nil {
-		return "", err
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	return string(update), nil
+	if volume == 0 {
+		volume = nodeInfo.Volume
+	}
+	if volume < nodeInfo.Volume-nodeInfo.RestVol {
+		return "", sdkErr.New(sdkErr.CHAIN_ERROR, "volume %d is less than original volume %d - restvol %d", volume, nodeInfo.Volume, nodeInfo.RestVol)
+	}
+	if serviceTime == 0 {
+		serviceTime = nodeInfo.ServiceTime
+	}
+	if len(addr) == 0 {
+		addr = string(nodeInfo.NodeAddr)
+	}
+	txHash, err := e.sdk.EVM.Fs.NodeUpdate(volume, serviceTime, addr)
+	if err != nil {
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
 }
 
 func (e Ethereum) NodeWithdrawProfit() (string, error) {
