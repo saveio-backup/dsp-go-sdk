@@ -3,6 +3,7 @@ package ethereum
 import (
 	"encoding/hex"
 	ethCom "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/types/state"
@@ -12,7 +13,6 @@ import (
 	chainCom "github.com/saveio/themis/common"
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/core/types"
-	"github.com/saveio/themis/smartcontract/service/native/dns"
 	"github.com/saveio/themis/smartcontract/service/native/micropayment"
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
@@ -219,88 +219,6 @@ func (e Ethereum) GetChannelInfo(channelID uint64, participant1, participant2 ch
 }
 
 func (e Ethereum) FastTransfer(paymentId uint64, from, to chainCom.Address, amount uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) GetAllDnsNodes() (map[string]dns.DNSNodeInfo, error) {
-	nodes, err := e.sdk.EVM.Dns.GetAllDnsNodes()
-	if err != nil {
-		return nil, err
-	}
-	return nodes, nil
-
-}
-
-func (e Ethereum) QueryPluginsInfo() (*dns.NameInfoList, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) RegisterHeader(header, desc string, ttl uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) RegisterUrl(url string, rType uint64, name, desc string, ttl uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) BindUrl(urlType uint64, url string, name, desc string, ttl uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) DeleteUrl(url string) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) QueryUrl(url string, ownerAddr chainCom.Address) (*dns.NameInfo, error) {
-	info, err := e.sdk.Native.Dns.QueryUrl(url, ownerAddr)
-	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
-	}
-	return info, nil
-}
-
-func (e Ethereum) GetDnsNodeByAddr(wallet chainCom.Address) (*dns.DNSNodeInfo, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) DNSNodeReg(ip, port []byte, initPos uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) UnregisterDNSNode() (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) QuitNode() (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) AddInitPos(addPosAmount uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) ReduceInitPos(changePosAmount uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) GetPeerPoolMap() (*dns.PeerPoolMap, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e Ethereum) GetPeerPoolItem(pubKey string) (*dns.PeerPoolItem, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -531,13 +449,19 @@ func (e Ethereum) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, bl
 }
 
 func (e Ethereum) RegisterNode(addr string, volume, serviceTime uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	register, err := e.sdk.EVM.Fs.NodeRegister(volume, serviceTime, addr)
+	if err != nil {
+		return "", err
+	}
+	return hexutil.Encode(register), nil
 }
 
 func (e Ethereum) NodeExit() (string, error) {
-	//TODO implement me
-	panic("implement me")
+	cancel, err := e.sdk.EVM.Fs.NodeCancel()
+	if err != nil {
+		return "", err
+	}
+	return hexutil.Encode(cancel), nil
 }
 
 func (e Ethereum) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
@@ -579,6 +503,9 @@ func (e Ethereum) UpdateNode(addr string, volume, serviceTime uint64) (string, e
 }
 
 func (e Ethereum) NodeWithdrawProfit() (string, error) {
-	//TODO implement me
-	panic("implement me")
+	profit, err := e.sdk.EVM.Fs.NodeWithDrawProfit()
+	if err != nil {
+		return "", err
+	}
+	return hexutil.Encode(profit), nil
 }

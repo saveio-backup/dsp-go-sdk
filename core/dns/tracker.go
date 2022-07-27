@@ -39,7 +39,7 @@ func (d *DNS) SetupTrackers() error {
 		if len(reserved) > 0 && !ok {
 			continue
 		}
-		log.Debugf("DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
+		log.Debugf("setup DNS %s :%v, port %v", v.WalletAddr.ToBase58(), string(v.IP), string(v.Port))
 		if len(d.trackerUrls) >= d.maxNodeNum {
 			break
 		}
