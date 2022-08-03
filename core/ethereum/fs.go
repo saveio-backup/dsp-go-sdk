@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	ethCom "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
@@ -488,7 +489,8 @@ func (e Ethereum) NodeExit() (string, error) {
 }
 
 func (e Ethereum) QueryNode(walletAddr string) (*fs.FsNodeInfo, error) {
-	address, err := chainCom.AddressFromBase58(walletAddr)
+	toAddress := ethCom.HexToAddress(walletAddr)
+	address, err := chainCom.AddressParseFromBytes(toAddress[:])
 	if err != nil {
 		return nil, err
 	}
