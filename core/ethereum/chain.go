@@ -107,7 +107,7 @@ func (e Ethereum) GetBlockHeightByTxHash(txHash string) (uint32, error) {
 }
 
 func (e Ethereum) BalanceOf(addr chainCom.Address) (uint64, error) {
-	address := ethCom.Address(addr)
+	address := ethCom.BytesToAddress(addr[:])
 	of, err := e.sdk.EVM.ERC20.BalanceOf(address)
 	if err != nil {
 		return 0, err
@@ -146,7 +146,8 @@ func (e Ethereum) GetTransaction(txHash string) (*types.Transaction, error) {
 
 func (e Ethereum) GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEvent, error) {
 	//TODO implement me
-	panic("implement me")
+	log.Errorf("GetSmartContractEvent not implemented")
+	return nil, nil
 }
 
 func (e Ethereum) GetSmartContract(contractAddress string) (*sdkCom.SmartContract, error) {
