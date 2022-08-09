@@ -362,7 +362,11 @@ func (e Ethereum) GetSectorInfo(sectorId uint64) (*fs.SectorInfo, error) {
 }
 
 func (e Ethereum) GetSectorInfosForNode(walletAddr string) (*fs.SectorInfos, error) {
-	address, err := chainCom.AddressFromBase58(walletAddr)
+	ethAddress := ethCom.HexToAddress(walletAddr)
+	address, err := chainCom.AddressParseFromBytes(ethAddress.Bytes())
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
