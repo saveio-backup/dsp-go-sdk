@@ -117,17 +117,26 @@ func GetDecryptedFilePath(filePath, fileName string) string {
 	if i == -1 {
 		return filePath + "-decrypted"
 	}
-	name := filePath[:i]
+	path := filePath[:i]
 	if len(fileName) == 0 {
-		return name
+		return path
 	}
 	orignalExt := ""
 	origExtIndex := strings.LastIndex(fileName, ".")
 	if origExtIndex == -1 {
-		return name
+		return path
 	}
 	orignalExt = fileName[origExtIndex:]
-	return name + orignalExt
+	newPath := path
+	for count := 1; count < 1000; count++ {
+		exist := chainCom.FileExisted(newPath + orignalExt)
+		if exist {
+			newPath = path + fmt.Sprintf(" (%d)", count)
+		} else {
+			break
+		}
+	}
+	return newPath + orignalExt
 }
 
 // func GenIdByTimestamp(r *rand.Rand) string {
