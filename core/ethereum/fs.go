@@ -125,14 +125,10 @@ func (e Ethereum) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (s
 	needDeleteFile := false
 	for _, fileHashStr := range fileHashStrs {
 		info, err := e.GetFileInfo(fileHashStr)
-		log.Debugf("delete file get fileinfo %v, err %v", info, err)
 		if err != nil {
-			if derr, ok := err.(*sdkErr.Error); ok && derr.Code != sdkErr.FILE_NOT_FOUND_FROM_CHAIN {
-				log.Debugf("info:%v, other err:%s", info, err)
-				return "", 0, sdkErr.New(sdkErr.FILE_NOT_FOUND_FROM_CHAIN,
-					"file info not found, %s has deleted", fileHashStr)
-			}
+			info = nil
 		}
+		log.Debugf("evm delete file get fileinfo %v, err %v", info, err)
 		if info != nil && info.FileOwner.ToBase58() != e.WalletAddress() {
 			return "", 0, sdkErr.New(sdkErr.DELETE_FILE_ACCESS_DENIED,
 				"file %s can't be deleted, you are not the owner", fileHashStr)
