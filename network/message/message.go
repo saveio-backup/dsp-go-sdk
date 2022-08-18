@@ -87,7 +87,7 @@ func ReadMessage(msg proto.Message) *Message {
 				return nil
 			}
 			if err := crypto.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, file.PayInfo.WalletAddress); err != nil {
-				log.Debugf("receive a invalid file msg")
+				log.Debugf("receive a invalid file msg, err: %v", err)
 				return nil
 			}
 			newMsg.Payload = file

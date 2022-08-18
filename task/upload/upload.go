@@ -249,6 +249,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	} else {
 		walletAddrs, err := this.findReceivers(nil)
 		if err != nil {
+			log.Errorf("find receivers failed, %v", err)
 			return nil, sdkErr.NewWithError(sdkErr.SEARCH_RECEIVERS_FAILED, err)
 		}
 		log.Debugf("file %s find receivers %v", fileHashStr, walletAddrs)
