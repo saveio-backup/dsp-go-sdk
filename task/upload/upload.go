@@ -640,6 +640,10 @@ func (this *UploadTask) broadcastAskMsg(msg *message.Message, nodeList []string,
 		lock.Lock()
 		defer lock.Unlock()
 		p2pMsg := message.ReadMessage(res)
+		if p2pMsg == nil {
+			log.Errorf("read message failed")
+			return false
+		}
 		if p2pMsg.Error != nil && p2pMsg.Error.Code != sdkErr.SUCCESS {
 			log.Errorf("get file fetch_ack msg err code %d, msg %s", p2pMsg.Error.Code, p2pMsg.Error.Message)
 			return false

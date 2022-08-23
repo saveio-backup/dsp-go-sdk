@@ -2,7 +2,8 @@ package message
 
 import (
 	"crypto/sha256"
-
+	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
@@ -81,6 +82,32 @@ func WithSign(acc *account.Account) SignOption {
 		msg.Sig = &Signature{
 			SigData:   sigData,
 			PublicKey: keypair.SerializePublicKey(acc.PublicKey),
+		}
+		return
+	})
+}
+
+func WithSignByETH(acc *account.Account) SignOption {
+	return msgOptionFunc(func(msg *Message) {
+		data, err := proto.Marshal(msg.Payload)
+		if err != nil {
+			return
+		}
+		msg.Header.MsgLength = int32(len(data))
+		var sigData []byte
+		hashData := sha256.Sum256(data[:crypto.DigestLength])
+		priKey, err := crypto.HexToECDSA(fmt.Sprintf("%x", acc.GetEthPrivateKey()))
+		if err != nil {
+			return
+		}
+		sigData, err = crypto.Sign(hashData[:], priKey)
+		if err != nil {
+			return
+		}
+		fmt.Println("===123===", len(sigData))
+		msg.Sig = &Signature{
+			SigData:   sigData,
+			PublicKey: acc.GetEthPublicKey(),
 		}
 		return
 	})
