@@ -605,11 +605,22 @@ func (this *UploadTask) findReceivers(primaryNodes []chainCom.Address) ([]chainC
 			nodeList = removeLocalIPNodes(nodeList)
 		}
 	}
-	msg := message.NewFileMsg(this.GetFileHash(), netCom.FILE_OP_FETCH_ASK,
-		message.WithSessionId(this.GetId()), // use task id as session id to remote peers
-		message.WithWalletAddress(this.Mgr.Chain().WalletAddress()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
-	)
+	var msg *message.Message
+	chainType := this.Mgr.Chain().GetChainType()
+	switch chainType {
+	case consts.DspModeOp:
+		msg = message.NewFileMsg(this.GetFileHash(), netCom.FILE_OP_FETCH_ASK,
+			message.WithSessionId(this.GetId()), // use task id as session id to remote peers
+			message.WithWalletAddress(this.Mgr.Chain().WalletAddress()),
+			message.WithSignByETH(this.Mgr.Chain().CurrentAccount()),
+		)
+	default:
+		msg = message.NewFileMsg(this.GetFileHash(), netCom.FILE_OP_FETCH_ASK,
+			message.WithSessionId(this.GetId()), // use task id as session id to remote peers
+			message.WithWalletAddress(this.Mgr.Chain().WalletAddress()),
+			message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		)
+	}
 	log.Debugf("broadcast fetch_ask msg of file: %s, to %v", this.GetFileHash(), nodeList)
 	this.SetNodeNetPhase(nodeList, int(types.WorkerSendFileAsk))
 	walletAddrs, err := this.broadcastAskMsg(msg, nodeList, receiverCount)
