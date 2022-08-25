@@ -1213,6 +1213,7 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 			if !isFile {
 				continue
 			}
+			fileName = ReplaceSpecialCharacters(fileName)
 			fullDir := filepath.Join(this.GetFilePath(), dirPath)
 			filePath := filepath.Join(fullDir, fileName)
 			fileHandler, err := createDownloadFile(fullDir, filePath)

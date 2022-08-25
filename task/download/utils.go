@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/saveio/dsp-go-sdk/consts"
@@ -93,4 +94,26 @@ func SplitFileNameFromPathWithOS(s string) (dirPath string, fileName string, isF
 	s += flag
 	// adapt cross-platform
 	return filepath.FromSlash(s), a[len(a)-1], true
+}
+
+func ReplaceSpecialCharacters(s string) string {
+	s = strings.Replace(s, "/", "_", -1)
+	if runtime.GOOS == "windows" {
+		s = strings.TrimSpace(s)
+		s = strings.Replace(s, ":", "_", -1)
+		s = strings.Replace(s, "?", "_", -1)
+		s = strings.Replace(s, "*", "_", -1)
+		s = strings.Replace(s, "\"", "_", -1)
+		s = strings.Replace(s, "<", "_", -1)
+		s = strings.Replace(s, ">", "_", -1)
+		s = strings.Replace(s, "|", "_", -1)
+	}
+	return s
+}
+
+func HasSpecialCharacters(s string) bool {
+	if strings.ContainsAny(s, "/:?*\"<>|") {
+		return true
+	}
+	return false
 }
