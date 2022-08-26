@@ -183,7 +183,7 @@ func (this *DownloadTask) Cancel() error {
 				message.WithSessionId(ses.SessionId),
 				message.WithWalletAddress(this.GetCurrentWalletAddr()),
 				message.WithAsset(int32(ses.Asset)),
-				message.WithSign(this.Mgr.Chain().CurrentAccount()),
+				message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 			)
 			client.P2PSend(a, msg.MessageId, msg.ToProtoMsg())
 			wg.Done()
@@ -293,7 +293,7 @@ func (this *DownloadTask) getDownloadPeerPrices(addrs []string) (
 	msg := message.NewFileMsg(this.GetFileHash(), netCom.FILE_OP_DOWNLOAD_ASK,
 		message.WithWalletAddress(this.GetCurrentWalletAddr()),
 		message.WithAsset(this.GetAsset()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	blockHashes := make([]string, 0)
 	prefix := ""
@@ -431,7 +431,7 @@ func (this *DownloadTask) internalDownload() error {
 				message.WithSessionId(sessionId),
 				message.WithWalletAddress(this.GetCurrentWalletAddr()),
 				message.WithAsset(this.GetAsset()),
-				message.WithSign(this.Mgr.Chain().CurrentAccount()),
+				message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 			)
 			log.Debugf("broadcast file_download msg to %v", walletAddr)
 			hostAddr, err := client.P2PGetHostAddrFromWalletAddr(walletAddr, client.P2PNetTypeDsp)
@@ -1190,7 +1190,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				message.WithSessionId(sid),
 				message.WithWalletAddress(this.GetCurrentWalletAddr()),
 				message.WithAsset(this.GetAsset()),
-				message.WithSign(this.Mgr.Chain().CurrentAccount()),
+				message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 			)
 			hostAddr, err := client.P2PGetHostAddrFromWalletAddr(w, client.P2PNetTypeDsp)
 			if err != nil {

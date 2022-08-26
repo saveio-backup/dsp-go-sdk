@@ -10,7 +10,6 @@ import (
 	"github.com/saveio/carrier/crypto/ed25519"
 	"github.com/saveio/themis-go-sdk/utils"
 	"github.com/saveio/themis/account"
-	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/core/types"
 	"github.com/saveio/themis/crypto/keypair"
 )
@@ -78,9 +77,8 @@ func VerifyMsg(pubKey, data, sig []byte) error {
 
 func VerifyMsgForETH(pubKey, data, sig []byte) error {
 	hashData := sha256.Sum256(data[:ethCrypto.DigestLength])
-	signature := ethCrypto.VerifySignature(pubKey, hashData[:], sig[:len(sig)-1])
+	signature := ethCrypto.VerifySignature(pubKey, hashData[:], sig[:ethCrypto.RecoveryIDOffset])
 	if !signature {
-		log.Debugf("VerifyMsgByETH failed, pubKey: %d, data: %d, sig: %d", len(pubKey), len(hashData), len(sig))
 		return fmt.Errorf("verify signature failed")
 	}
 	return nil
@@ -103,9 +101,9 @@ func PublicKeyMatchAddress(pubKey []byte, address string) error {
 
 	// unmarshal eth address
 	ethAddr := ethCom.Address{}
-	pubkey, err := ethCrypto.UnmarshalPubkey(pubKey)
+	ethPubKey, err := ethCrypto.UnmarshalPubkey(pubKey)
 	if err == nil {
-		ethAddr = ethCrypto.PubkeyToAddress(*pubkey)
+		ethAddr = ethCrypto.PubkeyToAddress(*ethPubKey)
 	}
 
 	if addr.ToBase58() != address && ethAddr.String() != address {

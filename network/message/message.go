@@ -2,7 +2,6 @@ package message
 
 import (
 	"crypto/sha256"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/pb"

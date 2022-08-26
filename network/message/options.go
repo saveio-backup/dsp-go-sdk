@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gogo/protobuf/proto"
+	"github.com/saveio/dsp-go-sdk/consts"
 	"github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/types/file"
 	"github.com/saveio/dsp-go-sdk/network/message/types/payment"
@@ -59,7 +60,16 @@ func WithSyn(syn string) MsgOption {
 	})
 }
 
-func WithSign(acc *account.Account) SignOption {
+func WithSign(acc *account.Account, mode string) SignOption {
+	switch mode {
+	case consts.DspModeOp:
+		return WithSignByETH(acc)
+	default:
+		return WithSignByThemis(acc)
+	}
+}
+
+func WithSignByThemis(acc *account.Account) SignOption {
 	return msgOptionFunc(func(msg *Message) {
 		data, err := proto.Marshal(msg.Payload)
 		if err != nil {
@@ -104,7 +114,6 @@ func WithSignByETH(acc *account.Account) SignOption {
 		if err != nil {
 			return
 		}
-		fmt.Println("===123===", len(sigData))
 		msg.Sig = &Signature{
 			SigData:   sigData,
 			PublicKey: acc.GetEthPublicKey(),

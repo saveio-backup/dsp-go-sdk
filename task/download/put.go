@@ -124,7 +124,7 @@ func (this *DownloadTask) PutBlocks(peerAddr string, resps []*types.BlockResp) e
 	doneMsg := message.NewFileMsg(fileHashStr, netCom.FILE_OP_FETCH_DONE,
 		message.WithSessionId(taskId),
 		message.WithWalletAddress(this.GetCurrentWalletAddr()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	return client.P2PSend(peerAddr, doneMsg.MessageId, doneMsg.ToProtoMsg())
 }

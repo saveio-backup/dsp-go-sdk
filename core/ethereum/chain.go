@@ -102,8 +102,8 @@ func (e Ethereum) WaitForTxConfirmed(blockHeight uint64) error {
 }
 
 func (e Ethereum) GetBlockHeightByTxHash(txHash string) (uint32, error) {
-	//TODO implement me
-	panic("implement me")
+	log.Errorf("GetBlockHeightByTxHash not implemented")
+	return 0, nil
 }
 
 func (e Ethereum) BalanceOf(addr chainCom.Address) (uint64, error) {

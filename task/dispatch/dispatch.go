@@ -127,7 +127,7 @@ func (this *DispatchTask) Start() error {
 			msg := message.NewFileMsg(fileHashStr, netCom.FILE_OP_FETCH_ASK,
 				message.WithSessionId(this.GetId()),
 				message.WithWalletAddress(this.GetCurrentWalletAddr()),
-				message.WithSign(this.Mgr.Chain().CurrentAccount()),
+				message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 			)
 			log.Debugf("task %s, file %s send file ask msg to %s", taskId, fileHashStr, peerWalletAddr)
 			resp, err := client.P2PSendAndWaitReply(peerWalletAddr, msg.MessageId, msg.ToProtoMsg())
