@@ -1206,26 +1206,34 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 	log.Debugf("write block to dir, dirMap: %v", len(dirMap))
 	if this.Mgr.IsClient() {
 		for fullPath, cids := range dirMap {
-			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
-			if !isFile {
-				continue
+			rootCid := ""
+			for cid, _ := range cids {
+				rootCid = cid
+				if len(rootCid) > 0 {
+					break
+				}
 			}
-			fileName = ReplaceSpecialCharacters(fileName)
+			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
+		}
+		for fullPath, cids := range dirMap {
+			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
 			fullDir := filepath.Join(this.GetFilePath(), dirPath)
-			filePath := filepath.Join(fullDir, fileName)
 			err := dspOs.CreateDirIfNotExist(fullDir)
 			if err != nil {
 				log.Errorf("create dir %s failed %s", fullDir, err)
 				return err
 			}
-
-			if fullPath == max.DirPrefixFileName {
+			if !isFile {
+				continue
+			}
+			fileName = ReplaceSpecialCharacters(fileName)
+			if fileName == max.DirPrefixFileName {
 				continue
 			}
 			if fileName == max.DirSealingFileName {
 				continue
 			}
-
+			filePath := filepath.Join(fullDir, fileName)
 			fileHandler, err := createDownloadFile(fullDir, filePath)
 			log.Debugf("create file in dir, pathConfig: %s, dirPath: %s, fullDir: %s, filePath: %s",
 				this.GetFilePath(), dirPath, fullDir, filePath)
@@ -1239,15 +1247,6 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 					log.Errorf("close file err %s", err)
 				}
 			}(fileHandler)
-
-			rootCid := ""
-			for cid, _ := range cids {
-				rootCid = cid
-				if len(rootCid) > 0 {
-					break
-				}
-			}
-			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
 
 			writeAtPos := int64(0)
 			orderCid := rankByValue(cids)
@@ -1384,6 +1383,14 @@ func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, ci
 			offset += 1
 			subDirMap[v.Cid.String()] = offset
 			dagInfo[fullPath] = subDirMap
+		} else {
+			subDirMap, exist := dagInfo[v.Name]
+			if !exist {
+				subDirMap = make(map[string]int64)
+			}
+			offset += 1
+			subDirMap[v.Cid.String()] = offset
+			dagInfo[v.Name] = subDirMap
 		}
 	}
 	// the above links must be record first
