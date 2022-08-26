@@ -2,6 +2,8 @@ package download
 
 import (
 	"fmt"
+	dspOs "github.com/saveio/dsp-go-sdk/utils/os"
+	"github.com/saveio/max/max"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -1204,11 +1206,6 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 	log.Debugf("write block to dir, dirMap: %v", len(dirMap))
 	if this.Mgr.IsClient() {
 		for fullPath, cids := range dirMap {
-			// TODO wangyu magic constance
-			if fullPath == ".SaveioDirPrefix" {
-				continue
-			}
-
 			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
 			if !isFile {
 				continue
@@ -1216,6 +1213,19 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 			fileName = ReplaceSpecialCharacters(fileName)
 			fullDir := filepath.Join(this.GetFilePath(), dirPath)
 			filePath := filepath.Join(fullDir, fileName)
+			err := dspOs.CreateDirIfNotExist(fullDir)
+			if err != nil {
+				log.Errorf("create dir %s failed %s", fullDir, err)
+				return err
+			}
+
+			if fullPath == max.DirPrefixFileName {
+				continue
+			}
+			if fileName == max.DirSealingFileName {
+				continue
+			}
+
 			fileHandler, err := createDownloadFile(fullDir, filePath)
 			log.Debugf("create file in dir, pathConfig: %s, dirPath: %s, fullDir: %s, filePath: %s",
 				this.GetFilePath(), dirPath, fullDir, filePath)
@@ -1223,11 +1233,12 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 				log.Errorf("createDirErr: %s", err)
 				return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, err)
 			}
-			defer func() {
-				if err := fileHandler.Close(); err != nil {
+			defer func(fileHandler *os.File) {
+				err := fileHandler.Close()
+				if err != nil {
 					log.Errorf("close file err %s", err)
 				}
-			}()
+			}(fileHandler)
 
 			rootCid := ""
 			for cid, _ := range cids {
@@ -1237,10 +1248,6 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 				}
 			}
 			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
-
-			// remove dir prefix
-			// TODO wangyu magic constance
-			delete(dirMap, ".SaveioDirPrefix")
 
 			writeAtPos := int64(0)
 			orderCid := rankByValue(cids)
