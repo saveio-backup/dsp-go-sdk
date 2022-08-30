@@ -17,12 +17,3 @@ require (
 	github.com/saveio/themis-go-sdk v0.0.0-20220331084210-7faa0e677214
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )
-
-replace (
-	github.com/saveio/carrier => ../carrier
-	github.com/saveio/max => ../max
-	github.com/saveio/pylons => ../pylons
-	github.com/saveio/themis => ../themis
-	github.com/saveio/themis-go-sdk => ../themis-go-sdk
-	github.com/tjfoc/gmsm => github.com/tjfoc/gmsm v1.3.1
-)
