@@ -40,10 +40,10 @@ func (c *Chain) StoreFile(
 	blockNum, blockSizeInKB, proveLevel, expiredHeight, copyNum uint64,
 	fileDesc []byte, privilege uint64, proveParam []byte,
 	storageType, realFileSize uint64,
-	primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo,
+	primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo,url string,
 ) (string, uint32, error) {
 	return c.client.StoreFile(fileHashStr, blocksRoot, blockNum, blockSizeInKB, proveLevel, expiredHeight,
-		copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes, plotInfo)
+		copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes, plotInfo,url)
 }
 
 func (c *Chain) DeleteFiles(files []string, gasLimit uint64) (string, error) {
