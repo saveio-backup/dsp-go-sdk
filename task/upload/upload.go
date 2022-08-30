@@ -2,6 +2,7 @@ package upload
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"os"
 	"sync"
 	"time"
@@ -249,6 +250,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	} else {
 		walletAddrs, err := this.findReceivers(nil)
 		if err != nil {
+			log.Errorf("find receivers failed, %v", err)
 			return nil, sdkErr.NewWithError(sdkErr.SEARCH_RECEIVERS_FAILED, err)
 		}
 		log.Debugf("file %s find receivers %v", fileHashStr, walletAddrs)
@@ -434,7 +436,7 @@ func (this *UploadTask) Resume() error {
 	msg := message.NewFileMsg(fileHashStr, netCom.FILE_OP_FETCH_RESUME,
 		message.WithSessionId(taskId),
 		message.WithWalletAddress(this.Mgr.Chain().WalletAddress()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	_, err := client.P2PBroadcast([]string{hostAddr}, msg.ToProtoMsg(), msg.MessageId)
 	if err != nil {
@@ -511,7 +513,7 @@ func (this *UploadTask) Cancel(tx string, txHeight uint32) (*types.DeleteUploadF
 	msg := message.NewFileMsg(fileHashStr, netCom.FILE_OP_FETCH_CANCEL,
 		message.WithSessionId(taskId),
 		message.WithWalletAddress(this.Mgr.Chain().WalletAddress()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	ret, err := client.P2PBroadcast(nodeList, msg.ToProtoMsg(), msg.MessageId)
 	log.Debugf("broadcast cancel file %s msg ret %v, err: %s", fileHashStr, ret, err)
@@ -550,7 +552,7 @@ func (this *UploadTask) sendPauseMsg() error {
 	msg := message.NewFileMsg(this.GetFileHash(), netCom.FILE_OP_FETCH_PAUSE,
 		message.WithSessionId(this.GetId()),
 		message.WithWalletAddress(this.Mgr.Chain().WalletAddress()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	ret, err := client.P2PBroadcast([]string{hostAddr}, msg.ToProtoMsg(), msg.MessageId)
 	if err != nil {
@@ -607,7 +609,7 @@ func (this *UploadTask) findReceivers(primaryNodes []chainCom.Address) ([]chainC
 	msg := message.NewFileMsg(this.GetFileHash(), netCom.FILE_OP_FETCH_ASK,
 		message.WithSessionId(this.GetId()), // use task id as session id to remote peers
 		message.WithWalletAddress(this.Mgr.Chain().WalletAddress()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	log.Debugf("broadcast fetch_ask msg of file: %s, to %v", this.GetFileHash(), nodeList)
 	this.SetNodeNetPhase(nodeList, int(types.WorkerSendFileAsk))
@@ -639,6 +641,10 @@ func (this *UploadTask) broadcastAskMsg(msg *message.Message, nodeList []string,
 		lock.Lock()
 		defer lock.Unlock()
 		p2pMsg := message.ReadMessage(res)
+		if p2pMsg == nil {
+			log.Errorf("read message failed")
+			return false
+		}
 		if p2pMsg.Error != nil && p2pMsg.Error.Code != sdkErr.SUCCESS {
 			log.Errorf("get file fetch_ack msg err code %d, msg %s", p2pMsg.Error.Code, p2pMsg.Error.Message)
 			return false
@@ -656,7 +662,9 @@ func (this *UploadTask) broadcastAskMsg(msg *message.Message, nodeList []string,
 		existWallet[fileMsg.PayInfo.WalletAddress] = struct{}{}
 		walletAddress, err := chainCom.AddressFromBase58(fileMsg.PayInfo.WalletAddress)
 		if err != nil {
-			return false
+			// eth address
+			address := common.HexToAddress(fileMsg.PayInfo.WalletAddress)
+			walletAddress = chainCom.Address(address)
 		}
 		// compare chain info
 		if fileMsg.ChainInfo.Height > height && fileMsg.ChainInfo.Height > height+consts.MAX_BLOCK_HEIGHT_DIFF {
@@ -735,7 +743,7 @@ func (this *UploadTask) sendFetchReadyMsg(peerWalletAddr string) (*message.Messa
 		message.WithTxHeight(uint64(this.GetStoreTxHeight())),
 		message.WithPrefix(this.GetPrefix()),
 		message.WithTotalBlockCount(this.GetTotalBlockCnt()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	log.Debugf("send ready msg tx %s, height %d, sessionId %s, prefix %s, blocks root %s",
 		this.GetStoreTx(), this.GetStoreTxHeight(), taskId, this.GetPrefix(), this.GetBlocksRoot())
@@ -1057,7 +1065,7 @@ func (this *UploadTask) sendDeleteMsg(deleteTaskTx string, deleteTaskTxHeight ui
 			message.WithWalletAddress(this.Mgr.Chain().WalletAddress()),
 			message.WithTxHash(deleteTaskTx),
 			message.WithTxHeight(uint64(deleteTaskTxHeight)),
-			message.WithSign(this.Mgr.Chain().CurrentAccount()),
+			message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 		)
 		nodeStatusLock := new(sync.Mutex)
 		nodeStatus := make([]types.DeleteFileStatus, 0, len(storingNode))

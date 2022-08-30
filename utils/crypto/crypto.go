@@ -4,7 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-
+	ethCom "github.com/ethereum/go-ethereum/common"
+	ethCrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/saveio/carrier/crypto"
 	"github.com/saveio/carrier/crypto/ed25519"
 	"github.com/saveio/themis-go-sdk/utils"
@@ -74,10 +75,21 @@ func VerifyMsg(pubKey, data, sig []byte) error {
 	return utils.Verify(publicKey, data, sig)
 }
 
+func VerifyMsgForETH(pubKey, data, sig []byte) error {
+	hashData := sha256.Sum256(data[:ethCrypto.DigestLength])
+	signature := ethCrypto.VerifySignature(pubKey, hashData[:], sig[:ethCrypto.RecoveryIDOffset])
+	if !signature {
+		return fmt.Errorf("verify signature failed")
+	}
+	return nil
+}
+
 func PublicKeyMatchAddress(pubKey []byte, address string) error {
 	if len(pubKey) == 0 || len(address) == 0 {
 		return fmt.Errorf("address is empty %v %v", pubKey, address)
 	}
+
+	// unmarshal ont address
 	publicKey, err := keypair.DeserializePublicKey(pubKey)
 	if err != nil {
 		return err
@@ -86,8 +98,16 @@ func PublicKeyMatchAddress(pubKey []byte, address string) error {
 	if err != nil {
 		return err
 	}
-	if addr.ToBase58() != address {
-		return fmt.Errorf("publicKey address %s not match %s", addr.ToBase58(), address)
+
+	// unmarshal eth address
+	ethAddr := ethCom.Address{}
+	ethPubKey, err := ethCrypto.UnmarshalPubkey(pubKey)
+	if err == nil {
+		ethAddr = ethCrypto.PubkeyToAddress(*ethPubKey)
+	}
+
+	if addr.ToBase58() != address && ethAddr.String() != address {
+		return fmt.Errorf("publicKey ont address %s, eth address %s, not match %s", addr.ToBase58(), ethAddr, address)
 	}
 	return nil
 }

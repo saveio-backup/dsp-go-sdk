@@ -2,6 +2,8 @@ package download
 
 import (
 	"fmt"
+	dspOs "github.com/saveio/dsp-go-sdk/utils/os"
+	"github.com/saveio/max/max"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -181,7 +183,7 @@ func (this *DownloadTask) Cancel() error {
 				message.WithSessionId(ses.SessionId),
 				message.WithWalletAddress(this.GetCurrentWalletAddr()),
 				message.WithAsset(int32(ses.Asset)),
-				message.WithSign(this.Mgr.Chain().CurrentAccount()),
+				message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 			)
 			client.P2PSend(a, msg.MessageId, msg.ToProtoMsg())
 			wg.Done()
@@ -291,7 +293,7 @@ func (this *DownloadTask) getDownloadPeerPrices(addrs []string) (
 	msg := message.NewFileMsg(this.GetFileHash(), netCom.FILE_OP_DOWNLOAD_ASK,
 		message.WithWalletAddress(this.GetCurrentWalletAddr()),
 		message.WithAsset(this.GetAsset()),
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	blockHashes := make([]string, 0)
 	prefix := ""
@@ -429,7 +431,7 @@ func (this *DownloadTask) internalDownload() error {
 				message.WithSessionId(sessionId),
 				message.WithWalletAddress(this.GetCurrentWalletAddr()),
 				message.WithAsset(this.GetAsset()),
-				message.WithSign(this.Mgr.Chain().CurrentAccount()),
+				message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 			)
 			log.Debugf("broadcast file_download msg to %v", walletAddr)
 			hostAddr, err := client.P2PGetHostAddrFromWalletAddr(walletAddr, client.P2PNetTypeDsp)
@@ -1188,7 +1190,7 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				message.WithSessionId(sid),
 				message.WithWalletAddress(this.GetCurrentWalletAddr()),
 				message.WithAsset(this.GetAsset()),
-				message.WithSign(this.Mgr.Chain().CurrentAccount()),
+				message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 			)
 			hostAddr, err := client.P2PGetHostAddrFromWalletAddr(w, client.P2PNetTypeDsp)
 			if err != nil {
@@ -1204,30 +1206,6 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 	log.Debugf("write block to dir, dirMap: %v", len(dirMap))
 	if this.Mgr.IsClient() {
 		for fullPath, cids := range dirMap {
-			// TODO wangyu magic constance
-			if fullPath == ".SaveioDirPrefix" {
-				continue
-			}
-
-			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
-			if !isFile {
-				continue
-			}
-			fullDir := filepath.Join(this.GetFilePath(), dirPath)
-			filePath := filepath.Join(fullDir, fileName)
-			fileHandler, err := createDownloadFile(fullDir, filePath)
-			log.Debugf("create file in dir, pathConfig: %s, dirPath: %s, fullDir: %s, filePath: %s",
-				this.GetFilePath(), dirPath, fullDir, filePath)
-			if err != nil {
-				log.Errorf("createDirErr: %s", err)
-				return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, err)
-			}
-			defer func() {
-				if err := fileHandler.Close(); err != nil {
-					log.Errorf("close file err %s", err)
-				}
-			}()
-
 			rootCid := ""
 			for cid, _ := range cids {
 				rootCid = cid
@@ -1236,10 +1214,39 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 				}
 			}
 			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
-
-			// remove dir prefix
-			// TODO wangyu magic constance
-			delete(dirMap, ".SaveioDirPrefix")
+		}
+		for fullPath, cids := range dirMap {
+			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
+			fullDir := filepath.Join(this.GetFilePath(), dirPath)
+			err := dspOs.CreateDirIfNotExist(fullDir)
+			if err != nil {
+				log.Errorf("create dir %s failed %s", fullDir, err)
+				return err
+			}
+			if !isFile {
+				continue
+			}
+			fileName = ReplaceSpecialCharacters(fileName)
+			if fileName == max.DirPrefixFileName {
+				continue
+			}
+			if fileName == max.DirSealingFileName {
+				continue
+			}
+			filePath := filepath.Join(fullDir, fileName)
+			fileHandler, err := createDownloadFile(fullDir, filePath)
+			log.Debugf("create file in dir, pathConfig: %s, dirPath: %s, fullDir: %s, filePath: %s",
+				this.GetFilePath(), dirPath, fullDir, filePath)
+			if err != nil {
+				log.Errorf("createDirErr: %s", err)
+				return sdkErr.NewWithError(sdkErr.CREATE_DOWNLOAD_FILE_FAILED, err)
+			}
+			defer func(fileHandler *os.File) {
+				err := fileHandler.Close()
+				if err != nil {
+					log.Errorf("close file err %s", err)
+				}
+			}(fileHandler)
 
 			writeAtPos := int64(0)
 			orderCid := rankByValue(cids)
@@ -1376,6 +1383,14 @@ func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, ci
 			offset += 1
 			subDirMap[v.Cid.String()] = offset
 			dagInfo[fullPath] = subDirMap
+		} else {
+			subDirMap, exist := dagInfo[v.Name]
+			if !exist {
+				subDirMap = make(map[string]int64)
+			}
+			offset += 1
+			subDirMap[v.Cid.String()] = offset
+			dagInfo[v.Name] = subDirMap
 		}
 	}
 	// the above links must be record first

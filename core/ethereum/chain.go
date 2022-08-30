@@ -102,8 +102,8 @@ func (e Ethereum) WaitForTxConfirmed(blockHeight uint64) error {
 }
 
 func (e Ethereum) GetBlockHeightByTxHash(txHash string) (uint32, error) {
-	//TODO implement me
-	panic("implement me")
+	log.Errorf("GetBlockHeightByTxHash not implemented")
+	return 0, nil
 }
 
 func (e Ethereum) BalanceOf(addr chainCom.Address) (uint64, error) {
@@ -189,8 +189,7 @@ func (e Ethereum) GetSmartContractEventByEventIdAndHeights(contractAddress strin
 }
 
 func (e Ethereum) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartContactEvent, error) {
-	//TODO implement me
-	panic("implement me")
+	return e.sdk.GetSmartContractEventByBlock(height)
 }
 
 func (e Ethereum) Transfer(gasPrice, gasLimit uint64, from *account.Account, to chainCom.Address, amount uint64) (string, error) {

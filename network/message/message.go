@@ -2,7 +2,6 @@ package message
 
 import (
 	"crypto/sha256"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/network/common"
 	"github.com/saveio/dsp-go-sdk/network/message/pb"
@@ -87,7 +86,7 @@ func ReadMessage(msg proto.Message) *Message {
 				return nil
 			}
 			if err := crypto.PublicKeyMatchAddress(pbMsg.Sig.PublicKey, file.PayInfo.WalletAddress); err != nil {
-				log.Debugf("receive a invalid file msg")
+				log.Debugf("receive a invalid file msg, err: %v", err)
 				return nil
 			}
 			newMsg.Payload = file
@@ -175,10 +174,11 @@ func isMsgVerified(pbMsg *pb.Message) bool {
 
 	// msg data length too large
 	if len(data) < common.MAX_SIG_DATA_LEN {
-		err := crypto.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
-		if err != nil {
-			log.Errorf("verified failed %x %x %x", pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
-			return false
+		ontErr := crypto.VerifyMsg(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
+		ethErr := crypto.VerifyMsgForETH(pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
+		if ontErr != nil && ethErr != nil {
+			log.Debugf("normal msg verified failed ont err: %s, eth err: %s,\n %x %x %x",
+				ontErr, ethErr, pbMsg.Sig.PublicKey, data, pbMsg.Sig.SigData)
 		}
 		return true
 	}

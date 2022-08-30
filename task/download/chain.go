@@ -212,7 +212,7 @@ func (this *DownloadTask) fastTransfer(taskId string, payInfo *file.Payment, pay
 		consts.ASSET_USDT,
 		amount,
 		txHash,
-		message.WithSign(this.Mgr.Chain().CurrentAccount()),
+		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
 	_, err = client.P2PSendAndWaitReply(payInfo.WalletAddress, msg.MessageId, msg.ToProtoMsg())
 	if err != nil {

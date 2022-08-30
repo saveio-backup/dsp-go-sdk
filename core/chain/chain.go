@@ -39,6 +39,15 @@ func NewChain(acc *account.Account, rpcAddrs []string, mode string, opts ...Chai
 	return chain
 }
 
+func (c *Chain) GetChainType() string {
+	switch c.client.(type) {
+	case *ethereum.Ethereum:
+		return consts.DspModeOp
+	default:
+		return consts.DspModeThemis
+	}
+}
+
 func (c *Chain) SetAccount(acc *account.Account) {
 	c.client.SetAccount(acc)
 }

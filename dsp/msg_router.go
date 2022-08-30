@@ -60,7 +60,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, paymentMsg.TxHash)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -74,7 +74,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		log.Errorf("get event nil from tx %v", paymentMsg.TxHash)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -109,7 +109,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 	if !valid {
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -125,7 +125,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		log.Errorf("get taskId with payment id failed %s", err)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -140,7 +140,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		log.Errorf("get share taskId with id %s not found", taskId)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -166,7 +166,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		log.Errorf("delete share file info %s", err)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -182,7 +182,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		paymentMsg.Sender, uint64(paymentMsg.Amount))
 
 	replyMsg := message.NewEmptyMsg(
-		message.WithSign(this.Chain.CurrentAccount()),
+		message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 		message.WithSyn(msg.MessageId),
 	)
 	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -269,7 +269,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peerWalletAddr 
 				"",
 				message.WithSessionId(fileMsg.SessionId),
 				message.WithWalletAddress(this.Chain.WalletAddress()),
-				message.WithSign(this.Chain.CurrentAccount()),
+				message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 				message.ChainHeight(height),
 				message.WithSyn(msg.MessageId),
 			)
@@ -277,7 +277,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peerWalletAddr 
 			replyMsg = message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 				message.WithSessionId(fileMsg.SessionId),
 				message.WithWalletAddress(this.Chain.WalletAddress()),
-				message.WithSign(this.Chain.CurrentAccount()),
+				message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 				message.ChainHeight(height),
 				message.WithSyn(msg.MessageId),
 			)
@@ -298,7 +298,7 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peerWalletAddr 
 	newMsg := message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 		message.WithSessionId(fileMsg.SessionId),
 		message.WithWalletAddress(this.Chain.WalletAddress()),
-		message.WithSign(this.Chain.CurrentAccount()),
+		message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 		message.ChainHeight(height),
 		message.WithSyn(msg.MessageId),
 	)
@@ -318,7 +318,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 		replyMsg := message.NewFileMsgWithError(fileHash,
 			netcom.FILE_OP_FETCH_RDY_OK, errorCode, errorMsg,
 			message.WithWalletAddress(this.Chain.WalletAddress()),
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(synMsgId),
 		)
 		err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg())
@@ -465,7 +465,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 		message.WithWalletAddress(this.Chain.WalletAddress()),
 		message.WithBreakpointHash(currentBlockHash),
 		message.WithBreakpointIndex(uint64(currentBlockIndex)),
-		message.WithSign(this.Chain.CurrentAccount()),
+		message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 		message.WithSyn(msg.MessageId),
 	)
 	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -562,7 +562,7 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext,
 				netcom.FILE_OP_DELETE_ACK, serr.DELETE_FILE_TX_UNCONFIRMED, err.Error(),
 				message.WithSessionId(fileMsg.SessionId),
 				message.WithWalletAddress(this.Chain.WalletAddress()),
-				message.WithSign(this.Chain.CurrentAccount()),
+				message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 				message.WithSyn(msg.MessageId),
 			)
 			if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -580,7 +580,7 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext,
 			serr.DELETE_FILE_FILEINFO_EXISTS, "file info hasn't been deleted",
 			message.WithSessionId(fileMsg.SessionId),
 			message.WithWalletAddress(this.Chain.WalletAddress()),
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -593,7 +593,7 @@ func (this *Dsp) handleFileDeleteMsg(ctx *network.ComponentContext,
 	replyMsg := message.NewFileMsg(fileMsg.Hash, netcom.FILE_OP_DELETE_ACK,
 		message.WithSessionId(fileMsg.SessionId),
 		message.WithWalletAddress(this.Chain.WalletAddress()),
-		message.WithSign(this.Chain.CurrentAccount()),
+		message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 		message.WithSyn(msg.MessageId),
 	)
 	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -619,7 +619,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 			message.WithWalletAddress(this.Chain.WalletAddress()),
 			message.WithUnitPrice(0),
 			message.WithAsset(0),
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -684,7 +684,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 			message.WithPrefix(prefix),
 			message.WithUnitPrice(consts.DOWNLOAD_BLOCK_PRICE),
 			message.WithAsset(fileMsg.PayInfo.Asset),
-			message.WithSign(this.Chain.CurrentAccount()),
+			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -739,7 +739,7 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 		message.WithPrefix(prefix),
 		message.WithUnitPrice(consts.DOWNLOAD_BLOCK_PRICE),
 		message.WithAsset(fileMsg.PayInfo.Asset),
-		message.WithSign(this.Chain.CurrentAccount()),
+		message.WithSign(this.Chain.CurrentAccount(), this.Mode),
 		message.WithSyn(msg.MessageId),
 	)
 	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -979,6 +979,6 @@ func (this *Dsp) handleReqProgressMsg(ctx *network.ComponentContext,
 		})
 	}
 	resp := message.NewProgressMsg(this.WalletAddress(), progressMsg.Hash, netcom.FILE_OP_PROGRESS,
-		nodeInfos, message.WithSign(this.CurrentAccount()), message.WithSyn(msg.MessageId))
+		nodeInfos, message.WithSign(this.CurrentAccount(), this.Mode), message.WithSyn(msg.MessageId))
 	client.P2PSend(peerWalletAddr, resp.MessageId, resp.ToProtoMsg())
 }

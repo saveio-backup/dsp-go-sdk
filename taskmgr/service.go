@@ -230,7 +230,7 @@ func (this *TaskMgr) runGetProgressTicker() bool {
 			fileHash,
 			netCom.FILE_OP_PROGRESS_REQ,
 			toReqPeers,
-			message.WithSign(this.chain.CurrentAccount()),
+			message.WithSign(this.chain.CurrentAccount(), this.Chain().GetChainType()),
 		)
 		// send req progress msg
 		resp, err := client.P2PSendAndWaitReply(nodeAddr, msg.MessageId, msg.ToProtoMsg())
