@@ -92,22 +92,8 @@ func (e Ethereum) StoreFile(fileHashStr, blocksRoot string, blockNum, blockSizeI
 	}
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	log.Debugf("store file txhash :%v, tx: %v", txHash, tx)
-
-	txHeight, err := e.PollForTxConfirmed(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, tx)
-	if err != nil || txHeight == 0 {
-		log.Errorf("poll tx failed %s", err)
-		return "", 0, err
-	}
-	if e.blockConfirm > 0 {
-		_, err = e.WaitForGenerateBlock(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second,
-			e.blockConfirm)
-		if err != nil {
-			log.Errorf("wait for generate err %s", err)
-			return "", 0, err
-		}
-	}
-
-	return tx, txHeight, nil
+	// TODO wangyu
+	return tx, 0, nil
 }
 
 func (e Ethereum) DeleteFiles(files []string, gasLimit uint64) (string, error) {

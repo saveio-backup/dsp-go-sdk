@@ -3,6 +3,7 @@ package message
 import (
 	"crypto/sha256"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gogo/protobuf/proto"
 	"github.com/saveio/dsp-go-sdk/consts"

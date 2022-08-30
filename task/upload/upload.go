@@ -2,7 +2,6 @@ package upload
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"os"
 	"sync"
 	"time"
@@ -38,7 +37,7 @@ import (
 // Phase7: continuesly request dispatch progress to master node
 func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.UploadOption) (
 	*types.UploadResult, error) {
-	file, err := os.Stat(filePath)
+	fileStat, err := os.Stat(filePath)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.INTERNAL_ERROR, err)
 	}
@@ -55,7 +54,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	}
 	checksum := ""
 	var fileType uint8
-	if file.IsDir() {
+	if fileStat.IsDir() {
 		fileType = prefix.FILETYPE_DIR
 		checksum, err = crypto.GetSimpleChecksumOfDir(filePath)
 		if err != nil {
@@ -146,7 +145,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 				return nil, err
 			}
 		}
-		if !file.IsDir() {
+		if !fileStat.IsDir() {
 			hashes, err = this.Mgr.Fs().NodesFromFile(filePath, prefixStr, opt.Encrypt, string(opt.EncryptPassword), publicKey)
 			if err != nil {
 				return nil, err
@@ -660,11 +659,9 @@ func (this *UploadTask) broadcastAskMsg(msg *message.Message, nodeList []string,
 			return false
 		}
 		existWallet[fileMsg.PayInfo.WalletAddress] = struct{}{}
-		walletAddress, err := chainCom.AddressFromBase58(fileMsg.PayInfo.WalletAddress)
+		walletAddress, err := chainCom.AddressFromBase58(walletAddr)
 		if err != nil {
-			// eth address
-			address := common.HexToAddress(fileMsg.PayInfo.WalletAddress)
-			walletAddress = chainCom.Address(address)
+			return false
 		}
 		// compare chain info
 		if fileMsg.ChainInfo.Height > height && fileMsg.ChainInfo.Height > height+consts.MAX_BLOCK_HEIGHT_DIFF {
@@ -745,8 +742,8 @@ func (this *UploadTask) sendFetchReadyMsg(peerWalletAddr string) (*message.Messa
 		message.WithTotalBlockCount(this.GetTotalBlockCnt()),
 		message.WithSign(this.Mgr.Chain().CurrentAccount(), this.Mgr.Chain().GetChainType()),
 	)
-	log.Debugf("send ready msg tx %s, height %d, sessionId %s, prefix %s, blocks root %s",
-		this.GetStoreTx(), this.GetStoreTxHeight(), taskId, this.GetPrefix(), this.GetBlocksRoot())
+	log.Debugf("send ready msg tx %s, height %d, sessionId %s, prefix %s, blocks root %s, msg id %s, to %s",
+		this.GetStoreTx(), this.GetStoreTxHeight(), taskId, this.GetPrefix(), this.GetBlocksRoot(), msg.MessageId, peerWalletAddr)
 	resp, err := client.P2PSendAndWaitReply(peerWalletAddr, msg.MessageId, msg.ToProtoMsg())
 	if err != nil {
 		return nil, err

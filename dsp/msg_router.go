@@ -2,6 +2,7 @@ package dsp
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"strings"
 
 	"github.com/saveio/dsp-go-sdk/actor/client"
@@ -268,16 +269,16 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peerWalletAddr 
 				serr.TOO_MANY_TASKS,
 				"",
 				message.WithSessionId(fileMsg.SessionId),
-				message.WithWalletAddress(this.Chain.WalletAddress()),
-				message.WithSign(this.Chain.CurrentAccount(), this.Mode),
+				message.WithWalletAddress(this.Chain.CurrentAccount().Address.ToBase58()),
+				message.WithSign(this.Chain.CurrentAccount(), consts.DspModeThemis),
 				message.ChainHeight(height),
 				message.WithSyn(msg.MessageId),
 			)
 		} else {
 			replyMsg = message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 				message.WithSessionId(fileMsg.SessionId),
-				message.WithWalletAddress(this.Chain.WalletAddress()),
-				message.WithSign(this.Chain.CurrentAccount(), this.Mode),
+				message.WithWalletAddress(this.Chain.CurrentAccount().Address.ToBase58()),
+				message.WithSign(this.Chain.CurrentAccount(), consts.DspModeThemis),
 				message.ChainHeight(height),
 				message.WithSyn(msg.MessageId),
 			)
@@ -295,10 +296,11 @@ func (this *Dsp) handleFileAskMsg(ctx *network.ComponentContext, peerWalletAddr 
 	// if state == store.TaskStateCancel || state == store.TaskStateFailed || state == store.TaskStateDone {
 	// 	log.Warnf("the task has a wrong state of file_ask %s", state)
 	// }
+	// there use themis address reply
 	newMsg := message.NewFileMsg(fileMsg.GetHash(), netcom.FILE_OP_FETCH_ACK,
 		message.WithSessionId(fileMsg.SessionId),
-		message.WithWalletAddress(this.Chain.WalletAddress()),
-		message.WithSign(this.Chain.CurrentAccount(), this.Mode),
+		message.WithWalletAddress(this.Chain.CurrentAccount().Address.ToBase58()),
+		message.WithSign(this.Chain.CurrentAccount(), consts.DspModeThemis),
 		message.ChainHeight(height),
 		message.WithSyn(msg.MessageId),
 	)
@@ -325,10 +327,12 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 		if err != nil {
 			log.Errorf("reply rdy ok msg failed %s", err)
 		}
+		log.Debugf("replyErr: file rdy ok msg to %s success", peerWalletAddr)
 		return err
 	}
 	// check file tx, and if it is confirmed, and file info is still exist
 	if fileMsg.Tx == nil {
+		log.Errorf("file rdy msg has no tx %s", fileMsg.Hash)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.MISS_UPLOADED_FILE_TX, "upload file tx is required")
 		return
 	}
@@ -346,9 +350,12 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 	}
 	log.Debugf("get file info %s success", fileMsg.Hash)
 	// check upload privilege
-	if fileMsg.PayInfo == nil || (info.FileOwner.ToBase58() != fileMsg.PayInfo.WalletAddress &&
-		len(info.PrimaryNodes.AddrList) > 0 &&
-		info.PrimaryNodes.AddrList[0].ToBase58() != fileMsg.PayInfo.WalletAddress) {
+	ethAddress := common.BytesToAddress(info.FileOwner[:])
+	if fileMsg.PayInfo == nil ||
+		(info.FileOwner.ToBase58() != fileMsg.PayInfo.WalletAddress &&
+			ethAddress.String() != fileMsg.PayInfo.WalletAddress &&
+			len(info.PrimaryNodes.AddrList) > 0 &&
+			info.PrimaryNodes.AddrList[0].ToBase58() != fileMsg.PayInfo.WalletAddress) {
 		log.Errorf("receive fetch ask msg from wrong account %s", fileMsg.PayInfo.WalletAddress)
 		replyErr(fileMsg.Hash, msg.MessageId, serr.NO_PRIVILEGE_TO_UPLOAD, "fetch owner not match")
 		return
@@ -364,6 +371,7 @@ func (this *Dsp) handleFileRdyMsg(ctx *network.ComponentContext, peerWalletAddr 
 	// my task. use my wallet address
 	var downloadTask *download.DownloadTask
 	taskId := this.TaskMgr.GetDownloadedTaskId(fileMsg.Hash, this.Chain.WalletAddress())
+	log.Debugf("[handleFileRdyMsg] get downloaded task %s", taskId)
 	if len(taskId) == 0 {
 		// handle new download task. use my wallet address
 		log.Debugf("task not exist, create new download task")
