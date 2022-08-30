@@ -17,7 +17,6 @@ func (this *Dsp) UploadTaskExist(filePath string) (bool, error) {
 // UploadFile upload new file logic synchronously
 func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.UploadOption) (
 	uploadRet *types.UploadResult, err error) {
-
 	defer func() {
 		sdkErr, _ := err.(*sdkErr.Error)
 		if uploadRet == nil {

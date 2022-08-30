@@ -269,6 +269,7 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 			StartNonce: plotCfg.StartNonce,
 			Nonces:     plotCfg.Nonces,
 		},
+		url: p.GetUrl(),
 	}
 
 	tx, height, err := p.Mgr.Chain().StoreFile(sp.fileHash,
@@ -286,6 +287,7 @@ func (p *PocTask) AddPlotFile(plotCfg *PlotConfig) error {
 		sp.primaryNodes,
 		sp.candidateNodes,
 		sp.plotInfo,
+		sp.url,
 	)
 	if err != nil {
 		return err

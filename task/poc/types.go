@@ -26,6 +26,7 @@ type StoreFileParam struct {
 	primaryNodes   []common.Address
 	candidateNodes []common.Address
 	plotInfo       *savefs.PlotInfo
+	url string
 }
 
 type PlotConfig struct {

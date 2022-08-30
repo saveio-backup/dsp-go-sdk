@@ -88,7 +88,7 @@ type Client interface {
 		blockNum, blockSizeInKB, proveLevel, expiredHeight, copyNum uint64,
 		fileDesc []byte, privilege uint64, proveParam []byte,
 		storageType, realFileSize uint64,
-		primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo,
+		primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo,url string,
 	) (string, uint32, error)
 	DeleteFiles(files []string, gasLimit uint64) (string, error)
 	DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (string, uint32, error)
