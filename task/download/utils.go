@@ -98,12 +98,13 @@ func SplitFileNameFromPathWithOS(s string) (dirPath string, fileName string, isF
 
 func ReplaceSpecialCharacters(s string) string {
 	s = strings.Replace(s, "/", "_", -1)
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" || true {
 		s = strings.TrimSpace(s)
 		s = strings.Replace(s, ":", "_", -1)
 		s = strings.Replace(s, "?", "_", -1)
 		s = strings.Replace(s, "*", "_", -1)
 		s = strings.Replace(s, "\"", "_", -1)
+		s = strings.Replace(s, "\\", "_", -1)
 		s = strings.Replace(s, "<", "_", -1)
 		s = strings.Replace(s, ">", "_", -1)
 		s = strings.Replace(s, "|", "_", -1)
@@ -112,7 +113,7 @@ func ReplaceSpecialCharacters(s string) string {
 }
 
 func HasSpecialCharacters(s string) bool {
-	if strings.ContainsAny(s, "/:?*\"<>|") {
+	if strings.ContainsAny(s, "/:?*\"\\<>|") {
 		return true
 	}
 	return false

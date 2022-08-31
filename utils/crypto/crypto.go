@@ -54,6 +54,20 @@ func AddressFromPubkeyHex(pubKeyHex string) string {
 	return addr.ToBase58()
 }
 
+func EthAddressFromPublicKeyHex(pubKeyHex string) string {
+	addr := ethCom.Address{}
+	pubKey, err := hex.DecodeString(pubKeyHex)
+	if err != nil {
+		return addr.String()
+	}
+	ethPubKey, err := ethCrypto.UnmarshalPubkey(pubKey)
+	if err != nil {
+		return addr.String()
+	}
+	addr = ethCrypto.PubkeyToAddress(*ethPubKey)
+	return addr.String()
+}
+
 func NewNetworkEd25519KeyPair(pubKey, salt []byte) *crypto.KeyPair {
 	tkPub, tkPri, err := ed25519.GenerateKey(&accountReader{
 		PublicKey: append(pubKey, salt...),
