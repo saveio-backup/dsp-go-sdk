@@ -1385,7 +1385,7 @@ func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, ci
 				subDirMap = make(map[string]int64)
 			}
 			offsetTmp := offset
-			if strings.HasPrefix(v.Cid.String(), "SaveQm") {
+			if strings.HasPrefix(v.Cid.String(), consts.PROTO_NODE_PREFIX) {
 				offsetTmp = offset / consts.BLOCKS_OFFSET_BASE
 			}
 			SetMapWithSuffix(subDirMap, v.Cid.String(), offsetTmp)
