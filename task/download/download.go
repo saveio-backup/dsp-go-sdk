@@ -1214,7 +1214,7 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 					break
 				}
 			}
-			this.travelDagLinks(dirMap, rootCid, fullPath, (cids[rootCid])*10000)
+			this.travelDagLinks(dirMap, rootCid, fullPath, (cids[rootCid])*consts.BLOCKS_OFFSET_BASE)
 		}
 		for fullPath, cids := range dirMap {
 			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
@@ -1377,7 +1377,7 @@ func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, ci
 		return offset
 	}
 	for _, v := range links {
-		offset += 1 * 10000
+		offset += 1 * consts.BLOCKS_OFFSET_BASE
 		// is file if link's name is empty
 		if v.Name == "" {
 			subDirMap, exist := dagInfo[fullPath]
@@ -1386,7 +1386,7 @@ func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, ci
 			}
 			offsetTmp := offset
 			if strings.HasPrefix(v.Cid.String(), "SaveQm") {
-				offsetTmp = offset / 10000
+				offsetTmp = offset / consts.BLOCKS_OFFSET_BASE
 			}
 			SetMapWithSuffix(subDirMap, v.Cid.String(), offsetTmp)
 			dagInfo[fullPath] = subDirMap
@@ -1401,7 +1401,7 @@ func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, ci
 	}
 	// the above links must be record first
 	for _, v := range links {
-		offset += 1 * 10000
+		offset += 1 * consts.BLOCKS_OFFSET_BASE
 		if v.Name == "" {
 			// if file have more deep links
 			offset = this.travelDagLinks(dagInfo, v.Cid.String(), fullPath, offset)
