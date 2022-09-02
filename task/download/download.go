@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1213,7 +1214,7 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 					break
 				}
 			}
-			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
+			this.travelDagLinks(dirMap, rootCid, fullPath, (cids[rootCid])*10000)
 		}
 		for fullPath, cids := range dirMap {
 			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
@@ -1226,6 +1227,7 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 			if !isFile {
 				continue
 			}
+			dirPath = filepath.Join(dirPath, fileName)
 			fileName = ReplaceSpecialCharacters(fileName)
 			if fileName == max.DirPrefixFileName {
 				continue
@@ -1256,6 +1258,7 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 				return err
 			}
 			for _, v := range orderCid {
+				v.Key = RemoveSuffix(v.Key)
 				hasBlock, err := this.Mgr.Fs().HasBlock(v.Key)
 				if err != nil {
 					log.Errorf("has block err: %s", err)
@@ -1374,30 +1377,33 @@ func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, ci
 		return offset
 	}
 	for _, v := range links {
+		offset += 1 * 10000
 		// is file if link's name is empty
 		if v.Name == "" {
 			subDirMap, exist := dagInfo[fullPath]
 			if !exist {
 				subDirMap = make(map[string]int64)
 			}
-			offset += 1
-			subDirMap[v.Cid.String()] = offset
+			offsetTmp := offset
+			if strings.HasPrefix(v.Cid.String(), "SaveQm") {
+				offsetTmp = offset / 10000
+			}
+			SetMapWithSuffix(subDirMap, v.Cid.String(), offsetTmp)
 			dagInfo[fullPath] = subDirMap
 		} else {
 			subDirMap, exist := dagInfo[v.Name]
 			if !exist {
 				subDirMap = make(map[string]int64)
 			}
-			offset += 1
 			subDirMap[v.Cid.String()] = offset
 			dagInfo[v.Name] = subDirMap
 		}
 	}
 	// the above links must be record first
 	for _, v := range links {
+		offset += 1 * 10000
 		if v.Name == "" {
 			// if file have more deep links
-			offset += 1
 			offset = this.travelDagLinks(dagInfo, v.Cid.String(), fullPath, offset)
 		}
 	}

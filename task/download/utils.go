@@ -98,7 +98,7 @@ func SplitFileNameFromPathWithOS(s string) (dirPath string, fileName string, isF
 
 func ReplaceSpecialCharacters(s string) string {
 	s = strings.Replace(s, "/", "_", -1)
-	if runtime.GOOS == "windows" || true {
+	if runtime.GOOS == "windows" {
 		s = strings.TrimSpace(s)
 		s = strings.Replace(s, ":", "_", -1)
 		s = strings.Replace(s, "?", "_", -1)
@@ -117,4 +117,29 @@ func HasSpecialCharacters(s string) bool {
 		return true
 	}
 	return false
+}
+
+func SetMapWithSuffix(dict map[string]int64, key string, value int64) {
+	suffix := "-"
+	keyTmp := key
+	for {
+		_, ok := dict[keyTmp]
+		if ok {
+			keyTmp += suffix
+		} else {
+			break
+		}
+	}
+	dict[keyTmp] = value
+}
+
+func RemoveSuffix(key string) string {
+	for {
+		if strings.HasSuffix(key, "-") {
+			key = strings.TrimSuffix(key, "-")
+		} else {
+			break
+		}
+	}
+	return key
 }
