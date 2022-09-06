@@ -42,6 +42,10 @@ func NewThemis(acc *account.Account, rpcAddrs []string) *Themis {
 	return ch
 }
 
+func (t *Themis) GetSDK() *themisSDK.Chain {
+	return t.sdk
+}
+
 func (t *Themis) SetAccount(acc *account.Account) {
 	t.account = acc
 	t.sdk.Native.SetDefaultAccount(acc)

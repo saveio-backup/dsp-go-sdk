@@ -39,6 +39,10 @@ func NewEthereum(acc *account.Account, rpcAddrs []string) *Ethereum {
 	return ch
 }
 
+func (e Ethereum) GetSDK() *themisSDK.Chain {
+	return e.sdk
+}
+
 func (e Ethereum) SetAccount(acc *account.Account) {
 	e.account = acc
 	e.sdk.EVM.SetDefaultAccount(acc)
@@ -93,7 +97,8 @@ func (e Ethereum) PollForTxConfirmed(timeout time.Duration, txHashStr string) (u
 
 func (e Ethereum) WaitForGenerateBlock(timeout time.Duration, blockCount ...uint32) (bool, error) {
 	//TODO implement me
-	panic("implement me")
+	log.Errorf("WaitForGenerateBlock not implemented")
+	return true, nil
 }
 
 func (e Ethereum) WaitForTxConfirmed(blockHeight uint64) error {

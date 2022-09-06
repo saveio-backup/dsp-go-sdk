@@ -48,6 +48,10 @@ func (c *Chain) GetChainType() string {
 	}
 }
 
+func (c *Chain) GetSDK() *themisSDK.Chain {
+	return c.client.GetSDK()
+}
+
 func (c *Chain) SetAccount(acc *account.Account) {
 	c.client.SetAccount(acc)
 }

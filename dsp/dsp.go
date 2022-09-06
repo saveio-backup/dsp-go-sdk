@@ -64,7 +64,7 @@ func NewDsp(c *config.DspConfig, acc *account.Account, p2pActor *actor.PID, mode
 	}
 	if len(c.FsRepoRoot) > 0 {
 		var err error
-		d.Fs, err = fs.NewFs(d.Chain.SDK(),
+		d.Fs, err = fs.NewFs(d.Chain,
 			fs.RepoRoot(d.config.FsRepoRoot),
 			fs.FsType(d.config.FsType),
 			fs.ChunkSize(consts.CHUNK_SIZE),
