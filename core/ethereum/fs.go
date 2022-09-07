@@ -84,9 +84,9 @@ func (e Ethereum) ProveParamDes(buf []byte) (*fs.ProveParam, error) {
 	return arg, nil
 }
 
-func (e Ethereum) StoreFile(fileHashStr, blocksRoot string, blockNum, blockSizeInKB, proveLevel, expiredHeight, copyNum uint64, fileDesc []byte, privilege uint64, proveParam []byte, storageType, realFileSize uint64, primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo,url string) (string, uint32, error) {
+func (e Ethereum) StoreFile(fileHashStr, blocksRoot string, blockNum, blockSizeInKB, proveLevel, expiredHeight, copyNum uint64, fileDesc []byte, privilege uint64, proveParam []byte, storageType, realFileSize uint64, primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo, url string) (string, uint32, error) {
 	txHash, err := e.sdk.EVM.Fs.StoreFile(fileHashStr, blocksRoot, blockNum, blockSizeInKB, proveLevel,
-		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes, plotInfo,url)
+		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes, plotInfo, url)
 	if err != nil {
 		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
@@ -115,7 +115,11 @@ func (e Ethereum) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (s
 			info = nil
 		}
 		log.Debugf("evm delete file get fileinfo %v, err %v", info, err)
-		if info != nil && info.FileOwner.ToBase58() != e.WalletAddress() {
+		if info == nil {
+			return "", 0, nil
+		}
+		address := ethCom.BytesToAddress(info.FileOwner[:])
+		if info != nil && address.String() != e.WalletAddress() {
 			return "", 0, sdkErr.New(sdkErr.DELETE_FILE_ACCESS_DENIED,
 				"file %s can't be deleted, you are not the owner", fileHashStr)
 		}
