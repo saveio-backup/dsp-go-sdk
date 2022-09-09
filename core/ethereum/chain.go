@@ -1,7 +1,11 @@
 package ethereum
 
 import (
+	"encoding/hex"
+	"fmt"
 	ethCom "github.com/ethereum/go-ethereum/common"
+	"github.com/saveio/dsp-go-sdk/consts"
+	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/types/state"
 	themisSDK "github.com/saveio/themis-go-sdk"
 	sdkCom "github.com/saveio/themis-go-sdk/common"
@@ -57,8 +61,7 @@ func (e Ethereum) SetIsClient(isClient bool) {
 }
 
 func (e Ethereum) BlockConfirm() uint32 {
-	//TODO implement me
-	panic("implement me")
+	return e.blockConfirm
 }
 
 func (e Ethereum) SetBlockConfirm(blockConfirm uint32) {
@@ -90,25 +93,72 @@ func (e Ethereum) GetCurrentBlockHeight() (uint32, error) {
 }
 
 func (e Ethereum) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
-	//TODO implement me
-	log.Errorf("PollForTxConfirmed not implemented")
-	return 1, nil
+	reverseTxHash, err := hex.DecodeString(txHashStr)
+	if err != nil {
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	txHash := chainCom.ToArrayReverse(reverseTxHash)
+	height, err := e.sdk.PollForTxConfirmedHeight(timeout, txHash)
+	if err != nil {
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return height, nil
 }
 
 func (e Ethereum) WaitForGenerateBlock(timeout time.Duration, blockCount ...uint32) (bool, error) {
-	//TODO implement me
-	log.Errorf("WaitForGenerateBlock not implemented")
-	return true, nil
+	if len(blockCount) == 0 {
+		if e.blockConfirm != 0 {
+			blockCount = make([]uint32, 0)
+			blockCount = append(blockCount, e.blockConfirm)
+		} else {
+			return true, nil
+		}
+	} else {
+		if blockCount[0] == 0 {
+			if e.blockConfirm != 0 {
+				blockCount[0] = e.blockConfirm
+			} else {
+				return true, nil
+			}
+		}
+	}
+	confirmed, err := e.sdk.WaitForGenerateBlock(timeout, blockCount...)
+	if err != nil {
+		return false, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return confirmed, nil
 }
 
 func (e Ethereum) WaitForTxConfirmed(blockHeight uint64) error {
-	log.Errorf("WaitForTxConfirmed not implemented")
+	currentBlockHeight, err := e.GetCurrentBlockHeight()
+	log.Debugf("wait for tx confirmed height: %d, now: %d", blockHeight, currentBlockHeight)
+	if err != nil {
+		log.Errorf("get block height err %s", err)
+		return err
+	}
+	if blockHeight <= uint64(currentBlockHeight) {
+		return nil
+	}
+
+	timeout := consts.WAIT_FOR_GENERATEBLOCK_TIMEOUT * uint32(blockHeight-uint64(currentBlockHeight))
+	if timeout > consts.DOWNLOAD_FILE_TIMEOUT {
+		timeout = consts.DOWNLOAD_FILE_TIMEOUT
+	}
+	waitSuccess, err := e.WaitForGenerateBlock(time.Duration(timeout)*time.Second,
+		uint32(blockHeight-uint64(currentBlockHeight)))
+	if err != nil || !waitSuccess {
+		log.Errorf("get block height err %s %d %d", err, currentBlockHeight, blockHeight)
+		return fmt.Errorf("get block height err %d %d", currentBlockHeight, blockHeight)
+	}
 	return nil
 }
 
 func (e Ethereum) GetBlockHeightByTxHash(txHash string) (uint32, error) {
-	log.Errorf("GetBlockHeightByTxHash not implemented")
-	return 0, nil
+	height, err := e.sdk.GetBlockHeightByTxHash(txHash)
+	if err != nil {
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return height, nil
 }
 
 func (e Ethereum) BalanceOf(addr chainCom.Address) (uint64, error) {
@@ -125,64 +175,99 @@ func (e Ethereum) GetChainVersion() (string, error) {
 }
 
 func (e Ethereum) GetBlockHash(height uint32) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetBlockHash(height)
+	if err != nil {
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
 
 func (e Ethereum) GetBlockByHash(blockHash string) (*types.Block, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetBlockByHash(blockHash)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetBlockTxHashesByHeight(height uint32) (*sdkCom.BlockTxHashes, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetBlockTxHashesByHeight(height)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetBlockByHeight(height uint32) (*types.Block, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetBlockByHeight(height)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetTransaction(txHash string) (*types.Transaction, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetTransaction(txHash)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEvent, error) {
-	//TODO implement me
-	log.Errorf("GetSmartContractEvent not implemented")
-	return nil, nil
+	val, err := e.sdk.GetSmartContractEvent(txHash)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetSmartContract(contractAddress string) (*sdkCom.SmartContract, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetSmartContract(contractAddress)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetStorage(contractAddress string, key []byte) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetStorage(contractAddress, key)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetMerkleProof(txHash string) (*sdkCom.MerkleProof, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetMerkleProof(txHash)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetGasPrice() (uint64, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetGasPrice()
+	if err != nil {
+		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetMemPoolTxCount() (*sdkCom.MemPoolTxCount, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetMemPoolTxCount()
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetMemPoolTxState(txHash string) (*sdkCom.MemPoolTxState, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.GetMemPoolTxState(txHash)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetSmartContractEventByEventId(contractAddress string, address string, eventId uint32) ([]*sdkCom.SmartContactEvent, error) {
@@ -198,26 +283,41 @@ func (e Ethereum) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartCont
 }
 
 func (e Ethereum) Transfer(gasPrice, gasLimit uint64, from *account.Account, to chainCom.Address, amount uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.Native.Usdt.Transfer(gasPrice, gasLimit, from, to, amount)
+	if err != nil {
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
 
 func (e Ethereum) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account.Account, version byte, contractAddress chainCom.Address, method string, params []interface{}) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.InvokeNativeContract(gasPrice, gasLimit, signer, version, contractAddress, method, params)
+	if err != nil {
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
 
 func (e Ethereum) PreExecInvokeNativeContract(contractAddress chainCom.Address, version byte, method string, params []interface{}) (*sdkCom.PreExecResult, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.PreExecInvokeNativeContract(contractAddress, version, method, params)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) GetChannelInfo(channelID uint64, participant1, participant2 chainCom.Address) (*micropayment.ChannelInfo, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.Native.Channel.GetChannelInfo(channelID, participant1, participant2)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
 }
 
 func (e Ethereum) FastTransfer(paymentId uint64, from, to chainCom.Address, amount uint64) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	val, err := e.sdk.Native.Channel.FastTransfer(paymentId, from, to, amount)
+	if err != nil {
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
