@@ -136,15 +136,8 @@ func (e Ethereum) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (s
 		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
 	log.Debugf("delete file txHash %s", txHashStr)
-	txHeight, err := e.PollForTxConfirmed(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, txHashStr)
-	if err != nil || txHeight == 0 {
-		return "", 0, sdkErr.New(sdkErr.CHAIN_ERROR, "wait for tx confirmed failed")
-	}
-	log.Debugf("delete file tx height %d, err %v", txHeight, err)
-	if err != nil {
-		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
-	}
-	return txHashStr, txHeight, nil
+	// TODO wangyu height
+	return txHashStr, 0, nil
 }
 
 func (e Ethereum) AddWhiteLists(fileHashStr string, whitelists []fs.Rule) (string, error) {

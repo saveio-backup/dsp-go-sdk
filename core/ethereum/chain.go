@@ -93,12 +93,8 @@ func (e Ethereum) GetCurrentBlockHeight() (uint32, error) {
 }
 
 func (e Ethereum) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
-	reverseTxHash, err := hex.DecodeString(txHashStr)
-	if err != nil {
-		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
-	}
-	txHash := chainCom.ToArrayReverse(reverseTxHash)
-	height, err := e.sdk.PollForTxConfirmedHeight(timeout, txHash)
+	hash := ethCom.HexToHash(txHashStr)
+	height, err := e.sdk.PollForTxConfirmedHeight(timeout, hash.Bytes())
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
