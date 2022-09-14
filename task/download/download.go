@@ -1219,11 +1219,10 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 				continue
 			}
 			dirPath = filepath.Join(dirPath, fileName)
-			fileName = ReplaceSpecialCharacters(fileName)
-			if fileName == max.DirPrefixFileName {
+			if strings.HasPrefix(fileName, max.DirPrefixFileName) {
 				continue
 			}
-			if fileName == max.DirSealingFileName {
+			if strings.HasPrefix(fileName, max.DirSealingFileName) {
 				continue
 			}
 			filePath := filepath.Join(fullDir, fileName)

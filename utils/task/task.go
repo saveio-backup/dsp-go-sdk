@@ -121,12 +121,14 @@ func GetDecryptedFilePath(filePath, fileName string) string {
 	if len(fileName) == 0 {
 		return path
 	}
-	orignalExt := ""
 	origExtIndex := strings.LastIndex(fileName, ".")
 	if origExtIndex == -1 {
 		return path
 	}
-	orignalExt = fileName[origExtIndex:]
+	orignalExt := ""
+	if origExtIndex > 0 {
+		orignalExt = fileName[origExtIndex:]
+	}
 	newPath := path
 	for count := 1; count < 1000; count++ {
 		exist := chainCom.FileExisted(newPath + orignalExt)
