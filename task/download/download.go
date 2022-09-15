@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1090,31 +1091,22 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 			}
 
 			// encrypt file can generate tage
-			if isDir && !isFileEncrypted {
-				// dir don't put tag temporary TODO @wangyu
+			if this.Mgr.IsClient() && !isDir {
+				err = this.Mgr.Fs().PutBlockForFileStore(this.GetFilePath(), getBlock, uint64(value.Offset))
+				log.Debugf("put block for store err %v", err)
+			} else {
 				err = this.Mgr.Fs().PutBlock(getBlock)
 				if err != nil {
 					log.Errorf("put block err: %s", err)
 					return err
 				}
-			} else {
-				if this.Mgr.IsClient() {
-					err = this.Mgr.Fs().PutBlockForFileStore(this.GetFilePath(), getBlock, uint64(value.Offset))
-					log.Debugf("put block for store err %v", err)
-				} else {
-					err = this.Mgr.Fs().PutBlock(getBlock)
-					if err != nil {
-						log.Errorf("put block err: %s", err)
-						return err
-					}
-					log.Debugf("put block only %s value.index %d, value.tag:%d", blockCid, value.Index, len(value.Tag))
-					err = this.Mgr.Fs().PutTag(blockCid, this.GetFileHash(), value.Index, value.Tag)
-				}
-				log.Debugf("put block for file %s block: %s, offset:%d", this.GetFilePath(), blockCid, value.Offset)
-				if err != nil {
-					log.Errorf("put block err %s", err)
-					return err
-				}
+				log.Debugf("put block only %s value.index %d, value.tag:%d", blockCid, value.Index, len(value.Tag))
+				err = this.Mgr.Fs().PutTag(blockCid, this.GetFileHash(), value.Index, value.Tag)
+			}
+			log.Debugf("put block for file %s block: %s, offset:%d", this.GetFilePath(), blockCid, value.Offset)
+			if err != nil {
+				log.Errorf("put block err %s", err)
+				return err
 			}
 
 			links := make([]string, 0, len(dagLinks))
@@ -1213,7 +1205,7 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 					break
 				}
 			}
-			this.travelDagLinks(dirMap, rootCid, fullPath, cids[rootCid])
+			this.travelDagLinks(dirMap, rootCid, fullPath, (cids[rootCid])*consts.BLOCKS_OFFSET_BASE)
 		}
 		for fullPath, cids := range dirMap {
 			dirPath, fileName, isFile := SplitFileNameFromPath(fullPath)
@@ -1226,11 +1218,11 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 			if !isFile {
 				continue
 			}
-			fileName = ReplaceSpecialCharacters(fileName)
-			if fileName == max.DirPrefixFileName {
+			dirPath = filepath.Join(dirPath, fileName)
+			if strings.HasPrefix(fileName, max.DirPrefixFileName) {
 				continue
 			}
-			if fileName == max.DirSealingFileName {
+			if strings.HasPrefix(fileName, max.DirSealingFileName) {
 				continue
 			}
 			filePath := filepath.Join(fullDir, fileName)
@@ -1256,6 +1248,7 @@ func (this *DownloadTask) writeBlockToDir(dirMap map[string]map[string]int64) er
 				return err
 			}
 			for _, v := range orderCid {
+				v.Key = RemoveSuffix(v.Key)
 				hasBlock, err := this.Mgr.Fs().HasBlock(v.Key)
 				if err != nil {
 					log.Errorf("has block err: %s", err)
@@ -1374,30 +1367,33 @@ func (this *DownloadTask) travelDagLinks(dagInfo map[string]map[string]int64, ci
 		return offset
 	}
 	for _, v := range links {
+		offset += 1 * consts.BLOCKS_OFFSET_BASE
 		// is file if link's name is empty
 		if v.Name == "" {
 			subDirMap, exist := dagInfo[fullPath]
 			if !exist {
 				subDirMap = make(map[string]int64)
 			}
-			offset += 1
-			subDirMap[v.Cid.String()] = offset
+			offsetTmp := offset
+			if strings.HasPrefix(v.Cid.String(), consts.PROTO_NODE_PREFIX) {
+				offsetTmp = offset / consts.BLOCKS_OFFSET_BASE
+			}
+			SetMapWithSuffix(subDirMap, v.Cid.String(), offsetTmp)
 			dagInfo[fullPath] = subDirMap
 		} else {
 			subDirMap, exist := dagInfo[v.Name]
 			if !exist {
 				subDirMap = make(map[string]int64)
 			}
-			offset += 1
 			subDirMap[v.Cid.String()] = offset
 			dagInfo[v.Name] = subDirMap
 		}
 	}
 	// the above links must be record first
 	for _, v := range links {
+		offset += 1 * consts.BLOCKS_OFFSET_BASE
 		if v.Name == "" {
 			// if file have more deep links
-			offset += 1
 			offset = this.travelDagLinks(dagInfo, v.Cid.String(), fullPath, offset)
 		}
 	}

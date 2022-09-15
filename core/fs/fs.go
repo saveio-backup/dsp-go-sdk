@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/saveio/dsp-go-sdk/core/chain"
 	"github.com/saveio/themis/crypto/keypair"
 	"os"
 	"strings"
@@ -20,7 +21,6 @@ import (
 
 	queue "github.com/saveio/dsp-go-sdk/types/queue"
 	osUtil "github.com/saveio/dsp-go-sdk/utils/os"
-	sdk "github.com/saveio/themis-go-sdk"
 	"github.com/saveio/themis/common/log"
 
 	"github.com/saveio/max/importer/helpers"
@@ -37,7 +37,7 @@ type Fs struct {
 }
 
 // NewFs. new fs instance
-func NewFs(chain *sdk.Chain, opts ...FsOption) (*Fs, error) {
+func NewFs(chain *chain.Chain, opts ...FsOption) (*Fs, error) {
 	initOpt := &InitFsOption{}
 	for _, opt := range opts {
 		opt.apply(initOpt)

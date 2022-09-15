@@ -238,6 +238,9 @@ func (this *TaskMgr) runGetProgressTicker() bool {
 			continue
 		}
 		p2pMsg := message.ReadMessage(resp)
+		if p2pMsg == nil {
+			continue
+		}
 		progress := p2pMsg.Payload.(*progress.Progress)
 		if progress.Hash != fileHash {
 			continue

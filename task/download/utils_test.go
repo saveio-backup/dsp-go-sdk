@@ -39,3 +39,31 @@ func TestSplitFileNameFromPathWithOS(t *testing.T) {
 		fmt.Println(v, path, name, file)
 	}
 }
+
+func TestRemoveSuffix(t *testing.T) {
+	s := []string{
+		"aaaa",
+		"aaaa-",
+		"aaaa--",
+		"aaaa---",
+		"aaaa----",
+	}
+	for _, v := range s {
+		fmt.Println(RemoveSuffix(v))
+	}
+}
+
+func TestSetMapWithSuffix(t *testing.T) {
+	dict := make(map[string]int64)
+	s := []string{
+		"aaaa",
+		"aaaa-",
+		"aaaa--",
+		"aaaa---",
+		"aaaa----",
+	}
+	for _, v := range s {
+		SetMapWithSuffix(dict, v, 1)
+	}
+	fmt.Println(dict)
+}

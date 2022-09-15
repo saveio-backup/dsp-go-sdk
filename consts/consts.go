@@ -38,6 +38,7 @@ const (
 	URL_LINK_VERSION              = "1.0"   // url link version
 	ENCRYPTED_FILE_EXTENSION      = ".ept"  // encrypted file extension
 	ENCRYPTED_A_FILE_EXTENSION    = ".epta" // encrypted asymmetrically file extension
+	BLOCKS_OFFSET_BASE            = 10000
 )
 
 // oni link
