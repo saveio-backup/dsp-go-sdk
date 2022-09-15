@@ -1011,7 +1011,6 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 	defer stateCheckTicker.Stop()
 	dagInfo := make(map[string]map[string]int64)
 	fileType := uPrefix.GetPrefixFileType(this.GetPrefix())
-	eType := uPrefix.GetPrefixEncryptType(this.GetPrefix())
 	isDir := fileType == uPrefix.FILETYPE_DIR
 	for {
 		select {
@@ -1050,24 +1049,13 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 				if v.Name == "" {
 					continue
 				}
-				fileName := v.Name
-				if isFileEncrypted {
-					if eType == uPrefix.ENCRYPTTYPE_AES {
-						path, name, _ := SplitFileNameFromPath(fileName)
-						fileName = uTask.GetFileFullPath(path, "", name, true)
-					}
-					if eType == uPrefix.ENCRYPTTYPE_ECIES {
-						path, name, _ := SplitFileNameFromPath(fileName)
-						fileName = uTask.GetFileFullPathA(path, "", name, true)
-					}
-				}
 				// record file path
-				subDirMap, exist := dagInfo[fileName]
+				subDirMap, exist := dagInfo[v.Name]
 				if !exist {
 					subDirMap = make(map[string]int64)
 				}
 				subDirMap[v.Cid.String()] = value.Offset
-				dagInfo[fileName] = subDirMap
+				dagInfo[v.Name] = subDirMap
 			}
 			err = this.SetDagInfo(dagInfo)
 			if err != nil {
