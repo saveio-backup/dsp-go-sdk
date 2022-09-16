@@ -220,6 +220,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 		return nil, err
 	}
 	if this.IsTaskPaused() {
+		log.Debugf("task %s is paused, return", taskId)
 		return nil, this.sendPauseMsg()
 	}
 	if this.IsTaskCancel() {
@@ -227,9 +228,11 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	}
 	tagsRoot, err := this.GetMerkleRootForTag(fileID, tags)
 	if err != nil {
+		log.Errorf("get merkle root for tag failed, %v", err)
 		return nil, err
 	}
 	if this.IsTaskPaused() {
+		log.Debugf("task %s is paused, return", taskId)
 		return nil, this.sendPauseMsg()
 	}
 	if this.IsTaskCancel() {
@@ -260,7 +263,6 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			return nil, sdkErr.NewWithError(sdkErr.PAY_FOR_STORE_FILE_FAILED, err)
 		}
 	}
-
 	if this.IsTaskPaused() {
 		return nil, this.sendPauseMsg()
 	}
