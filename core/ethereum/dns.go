@@ -28,7 +28,7 @@ func (e *Ethereum) RegisterHeader(header, desc string, ttl uint64) (string, erro
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
@@ -37,7 +37,7 @@ func (e *Ethereum) RegisterUrl(url string, rType uint64, name, desc string, ttl 
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
@@ -46,7 +46,7 @@ func (e *Ethereum) BindUrl(urlType uint64, url string, name, desc string, ttl ui
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
@@ -55,7 +55,7 @@ func (e *Ethereum) DeleteUrl(url string) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
@@ -80,7 +80,7 @@ func (e *Ethereum) DNSNodeReg(ip, port []byte, initPos uint64) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
@@ -89,7 +89,7 @@ func (e *Ethereum) UnregisterDNSNode() (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
@@ -98,7 +98,7 @@ func (e *Ethereum) QuitNode() (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
@@ -107,7 +107,7 @@ func (e *Ethereum) AddInitPos(addPosAmount uint64) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
@@ -116,7 +116,7 @@ func (e *Ethereum) ReduceInitPos(changePosAmount uint64) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash[:]))
+	tx := hex.EncodeToString(txHash[:])
 	return tx, nil
 }
 
