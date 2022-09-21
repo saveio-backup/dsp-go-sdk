@@ -1089,7 +1089,9 @@ func (this *DownloadTask) receiveBlockNoOrder(peerAddrWallet []string) error {
 					return err
 				}
 				log.Debugf("put block only %s value.index %d, value.tag:%d", blockCid, value.Index, len(value.Tag))
-				err = this.Mgr.Fs().PutTag(blockCid, this.GetFileHash(), value.Index, value.Tag)
+				if len(value.Tag) > 0 {
+					err = this.Mgr.Fs().PutTag(blockCid, this.GetFileHash(), value.Index, value.Tag)
+				}
 			}
 			log.Debugf("put block for file %s block: %s, offset:%d", this.GetFilePath(), blockCid, value.Offset)
 			if err != nil {

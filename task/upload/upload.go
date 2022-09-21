@@ -1005,12 +1005,12 @@ func (this *UploadTask) sendBlockFlightMsg(peerAddr string, blocks []*block.Bloc
 		this.GetFileHash(), blocks[0].Hash, blocks[len(blocks)-1].Hash,
 		blocks[0].Index, blocks[len(blocks)-1].Index, peerAddr, msg.MessageId)
 	sendingTime := time.Now().Unix()
-	log.Debugf("sending %s", sendLogMsg)
+	log.Debugf("sending log msg: %s", sendLogMsg)
 	if err := client.P2PSend(peerAddr, msg.MessageId, msg.ToProtoMsg()); err != nil {
 		log.Errorf("%v, err %s", sendLogMsg, err)
 		return err
 	}
-	log.Debugf("sending %s success\n, used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
+	log.Debugf("sending log msg %s success\n, used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
 	return nil
 }
 

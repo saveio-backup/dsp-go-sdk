@@ -111,7 +111,6 @@ func (this *UploadTask) SetUploadProgressDone(id, nodeAddr string) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 

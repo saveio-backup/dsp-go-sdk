@@ -536,7 +536,10 @@ func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext,
 	}
 	log.Debugf("receive fetch done msg, save task id:%s fileHash: %s, from %s done",
 		taskId, fileMsg.Hash, peerWalletAddr)
-	uploadTask.SetUploadProgressDone(taskId, peerWalletAddr)
+	err := uploadTask.SetUploadProgressDone(taskId, peerWalletAddr)
+	if err != nil {
+		log.Errorf("set upload progress done failed", err)
+	}
 }
 
 func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext,
