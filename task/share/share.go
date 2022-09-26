@@ -1,6 +1,7 @@
 package share
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/saveio/dsp-go-sdk/actor/client"
@@ -23,7 +24,13 @@ func (this *ShareTask) ShareBlock(req []*types.GetBlockReq) {
 	taskId := ""
 	reqWalletAddr := ""
 	reqAsset := int32(0)
-	paymentId := this.Mgr.Channel().NewPaymentId()
+	// TODO wangyu how handle channel is nil condition
+	var paymentId int32
+	if this.Mgr.Channel() != nil {
+		paymentId = this.Mgr.Channel().NewPaymentId()
+	} else {
+		paymentId = rand.Int31()
+	}
 	var shareErr *sdkErr.Error
 
 	for _, blockmsg := range req {

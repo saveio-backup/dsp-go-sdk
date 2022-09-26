@@ -47,9 +47,10 @@ func (this *DownloadTask) Start(opt *types.DownloadOption) error {
 		log.Errorf("taskId %s no filehash for download", this.GetId())
 		return sdkErr.New(sdkErr.DOWNLOAD_FILEHASH_NOT_FOUND, "no filehash for download")
 	}
-	if !this.Mgr.DNS().HasDNS() {
-		return sdkErr.New(sdkErr.NO_CONNECTED_DNS, "no online dns node")
-	}
+	// TODO wangyu
+	//if !this.Mgr.DNS().HasDNS() {
+	//	return sdkErr.New(sdkErr.NO_CONNECTED_DNS, "no online dns node")
+	//}
 	log.Debugf("download file dns node %s, url %s, total block %v", this.Mgr.DNS().CurrentDNSWallet(), opt.Url, opt.BlockNum)
 
 	if opt.MaxPeerCnt > consts.MAX_DOWNLOAD_PEERS_NUM {
@@ -72,7 +73,6 @@ func (this *DownloadTask) Start(opt *types.DownloadOption) error {
 		base.Walletaddr(this.GetCurrentWalletAddr())); err != nil {
 		return err
 	}
-
 	this.EmitProgress(types.TaskDownloadFileStart)
 	if stop := this.IsTaskStop(); stop {
 		return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "download task %s is stop", this.GetId())
@@ -82,7 +82,6 @@ func (this *DownloadTask) Start(opt *types.DownloadOption) error {
 	if err != nil {
 		return err
 	}
-
 	if stop := this.IsTaskStop(); stop {
 		return sdkErr.New(sdkErr.DOWNLOAD_BLOCK_FAILED, "download task %s is stop", this.GetId())
 	}
@@ -208,15 +207,14 @@ func (this *DownloadTask) Cancel() error {
 func (this *DownloadTask) getPeersForDownload() ([]string, error) {
 	fileHashStr := this.GetFileHash()
 	addrs := this.Mgr.DNS().GetPeerFromTracker(fileHashStr)
-	log.Debugf("get addr from peer %v, hash %s %v", addrs, fileHashStr, this.Mgr.DNS().GetTrackerList())
+	log.Debugf("get addr from tracker peer %v, hash %s %v", addrs, fileHashStr, this.Mgr.DNS().GetTrackerList())
 	if len(addrs) > 0 {
 		return addrs, nil
 	}
-	log.Warnf("get 0 peer from tracker of file %s, tracker num %d",
-		fileHashStr, len(this.Mgr.DNS().GetTrackerList()))
+	log.Warnf("get 0 peer from tracker of file %s, tracker num %d", fileHashStr, len(this.Mgr.DNS().GetTrackerList()))
 	addrs = this.getFileProvedNode(fileHashStr)
 	if len(addrs) > 0 {
-		log.Debugf("get addr from peer %v, hash %s", addrs, fileHashStr)
+		log.Debugf("get addr from prove node peer %v, hash %s", addrs, fileHashStr)
 		return addrs, nil
 	}
 	return nil, sdkErr.New(sdkErr.NO_DOWNLOAD_SEED, "No peer for downloading the file %s", fileHashStr)
@@ -349,7 +347,7 @@ func (this *DownloadTask) getDownloadPeerPrices(addrs []string) (
 		return false
 	}
 	ret, err := client.P2PBroadcast(addrs, msg.ToProtoMsg(), msg.MessageId, reply)
-	log.Debugf("broadcast file download msg result %v err %s", ret, err)
+	log.Debugf("broadcast file download msg result %v err %v", ret, err)
 	if err != nil {
 		return nil, err
 	}
