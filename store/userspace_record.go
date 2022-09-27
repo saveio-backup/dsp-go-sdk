@@ -13,6 +13,7 @@ const (
 	UserspaceOperationNone UserspaceOperation = iota
 	UserspaceOperationAdd
 	UserspaceOperationRevoke
+	UserspaceOperationCash
 )
 
 type UserspaceTransferType uint

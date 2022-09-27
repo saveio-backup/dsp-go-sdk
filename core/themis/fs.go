@@ -483,6 +483,18 @@ func (t *Themis) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount
 	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
 	return tx, nil
 }
+func (t *Themis) CashUserSpace(walletAddr string) (string, error) {
+	address, err := chainCom.AddressFromBase58(walletAddr)
+	if err != nil {
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
+	}
+	txHash, err := t.sdk.Native.Fs.CashUserSpace(address)
+	if err != nil {
+		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
+	}
+	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	return tx, nil
+}
 
 func (t *Themis) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)

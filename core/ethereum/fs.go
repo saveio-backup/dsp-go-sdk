@@ -432,6 +432,14 @@ func (e Ethereum) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCoun
 	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
+func (e Ethereum) CashUserSpace(walletAddr string) (string, error) {
+	//address, err := chainCom.AddressFromBase58(walletAddr)
+	//if err != nil {
+	//	return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	//}
+
+	return "", nil
+}
 
 func (e Ethereum) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
 	address, err := chainCom.AddressFromBase58(walletAddr)
