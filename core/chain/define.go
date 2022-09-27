@@ -114,6 +114,7 @@ type Client interface {
 	CheckFilePrivilege(info *fs.FileInfo, fileHashStr, walletAddr string) bool
 	GetUserSpace(walletAddr string) (*fs.UserSpace, error)
 	UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error)
+	CashUserSpace(walletAddr string) (string, error)
 	GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error)
 	RegisterNode(addr string, volume, serviceTime uint64) (string, error)
 	NodeExit() (string, error)

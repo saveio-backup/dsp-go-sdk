@@ -43,7 +43,14 @@ func (this *Dsp) Address() chainCom.Address {
 	}
 	return acc.Address
 }
-
+// WalletAddress. get base58 address
+func (this *Dsp) StringToAddress(addrString string) chainCom.Address {
+	addr,err:=chainCom.AddressFromHexString(addrString)
+	if err != nil {
+		return chainCom.ADDRESS_EMPTY
+	}
+		return addr
+}
 // WalletAddress. get base58 address
 func (this *Dsp) WalletAddress() string {
 	if this == nil {
@@ -99,7 +106,10 @@ func (this *Dsp) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount
 	string, error) {
 	return this.Chain.UpdateUserSpace(walletAddr, size, sizeOpType, blockCount, countOpType)
 }
-
+func (this *Dsp) CashUserSpace(walletAddr string) (
+	string, error) {
+	return this.Chain.CashUserSpace(walletAddr)
+}
 func (this *Dsp) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (
 	*usdt.State, error) {
 	return this.Chain.GetUpdateUserSpaceCost(walletAddr, size, sizeOpType, blockCount, countOpType)

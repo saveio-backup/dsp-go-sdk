@@ -139,7 +139,9 @@ func (c *Chain) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
 func (c *Chain) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error) {
 	return c.client.UpdateUserSpace(walletAddr, size, sizeOpType, blockCount, countOpType)
 }
-
+func (c *Chain) CashUserSpace(walletAddr string) (string, error) {
+	return c.client.CashUserSpace(walletAddr)
+}
 func (c *Chain) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
 	return c.client.GetUpdateUserSpaceCost(walletAddr, size, sizeOpType, blockCount, countOpType)
 }
