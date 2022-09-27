@@ -47,10 +47,11 @@ func (this *DownloadTask) Start(opt *types.DownloadOption) error {
 		log.Errorf("taskId %s no filehash for download", this.GetId())
 		return sdkErr.New(sdkErr.DOWNLOAD_FILEHASH_NOT_FOUND, "no filehash for download")
 	}
-	// TODO wangyu
-	//if !this.Mgr.DNS().HasDNS() {
-	//	return sdkErr.New(sdkErr.NO_CONNECTED_DNS, "no online dns node")
-	//}
+	if this.Mgr.Config().Mode != consts.DspModeOp {
+		if !this.Mgr.DNS().HasDNS() {
+			return sdkErr.New(sdkErr.NO_CONNECTED_DNS, "no online dns node")
+		}
+	}
 	log.Debugf("download file dns node %s, url %s, total block %v", this.Mgr.DNS().CurrentDNSWallet(), opt.Url, opt.BlockNum)
 
 	if opt.MaxPeerCnt > consts.MAX_DOWNLOAD_PEERS_NUM {

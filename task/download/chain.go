@@ -78,8 +78,10 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 	if payInfo.WalletAddress == this.GetCurrentWalletAddr() {
 		return sdkErr.New(sdkErr.PAY_BLOCK_TO_SELF, "can't pay to self : %s", payInfo.WalletAddress)
 	}
-	if this.Mgr.DNS() == nil || !this.Mgr.DNS().HasDNS() {
-		return sdkErr.New(sdkErr.NO_CONNECTED_DNS, "no dns")
+	if this.Mgr.Config().Mode != consts.DspModeOp {
+		if this.Mgr.DNS() == nil || !this.Mgr.DNS().HasDNS() {
+			return sdkErr.New(sdkErr.NO_CONNECTED_DNS, "no dns")
+		}
 	}
 	amount := blockSize * payInfo.UnitPrice
 	// if blockSize%consts.CHUNK_SIZE != 0 {
@@ -103,6 +105,10 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 			amount); err != nil {
 			return err
 		}
+	}
+
+	if this.Mgr.Config().Mode == consts.DspModeOp {
+		return this.fastTransfer(taskId, payInfo, paymentId, amount)
 	}
 
 	if this.PayOnLayer1() && !this.Mgr.Config().EnableLayer2 {

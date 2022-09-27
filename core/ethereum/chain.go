@@ -312,9 +312,9 @@ func (e Ethereum) GetChannelInfo(channelID uint64, participant1, participant2 ch
 }
 
 func (e Ethereum) FastTransfer(paymentId uint64, from, to chainCom.Address, amount uint64) (string, error) {
-	val, err := e.sdk.Native.Channel.FastTransfer(paymentId, from, to, amount)
+	tx, err := e.sdk.EVM.ERC20.Transfer(ethCom.BytesToAddress(from[:]), ethCom.BytesToAddress(to[:]), amount)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+	return hex.EncodeToString(tx), nil
 }
