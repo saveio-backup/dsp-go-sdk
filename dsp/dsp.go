@@ -126,7 +126,7 @@ func (this *Dsp) Start() error {
 	this.state.Set(state.ModuleStateStarting)
 	if err := this.DNS.SetupTrackers(); err != nil {
 		this.state.Set(state.ModuleStateError)
-		log.Errorf("set up dns err %v", err)
+		log.Errorf("set up dns trackers err %v", err)
 	}
 
 	if this.Channel != nil {

@@ -90,10 +90,12 @@ func (e Ethereum) StoreFile(fileHashStr, blocksRoot string, blockNum, blockSizeI
 	if err != nil {
 		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
-	log.Debugf("store file txhash :%v, tx: %v", txHash, tx)
-	// TODO wangyu
-	return tx, 0, nil
+	tx := hex.EncodeToString(txHash)
+	height, err := e.sdk.EVM.Fs.Client.GetClient().GetBlockHeightByTxHash(tx)
+	if err != nil {
+		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return tx, height, nil
 }
 
 func (e Ethereum) DeleteFiles(files []string, gasLimit uint64) (string, error) {
@@ -131,8 +133,8 @@ func (e Ethereum) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (s
 		return "", 0, sdkErr.New(sdkErr.NO_FILE_NEED_DELETED, "no file to delete")
 	}
 	txHashStr, err := e.DeleteFiles(fileHashStrs, gasLimit)
-	log.Debugf("delete file tx %v, err %v", txHashStr, err)
 	if err != nil {
+		log.Error("delete files error ", err)
 		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
 	log.Debugf("delete file txHash %s", txHashStr)
@@ -145,7 +147,7 @@ func (e Ethereum) AddWhiteLists(fileHashStr string, whitelists []fs.Rule) (strin
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	_, err = e.PollForTxConfirmed(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, tx)
 	if err != nil {
 		return "", err
@@ -209,7 +211,7 @@ func (e Ethereum) WhiteListOp(fileHashStr string, op uint64, whiteList fs.WhiteL
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
+	return hex.EncodeToString(txHash), nil
 }
 
 func (e Ethereum) GetNodeInfoByWallet(walletAddr chainCom.Address) (*fs.FsNodeInfo, error) {
@@ -319,7 +321,7 @@ func (e Ethereum) CreateSector(sectorId uint64, proveLevel uint64, size uint64, 
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 
@@ -328,7 +330,7 @@ func (e Ethereum) DeleteSector(sectorId uint64) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 
@@ -427,7 +429,7 @@ func (e Ethereum) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCoun
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 func (e Ethereum) CashUserSpace(walletAddr string) (string, error) {
@@ -514,7 +516,7 @@ func (e Ethereum) UpdateNode(addr string, volume, serviceTime uint64) (string, e
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 

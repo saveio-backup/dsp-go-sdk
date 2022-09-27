@@ -536,7 +536,10 @@ func (this *Dsp) handleFileFetchDoneMsg(ctx *network.ComponentContext,
 	}
 	log.Debugf("receive fetch done msg, save task id:%s fileHash: %s, from %s done",
 		taskId, fileMsg.Hash, peerWalletAddr)
-	uploadTask.SetUploadProgressDone(taskId, peerWalletAddr)
+	err := uploadTask.SetUploadProgressDone(taskId, peerWalletAddr)
+	if err != nil {
+		log.Errorf("set upload progress done failed", err)
+	}
 }
 
 func (this *Dsp) handleFileFetchCancelMsg(ctx *network.ComponentContext,
@@ -624,10 +627,10 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 	replyErr := func(sessionId, fileHash string, errorCode uint32, errorMsg string, ctx *network.ComponentContext) {
 		replyMsg := message.NewFileMsgWithError(fileMsg.Hash, netcom.FILE_OP_DOWNLOAD_ACK, errorCode, errorMsg,
 			message.WithSessionId(sessionId),
-			message.WithWalletAddress(this.Chain.WalletAddress()),
+			message.WithWalletAddress(this.Chain.CurrentAccount().Address.ToBase58()),
 			message.WithUnitPrice(0),
 			message.WithAsset(0),
-			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
+			message.WithSign(this.Chain.CurrentAccount(), consts.DspModeThemis),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -688,11 +691,11 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 			message.WithSessionId(sessionId),
 			message.WithBlockHashes(this.TaskMgr.FileBlockHashes(downloadedId)),
 			message.WithTotalBlockCount(totalCount),
-			message.WithWalletAddress(this.Chain.WalletAddress()),
+			message.WithWalletAddress(this.Chain.CurrentAccount().Address.ToBase58()),
 			message.WithPrefix(prefix),
 			message.WithUnitPrice(consts.DOWNLOAD_BLOCK_PRICE),
 			message.WithAsset(fileMsg.PayInfo.Asset),
-			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
+			message.WithSign(this.Chain.CurrentAccount(), consts.DspModeThemis),
 			message.WithSyn(msg.MessageId),
 		)
 		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
@@ -743,11 +746,11 @@ func (this *Dsp) handleFileDownloadAskMsg(ctx *network.ComponentContext,
 		message.WithSessionId(sessionId),
 		message.WithBlockHashes(allBlockHashes),
 		message.WithTotalBlockCount(totalBlockCount),
-		message.WithWalletAddress(this.Chain.WalletAddress()),
+		message.WithWalletAddress(this.Chain.CurrentAccount().Address.ToBase58()),
 		message.WithPrefix(prefix),
 		message.WithUnitPrice(consts.DOWNLOAD_BLOCK_PRICE),
 		message.WithAsset(fileMsg.PayInfo.Asset),
-		message.WithSign(this.Chain.CurrentAccount(), this.Mode),
+		message.WithSign(this.Chain.CurrentAccount(), consts.DspModeThemis),
 		message.WithSyn(msg.MessageId),
 	)
 	if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {

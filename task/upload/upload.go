@@ -220,6 +220,7 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 		return nil, err
 	}
 	if this.IsTaskPaused() {
+		log.Debugf("task %s is paused, return", taskId)
 		return nil, this.sendPauseMsg()
 	}
 	if this.IsTaskCancel() {
@@ -227,9 +228,11 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 	}
 	tagsRoot, err := this.GetMerkleRootForTag(fileID, tags)
 	if err != nil {
+		log.Errorf("get merkle root for tag failed, %v", err)
 		return nil, err
 	}
 	if this.IsTaskPaused() {
+		log.Debugf("task %s is paused, return", taskId)
 		return nil, this.sendPauseMsg()
 	}
 	if this.IsTaskCancel() {
@@ -260,7 +263,6 @@ func (this *UploadTask) Start(newTask bool, taskId, filePath string, opt *fs.Upl
 			return nil, sdkErr.NewWithError(sdkErr.PAY_FOR_STORE_FILE_FAILED, err)
 		}
 	}
-
 	if this.IsTaskPaused() {
 		return nil, this.sendPauseMsg()
 	}
@@ -1003,12 +1005,12 @@ func (this *UploadTask) sendBlockFlightMsg(peerAddr string, blocks []*block.Bloc
 		this.GetFileHash(), blocks[0].Hash, blocks[len(blocks)-1].Hash,
 		blocks[0].Index, blocks[len(blocks)-1].Index, peerAddr, msg.MessageId)
 	sendingTime := time.Now().Unix()
-	log.Debugf("sending %s", sendLogMsg)
+	log.Debugf("sending log msg: %s", sendLogMsg)
 	if err := client.P2PSend(peerAddr, msg.MessageId, msg.ToProtoMsg()); err != nil {
 		log.Errorf("%v, err %s", sendLogMsg, err)
 		return err
 	}
-	log.Debugf("sending %s success\n, used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
+	log.Debugf("sending log msg %s success\n, used %ds", sendLogMsg, time.Now().Unix()-sendingTime)
 	return nil
 }
 

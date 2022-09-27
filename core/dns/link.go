@@ -30,9 +30,9 @@ func (d *DNS) RegisterFileUrl(url, link string) (string, error) {
 	if err != nil || height == 0 {
 		return "", sdkErr.New(sdkErr.CHAIN_ERROR, "tx confirm err %s", err)
 	}
-
-	d.chain.WaitForGenerateBlock(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, 1)
-
+	if d.chain.GetChainType() != consts.DspModeOp {
+		d.chain.WaitForGenerateBlock(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, 1)
+	}
 	return tx, nil
 }
 
