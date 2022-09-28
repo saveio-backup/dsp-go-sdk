@@ -70,7 +70,7 @@ func (this *UserspaceRecordDB) InsertUserspaceRecord(id, walletAddr string, size
 	switch sizeOp {
 	case UserspaceOperationAdd:
 		totalSize += size
-	case UserspaceOperationRevoke:
+	case UserspaceOperationRevoke, UserspaceOperationCash:
 		if totalSize >= size {
 			totalSize -= size
 		}
@@ -82,7 +82,7 @@ func (this *UserspaceRecordDB) InsertUserspaceRecord(id, walletAddr string, size
 			expiredAt = now
 		}
 		expiredAt += second
-	case UserspaceOperationRevoke:
+	case UserspaceOperationRevoke, UserspaceOperationCash:
 		if expiredAt >= second {
 			expiredAt -= second
 		} else {
