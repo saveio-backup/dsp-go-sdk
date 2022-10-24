@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	errFileInfoNotFound = errors.New("FsGetFileInfo getFsFileInfo error")
+	errFileInfoNotFound = errors.New("file not exist")
 )
 
 func (e Ethereum) GetFileInfo(fileHashStr string) (*fs.FileInfo, error) {
@@ -117,10 +117,10 @@ func (e Ethereum) DeleteUploadedFiles(fileHashStrs []string, gasLimit uint64) (s
 		if err != nil {
 			info = nil
 		}
-		log.Debugf("evm delete file get fileinfo %v, err %v", info, err)
 		if info == nil {
 			return "", 0, nil
 		}
+		log.Debugf("evm delete file get file hash %v, err %v", info.FileHash, err)
 		address := ethCom.BytesToAddress(info.FileOwner[:])
 		if info != nil && address.String() != e.WalletAddress() {
 			return "", 0, sdkErr.New(sdkErr.DELETE_FILE_ACCESS_DENIED,
