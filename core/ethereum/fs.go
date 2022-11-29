@@ -4,6 +4,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	ethCom "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/saveio/dsp-go-sdk/consts"
@@ -13,8 +16,6 @@ import (
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
 	"github.com/saveio/themis/smartcontract/service/native/usdt"
-	"strings"
-	"time"
 )
 
 var (
@@ -442,10 +443,17 @@ func (e Ethereum) CashUserSpace(walletAddr string) (string, error) {
 }
 
 func (e Ethereum) GetUpdateUserSpaceCost(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (*usdt.State, error) {
+
 	address, err := chainCom.AddressFromBase58(walletAddr)
 	if err != nil {
-		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+		ethAddr := ethCom.HexToAddress(walletAddr)
+		address, err = chainCom.AddressParseFromBytes(ethAddr.Bytes())
+		if err != nil {
+			return nil, err
+		}
 	}
+	log.Infof("wallet addr %s address %s", walletAddr, address)
+
 	if size == 0 {
 		sizeOpType = uint64(fs.UserSpaceNone)
 	}

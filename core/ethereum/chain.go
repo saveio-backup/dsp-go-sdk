@@ -3,6 +3,10 @@ package ethereum
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"math/rand"
+	"time"
+
 	ethCom "github.com/ethereum/go-ethereum/common"
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
@@ -14,8 +18,6 @@ import (
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/core/types"
 	"github.com/saveio/themis/smartcontract/service/native/micropayment"
-	"math/rand"
-	"time"
 )
 
 type Ethereum struct {
@@ -30,6 +32,7 @@ type Ethereum struct {
 func NewEthereum(acc *account.Account, rpcAddrs []string) *Ethereum {
 	sdkClient := themisSDK.NewChain()
 	sdkClient.NewEthClient().SetAddress(rpcAddrs)
+	sdkClient.GetEthClient().DialClient()
 	if acc != nil {
 		sdkClient.SetDefaultAccount(acc)
 	}
@@ -211,6 +214,14 @@ func (e Ethereum) GetTransaction(txHash string) (*types.Transaction, error) {
 	return val, nil
 }
 
+func (e Ethereum) GetRawTransaction(txHash string) ([]byte, error) {
+	val, err := e.sdk.GetRawTransaction(txHash)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	}
+	return val, nil
+}
+
 func (e Ethereum) GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEvent, error) {
 	val, err := e.sdk.GetSmartContractEvent(txHash)
 	if err != nil {
@@ -280,11 +291,17 @@ func (e Ethereum) GetSmartContractEventByBlock(height uint32) (*sdkCom.SmartCont
 }
 
 func (e Ethereum) Transfer(gasPrice, gasLimit uint64, from *account.Account, to chainCom.Address, amount uint64) (string, error) {
-	val, err := e.sdk.Native.Usdt.Transfer(gasPrice, gasLimit, from, to, amount)
+	tx, err := e.sdk.EVM.ERC20.Transfer(ethCom.BytesToAddress(from.EthAddress.Bytes()), ethCom.BytesToAddress(to[:]), big.NewInt(int64(amount)), nil)
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+	return hex.EncodeToString(tx), nil
+
+	// val, err := e.sdk.Native.Usdt.Transfer(gasPrice, gasLimit, from, to, amount)
+	// if err != nil {
+	// 	return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
+	// }
+	// return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
 
 func (e Ethereum) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account.Account, version byte, contractAddress chainCom.Address, method string, params []interface{}) (string, error) {
@@ -312,7 +329,7 @@ func (e Ethereum) GetChannelInfo(channelID uint64, participant1, participant2 ch
 }
 
 func (e Ethereum) FastTransfer(paymentId uint64, from, to chainCom.Address, amount uint64) (string, error) {
-	tx, err := e.sdk.EVM.ERC20.Transfer(ethCom.BytesToAddress(from[:]), ethCom.BytesToAddress(to[:]), amount)
+	tx, err := e.sdk.EVM.ERC20.Transfer(ethCom.BytesToAddress(from[:]), ethCom.BytesToAddress(to[:]), big.NewInt(int64(amount)), big.NewInt(int64(paymentId)).Bytes())
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}

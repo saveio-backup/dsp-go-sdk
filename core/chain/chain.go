@@ -1,10 +1,11 @@
 package chain
 
 import (
+	"time"
+
 	"github.com/saveio/dsp-go-sdk/consts"
 	ethereum "github.com/saveio/dsp-go-sdk/core/ethereum"
 	themis "github.com/saveio/dsp-go-sdk/core/themis"
-	"time"
 
 	"github.com/saveio/dsp-go-sdk/types/state"
 	themisSDK "github.com/saveio/themis-go-sdk"
@@ -134,6 +135,10 @@ func (c *Chain) GetBlockByHeight(height uint32) (*types.Block, error) {
 
 func (c *Chain) GetTransaction(txHash string) (*types.Transaction, error) {
 	return c.client.GetTransaction(txHash)
+}
+
+func (c *Chain) GetRawTransaction(txHash string) ([]byte, error) {
+	return c.client.GetRawTransaction(txHash)
 }
 
 func (c *Chain) GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEvent, error) {

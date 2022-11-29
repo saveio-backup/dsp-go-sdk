@@ -3,6 +3,9 @@ package chain
 import (
 	"encoding/hex"
 	"fmt"
+	"math/rand"
+	"time"
+
 	"github.com/saveio/dsp-go-sdk/consts"
 	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"github.com/saveio/dsp-go-sdk/types/state"
@@ -13,8 +16,6 @@ import (
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/themis/core/types"
 	"github.com/saveio/themis/smartcontract/service/native/micropayment"
-	"math/rand"
-	"time"
 )
 
 type Themis struct {
@@ -216,6 +217,14 @@ func (t *Themis) GetBlockByHeight(height uint32) (*types.Block, error) {
 
 func (t *Themis) GetTransaction(txHash string) (*types.Transaction, error) {
 	val, err := t.sdk.GetTransaction(txHash)
+	if err != nil {
+		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
+	}
+	return val, nil
+}
+
+func (t *Themis) GetRawTransaction(txHash string) ([]byte, error) {
+	val, err := t.sdk.GetRawTransaction(txHash)
 	if err != nil {
 		return nil, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}

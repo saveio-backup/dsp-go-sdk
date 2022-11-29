@@ -2,8 +2,12 @@ package dsp
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
+	"math/big"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	sdkCom "github.com/saveio/themis-go-sdk/common"
 
 	"github.com/saveio/dsp-go-sdk/actor/client"
 	"github.com/saveio/dsp-go-sdk/consts"
@@ -52,11 +56,43 @@ func (this *Dsp) Receive(ctx *network.ComponentContext, peerWalletAddr string) {
 	}
 }
 
+func (this *Dsp) getEvmPaymentInfo(txHash string) (uint64, int32, error) {
+	tx := &ethTypes.Transaction{}
+
+	rawTx, err := this.Chain.GetRawTransaction(txHash)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if err := tx.UnmarshalBinary(rawTx); err != nil {
+		return 0, 0, err
+
+	}
+	txPaymentId := big.NewInt(0).SetBytes(tx.Data())
+
+	return tx.Value().Uint64(), int32(txPaymentId.Int64()), nil
+}
+
 func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr string, msg *message.Message) {
 	paymentMsg := msg.Payload.(*payment.Payment)
 	log.Debugf("handle payment msg txHash %s %v", paymentMsg.TxHash, paymentMsg)
 
-	event, err := this.Chain.GetSmartContractEvent(paymentMsg.TxHash)
+	var event *sdkCom.SmartContactEvent
+	var err error
+	if this.Chain.GetChainType() == consts.DspModeOp {
+		var txAmount uint64
+		var txPaymentId int32
+		txAmount, txPaymentId, err = this.getEvmPaymentInfo(paymentMsg.TxHash)
+
+		log.Debugf("evm payment tx value %v payment id %v, err %s", txAmount, txPaymentId, err)
+		if err != nil || paymentMsg.PaymentId != txPaymentId || paymentMsg.Amount != txAmount {
+			err = fmt.Errorf("wrong payment transaction paymentId %v, amount %v", txPaymentId, txAmount)
+		}
+	} else {
+
+		event, err = this.Chain.GetSmartContractEvent(paymentMsg.TxHash)
+	}
+
 	if err != nil {
 		log.Errorf("handle payment msg, get smart contract event err %s for tx %s", err, paymentMsg.TxHash)
 		// TODO: reply err
@@ -71,7 +107,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		}
 		return
 	}
-	if event == nil || event.Notify == nil {
+	if (this.Chain.GetChainType() != consts.DspModeOp) && (event == nil || event.Notify == nil) {
 		log.Errorf("get event nil from tx %v", paymentMsg.TxHash)
 		// TODO: reply err
 		replyMsg := message.NewEmptyMsg(
@@ -86,39 +122,43 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		return
 	}
 
-	valid := false
-	for _, n := range event.Notify {
-		if n == nil || n.States == nil {
-			continue
+	if this.Chain.GetChainType() != consts.DspModeOp {
+
+		valid := false
+		for _, n := range event.Notify {
+			if n == nil || n.States == nil {
+				continue
+			}
+			s, ok := n.States.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			paymentId, ok := s["paymentId"].(float64)
+			if !ok {
+				log.Errorf("payment id convert err %T", s["paymentId"])
+				continue
+			}
+			log.Debugf("get payment id %v %T from event %v, paymentMsg.PaymentId %v",
+				s["paymentId"], s["paymentId"], paymentId, paymentMsg.PaymentId)
+			if int32(paymentId) == int32(paymentMsg.PaymentId) {
+				valid = true
+				break
+			}
 		}
-		s, ok := n.States.(map[string]interface{})
-		if !ok {
-			continue
+		if !valid {
+			// TODO: reply err
+			replyMsg := message.NewEmptyMsg(
+				message.WithSign(this.Chain.CurrentAccount(), this.Mode),
+				message.WithSyn(msg.MessageId),
+			)
+			if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
+				log.Errorf("reply payment error msg failed", err)
+			} else {
+				log.Debugf("reply payment error msg success")
+			}
+			return
+
 		}
-		paymentId, ok := s["paymentId"].(float64)
-		if !ok {
-			log.Errorf("payment id convert err %T", s["paymentId"])
-			continue
-		}
-		log.Debugf("get payment id %v %T from event %v, paymentMsg.PaymentId %v",
-			s["paymentId"], s["paymentId"], paymentId, paymentMsg.PaymentId)
-		if int32(paymentId) == int32(paymentMsg.PaymentId) {
-			valid = true
-			break
-		}
-	}
-	if !valid {
-		// TODO: reply err
-		replyMsg := message.NewEmptyMsg(
-			message.WithSign(this.Chain.CurrentAccount(), this.Mode),
-			message.WithSyn(msg.MessageId),
-		)
-		if err := client.P2PSend(peerWalletAddr, replyMsg.MessageId, replyMsg.ToProtoMsg()); err != nil {
-			log.Errorf("reply payment error msg failed", err)
-		} else {
-			log.Debugf("reply payment error msg success")
-		}
-		return
 	}
 
 	taskId, err := this.TaskMgr.GetTaskIdWithPaymentId(int32(paymentMsg.PaymentId))
@@ -177,7 +217,7 @@ func (this *Dsp) handlePaymentMsg(ctx *network.ComponentContext, peerWalletAddr 
 		}
 		return
 	}
-	log.Debugf("delete unpaid success taskId: %v, fileHash: %v, fileName: %v, owner: %v, sender: %v, amount: %v",
+	log.Debugf("handle payment msg delete unpaid success taskId: %v, fileHash: %v, fileName: %v, owner: %v, sender: %v, amount: %v",
 		taskId, fileHashStr, fileName, fileOwner, paymentMsg.Sender, uint64(paymentMsg.Amount))
 	this.TaskMgr.InsertShareRecord(taskId, fileHashStr, fileName, fileOwner,
 		paymentMsg.Sender, uint64(paymentMsg.Amount))

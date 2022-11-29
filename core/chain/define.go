@@ -1,6 +1,8 @@
 package chain
 
 import (
+	"time"
+
 	"github.com/saveio/dsp-go-sdk/types/state"
 	themisSDK "github.com/saveio/themis-go-sdk"
 	sdkCom "github.com/saveio/themis-go-sdk/common"
@@ -12,7 +14,6 @@ import (
 	fs "github.com/saveio/themis/smartcontract/service/native/savefs"
 	"github.com/saveio/themis/smartcontract/service/native/savefs/pdp"
 	"github.com/saveio/themis/smartcontract/service/native/usdt"
-	"time"
 )
 
 type Client interface {
@@ -39,6 +40,7 @@ type Client interface {
 	GetBlockTxHashesByHeight(height uint32) (*sdkCom.BlockTxHashes, error)
 	GetBlockByHeight(height uint32) (*types.Block, error)
 	GetTransaction(txHash string) (*types.Transaction, error)
+	GetRawTransaction(txHash string) ([]byte, error)
 	GetSmartContractEvent(txHash string) (*sdkCom.SmartContactEvent, error)
 	GetSmartContract(contractAddress string) (*sdkCom.SmartContract, error)
 	GetStorage(contractAddress string, key []byte) ([]byte, error)
