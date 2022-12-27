@@ -398,11 +398,12 @@ func (e Ethereum) CheckFilePrivilege(info *fs.FileInfo, fileHashStr, walletAddr 
 }
 
 func (e Ethereum) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
-	base58, err := chainCom.AddressFromBase58(walletAddr)
+	ethAddress := ethCom.HexToAddress(walletAddr)
+	ontAddress, err := chainCom.AddressParseFromBytes(ethAddress.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	space, err := e.sdk.EVM.Fs.GetUserSpace(base58)
+	space, err := e.sdk.EVM.Fs.GetUserSpace(ontAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +411,8 @@ func (e Ethereum) GetUserSpace(walletAddr string) (*fs.UserSpace, error) {
 }
 
 func (e Ethereum) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount, countOpType uint64) (string, error) {
-	address, err := chainCom.AddressFromBase58(walletAddr)
+	ethAddress := ethCom.HexToAddress(walletAddr)
+	ontAddress, err := chainCom.AddressParseFromBytes(ethAddress.Bytes())
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
@@ -420,7 +422,7 @@ func (e Ethereum) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCoun
 	if blockCount == 0 {
 		countOpType = uint64(fs.UserSpaceNone)
 	}
-	txHash, err := e.sdk.EVM.Fs.UpdateUserSpace(address, &fs.UserSpaceOperation{
+	txHash, err := e.sdk.EVM.Fs.UpdateUserSpace(ontAddress, &fs.UserSpaceOperation{
 		Type:  sizeOpType,
 		Value: size,
 	}, &fs.UserSpaceOperation{
