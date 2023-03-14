@@ -116,19 +116,19 @@ func (t *Themis) StoreFile(
 	blockNum, blockSizeInKB, proveLevel, expiredHeight, copyNum uint64,
 	fileDesc []byte, privilege uint64, proveParam []byte,
 	storageType, realFileSize uint64,
-	primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo,url string,
+	primaryNodes, candidateNodes []chainCom.Address, plotInfo *fs.PlotInfo, url string,
 ) (string, uint32, error) {
 	txHash, err := t.sdk.Native.Fs.StoreFile(fileHashStr, blocksRoot, blockNum, blockSizeInKB, proveLevel,
-		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes, plotInfo,url)
+		expiredHeight, copyNum, fileDesc, privilege, proveParam, storageType, realFileSize, primaryNodes, candidateNodes, plotInfo, url)
 	if err != nil {
 		return "", 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	log.Debugf("store file txhash :%v, tx: %v", txHash, tx)
 
 	txHeight, err := t.PollForTxConfirmed(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, tx)
 	if err != nil || txHeight == 0 {
-		log.Errorf("poll tx failed %s", err)
+		log.Errorf("poll tx %s failed %s", tx, err)
 		return "", 0, err
 	}
 	if t.blockConfirm > 0 {
@@ -139,7 +139,6 @@ func (t *Themis) StoreFile(
 			return "", 0, err
 		}
 	}
-
 	return tx, txHeight, nil
 }
 
@@ -148,7 +147,7 @@ func (t *Themis) DeleteFiles(files []string, gasLimit uint64) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 
@@ -200,7 +199,7 @@ func (t *Themis) AddWhiteLists(fileHashStr string, whitelists []fs.Rule) (string
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	_, err = t.PollForTxConfirmed(time.Duration(consts.TX_CONFIRM_TIMEOUT)*time.Second, tx)
 	if err != nil {
 		return "", err
@@ -264,7 +263,7 @@ func (t *Themis) WhiteListOp(fileHashStr string, op uint64, whiteList fs.WhiteLi
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(txHash)), nil
+	return hex.EncodeToString(txHash), nil
 }
 
 func (t *Themis) GetNodeInfoByWallet(walletAddr chainCom.Address) (*fs.FsNodeInfo, error) {
@@ -374,7 +373,7 @@ func (t *Themis) CreateSector(sectorId uint64, proveLevel uint64, size uint64, i
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 
@@ -383,7 +382,7 @@ func (t *Themis) DeleteSector(sectorId uint64) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 
@@ -480,7 +479,7 @@ func (t *Themis) UpdateUserSpace(walletAddr string, size, sizeOpType, blockCount
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 func (t *Themis) CashUserSpace(walletAddr string) (string, error) {
@@ -492,7 +491,7 @@ func (t *Themis) CashUserSpace(walletAddr string) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 

@@ -97,8 +97,7 @@ func (e Ethereum) GetCurrentBlockHeight() (uint32, error) {
 
 func (e Ethereum) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
 	hash := ethCom.HexToHash(txHashStr)
-	reverse := chainCom.ToArrayReverse(hash.Bytes())
-	height, err := e.sdk.PollForTxConfirmedHeight(timeout, reverse)
+	height, err := e.sdk.PollForTxConfirmedHeight(timeout, hash.Bytes())
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
@@ -179,7 +178,7 @@ func (e Ethereum) GetBlockHash(height uint32) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+	return hex.EncodeToString(val[:]), nil
 }
 
 func (e Ethereum) GetBlockByHash(blockHash string) (*types.Block, error) {
@@ -296,12 +295,6 @@ func (e Ethereum) Transfer(gasPrice, gasLimit uint64, from *account.Account, to 
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
 	return hex.EncodeToString(tx), nil
-
-	// val, err := e.sdk.Native.Usdt.Transfer(gasPrice, gasLimit, from, to, amount)
-	// if err != nil {
-	// 	return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
-	// }
-	// return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
 }
 
 func (e Ethereum) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account.Account, version byte, contractAddress chainCom.Address, method string, params []interface{}) (string, error) {
@@ -309,7 +302,7 @@ func (e Ethereum) InvokeNativeContract(gasPrice, gasLimit uint64, signer *accoun
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, e.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+	return hex.EncodeToString(val[:]), nil
 }
 
 func (e Ethereum) PreExecInvokeNativeContract(contractAddress chainCom.Address, version byte, method string, params []interface{}) (*sdkCom.PreExecResult, error) {

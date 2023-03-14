@@ -99,11 +99,10 @@ func (t *Themis) GetCurrentBlockHeight() (uint32, error) {
 }
 
 func (t *Themis) PollForTxConfirmed(timeout time.Duration, txHashStr string) (uint32, error) {
-	reverseTxHash, err := hex.DecodeString(txHashStr)
+	txHash, err := hex.DecodeString(txHashStr)
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	txHash := chainCom.ToArrayReverse(reverseTxHash)
 	height, err := t.sdk.PollForTxConfirmedHeight(timeout, txHash)
 	if err != nil {
 		return 0, sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
@@ -188,7 +187,7 @@ func (t *Themis) GetBlockHash(height uint32) (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+	return hex.EncodeToString(val[:]), nil
 }
 
 func (t *Themis) GetBlockByHash(blockHash string) (*types.Block, error) {
@@ -314,7 +313,7 @@ func (t *Themis) Transfer(gasPrice, gasLimit uint64, from *account.Account, to c
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+	return hex.EncodeToString(val[:]), nil
 }
 
 func (t *Themis) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account.Account, version byte, contractAddress chainCom.Address, method string, params []interface{}) (string, error) {
@@ -322,7 +321,7 @@ func (t *Themis) InvokeNativeContract(gasPrice, gasLimit uint64, signer *account
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+	return hex.EncodeToString(val[:]), nil
 }
 
 func (t *Themis) PreExecInvokeNativeContract(contractAddress chainCom.Address, version byte, method string, params []interface{}) (*sdkCom.PreExecResult, error) {
@@ -346,5 +345,5 @@ func (t *Themis) FastTransfer(paymentId uint64, from, to chainCom.Address, amoun
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	return hex.EncodeToString(chainCom.ToArrayReverse(val[:])), nil
+	return hex.EncodeToString(val[:]), nil
 }

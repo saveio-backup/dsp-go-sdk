@@ -15,7 +15,7 @@ func (t *Themis) RegisterNode(addr string, volume, serviceTime uint64) (string, 
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 
@@ -25,7 +25,7 @@ func (t *Themis) NodeExit() (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 
@@ -64,7 +64,7 @@ func (t *Themis) UpdateNode(addr string, volume, serviceTime uint64) (string, er
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
 
@@ -74,6 +74,6 @@ func (t *Themis) NodeWithdrawProfit() (string, error) {
 	if err != nil {
 		return "", sdkErr.NewWithError(sdkErr.CHAIN_ERROR, t.FormatError(err))
 	}
-	tx := hex.EncodeToString(chainCom.ToArrayReverse(txHash))
+	tx := hex.EncodeToString(txHash)
 	return tx, nil
 }
