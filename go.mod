@@ -10,10 +10,10 @@ require (
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/itchyny/base58-go v0.1.0
 	github.com/ontio/ontology-eventbus v0.9.1
-	github.com/saveio/carrier v0.0.0-20210802055929-7567cc29dfc9
-	github.com/saveio/max v0.0.0-20221129101302-27e288224dfc
-	github.com/saveio/pylons v0.0.0-20220209062224-f4c541f85b18
-	github.com/saveio/themis v1.0.175-0.20221129100116-4008d4b1ba7e
-	github.com/saveio/themis-go-sdk v0.0.0-20221129100912-6c2788e7f5ac
+	github.com/saveio/carrier v0.0.0-20230322093539-24eaadd546b5
+	github.com/saveio/max v0.0.0-20230324091118-889c76b11561
+	github.com/saveio/pylons v0.0.0-20230322094600-b5981ca8ed91
+	github.com/saveio/themis v1.0.175
+	github.com/saveio/themis-go-sdk v0.0.0-20230314033227-3033a22d3bcd
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )
