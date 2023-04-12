@@ -199,6 +199,11 @@ func (this *TaskMgr) DeleteDownloadedFile(taskId string) error {
 		log.Errorf("fs delete file: %s, path: %s, err: %s", fileHashStr, filePath, err)
 		return err
 	}
+	_, err = this.Chain().DeleteFiles([]string{fileHashStr}, 0)
+	if err != nil {
+		log.Errorf("delete file %s from chain err %s", fileHashStr, err)
+		return err
+	}
 	log.Debugf("delete local file success fileHash:%s, path:%s", fileHashStr, filePath)
 	return this.CleanDownloadTask(taskId)
 }
