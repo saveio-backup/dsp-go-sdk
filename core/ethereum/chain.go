@@ -43,6 +43,7 @@ func NewEthereum(acc *account.Account, rpcAddrs []string) *Ethereum {
 		s:       state.NewSyncState(),
 	}
 	ch.s.Set(state.ModuleStateActive)
+	sdkClient.NewVerifierService()
 	return ch
 }
 
