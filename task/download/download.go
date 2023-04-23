@@ -2,8 +2,6 @@ package download
 
 import (
 	"fmt"
-	dspOs "github.com/saveio/dsp-go-sdk/utils/os"
-	"github.com/saveio/max/max"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,6 +11,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	dspOs "github.com/saveio/dsp-go-sdk/utils/os"
+	"github.com/saveio/max/max"
 
 	blocks "github.com/saveio/max/Godeps/_workspace/src/gx/ipfs/Qmej7nf81hi2x2tvjRBF3mcp74sQyuDH4VMYDGd1YtXjb2/go-block-format"
 	"github.com/saveio/max/merkledag"
@@ -553,7 +554,11 @@ func (this *DownloadTask) downloadBlock(taskId, fileHash, walletAddr string, blo
 	if paymentId == 0 {
 		paymentId = this.Mgr.Channel().NewPaymentId()
 	}
-	if err := this.payForBlock(payInfo, uint64(totalBytes), paymentId, true); err != nil {
+	totalKB := totalBytes / 1024
+	if totalKB == 0 {
+		totalKB = 1
+	}
+	if err := this.payForBlock(payInfo, uint64(totalKB), paymentId, true); err != nil {
 		log.Errorf("pay for blocks err %s", err)
 		this.EmitProgress(types.TaskDownloadPayForBlocksFailed)
 		return nil, sdkErr.New(sdkErr.PAY_UNPAID_BLOCK_FAILED, err.Error())
