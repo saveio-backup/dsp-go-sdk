@@ -188,7 +188,7 @@ func (this *DownloadTask) payForBlock(payInfo *file.Payment, blockSize uint64, p
 
 func (this *DownloadTask) GetChannelBalance(walletAddr string) uint64 {
 	info, err := this.Mgr.Channel().GetChannelInfo(walletAddr)
-	if err != nil {
+	if err != nil || info == nil {
 		log.Errorf("get channel info err %s for wallet %s", err, walletAddr)
 	}
 	return info.Balance
