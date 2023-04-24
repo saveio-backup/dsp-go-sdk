@@ -2,6 +2,7 @@ package taskmgr
 
 import (
 	"bytes"
+	sdkErr "github.com/saveio/dsp-go-sdk/error"
 	"time"
 
 	"github.com/saveio/dsp-go-sdk/actor/client"
@@ -320,6 +321,7 @@ func (this *TaskMgr) removeFileService() {
 
 				taskId := this.GetDownloadedTaskId(hash, this.chain.WalletAddress())
 				log.Debugf("delete removed file %s %s", taskId, hash)
+				this.DeleteFileFromChain(taskId)
 				this.DeleteDownloadedFile(taskId)
 
 				dispatchTask := this.GetDispatchTaskByReferId(taskId)
@@ -335,6 +337,23 @@ func (this *TaskMgr) removeFileService() {
 			return
 		}
 	}
+}
+
+func (this *TaskMgr) DeleteFileFromChain(taskId string) error {
+	if len(taskId) == 0 {
+		return sdkErr.New(sdkErr.DELETE_FILE_FAILED, "delete taskId is empty")
+	}
+	tsk := this.GetDownloadTask(taskId)
+	if tsk == nil {
+		return sdkErr.New(sdkErr.DELETE_FILE_FAILED, "task %s is nil", taskId)
+	}
+	fileHashStr := tsk.GetFileHash()
+	_, err := this.Chain().DeleteFiles([]string{fileHashStr}, 0)
+	if err != nil {
+		log.Errorf("delete file %s from chain err %s", fileHashStr, err)
+		return err
+	}
+	return nil
 }
 
 // startCheckFileProved. check file has proved service
