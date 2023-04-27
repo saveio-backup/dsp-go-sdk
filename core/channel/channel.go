@@ -324,6 +324,7 @@ func (this *Channel) CloseChannel(targetAddress string) error {
 	if !success {
 		return sdkErr.New(sdkErr.CHANNEL_CLOSE_FAILED, "close channel done but no success")
 	}
+
 	return nil
 }
 
@@ -365,11 +366,12 @@ func (this *Channel) CanTransfer(to string, amount uint64) error {
 		secs = 1
 	}
 	for i := 0; i < secs; i++ {
-		_, err := ch_actor.CanTransfer(pylonsCom.Address(target), pylonsCom.TokenAmount(amount))
-		if err == nil {
-			return nil
-		} else {
-			log.Errorf("can't transfer to %s, err %s", to, err)
+		can, err := ch_actor.CanTransfer(pylonsCom.Address(target), pylonsCom.TokenAmount(amount))
+		if err != nil {
+			return sdkErr.NewWithError(sdkErr.CHANNEL_START_INSTANCE_ERROR, err)
+		}
+		if !can {
+			return sdkErr.New(sdkErr.CHANNEL_START_INSTANCE_ERROR, "can't transfer to %s with amount %d", to, amount)
 		}
 		<-time.After(interval)
 	}

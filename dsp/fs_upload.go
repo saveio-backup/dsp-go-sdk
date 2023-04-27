@@ -35,7 +35,7 @@ func (this *Dsp) UploadFile(newTask bool, taskId, filePath string, opt *fs.Uploa
 			this.TaskMgr.DeleteUploadTask(taskId)
 		}
 	}()
-	if newTask {
+	if newTask && taskId == "" {
 		// new task because of task id is empty, generate a new task
 		uploadTask, err := this.TaskMgr.NewUploadTask(taskId)
 		if err != nil {
