@@ -353,6 +353,15 @@ func (this *TaskMgr) DeleteFileFromChain(taskId string) error {
 		log.Errorf("delete file %s from chain err %s", fileHashStr, err)
 		return err
 	}
+	url := tsk.GetUrl()
+	if url == "" {
+		return nil
+	}
+	_, err = this.Chain().DeleteUrl(url)
+	if err != nil {
+		log.Errorf("delete url %s from chain err %s", url, err)
+		return err
+	}
 	return nil
 }
 
