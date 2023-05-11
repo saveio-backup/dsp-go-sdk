@@ -428,6 +428,14 @@ func (this *Fs) registerRemoveNotify() {
 	}
 }
 
+func (this *Fs) RemoveFileListPush(fileHash string) {
+	this.removeFileList.Push(fileHash)
+}
+
+func (this *Fs) GetLocalSectorFileList(sectorId uint64) ([]string, error) {
+	list, err := this.fs.GetLocalSectorFileList(sectorId)
+	return list, err
+}
 // SetFsFileBlockHashes. set file block hashes
 func (this *Fs) SetFsFileBlockHashes(fileHash string, blockHashes []string) error {
 	err := this.fs.SetFileBlockHashes(fileHash, blockHashes)

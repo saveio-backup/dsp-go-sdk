@@ -119,6 +119,7 @@ func (d *DNS) Discovery() {
 	d.onlineDNS = connetedDNS
 	log.Debugf("discovery online dns %v", d.onlineDNS)
 	if d.autoBootstrap || len(d.onlineDNS) == 0 {
+		log.Debugf("auto bootstrap dns %t %d", d.autoBootstrap, len(d.onlineDNS))
 		return
 	}
 	channels, err := d.channel.AllChannels()
@@ -127,6 +128,7 @@ func (d *DNS) Discovery() {
 		return
 	}
 	if channels == nil || len(channels.Channels) == 0 {
+		log.Debugf("no channel, skip bootstrap dns")
 		return
 	}
 	addr, _ := d.channel.GetLastUsedDNSWalletAddr()
