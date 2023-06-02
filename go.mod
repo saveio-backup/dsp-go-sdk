@@ -17,3 +17,9 @@ require (
 	github.com/saveio/themis-go-sdk v0.0.0-20230314033227-3033a22d3bcd
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )
+
+replace (
+	github.com/saveio/themis-go-sdk => ../themis-go-sdk
+	github.com/saveio/themis => ../themis
+	github.com/saveio/max => ../max
+)
